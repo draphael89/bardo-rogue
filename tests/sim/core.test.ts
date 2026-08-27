@@ -1,0 +1,139 @@
+import { describe, it, expect } from 'vitest'
+import { createWorld } from '@/sim/scenarios'
+import { stepWorld } from '@/sim/step'
+import { emptyInput } from '@/sim/input'
+import { hashWorld } from '@/sim/hash'
+import { makeBot } from '@/sim/bots'
+import { Metrics } from '@/sim/metrics'
+import { tuning } from '@/tuning'
+import { isPlayerInvulnerable } from '@/sim/combat'
+import { arcHits } from '@/sim/combat'
+
+function run(world: ReturnType<typeof createWorld>, ticks: number, bot = makeBot('idle'), metrics?: Metrics) {
+  for (let i = 0; i < ticks; i++) {
+    stepWorld(world, bot(world))
+    if (metrics) { metrics.consume(world, world.events) }
+    world.events.length = 0
+  }
+}
+
+describe('determinism', () => {
+  it('same seed + same bot => same hash', () => {
+    const a = createWorld(7, 'full'), b = createWorld(7, 'full')
+    run(a, 1800, makeBot('kite')); run(b, 1800, makeBot('kite'))
+    expect(hashWorld(a)).toBe(hashWorld(b))
+  })
+  it('different seed => different hash', () => {
+    const a = createWorld(1, 'full'), b = createWorld(2, 'full')
+    run(a, 600, makeBot('kite')); run(b, 600, makeBot('kite'))
+    expect(hashWorld(a)).not.toBe(hashWorld(b))
+  })
+})
+
+describe('dodge', () => {
+  it('has i-frames exactly in the tuned window and a cooldown', () => {
+    const w = createWorld(1, 'empty')
+    const d = tuning.player.dodge
+    stepWorld(w, { ...emptyInput(), dodge: true, moveX: 1 })
+    expect(w.player.state).toBe('dodge')
+    const invuln: number[] = []
+    for (let t = w.player.stateTick; w.player.state === 'dodge'; ) {
+      if (isPlayerInvulnerable(w)) invuln.push(w.player.stateTick)
+      stepWorld(w, emptyInput()); t = w.player.stateTick
+    }
+    expect(invuln[0]).toBe(d.iStart)
+    expect(invuln[invuln.length - 1]).toBe(d.iEnd)
+    expect(w.player.state).toBe('free')
+  })
+  it('travels roughly the tuned distance', () => {
+    const w = createWorld(1, 'empty')
+    const x0 = w.player.x
+    stepWorld(w, { ...emptyInput(), dodge: true, moveX: 1 })
+    while (w.player.state === 'dodge') stepWorld(w, emptyInput())
+    expect(w.player.x - x0).toBeGreaterThan(tuning.player.dodge.distance * 0.85)
+    expect(w.player.x - x0).toBeLessThan(tuning.player.dodge.distance * 1.05)
+  })
+  it('rolls through a bolt without taking damage', () => {
+    const w = createWorld(1, 'empty')
+    const p = w.player
+    w.fireProjectile(p.x + 30, p.y, Math.PI, 110, 3, 200)
+    stepWorld(w, { ...emptyInput(), dodge: true, moveX: 1 })
+    let hurt = false
+    for (let i = 0; i < 30; i++) { stepWorld(w, emptyInput()); if (w.events.some(e => e.type === 'playerHurt')) hurt = true; w.events.length = 0 }
+    expect(hurt).toBe(false)
+    expect(p.hp).toBe(tuning.player.hp)
+  })
+})
+
+describe('attack', () => {
+  it('chains three swings when buffered and resets after', () => {
+    const w = createWorld(1, 'empty')
+    const swings: number[] = []
+    for (let i = 0; i < 120; i++) {
+      stepWorld(w, { ...emptyInput(), attack: i % 6 === 0 })
+      for (const e of w.events) if (e.type === 'swing') swings.push(e.swing)
+      w.events.length = 0
+    }
+    expect(swings.slice(0, 3)).toEqual([0, 1, 2])
+    expect(swings[3]).toBe(0)
+  })
+  it('hits a dummy in front once per swing and applies hit-stop', () => {
+    const w = createWorld(1, 'dummy')
+    const dummy = w.enemies.find(e => e.active)!
+    const p = w.player
+    p.x = dummy.x - 14; p.y = dummy.y
+    let hits = 0, froze = false
+    for (let i = 0; i < 40; i++) {
+      stepWorld(w, { ...emptyInput(), attack: i === 0, aimX: 1, aimY: 0 })
+      hits += w.events.filter(e => e.type === 'hit').length
+      if (w.freeze > 0) froze = true
+      w.events.length = 0
+    }
+    expect(hits).toBe(1)
+    expect(froze).toBe(true)
+    expect(dummy.hp).toBe(9999 - tuning.player.attack.swings[0].damage)
+  })
+  it('arc test respects angle and radius', () => {
+    expect(arcHits(0, 0, 0, 24, 140, 20, 0, 5)).toBe(true)
+    expect(arcHits(0, 0, 0, 24, 140, -20, 0, 5)).toBe(false)
+    expect(arcHits(0, 0, 0, 24, 140, 40, 0, 5)).toBe(false)
+    expect(arcHits(0, 0, 0, 24, 140, 10, 10, 5)).toBe(true)
+  })
+})
+
+describe('enemies', () => {
+  it('brute telegraphs before it can hurt', () => {
+    const w = createWorld(3, 'brute-only')
+    const p = w.player
+    const b = w.enemies.find(e => e.active)!
+    p.x = b.x; p.y = b.y + 20
+    let windupTick = -1, attackTick = -1
+    for (let i = 0; i < 200 && (attackTick < 0 || w.tick - attackTick < 20); i++) {
+      stepWorld(w, emptyInput())
+      for (const e of w.events) {
+        if (e.type === 'enemyWindup' && windupTick < 0) windupTick = w.tick
+        if (e.type === 'enemyAttack' && attackTick < 0) attackTick = w.tick
+      }
+      w.events.length = 0
+    }
+    expect(windupTick).toBeGreaterThan(0)
+    expect(attackTick - windupTick).toBe(tuning.brute.windup)
+    expect(p.hp).toBeLessThan(tuning.player.hp)
+  })
+  it('idle player dies in wave 1 within 30s', () => {
+    const w = createWorld(5, 'wave1')
+    const m = new Metrics()
+    run(w, 60 * 30, makeBot('idle'), m)
+    expect(m.summary().deaths).toBe(1)
+  })
+  it('kite bot clears the full room on most seeds', () => {
+    let clears = 0
+    for (let seed = 1; seed <= 6; seed++) {
+      const w = createWorld(seed, 'full')
+      const m = new Metrics()
+      run(w, 60 * 180, makeBot('kite'), m)
+      if (m.summary().clearSeconds !== null) clears++
+    }
+    expect(clears).toBeGreaterThanOrEqual(3)
+  })
+})

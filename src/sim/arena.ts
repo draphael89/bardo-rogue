@@ -35,6 +35,7 @@ export interface Arena {
 export const ARENA_COLS = 26
 export const ARENA_ROWS = 15
 
+// rng here is World.visualRng: cosmetic only, and never mixed into the world hash.
 export function buildArena(rng: Rng): Arena {
   const cols = ARENA_COLS, rows = ARENA_ROWS
   const base = new Uint16Array(cols * rows)
@@ -71,7 +72,7 @@ export function buildArena(rng: Rng): Arena {
     base[idx(c, 1)] = T.colFace
   }
 
-  // authored floor: overwrite tiles after rng so the world hash stays put
+  // authored floor: overwrite the varied tiles under it
   const paint = (c: number, r: number, t: number) => {
     if (c <= 0 || r <= 1 || c >= cols - 1 || r >= rows - 1) return
     if (solid[idx(c, r)]) return

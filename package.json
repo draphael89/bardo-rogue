@@ -15,6 +15,7 @@
     "sim": "tsx tools/headless.ts",
     "shot": "tsx tools/shot.ts",
     "poses": "tsx tools/poses.ts",
+    "strip": "tsx tools/strip.ts",
     "record-bot": "tsx tools/record-bot.ts",
     "record-bots": "tsx tools/record-bot.ts --all"
   },

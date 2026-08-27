@@ -1,0 +1,176 @@
+[
+  {
+    "bolts": 0,
+    "enemies": [
+      {
+        "hp": 8,
+        "id": 1,
+        "kind": "brute",
+        "state": "chase",
+        "stateTick": 30,
+        "x": 329.2,
+        "y": 135.5
+      },
+      {
+        "hp": 8,
+        "id": 2,
+        "kind": "brute",
+        "state": "chase",
+        "stateTick": 30,
+        "x": 200.1,
+        "y": 88
+      }
+    ],
+    "freeze": 0,
+    "metrics": {
+      "boltsCut": 0,
+      "boltsFired": 0,
+      "clearSeconds": null,
+      "damageTaken": 0,
+      "deathSeconds": null,
+      "deaths": 0,
+      "dodges": 0,
+      "enemyAttacks": 0,
+      "hitsLanded": 0,
+      "kills": 0,
+      "seconds": 2,
+      "successfulDodges": 0,
+      "swings": 1,
+      "ticks": 120,
+      "wavesCleared": 0,
+      "whiffSwings": 1
+    },
+    "player": {
+      "hp": 5,
+      "iframes": 0,
+      "state": "free",
+      "stateTick": 95,
+      "x": 200.3,
+      "y": 177.6
+    },
+    "tick": 120,
+    "wave": {
+      "groupIndex": 1,
+      "index": 0,
+      "state": "active",
+      "timer": 0,
+      "total": 3
+    }
+  },
+  {
+    "bolts": 0,
+    "enemies": [
+      {
+        "hp": 8,
+        "id": 1,
+        "kind": "brute",
+        "state": "chase",
+        "stateTick": 90,
+        "x": 281.5,
+        "y": 140.3
+      },
+      {
+        "hp": 8,
+        "id": 2,
+        "kind": "brute",
+        "state": "windup",
+        "stateTick": 3,
+        "x": 179.6,
+        "y": 127.5
+      }
+    ],
+    "freeze": 0,
+    "metrics": {
+      "boltsCut": 0,
+      "boltsFired": 0,
+      "clearSeconds": null,
+      "damageTaken": 0,
+      "deathSeconds": null,
+      "deaths": 0,
+      "dodges": 1,
+      "enemyAttacks": 0,
+      "hitsLanded": 0,
+      "kills": 0,
+      "seconds": 3,
+      "successfulDodges": 0,
+      "swings": 1,
+      "ticks": 180,
+      "wavesCleared": 0,
+      "whiffSwings": 1
+    },
+    "player": {
+      "hp": 5,
+      "iframes": 0,
+      "state": "free",
+      "stateTick": 41,
+      "x": 166.4,
+      "y": 149.5
+    },
+    "tick": 180,
+    "wave": {
+      "groupIndex": 1,
+      "index": 0,
+      "state": "active",
+      "timer": 0,
+      "total": 3
+    }
+  },
+  {
+    "bolts": 0,
+    "enemies": [
+      {
+        "hp": 8,
+        "id": 1,
+        "kind": "brute",
+        "state": "chase",
+        "stateTick": 146,
+        "x": 236.8,
+        "y": 142.8
+      },
+      {
+        "hp": 8,
+        "id": 2,
+        "kind": "brute",
+        "state": "recover",
+        "stateTick": 28,
+        "x": 165.2,
+        "y": 138.3
+      }
+    ],
+    "freeze": 0,
+    "metrics": {
+      "boltsCut": 0,
+      "boltsFired": 0,
+      "clearSeconds": null,
+      "damageTaken": 1,
+      "deathSeconds": null,
+      "deaths": 0,
+      "dodges": 1,
+      "enemyAttacks": 1,
+      "hitsLanded": 0,
+      "kills": 0,
+      "seconds": 4,
+      "successfulDodges": 0,
+      "swings": 2,
+      "ticks": 240,
+      "wavesCleared": 0,
+      "whiffSwings": 2
+    },
+    "player": {
+      "hp": 4,
+      "iframes": 8,
+      "state": "free",
+      "stateTick": 31,
+      "x": 149.2,
+      "y": 150.3
+    },
+    "tick": 240,
+    "wave": {
+      "groupIndex": 1,
+      "index": 0,
+      "state": "active",
+      "timer": 0,
+      "total": 3
+    }
+  }
+]

@@ -1,14 +1,24 @@
+import { Point } from 'pixi.js'
 import { emptyInput, type InputFrame } from '@/sim/input'
 import type { World } from '@/sim/world'
 import type { RenderApp } from '@/render/app'
+
+// Gamepad buttons read as edges. Every index here must be sampled through edge() every tick or its padPrev
+// goes stale and it fires twice.
+const PAD_ATTACK = [2, 5, 7]      // X / RB / RT
+const PAD_DODGE = [0, 1, 4]       // A / B / LB
+const PAD_RESTART = [9]           // start
+const PAD_EDGE = new Set([...PAD_ATTACK, ...PAD_DODGE, ...PAD_RESTART])
 
 // Keyboard + mouse + gamepad -> one InputFrame per sim tick. Presses between ticks are latched so nothing is dropped.
 export class InputSystem {
   private down = new Set<string>()
   private pressed = new Set<string>()
   private mouseX = 0; private mouseY = 0
-  private mouseDown = false; private mousePressed = false
+  private mousePressed = false
   private padPrev: boolean[] = []
+  private cursorScreen = new Point()
+  private cursorWorld = new Point()
   override: InputFrame | null = null   // debug API can force a frame
   lastAim = { x: 1, y: 0 }
 
@@ -22,8 +32,7 @@ export class InputSystem {
     window.addEventListener('blur', () => this.down.clear())
     const c = ra.app.canvas
     c.addEventListener('mousemove', e => { this.mouseX = e.clientX; this.mouseY = e.clientY })
-    c.addEventListener('mousedown', e => { if (e.button === 0) { this.mouseDown = true; this.mousePressed = true } })
-    window.addEventListener('mouseup', e => { if (e.button === 0) this.mouseDown = false })
+    c.addEventListener('mousedown', e => { if (e.button === 0) this.mousePressed = true })
     c.addEventListener('contextmenu', e => e.preventDefault())
   }
 
@@ -34,18 +43,21 @@ export class InputSystem {
     let mx = (d.has('KeyD') || d.has('ArrowRight') ? 1 : 0) - (d.has('KeyA') || d.has('ArrowLeft') ? 1 : 0)
     let my = (d.has('KeyS') || d.has('ArrowDown') ? 1 : 0) - (d.has('KeyW') || d.has('ArrowUp') ? 1 : 0)
 
-    // mouse aim in world space
+    // mouse aim in world space. Canvas -> the 480x270 render target, then through the INVERSE of the live world
+    // container transform, so shake / punch-zoom / camera roll cannot split the ray you see from the ray the sim uses.
     const rect = this.ra.app.canvas.getBoundingClientRect()
     const vx = (this.mouseX - rect.left - this.ra.screen.x) / this.ra.scale
     const vy = (this.mouseY - rect.top - this.ra.screen.y) / this.ra.scale
-    const wx = vx - this.ra.arenaOffset.x, wy = vy - this.ra.arenaOffset.y
+    const cw = this.ra.world.toLocal(this.cursorScreen.set(vx, vy), undefined, this.cursorWorld)
+    const wx = cw.x, wy = cw.y
     const p = world.player
     let ax = wx - p.x, ay = wy - p.y
     let al = Math.hypot(ax, ay)
     let aimSoft = false
     if (al > 0.5) { ax /= al; ay /= al } else { ax = this.lastAim.x; ay = this.lastAim.y }
 
-    let attack = this.mouseDown || this.mousePressed || d.has('KeyJ') || d.has('KeyZ') || this.pressed.has('KeyJ') || this.pressed.has('KeyZ')
+    // attack is an edge, like dodge: one press = one attack intention, holding never re-triggers (no hold-to-repeat)
+    let attack = this.mousePressed || this.pressed.has('KeyJ') || this.pressed.has('KeyZ')
     let dodge = this.pressed.has('Space') || this.pressed.has('ShiftLeft') || this.pressed.has('KeyK') || this.pressed.has('KeyX')
     let restart = this.pressed.has('KeyR')
 
@@ -68,10 +80,12 @@ export class InputSystem {
       else if (!(this.mouseX || this.mouseY)) aimSoft = true
       const b = (i: number) => !!pad.buttons[i]?.pressed
       const edge = (i: number) => { const now = b(i); const was = this.padPrev[i] ?? false; this.padPrev[i] = now; return now && !was }
-      if (b(2) || b(5) || b(7)) attack = true
-      if (edge(0) || edge(1) || edge(4)) dodge = true
-      if (edge(9)) restart = true
-      for (let i = 0; i < 16; i++) if (i !== 0 && i !== 1 && i !== 4 && i !== 9) this.padPrev[i] = b(i)
+      // no short-circuit: every listed button must be sampled or padPrev goes stale and it double-fires next tick
+      const anyEdge = (ids: readonly number[]) => { let hit = false; for (const i of ids) if (edge(i)) hit = true; return hit }
+      if (anyEdge(PAD_ATTACK)) attack = true
+      if (anyEdge(PAD_DODGE)) dodge = true
+      if (anyEdge(PAD_RESTART)) restart = true
+      for (let i = 0; i < 16; i++) if (!PAD_EDGE.has(i)) this.padPrev[i] = b(i)
     }
 
     const ml = Math.hypot(mx, my)

@@ -1,0 +1,939 @@
+{
+  "hashBlindSpots": {
+    "baseline": 760607364,
+    "variants": {
+      "state": {
+        "hash": 760607364,
+        "same": true
+      },
+      "vx": {
+        "hash": 760607364,
+        "same": true
+      },
+      "aimAngle": {
+        "hash": 760607364,
+        "same": true
+      },
+      "swingAngle": {
+        "hash": 760607364,
+        "same": true
+      },
+      "attackBuffer": {
+        "hash": 760607364,
+        "same": true
+      },
+      "iframes": {
+        "hash": 760607364,
+        "same": true
+      },
+      "god": {
+        "hash": 760607364,
+        "same": true
+      },
+      "waveTimer": {
+        "hash": 760607364,
+        "same": true
+      }
+    }
+  },
+  "comboRetarget": [
+    {
+      "tick": 1,
+      "index": 0,
+      "angle": 0,
+      "requestedAngle": 0
+    },
+    {
+      "tick": 15,
+      "index": 1,
+      "angle": 0,
+      "requestedAngle": -1.5707963267948966
+    },
+    {
+      "tick": 29,
+      "index": 2,
+      "angle": 0,
+      "requestedAngle": -1.5707963267948966
+    }
+  ],
+  "postClearDamage": {
+    "clear": {
+      "tick": 0,
+      "hp": 1,
+      "state": "done",
+      "bolts": 1,
+      "events": [
+        {
+          "type": "waveClear",
+          "wave": 1
+        },
+        {
+          "type": "roomClear"
+        }
+      ]
+    },
+    "after": {
+      "tick": 2,
+      "hp": 0,
+      "state": "dead",
+      "wave": "done",
+      "door": true
+    }
+  },
+  "projectileCapacity": {
+    "requested": 200,
+    "admitted": 64,
+    "rejected": 136,
+    "pool": 64
+  },
+  "enemyOverflow": {
+    "active": 32,
+    "queue": 0,
+    "brutes": 0
+  },
+  "boltDodgeMetric": {
+    "hp": 5,
+    "activeBolts": 1,
+    "events": [],
+    "successes": 0
+  },
+  "duplicateDodgeMetric": {
+    "before": 5,
+    "after": 5,
+    "count": 2,
+    "events": [
+      {
+        "type": "dodged",
+        "x": 211.39506172839506,
+        "y": 184
+      },
+      {
+        "type": "dodged",
+        "x": 211.39506172839506,
+        "y": 184
+      }
+    ]
+  },
+  "overlapWall": {
+    "x": 20.101000000000003,
+    "solid": true
+  },
+  "botQuantization": [
+    {
+      "seed": 1,
+      "quantized": false,
+      "hash": 1200422323,
+      "wallSeconds": 40.63333333333231,
+      "ticks": 2438,
+      "seconds": 40.6,
+      "swings": 30,
+      "hitsLanded": 34,
+      "whiffSwings": 2,
+      "kills": 15,
+      "dodges": 17,
+      "successfulDodges": 1,
+      "boltsFired": 26,
+      "boltsCut": 2,
+      "enemyAttacks": 45,
+      "damageTaken": 4,
+      "deaths": 0,
+      "wavesCleared": 3,
+      "clearSeconds": 40.6,
+      "deathSeconds": null
+    },
+    {
+      "seed": 2,
+      "quantized": false,
+      "hash": 2515239217,
+      "wallSeconds": 43.333333333332156,
+      "ticks": 2600,
+      "seconds": 43.3,
+      "swings": 30,
+      "hitsLanded": 34,
+      "whiffSwings": 3,
+      "kills": 15,
+      "dodges": 22,
+      "successfulDodges": 0,
+      "boltsFired": 29,
+      "boltsCut": 3,
+      "enemyAttacks": 47,
+      "damageTaken": 4,
+      "deaths": 0,
+      "wavesCleared": 3,
+      "clearSeconds": 43.3,
+      "deathSeconds": null
+    },
+    {
+      "seed": 3,
+      "quantized": false,
+      "hash": 601209804,
+      "wallSeconds": 39.6166666666657,
+      "ticks": 2377,
+      "seconds": 39.6,
+      "swings": 29,
+      "hitsLanded": 34,
+      "whiffSwings": 0,
+      "kills": 15,
+      "dodges": 21,
+      "successfulDodges": 0,
+      "boltsFired": 28,
+      "boltsCut": 2,
+      "enemyAttacks": 43,
+      "damageTaken": 4,
+      "deaths": 0,
+      "wavesCleared": 3,
+      "clearSeconds": 39.6,
+      "deathSeconds": null
+    },
+    {
+      "seed": 4,
+      "quantized": false,
+      "hash": 4108067849,
+      "wallSeconds": 39.26666666666572,
+      "ticks": 2356,
+      "seconds": 39.3,
+      "swings": 29,
+      "hitsLanded": 34,
+      "whiffSwings": 2,
+      "kills": 15,
+      "dodges": 15,
+      "successfulDodges": 1,
+      "boltsFired": 24,
+      "boltsCut": 1,
+      "enemyAttacks": 39,
+      "damageTaken": 4,
+      "deaths": 0,
+      "wavesCleared": 3,
+      "clearSeconds": 39.3,
+      "deathSeconds": null
+    },
+    {
+      "seed": 5,
+      "quantized": false,
+      "hash": 2239448331,
+      "wallSeconds": 37.8666666666658,
+      "ticks": 2272,
+      "seconds": 37.9,
+      "swings": 27,
+      "hitsLanded": 34,
+      "whiffSwings": 0,
+      "kills": 15,
+      "dodges": 17,
+      "successfulDodges": 0,
+      "boltsFired": 24,
+      "boltsCut": 0,
+      "enemyAttacks": 40,
+      "damageTaken": 4,
+      "deaths": 0,
+      "wavesCleared": 3,
+      "clearSeconds": 37.9,
+      "deathSeconds": null
+    },
+    {
+      "seed": 6,
+      "quantized": false,
+      "hash": 3816291592,
+      "wallSeconds": 37.8166666666658,
+      "ticks": 2269,
+      "seconds": 37.8,
+      "swings": 28,
+      "hitsLanded": 34,
+      "whiffSwings": 1,
+      "kills": 15,
+      "dodges": 17,
+      "successfulDodges": 0,
+      "boltsFired": 25,
+      "boltsCut": 0,
+      "enemyAttacks": 41,
+      "damageTaken": 4,
+      "deaths": 0,
+      "wavesCleared": 3,
+      "clearSeconds": 37.8,
+      "deathSeconds": null
+    },
+    {
+      "seed": 7,
+      "quantized": false,
+      "hash": 2780056707,
+      "wallSeconds": 37.8166666666658,
+      "ticks": 2269,
+      "seconds": 37.8,
+      "swings": 27,
+      "hitsLanded": 34,
+      "whiffSwings": 0,
+      "kills": 15,
+      "dodges": 19,
+      "successfulDodges": 0,
+      "boltsFired": 25,
+      "boltsCut": 0,
+      "enemyAttacks": 41,
+      "damageTaken": 4,
+      "deaths": 0,
+      "wavesCleared": 3,
+      "clearSeconds": 37.8,
+      "deathSeconds": null
+    },
+    {
+      "seed": 8,
+      "quantized": false,
+      "hash": 3637752694,
+      "wallSeconds": 40.51666666666565,
+      "ticks": 2431,
+      "seconds": 40.5,
+      "swings": 33,
+      "hitsLanded": 34,
+      "whiffSwings": 5,
+      "kills": 15,
+      "dodges": 24,
+      "successfulDodges": 0,
+      "boltsFired": 28,
+      "boltsCut": 2,
+      "enemyAttacks": 48,
+      "damageTaken": 4,
+      "deaths": 0,
+      "wavesCleared": 3,
+      "clearSeconds": 40.5,
+      "deathSeconds": null
+    },
+    {
+      "seed": 1,
+      "quantized": true,
+      "hash": 3352101617,
+      "wallSeconds": 40.63333333333231,
+      "ticks": 2438,
+      "seconds": 40.6,
+      "swings": 30,
+      "hitsLanded": 34,
+      "whiffSwings": 2,
+      "kills": 15,
+      "dodges": 17,
+      "successfulDodges": 1,
+      "boltsFired": 26,
+      "boltsCut": 2,
+      "enemyAttacks": 45,
+      "damageTaken": 4,
+      "deaths": 0,
+      "wavesCleared": 3,
+      "clearSeconds": 40.6,
+      "deathSeconds": null
+    },
+    {
+      "seed": 2,
+      "quantized": true,
+      "hash": 2445593481,
+      "wallSeconds": 43.333333333332156,
+      "ticks": 2600,
+      "seconds": 43.3,
+      "swings": 30,
+      "hitsLanded": 34,
+      "whiffSwings": 3,
+      "kills": 15,
+      "dodges": 22,
+      "successfulDodges": 0,
+      "boltsFired": 29,
+      "boltsCut": 3,
+      "enemyAttacks": 47,
+      "damageTaken": 4,
+      "deaths": 0,
+      "wavesCleared": 3,
+      "clearSeconds": 43.3,
+      "deathSeconds": null
+    },
+    {
+      "seed": 3,
+      "quantized": true,
+      "hash": 1595200985,
+      "wallSeconds": 39.6166666666657,
+      "ticks": 2377,
+      "seconds": 39.6,
+      "swings": 29,
+      "hitsLanded": 34,
+      "whiffSwings": 0,
+      "kills": 15,
+      "dodges": 21,
+      "successfulDodges": 0,
+      "boltsFired": 28,
+      "boltsCut": 2,
+      "enemyAttacks": 43,
+      "damageTaken": 4,
+      "deaths": 0,
+      "wavesCleared": 3,
+      "clearSeconds": 39.6,
+      "deathSeconds": null
+    },
+    {
+      "seed": 4,
+      "quantized": true,
+      "hash": 3983621384,
+      "wallSeconds": 39.26666666666572,
+      "ticks": 2356,
+      "seconds": 39.3,
+      "swings": 29,
+      "hitsLanded": 34,
+      "whiffSwings": 2,
+      "kills": 15,
+      "dodges": 15,
+      "successfulDodges": 1,
+      "boltsFired": 24,
+      "boltsCut": 1,
+      "enemyAttacks": 39,
+      "damageTaken": 4,
+      "deaths": 0,
+      "wavesCleared": 3,
+      "clearSeconds": 39.3,
+      "deathSeconds": null
+    },
+    {
+      "seed": 5,
+      "quantized": true,
+      "hash": 843342051,
+      "wallSeconds": 37.8666666666658,
+      "ticks": 2272,
+      "seconds": 37.9,
+      "swings": 27,
+      "hitsLanded": 34,
+      "whiffSwings": 0,
+      "kills": 15,
+      "dodges": 17,
+      "successfulDodges": 0,
+      "boltsFired": 24,
+      "boltsCut": 0,
+      "enemyAttacks": 40,
+      "damageTaken": 4,
+      "deaths": 0,
+      "wavesCleared": 3,
+      "clearSeconds": 37.9,
+      "deathSeconds": null
+    },
+    {
+      "seed": 6,
+      "quantized": true,
+      "hash": 1485798827,
+      "wallSeconds": 37.8166666666658,
+      "ticks": 2269,
+      "seconds": 37.8,
+      "swings": 28,
+      "hitsLanded": 34,
+      "whiffSwings": 1,
+      "kills": 15,
+      "dodges": 17,
+      "successfulDodges": 0,
+      "boltsFired": 25,
+      "boltsCut": 0,
+      "enemyAttacks": 41,
+      "damageTaken": 4,
+      "deaths": 0,
+      "wavesCleared": 3,
+      "clearSeconds": 37.8,
+      "deathSeconds": null
+    },
+    {
+      "seed": 7,
+      "quantized": true,
+      "hash": 2748082564,
+      "wallSeconds": 37.8166666666658,
+      "ticks": 2269,
+      "seconds": 37.8,
+      "swings": 27,
+      "hitsLanded": 34,
+      "whiffSwings": 0,
+      "kills": 15,
+      "dodges": 19,
+      "successfulDodges": 0,
+      "boltsFired": 25,
+      "boltsCut": 0,
+      "enemyAttacks": 41,
+      "damageTaken": 4,
+      "deaths": 0,
+      "wavesCleared": 3,
+      "clearSeconds": 37.8,
+      "deathSeconds": null
+    },
+    {
+      "seed": 8,
+      "quantized": true,
+      "hash": 660321017,
+      "wallSeconds": 40.51666666666565,
+      "ticks": 2431,
+      "seconds": 40.5,
+      "swings": 33,
+      "hitsLanded": 34,
+      "whiffSwings": 5,
+      "kills": 15,
+      "dodges": 24,
+      "successfulDodges": 1,
+      "boltsFired": 28,
+      "boltsCut": 2,
+      "enemyAttacks": 48,
+      "damageTaken": 4,
+      "deaths": 0,
+      "wavesCleared": 3,
+      "clearSeconds": 40.5,
+      "deathSeconds": null
+    }
+  ],
+  "cancelBoundary": [
+    {
+      "tick": 1,
+      "state": "attack",
+      "stateTick": 0,
+      "attackBuffer": 0,
+      "dodgeBuffer": 0,
+      "events": [
+        {
+          "type": "swing",
+          "x": 208,
+          "y": 184,
+          "angle": 0,
+          "swing": 0,
+          "heavy": false
+        }
+      ]
+    },
+    {
+      "tick": 2,
+      "state": "attack",
+      "stateTick": 1,
+      "attackBuffer": 0,
+      "dodgeBuffer": 0,
+      "events": []
+    },
+    {
+      "tick": 3,
+      "state": "attack",
+      "stateTick": 2,
+      "attackBuffer": 0,
+      "dodgeBuffer": 0,
+      "events": []
+    },
+    {
+      "tick": 4,
+      "state": "attack",
+      "stateTick": 3,
+      "attackBuffer": 0,
+      "dodgeBuffer": 0,
+      "events": []
+    },
+    {
+      "tick": 5,
+      "state": "attack",
+      "stateTick": 4,
+      "attackBuffer": 0,
+      "dodgeBuffer": 0,
+      "events": []
+    },
+    {
+      "tick": 6,
+      "state": "attack",
+      "stateTick": 5,
+      "attackBuffer": 0,
+      "dodgeBuffer": 0,
+      "events": []
+    },
+    {
+      "tick": 7,
+      "state": "attack",
+      "stateTick": 6,
+      "attackBuffer": 0,
+      "dodgeBuffer": 0,
+      "events": []
+    },
+    {
+      "tick": 8,
+      "state": "attack",
+      "stateTick": 7,
+      "attackBuffer": 0,
+      "dodgeBuffer": 0,
+      "events": []
+    },
+    {
+      "tick": 9,
+      "state": "attack",
+      "stateTick": 8,
+      "attackBuffer": 0,
+      "dodgeBuffer": 0,
+      "events": []
+    },
+    {
+      "tick": 10,
+      "state": "attack",
+      "stateTick": 9,
+      "attackBuffer": 0,
+      "dodgeBuffer": 0,
+      "events": []
+    },
+    {
+      "tick": 11,
+      "state": "attack",
+      "stateTick": 10,
+      "attackBuffer": 0,
+      "dodgeBuffer": 0,
+      "events": []
+    },
+    {
+      "tick": 12,
+      "state": "attack",
+      "stateTick": 11,
+      "attackBuffer": 0,
+      "dodgeBuffer": 7,
+      "events": []
+    },
+    {
+      "tick": 13,
+      "state": "dodge",
+      "stateTick": 0,
+      "attackBuffer": 0,
+      "dodgeBuffer": 0,
+      "events": [
+        {
+          "type": "dodge",
+          "x": 218,
+          "y": 184,
+          "angle": 0
+        }
+      ]
+    },
+    {
+      "tick": 14,
+      "state": "dodge",
+      "stateTick": 1,
+      "attackBuffer": 0,
+      "dodgeBuffer": 0,
+      "events": []
+    },
+    {
+      "tick": 15,
+      "state": "dodge",
+      "stateTick": 2,
+      "attackBuffer": 0,
+      "dodgeBuffer": 0,
+      "events": []
+    },
+    {
+      "tick": 16,
+      "state": "dodge",
+      "stateTick": 3,
+      "attackBuffer": 0,
+      "dodgeBuffer": 0,
+      "events": []
+    },
+    {
+      "tick": 17,
+      "state": "dodge",
+      "stateTick": 4,
+      "attackBuffer": 0,
+      "dodgeBuffer": 0,
+      "events": []
+    },
+    {
+      "tick": 18,
+      "state": "dodge",
+      "stateTick": 5,
+      "attackBuffer": 0,
+      "dodgeBuffer": 0,
+      "events": []
+    },
+    {
+      "tick": 19,
+      "state": "dodge",
+      "stateTick": 6,
+      "attackBuffer": 0,
+      "dodgeBuffer": 0,
+      "events": []
+    },
+    {
+      "tick": 20,
+      "state": "dodge",
+      "stateTick": 7,
+      "attackBuffer": 0,
+      "dodgeBuffer": 0,
+      "events": []
+    },
+    {
+      "tick": 21,
+      "state": "dodge",
+      "stateTick": 8,
+      "attackBuffer": 0,
+      "dodgeBuffer": 0,
+      "events": []
+    },
+    {
+      "tick": 22,
+      "state": "dodge",
+      "stateTick": 9,
+      "attackBuffer": 0,
+      "dodgeBuffer": 0,
+      "events": []
+    },
+    {
+      "tick": 23,
+      "state": "dodge",
+      "stateTick": 10,
+      "attackBuffer": 0,
+      "dodgeBuffer": 0,
+      "events": []
+    },
+    {
+      "tick": 24,
+      "state": "dodge",
+      "stateTick": 11,
+      "attackBuffer": 0,
+      "dodgeBuffer": 0,
+      "events": []
+    },
+    {
+      "tick": 25,
+      "state": "dodge",
+      "stateTick": 12,
+      "attackBuffer": 0,
+      "dodgeBuffer": 0,
+      "events": []
+    },
+    {
+      "tick": 26,
+      "state": "dodge",
+      "stateTick": 13,
+      "attackBuffer": 0,
+      "dodgeBuffer": 0,
+      "events": []
+    },
+    {
+      "tick": 27,
+      "state": "dodge",
+      "stateTick": 14,
+      "attackBuffer": 0,
+      "dodgeBuffer": 0,
+      "events": []
+    },
+    {
+      "tick": 28,
+      "state": "dodge",
+      "stateTick": 15,
+      "attackBuffer": 0,
+      "dodgeBuffer": 0,
+      "events": []
+    },
+    {
+      "tick": 29,
+      "state": "dodge",
+      "stateTick": 16,
+      "attackBuffer": 0,
+      "dodgeBuffer": 0,
+      "events": []
+    },
+    {
+      "tick": 30,
+      "state": "dodge",
+      "stateTick": 17,
+      "attackBuffer": 0,
+      "dodgeBuffer": 0,
+      "events": []
+    },
+    {
+      "tick": 31,
+      "state": "free",
+      "stateTick": 0,
+      "attackBuffer": 0,
+      "dodgeBuffer": 0,
+      "events": [
+        {
+          "type": "dodgeEnd",
+          "x": 262,
+          "y": 184
+        }
+      ]
+    },
+    {
+      "tick": 32,
+      "state": "free",
+      "stateTick": 1,
+      "attackBuffer": 0,
+      "dodgeBuffer": 0,
+      "events": []
+    },
+    {
+      "tick": 33,
+      "state": "free",
+      "stateTick": 2,
+      "attackBuffer": 0,
+      "dodgeBuffer": 0,
+      "events": []
+    },
+    {
+      "tick": 34,
+      "state": "free",
+      "stateTick": 3,
+      "attackBuffer": 0,
+      "dodgeBuffer": 0,
+      "events": []
+    },
+    {
+      "tick": 35,
+      "state": "free",
+      "stateTick": 4,
+      "attackBuffer": 0,
+      "dodgeBuffer": 0,
+      "events": []
+    },
+    {
+      "tick": 36,
+      "state": "free",
+      "stateTick": 5,
+      "attackBuffer": 0,
+      "dodgeBuffer": 0,
+      "events": []
+    },
+    {
+      "tick": 37,
+      "state": "free",
+      "stateTick": 6,
+      "attackBuffer": 0,
+      "dodgeBuffer": 0,
+      "events": []
+    },
+    {
+      "tick": 38,
+      "state": "free",
+      "stateTick": 7,
+      "attackBuffer": 0,
+      "dodgeBuffer": 0,
+      "events": []
+    },
+    {
+      "tick": 39,
+      "state": "free",
+      "stateTick": 8,
+      "attackBuffer": 0,
+      "dodgeBuffer": 0,
+      "events": []
+    },
+    {
+      "tick": 40,
+      "state": "free",
+      "stateTick": 9,
+      "attackBuffer": 0,
+      "dodgeBuffer": 0,
+      "events": []
+    },
+    {
+      "tick": 41,
+      "state": "free",
+      "stateTick": 10,
+      "attackBuffer": 0,
+      "dodgeBuffer": 0,
+      "events": []
+    },
+    {
+      "tick": 42,
+      "state": "free",
+      "stateTick": 11,
+      "attackBuffer": 0,
+      "dodgeBuffer": 0,
+      "events": []
+    },
+    {
+      "tick": 43,
+      "state": "free",
+      "stateTick": 12,
+      "attackBuffer": 0,
+      "dodgeBuffer": 0,
+      "events": []
+    },
+    {
+      "tick": 44,
+      "state": "free",
+      "stateTick": 13,
+      "attackBuffer": 0,
+      "dodgeBuffer": 0,
+      "events": []
+    },
+    {
+      "tick": 45,
+      "state": "free",
+      "stateTick": 14,
+      "attackBuffer": 0,
+      "dodgeBuffer": 0,
+      "events": []
+    }
+  ],
+  "simStress": [
+    {
+      "enemies": 32,
+      "projectiles": 0,
+      "medianUs": 1.4170000000035543,
+      "p95Us": 1.5420000000005984,
+      "maxUs": 145.70800000001327
+    },
+    {
+      "enemies": 32,
+      "projectiles": 32,
+      "medianUs": 1.9160000000226773,
+      "p95Us": 2.332999999993035,
+      "maxUs": 212.58299999999508
+    },
+    {
+      "enemies": 32,
+      "projectiles": 64,
+      "medianUs": 2.375000000000682,
+      "p95Us": 2.666000000004942,
+      "maxUs": 340.6659999999988
+    }
+  ],
+  "tuning": {
+    "swings": [
+      {
+        "startup": 6,
+        "active": 4,
+        "recovery": 14,
+        "damage": 2,
+        "radius": 24,
+        "arcDeg": 140,
+        "lunge": 10,
+        "hitstop": 3,
+        "knockback": 90,
+        "chainFrom": 4,
+        "dodgeCancelFrom": 2,
+        "sweep": 1,
+        "heavy": false
+      },
+      {
+        "startup": 6,
+        "active": 4,
+        "recovery": 14,
+        "damage": 2,
+        "radius": 24,
+        "arcDeg": 140,
+        "lunge": 10,
+        "hitstop": 3,
+        "knockback": 90,
+        "chainFrom": 4,
+        "dodgeCancelFrom": 2,
+        "sweep": -1,
+        "heavy": false
+      },
+      {
+        "startup": 10,
+        "active": 5,
+        "recovery": 22,
+        "damage": 4,
+        "radius": 28,
+        "arcDeg": 200,
+        "lunge": 6,
+        "hitstop": 6,
+        "knockback": 180,
+        "chainFrom": 999,
+        "dodgeCancelFrom": 6,
+        "sweep": 1,
+        "heavy": true
+      }
+    ],
+    "dodge": {
+      "total": 18,
+      "distance": 44,
+      "iStart": 2,
+      "iEnd": 12,
+      "attackCancelFrom": 14,
+      "buffer": 8
+    }
+  }
+}

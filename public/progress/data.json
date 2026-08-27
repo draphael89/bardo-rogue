@@ -1,9 +1,9 @@
 {
   "title": "Bardo Rogue",
-  "subtitle": "Gauntlet against Enter the Gungeon & Hades",
-  "updated": "2026-08-27T17:49:00-04:00",
-  "now": "arena-first-look",
-  "round": 11,
+  "subtitle": "Gauntlet against Enter the Gungeon & Hades \u2014 Phase 0 repair, then wave 1",
+  "updated": "2026-08-27T19:25:48-04:00",
+  "now": "phase-0: repairing the instruments",
+  "round": 0,
   "timeline": [
     {
       "t": "16:54",
@@ -15,7 +15,7 @@
     },
     {
       "t": "16:59",
-      "text": "Round 1 build in — lighting, grade, ritual floor, living air."
+      "text": "Round 1 build in \u2014 lighting, grade, ritual floor, living air."
     },
     {
       "t": "17:04",
@@ -27,19 +27,19 @@
     },
     {
       "t": "17:09",
-      "text": "Round 2 in — seal plate, nave, side aisles, wall furniture, side braziers."
+      "text": "Round 2 in \u2014 seal plate, nave, side aisles, wall furniture, side braziers."
     },
     {
       "t": "17:10",
-      "text": "R2 still lost: tan dirt + HUD-reticle seal. Approach change — opaque plate, floor wash, no ticks."
+      "text": "R2 still lost: tan dirt + HUD-reticle seal. Approach change \u2014 opaque plate, floor wash, no ticks."
     },
     {
       "t": "17:13",
-      "text": "Round 3 in — slate floor, gold seal + chevron, purple diamond rugs, graves/chest/table, wall windows."
+      "text": "Round 3 in \u2014 slate floor, gold seal + chevron, purple diamond rugs, graves/chest/table, wall windows."
     },
     {
       "t": "17:19",
-      "text": "Round 4 build — original bardo_room tileset. Kenney leaves the floor."
+      "text": "Round 4 build \u2014 original bardo_room tileset. Kenney leaves the floor."
     },
     {
       "t": "17:26",
@@ -51,11 +51,11 @@
     },
     {
       "t": "17:32",
-      "text": "Round 5 in — still pool in the steel plate, ash-leaf planters, velvet armchairs. Banner kit stripped."
+      "text": "Round 5 in \u2014 still pool in the steel plate, ash-leaf planters, velvet armchairs. Banner kit stripped."
     },
     {
       "t": "17:34",
-      "text": "Round 6 in — aisles packed with plants, well-lip on the pool, hotter window lights. Critic on the still."
+      "text": "Round 6 in \u2014 aisles packed with plants, well-lip on the pool, hotter window lights. Critic on the still."
     },
     {
       "t": "17:36",
@@ -63,7 +63,7 @@
     },
     {
       "t": "17:37",
-      "text": "Round 7 in — star well + broken ring, three plant kinds, richer runners."
+      "text": "Round 7 in \u2014 star well + broken ring, three plant kinds, richer runners."
     },
     {
       "t": "17:38",
@@ -71,7 +71,7 @@
     },
     {
       "t": "17:39",
-      "text": "Round 8 in — raised well lip, contact shadows under every prop. Still building."
+      "text": "Round 8 in \u2014 raised well lip, contact shadows under every prop. Still building."
     },
     {
       "t": "17:40",
@@ -79,7 +79,7 @@
     },
     {
       "t": "17:44",
-      "text": "Round 9 in — 32px plants and chairs, wine runners, brass threshold inlay, north counters. Critic on the still."
+      "text": "Round 9 in \u2014 32px plants and chairs, wine runners, brass threshold inlay, north counters. Critic on the still."
     },
     {
       "t": "17:45",
@@ -87,7 +87,7 @@
     },
     {
       "t": "17:47",
-      "text": "Round 10 in — Keep-light walls, bigger steel plate, quieter door. Furniture can actually be named in the wide shot."
+      "text": "Round 10 in \u2014 Keep-light walls, bigger steel plate, quieter door. Furniture can actually be named in the wide shot."
     },
     {
       "t": "17:48",
@@ -95,223 +95,149 @@
     },
     {
       "t": "17:49",
-      "text": "Round 11 in — carved dais with relief threshold, restored vignette, slight furniture asymmetry."
+      "text": "Round 11 in \u2014 carved dais with relief threshold, restored vignette, slight furniture asymmetry."
     },
     {
       "t": "17:50",
       "text": "Blind critic still on the bar. Gap: brick box of grid-snapped props and flat light vs materials, volume, a floor you remember."
+    },
+    {
+      "t": "19:05",
+      "text": "STOP on arena-first-look after 11 rounds, 0 passes. Four audits agree the root cause is not the builder: no art direction to aim at, and a 60 Hz game judged on stills."
+    },
+    {
+      "t": "19:08",
+      "text": "Verified all four audits against the live repo. 8 claims confirmed. 2 already stale: camera lookahead IS dt-corrected (camera.ts:24) and the gamepad deadzone IS already radial."
+    },
+    {
+      "t": "19:12",
+      "text": "Struck the automated gate that demanded a 60-120s clear. Measured 37.8-43.3s. The only ways to pass were HP inflation or filler waves, both banned by the vision. Replaced with a variance gate."
+    },
+    {
+      "t": "19:16",
+      "text": "Attack is now a true edge on keyboard, mouse and gamepad. Holding the button no longer plays the combo for you. Aim goes through the inverse world transform, so shake and zoom can no longer move your cursor."
+    },
+    {
+      "t": "19:21",
+      "text": "Harness repaired: live metrics getter, widened state hash, visual/gameplay RNG split, pool-overflow telemetry, restart replay parity. 35 tests green, was 18."
+    },
+    {
+      "t": "19:24",
+      "text": "The RNG split alone fixed the 'solved room'. kite/full clear spread 5.5s -> 8.9s; damage taken went from 4 on every seed to [2,4,1,3,3,3,4,2]. Zero variance was a coupling bug, not a wave-design problem."
+    },
+    {
+      "t": "19:26",
+      "text": "pnpm strip ships: tick-labelled motion strips with state, events and freeze marked. Nine timing pieces went from unjudgeable to judgeable."
+    },
+    {
+      "t": "19:27",
+      "text": "ART_DIRECTION.md ships, 533 lines with an acceptance test. The arena piece stays PARKED until it can be cited section by section instead of guessed at."
+    },
+    {
+      "t": "19:32",
+      "text": "Caught a gate of my own that was as unmeasured as the one I struck: dodge success measured 0.03, not the asserted 0.6-0.8. Replaced with direct measurement of roll speed against run speed."
+    },
+    {
+      "t": "19:34",
+      "text": "Found 29 Math.random calls in the render layer: the same strip captured twice differs. Giving presentation its own seeded generator, or every round-over-round diff is noise."
     }
   ],
   "pieces": [
     {
-      "id": "arena-first-look",
-      "take": "01",
-      "name": "The Threshold",
-      "blurb": "The room you wake in. Empty. Before anyone swings.",
-      "bar": "Gungeon Keep chamber",
-      "status": "building",
-      "rounds": 11,
-      "verdict": "theirs",
-      "gap": "Brick box of grid-snapped props and flat light vs materials, volume, and a floor you would remember.",
-      "before": "shots/arena-before.png",
-      "after": "shots/arena-after-r11.png",
-      "ref": "ref/gungeon-2.jpg"
+      "id": "phase-0-input",
+      "status": "done",
+      "title": "Attack edge-trigger + camera-aware aim",
+      "rounds": 0
     },
     {
-      "id": "combat-hud",
-      "take": "02",
-      "name": "Combat HUD",
-      "blurb": "Hearts, wave, death and clear cards.",
-      "bar": "Hades HUD",
-      "status": "queued",
-      "rounds": 0,
-      "verdict": null,
-      "gap": null,
-      "before": null,
-      "after": null,
-      "ref": "ref/hades-0.jpg"
+      "id": "phase-0-harness",
+      "status": "done",
+      "title": "Live metrics, wide hash, RNG split, overflow telemetry, replay parity",
+      "rounds": 0
+    },
+    {
+      "id": "phase-0-bible",
+      "status": "done",
+      "title": "ART_DIRECTION.md, 12 sections + acceptance test",
+      "rounds": 0
+    },
+    {
+      "id": "phase-0-strip",
+      "status": "building",
+      "title": "pnpm strip motion exporter",
+      "rounds": 0
+    },
+    {
+      "id": "phase-0-views",
+      "status": "building",
+      "title": "Per-entity view split so six lanes run in parallel",
+      "rounds": 0
+    },
+    {
+      "id": "phase-0-fxseed",
+      "status": "building",
+      "title": "Seeded presentation RNG so captures reproduce",
+      "rounds": 0
     },
     {
       "id": "sword-swing",
-      "take": "03",
-      "name": "Sword swing",
-      "blurb": "Startup, arc, contact. The core verb.",
-      "bar": "Hades Stygian Blade",
       "status": "queued",
-      "rounds": 0,
-      "verdict": null,
-      "gap": null,
-      "before": null,
-      "after": null,
-      "ref": null
-    },
-    {
-      "id": "dodge-roll",
-      "take": "04",
-      "name": "Dodge roll",
-      "blurb": "I-frames, hop, recovery.",
-      "bar": "Gungeon dodge roll",
-      "status": "queued",
-      "rounds": 0,
-      "verdict": null,
-      "gap": null,
-      "before": null,
-      "after": null,
-      "ref": null
+      "title": "Feel lane 1/3 \u2014 the three-hit chain",
+      "rounds": 0
     },
     {
       "id": "hit-impact",
-      "take": "05",
-      "name": "Hit impact",
-      "blurb": "Hit-stop, sparks, knockback, juice.",
-      "bar": "Gungeon contact",
       "status": "queued",
-      "rounds": 0,
-      "verdict": null,
-      "gap": null,
-      "before": null,
-      "after": null,
-      "ref": null
+      "title": "Feel lane 2/3 \u2014 light hits move the camera 0.19px; two reward channels are dead code",
+      "rounds": 0
+    },
+    {
+      "id": "dodge-roll",
+      "status": "queued",
+      "title": "Feel lane 3/3 \u2014 the roll is 54% faster than running",
+      "rounds": 0
     },
     {
       "id": "brute",
-      "take": "06",
-      "name": "Brute",
-      "blurb": "Telegraph, lunge, punish window.",
-      "bar": "Hades Thug",
       "status": "queued",
-      "rounds": 0,
-      "verdict": null,
-      "gap": null,
-      "before": null,
-      "after": null,
-      "ref": null
+      "title": "Readability is colour memory, not geometry",
+      "rounds": 0
     },
     {
       "id": "caster",
-      "take": "07",
-      "name": "Caster & bolts",
-      "blurb": "Aim line, fire, cuttable bolts.",
-      "bar": "Gungeon wizard",
       "status": "queued",
-      "rounds": 0,
-      "verdict": null,
-      "gap": null,
-      "before": null,
-      "after": null,
-      "ref": null
+      "title": "Bolt-cutting is the best idea in the combat and the least rewarded",
+      "rounds": 0
     },
     {
       "id": "charger",
-      "take": "08",
-      "name": "Charger",
-      "blurb": "Orbit, freeze, dash.",
-      "bar": "Gungeon shotgun kin",
       "status": "queued",
-      "rounds": 0,
-      "verdict": null,
-      "gap": null,
-      "before": null,
-      "after": null,
-      "ref": null
+      "title": "Red tell lasts ~147ms; four chargers read as four identical blinks",
+      "rounds": 0
     },
     {
-      "id": "waves",
-      "take": "09",
-      "name": "Wave pacing",
-      "blurb": "Three waves that teach, then press.",
-      "bar": "Gungeon room clear",
+      "id": "combat-hud",
       "status": "queued",
-      "rounds": 0,
-      "verdict": null,
-      "gap": null,
-      "before": null,
-      "after": null,
-      "ref": null
+      "title": "Banners desync from sim time; no gamepad glyphs",
+      "rounds": 0
     },
     {
-      "id": "boss",
-      "take": "10",
-      "name": "Boss",
-      "blurb": "A named fight with phases.",
-      "bar": "Gungeon boss chamber",
+      "id": "death-card",
       "status": "queued",
-      "rounds": 0,
-      "verdict": null,
-      "gap": null,
-      "before": null,
-      "after": null,
-      "ref": "ref/gungeon-0.jpg"
+      "title": "'YOU DIED / press R' over an indigo death-realm, under a fighter-game announcer",
+      "rounds": 0
     },
     {
-      "id": "run",
-      "take": "11",
-      "name": "Run structure",
-      "blurb": "Rooms, floors, doors, map.",
-      "bar": "Hades chambers",
+      "id": "audio-bed",
       "status": "queued",
-      "rounds": 0,
-      "verdict": null,
-      "gap": null,
-      "before": null,
-      "after": null,
-      "ref": null
+      "title": "One master bus, no loop flag, ambience literally cannot play",
+      "rounds": 0
     },
     {
-      "id": "gear",
-      "take": "12",
-      "name": "Weapons & items",
-      "blurb": "A kit that changes how you move.",
-      "bar": "Gungeon guns / Hades boons",
-      "status": "queued",
-      "rounds": 0,
-      "verdict": null,
-      "gap": null,
-      "before": null,
-      "after": null,
-      "ref": null
-    },
-    {
-      "id": "death",
-      "take": "13",
-      "name": "Death & return",
-      "blurb": "The bardo. Die, wake, go again.",
-      "bar": "Hades House of Hades",
-      "status": "queued",
-      "rounds": 0,
-      "verdict": null,
-      "gap": null,
-      "before": null,
-      "after": null,
-      "ref": "ref/hades-1.jpg"
-    },
-    {
-      "id": "audio",
-      "take": "14",
-      "name": "Sound & music",
-      "blurb": "Hits, air, a theme that belongs here.",
-      "bar": "Hades score / Gungeon Foley",
-      "status": "queued",
-      "rounds": 0,
-      "verdict": null,
-      "gap": null,
-      "before": null,
-      "after": null,
-      "ref": null
-    },
-    {
-      "id": "meta-ui",
-      "take": "15",
-      "name": "Title & meta UI",
-      "blurb": "The first screen. Pause. Return.",
-      "bar": "Hades title",
-      "status": "queued",
-      "rounds": 0,
-      "verdict": null,
-      "gap": null,
-      "before": null,
-      "after": null,
-      "ref": null
+      "id": "arena-first-look",
+      "status": "parked",
+      "title": "PARKED after 11 losses. Re-enters only behind the art bible and an authored asset kit.",
+      "rounds": 11
     }
   ]
 }

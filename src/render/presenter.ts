@@ -14,6 +14,7 @@ import { Lighting } from './light'
 import { PostFx } from './postfx'
 import { DamageNumbers } from './damageNumbers'
 import { Atmosphere } from './atmosphere'
+import { fxRng, seedFx } from './fxRng'
 
 // Reads sim state + events every frame and drives everything visible. Never mutates the sim.
 export class Presenter {
@@ -37,6 +38,7 @@ export class Presenter {
   private lastHurtAngle = 0
 
   constructor(public ra: RenderApp, public atlas: Atlas, public world: World) {
+    seedFx(world.seed)
     const L = ra.layers
     this.tilemap = buildTilemap(ra.app.renderer, atlas, world.arena, ra.arenaOffset)
     L.floor.addChild(this.tilemap.voidLayer, this.tilemap.sprite, this.tilemap.door)
@@ -57,6 +59,8 @@ export class Presenter {
   // Called when the world object is replaced (restart).
   bindWorld(world: World) {
     this.world = world
+    // presentation randomness restarts with the run, so the same seed replays the same sparks
+    seedFx(world.seed)
     for (const v of this.enemyViews.values()) v.destroy(); this.enemyViews.clear()
     for (const v of this.boltViews.values()) v.destroy(); this.boltViews.clear()
     for (const m of this.spawnMarkers) m.sprite.destroy(); this.spawnMarkers = []
@@ -155,7 +159,7 @@ export class Presenter {
       const b = w.projectiles.find(x => x.id === id && x.active)
       if (!b) { v.destroy(); this.boltViews.delete(id); continue }
       v.update(lerp(b.px, b.x, alpha), lerp(b.py, b.y, alpha), this.time)
-      if (Math.random() < 0.5) this.particles.boltTrail(b.x, b.y)
+      if (fxRng.ui.next() < 0.5) this.particles.boltTrail(b.x, b.y)
     }
     while (this.spawnMarkers.length < w.spawnQueue.length) this.spawnMarkers.push(new SpawnMarkerView(this.atlas, L.fx))
     for (let i = 0; i < this.spawnMarkers.length; i++) {

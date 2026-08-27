@@ -1,5 +1,6 @@
 import { Container, Text } from 'pixi.js'
 import { easeOutCubic } from './anim'
+import { fxRng } from './fxRng'
 
 interface D { t: Text; life: number; x: number; y: number }
 
@@ -22,7 +23,7 @@ export class DamageNumbers {
     d.t.text = String(amount)
     d.t.tint = heavy ? 0xffd070 : 0xffffff
     d.t.visible = true
-    d.x = Math.round(x + (Math.random() - 0.5) * 6); d.y = Math.round(y - 6)
+    d.x = Math.round(x + fxRng.ui.signed(6)); d.y = Math.round(y - 6)
     d.life = this.lifeSec
     this.live.push(d)
   }

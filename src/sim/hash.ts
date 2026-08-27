@@ -1,18 +1,67 @@
-import type { World } from './world'
+import type { World, PlayerState, EnemyState } from './world'
+import type { EnemyKind } from './events'
+import type { WaveState } from './world'
 
-// FNV-1a over the numeric state that matters. Same seed + same inputs must give the same hash.
+// Stable integer codes. Enum order is part of the hash contract: append, never reorder.
+const PLAYER_STATE: Record<PlayerState, number> = { free: 0, dodge: 1, attack: 2, dead: 3 }
+const ENEMY_STATE: Record<EnemyState, number> = {
+  idle: 0, chase: 1, windup: 2, attack: 3, recover: 4, stagger: 5, dead: 6,
+  position: 7, aim: 8, hover: 9, freeze: 10, dash: 11,
+}
+const ENEMY_KIND: Record<EnemyKind, number> = { brute: 0, caster: 1, charger: 2, dummy: 3 }
+const WAVE_STATE: Record<WaveState, number> = { idle: 0, pending: 1, active: 2, done: 3 }
+
+// FNV-1a over a canonical snapshot of everything the sim's outcome depends on.
+// Deliberately NOT hashed: world.visualRng (cosmetic-only stream) and the arena it builds,
+// so decoration changes cannot move a gameplay hash.
 export function hashWorld(world: World): number {
   let h = 0x811c9dc5
-  const mix = (n: number) => {
-    const v = Math.round(n * 1000) | 0
-    h ^= v & 0xff; h = Math.imul(h, 0x01000193)
-    h ^= (v >>> 8) & 0xff; h = Math.imul(h, 0x01000193)
-    h ^= (v >>> 16) & 0xff; h = Math.imul(h, 0x01000193)
-    h ^= (v >>> 24) & 0xff; h = Math.imul(h, 0x01000193)
-  }
+  const byte = (v: number) => { h ^= v & 0xff; h = Math.imul(h, 0x01000193) }
+  const int = (n: number) => { const v = n | 0; byte(v); byte(v >>> 8); byte(v >>> 16); byte(v >>> 24) }
+  const num = (n: number) => int(Math.round(n * 1000))   // px/angles to 1/1000
+  const flag = (b: boolean) => byte(b ? 1 : 0)
+
+  int(world.tick); int(world.freeze); num(world.timeScale); int(world.slowmoTicks)
+  int(world.swingCounter); int(world.nextEnemyId); int(world.nextProjectileId)
+  int(world.roomClearTick); flag(world.doorOpen); flag(world.wantsRestart)
+  int(world.rng.state)
+
   const p = world.player
-  mix(world.tick); mix(p.x); mix(p.y); mix(p.hp); mix(p.stateTick); mix(world.rng.state); mix(world.freeze)
-  for (const e of world.enemies) if (e.active) { mix(e.id); mix(e.x); mix(e.y); mix(e.hp); mix(e.stateTick) }
-  for (const b of world.projectiles) if (b.active) { mix(b.x); mix(b.y); mix(b.life) }
+  byte(PLAYER_STATE[p.state]); int(p.stateTick)
+  num(p.x); num(p.y); num(p.px); num(p.py); num(p.vx); num(p.vy); num(p.kbx); num(p.kby)
+  int(p.hp); int(p.maxHp); int(p.facing)
+  num(p.aimAngle); num(p.moveAngle); num(p.dodgeDirX); num(p.dodgeDirY)
+  int(p.swingIndex); num(p.swingAngle); int(p.swingId)
+  int(p.attackBuffer); int(p.dodgeBuffer); int(p.iframes); num(p.flash)
+  num(p.moveX); num(p.moveY); int(p.footTick); int(p.deathTick); flag(p.god)
+
+  let active = 0
+  for (const e of world.enemies) if (e.active) active++
+  int(active)
+  for (const e of world.enemies) {
+    if (!e.active) continue
+    int(e.id); byte(ENEMY_KIND[e.kind]); byte(ENEMY_STATE[e.state]); int(e.stateTick)
+    num(e.x); num(e.y); num(e.px); num(e.py); num(e.vx); num(e.vy); num(e.kbx); num(e.kby)
+    int(e.hp); int(e.maxHp); num(e.radius); int(e.facing)
+    num(e.aimAngle); num(e.targetX); num(e.targetY)
+    int(e.lastHitSwingId); num(e.flash); flag(e.hitDone)
+    num(e.orbitAngle); int(e.orbitDir); int(e.hoverTicks); int(e.cooldown); int(e.dashTicks); int(e.spawnTick)
+  }
+
+  let bolts = 0
+  for (const b of world.projectiles) if (b.active) bolts++
+  int(bolts)
+  for (const b of world.projectiles) {
+    if (!b.active) continue
+    int(b.id); num(b.x); num(b.y); num(b.px); num(b.py); num(b.vx); num(b.vy)
+    num(b.radius); int(b.life); num(b.angle)
+  }
+
+  const w = world.wave
+  int(w.index); byte(WAVE_STATE[w.state]); int(w.groupIndex); int(w.timer); int(w.total)
+
+  int(world.spawnQueue.length)
+  for (const s of world.spawnQueue) { byte(ENEMY_KIND[s.kind]); num(s.x); num(s.y); int(s.ticksLeft) }
+
   return h >>> 0
 }

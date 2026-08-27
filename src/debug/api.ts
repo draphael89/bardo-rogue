@@ -6,6 +6,7 @@ import { Metrics } from '@/sim/metrics'
 import { makeBot, type BotName } from '@/sim/bots'
 import type { Replay, EncodedReplay } from '@/sim/replay'
 import type { Loop } from '@/loop'
+import { seedFx } from '@/render/fxRng'
 
 // window.__game: what an agent (or Playwright) uses to drive and inspect the live game.
 export interface GameApi {
@@ -22,6 +23,7 @@ export interface GameApi {
   hash(): number
   state(): unknown
   frameStats(): unknown
+  fxSeed(n: number): void
   mute(m?: boolean): boolean
   debug(v?: boolean): boolean
   record(on?: boolean): boolean
@@ -49,7 +51,8 @@ export function installApi(host: {
   const api: GameApi = {
     get world() { return host.getWorld() },
     tuning,
-    metrics: host.metrics,
+    // live getter: reset() swaps the Metrics instance, and a stale one silently mis-measures
+    get metrics() { return host.metrics },
     loop: host.loop,
     presenter: host.presenter,
     reset: (seed, scenario, opts) => host.reset(seed, scenario, opts),
@@ -69,6 +72,8 @@ export function installApi(host: {
       }
     },
     frameStats: () => host.loop.stats(),
+    // force the presentation PRNG (particles, flicker, damage-number jitter) so a capture is reproducible
+    fxSeed: n => seedFx(n),
     mute: m => host.mute(m),
     debug: v => host.debug(v),
     record: on => host.record(on),

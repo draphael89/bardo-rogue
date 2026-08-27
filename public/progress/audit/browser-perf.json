@@ -1,0 +1,171 @@
+{
+  "environment": {
+    "dpr": 1,
+    "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5 Pro, Unspecified Version)",
+    "hardwareConcurrency": 18,
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+    "viewport": [
+      1920,
+      1080
+    ]
+  },
+  "method": "Paused simulation; live normal presentation loop; 32 static dummies, static bullets, 1500 persistent colocated additive particles. 45 warmup then 120 rAF intervals. JS-visible GL entry calls are not GPU timers. The 200 case extends the in-memory pool and is not supported production gameplay.",
+  "results": [
+    {
+      "callbackOnlyMs": {
+        "frames": 187,
+        "max": 6.3,
+        "p50": 1.6,
+        "p95": 2.2
+      },
+      "enemies": 32,
+      "filters": true,
+      "glDrawCallsPerInterval": {
+        "max": 10,
+        "median": 10,
+        "p95": 10
+      },
+      "heap": 41072400,
+      "over20ms": 0,
+      "particles": 1500,
+      "projectiles": 0,
+      "rafIntervalMs": {
+        "max": 14.800000000000182,
+        "median": 8.299999999999955,
+        "p95": 9.400000000000093
+      },
+      "samples": 120,
+      "syntheticPoolExtension": false
+    },
+    {
+      "callbackOnlyMs": {
+        "frames": 240,
+        "max": 2.3,
+        "p50": 1.9,
+        "p95": 2.2
+      },
+      "enemies": 32,
+      "filters": false,
+      "glDrawCallsPerInterval": {
+        "max": 9,
+        "median": 9,
+        "p95": 9
+      },
+      "heap": 44090720,
+      "over20ms": 0,
+      "particles": 1500,
+      "projectiles": 0,
+      "rafIntervalMs": {
+        "max": 17.299999999999727,
+        "median": 8.300000000000182,
+        "p95": 13.199999999999818
+      },
+      "samples": 120,
+      "syntheticPoolExtension": false
+    },
+    {
+      "callbackOnlyMs": {
+        "frames": 240,
+        "max": 3.4,
+        "p50": 2,
+        "p95": 2.4
+      },
+      "enemies": 32,
+      "filters": true,
+      "glDrawCallsPerInterval": {
+        "max": 136,
+        "median": 136,
+        "p95": 136
+      },
+      "heap": 41452118,
+      "over20ms": 0,
+      "particles": 1500,
+      "projectiles": 64,
+      "rafIntervalMs": {
+        "max": 17.100000000000364,
+        "median": 8.300000000000182,
+        "p95": 15.199999999999818
+      },
+      "samples": 120,
+      "syntheticPoolExtension": false
+    },
+    {
+      "callbackOnlyMs": {
+        "frames": 240,
+        "max": 2.5,
+        "p50": 1.8,
+        "p95": 2.3
+      },
+      "enemies": 32,
+      "filters": false,
+      "glDrawCallsPerInterval": {
+        "max": 135,
+        "median": 135,
+        "p95": 135
+      },
+      "heap": 48863482,
+      "over20ms": 0,
+      "particles": 1500,
+      "projectiles": 64,
+      "rafIntervalMs": {
+        "max": 13.799999999999272,
+        "median": 8.300000000000182,
+        "p95": 10.300000000000182
+      },
+      "samples": 120,
+      "syntheticPoolExtension": false
+    },
+    {
+      "callbackOnlyMs": {
+        "frames": 240,
+        "max": 3,
+        "p50": 2.4,
+        "p95": 2.9
+      },
+      "enemies": 32,
+      "filters": true,
+      "glDrawCallsPerInterval": {
+        "max": 408,
+        "median": 408,
+        "p95": 408
+      },
+      "heap": 46338664,
+      "over20ms": 0,
+      "particles": 1500,
+      "projectiles": 200,
+      "rafIntervalMs": {
+        "max": 17.299999999999272,
+        "median": 8.400000000000546,
+        "p95": 14.600000000000364
+      },
+      "samples": 120,
+      "syntheticPoolExtension": true
+    },
+    {
+      "callbackOnlyMs": {
+        "frames": 240,
+        "max": 3.2,
+        "p50": 2.5,
+        "p95": 2.9
+      },
+      "enemies": 32,
+      "filters": false,
+      "glDrawCallsPerInterval": {
+        "max": 407,
+        "median": 407,
+        "p95": 407
+      },
+      "heap": 52457908,
+      "over20ms": 0,
+      "particles": 1500,
+      "projectiles": 200,
+      "rafIntervalMs": {
+        "max": 16,
+        "median": 8.399999999999636,
+        "p95": 10.5
+      },
+      "samples": 120,
+      "syntheticPoolExtension": true
+    }
+  ]
+}

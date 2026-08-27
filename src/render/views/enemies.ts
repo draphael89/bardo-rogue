@@ -1,0 +1,52 @@
+import type { Atlas } from '../atlas'
+import type { World, Enemy } from '@/sim/world'
+import type { Container } from 'pixi.js'
+import { tuning } from '@/tuning'
+import { lerp } from '../anim'
+import { EntityView, SPRITE, WEAPON, type EnemyFrame, type Pose } from './shared'
+import { updateBruteView } from './enemy-brute'
+import { updateCasterView } from './enemy-caster'
+import { updateChargerView } from './enemy-charger'
+import { updateDummyView } from './enemy-dummy'
+
+export function createEnemyView(atlas: Atlas, e: Enemy, layers: { entities: Container; shadows: Container }): EntityView {
+  const w = e.kind === 'brute' ? WEAPON.brute : e.kind === 'caster' ? WEAPON.caster : null
+  return new EntityView(atlas, SPRITE[e.kind], w, layers)
+}
+
+// Scratch instances reused every call: this runs per enemy per frame, so it must not allocate.
+const frame: EnemyFrame = { x: 0, y: 0, alpha: 0, time: 0, tk: 0, speed: 0 }
+const pose: Pose = { sx: 1, sy: 1, rot: 0, hop: 0, tint: 0xffffff }
+
+// Thin dispatcher: computes the shared per-frame values, lets the kind's module set the pose,
+// then applies the juice/transform epilogue that is identical for every kind.
+export function updateEnemyView(v: EntityView, e: Enemy, world: World, alpha: number, time: number): void {
+  const x = lerp(e.px, e.x, alpha), y = lerp(e.py, e.y, alpha)
+  const feetY = y + e.radius + 1
+  const b = v.body
+  frame.x = x; frame.y = y; frame.alpha = alpha; frame.time = time
+  frame.tk = e.stateTick + alpha
+  frame.speed = Math.hypot(e.vx, e.vy)
+  pose.sx = 1; pose.sy = 1; pose.rot = 0; pose.hop = 0; pose.tint = 0xffffff
+
+  switch (e.kind) {
+    case 'brute': updateBruteView(v, e, frame, pose); break
+    case 'caster': updateCasterView(v, e, frame, pose); break
+    case 'charger': updateChargerView(v, e, frame, pose); break
+    case 'dummy': updateDummyView(v, e, frame, pose); break
+  }
+
+  let sx = pose.sx, sy = pose.sy, tint = pose.tint
+  const rot = pose.rot, hop = pose.hop
+  if (v.squash > 0) { const q = v.squash / tuning.juice.squashTicks; sx *= 1 + 0.3 * q; sy *= 1 - 0.3 * q }
+  if (v.redFlash > 0) tint = 0xff5a5a
+
+  b.position.set(Math.round(x), Math.round(feetY - hop))
+  b.scale.set(sx * e.facing, sy)
+  b.rotation = rot
+  b.tint = tint
+  b.zIndex = feetY
+  v.setFlash(e.flash > 0)
+  v.setShadow(x, feetY - 1, 14 - hop * 0.5, 6 - hop * 0.2, 0.35 - hop * 0.02)
+  void world
+}

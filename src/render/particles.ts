@@ -1,6 +1,7 @@
 import { Container, Sprite, Texture, RenderTexture, Rectangle } from 'pixi.js'
 import type { Atlas } from './atlas'
 import { tuning } from '@/tuning'
+import { fxRng } from './fxRng'
 
 interface P { s: Sprite; vx: number; vy: number; life: number; maxLife: number; drag: number; grav: number; scale0: number; scale1: number; rot: number; alpha0: number; alpha1: number; ground: number | null; tint0: number; tint1: number | null }
 
@@ -39,7 +40,7 @@ export class Particles {
     p.vx = o.vx ?? 0; p.vy = o.vy ?? 0; p.life = p.maxLife = o.maxLife ?? 0.4; p.drag = o.drag ?? 1; p.grav = o.grav ?? 0
     p.scale0 = o.scale0 ?? 1; p.scale1 = o.scale1 ?? p.scale0; p.rot = o.rot ?? 0; p.alpha0 = o.alpha0 ?? 1; p.alpha1 = o.alpha1 ?? 0; p.ground = o.ground ?? null
     p.tint0 = o.tint ?? 0xffffff; p.tint1 = o.tint1 ?? null
-    p.s.tint = p.tint0; p.s.blendMode = o.blend ?? 'normal'; p.s.rotation = Math.random() * 6.28
+    p.s.tint = p.tint0; p.s.blendMode = o.blend ?? 'normal'; p.s.rotation = fxRng.particles.next() * 6.28
     p.s.scale.set(p.scale0 / 64)
     this.live.push(p)
     return p
@@ -65,25 +66,25 @@ export class Particles {
 
   hitSparks(x: number, y: number, angle: number, n: number, tint: number) {
     for (let i = 0; i < n; i++) {
-      const a = angle + (Math.random() - 0.5) * 1.6
-      const sp = 60 + Math.random() * 160
-      this.spawn(this.atlas.particle(Math.random() < 0.5 ? 'spark_02' : 'star_04'), x, y, { vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, maxLife: 0.18 + Math.random() * 0.2, drag: 0.86, scale0: 6 + Math.random() * 6, scale1: 1, tint, blend: 'add', alpha0: 1, alpha1: 0.4 })
+      const a = angle + fxRng.particles.signed(1.6)
+      const sp = fxRng.particles.range(60, 220)
+      this.spawn(this.atlas.particle(fxRng.particles.next() < 0.5 ? 'spark_02' : 'star_04'), x, y, { vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, maxLife: fxRng.particles.range(0.18, 0.38), drag: 0.86, scale0: fxRng.particles.range(6, 12), scale1: 1, tint, blend: 'add', alpha0: 1, alpha1: 0.4 })
     }
     this.spawn(this.atlas.particle('circle_04'), x, y, { maxLife: 0.12, scale0: 10, scale1: 26, tint, blend: 'add', alpha0: 0.9, alpha1: 0 })
   }
 
   dust(x: number, y: number, angle: number, n: number) {
     for (let i = 0; i < n; i++) {
-      const a = angle + (Math.random() - 0.5) * 1.2
-      const sp = 10 + Math.random() * 30
-      this.spawn(this.atlas.particle('smoke_0' + (1 + Math.floor(Math.random() * 5))), x + (Math.random() - 0.5) * 4, y, { vx: Math.cos(a) * sp, vy: Math.sin(a) * sp * 0.4 - 6, maxLife: 0.35 + Math.random() * 0.25, drag: 0.9, scale0: 5 + Math.random() * 4, scale1: 12, tint: 0xd8b088, alpha0: 0.5, alpha1: 0 })
+      const a = angle + fxRng.particles.signed(1.2)
+      const sp = fxRng.particles.range(10, 40)
+      this.spawn(this.atlas.particle('smoke_0' + fxRng.particles.int(1, 5)), x + fxRng.particles.signed(4), y, { vx: Math.cos(a) * sp, vy: Math.sin(a) * sp * 0.4 - 6, maxLife: fxRng.particles.range(0.35, 0.6), drag: 0.9, scale0: fxRng.particles.range(5, 9), scale1: 12, tint: 0xd8b088, alpha0: 0.5, alpha1: 0 })
     }
   }
 
   puff(x: number, y: number, n: number, tint: number) {
     for (let i = 0; i < n; i++) {
-      const a = Math.random() * 6.28, sp = 15 + Math.random() * 25
-      this.spawn(this.atlas.particle('smoke_0' + (1 + Math.floor(Math.random() * 5))), x, y, { vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 10, maxLife: 0.4 + Math.random() * 0.3, drag: 0.9, scale0: 8, scale1: 18, tint, alpha0: 0.7, alpha1: 0 })
+      const a = fxRng.particles.next() * 6.28, sp = fxRng.particles.range(15, 40)
+      this.spawn(this.atlas.particle('smoke_0' + fxRng.particles.int(1, 5)), x, y, { vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 10, maxLife: fxRng.particles.range(0.4, 0.7), drag: 0.9, scale0: 8, scale1: 18, tint, alpha0: 0.7, alpha1: 0 })
     }
   }
 
@@ -92,13 +93,13 @@ export class Particles {
   }
 
   boltTrail(x: number, y: number) {
-    this.spawn(this.atlas.particle('circle_01'), x + (Math.random() - 0.5) * 2, y + (Math.random() - 0.5) * 2, { maxLife: 0.25, scale0: 5, scale1: 1, tint: 0xb060ff, blend: 'add', alpha0: 0.7, alpha1: 0 })
+    this.spawn(this.atlas.particle('circle_01'), x + fxRng.particles.signed(2), y + fxRng.particles.signed(2), { maxLife: 0.25, scale0: 5, scale1: 1, tint: 0xb060ff, blend: 'add', alpha0: 0.7, alpha1: 0 })
   }
 
   spawnBurst(x: number, y: number) {
     this.spawn(this.atlas.particle('circle_03'), x, y, { maxLife: 0.3, scale0: 4, scale1: 30, tint: 0xfff0c0, blend: 'add', alpha0: 0.9, alpha1: 0 })
     for (let i = 0; i < 10; i++) {
-      const a = Math.random() * 6.28, sp = 30 + Math.random() * 50
+      const a = fxRng.particles.next() * 6.28, sp = fxRng.particles.range(30, 80)
       this.spawn(this.atlas.particle('spark_01'), x, y, { vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 20, maxLife: 0.4, drag: 0.9, scale0: 5, scale1: 1, tint: 0xffe0a0, blend: 'add' })
     }
   }
@@ -106,12 +107,12 @@ export class Particles {
   // One brazier flame tongue (flame_05/06 are the solid shapes; 01-04 are wisps that vanish at this size).
   // Normal blend on purpose: additive over the grey wall would bleach to white; the lightmap supplies the glow.
   flame(x: number, y: number) {
-    const big = Math.random() < 0.3
-    const f = this.spawn(this.atlas.particle(Math.random() < 0.5 ? 'flame_05' : 'flame_06'), x + (Math.random() - 0.5) * 5, y + (Math.random() - 0.5) * 2, {
-      vx: (Math.random() - 0.5) * 6, vy: -16 - Math.random() * 14, maxLife: (big ? 0.5 : 0.3) + Math.random() * 0.15, drag: 0.94,
-      scale0: big ? 22 : 14 + Math.random() * 4, scale1: 5, rot: (Math.random() - 0.5) * 2, tint: 0xfff0a0, tint1: 0xff5a14, alpha0: 1, alpha1: 0.55,
+    const big = fxRng.particles.next() < 0.3
+    const f = this.spawn(this.atlas.particle(fxRng.particles.next() < 0.5 ? 'flame_05' : 'flame_06'), x + fxRng.particles.signed(5), y + fxRng.particles.signed(2), {
+      vx: fxRng.particles.signed(6), vy: -16 - fxRng.particles.next() * 14, maxLife: (big ? 0.5 : 0.3) + fxRng.particles.next() * 0.15, drag: 0.94,
+      scale0: big ? 22 : fxRng.particles.range(14, 18), scale1: 5, rot: fxRng.particles.signed(2), tint: 0xfff0a0, tint1: 0xff5a14, alpha0: 1, alpha1: 0.55,
     })
-    if (f) f.s.rotation = (Math.random() - 0.5) * 0.4 // spawn() randomises rotation; a flame must point up
+    if (f) f.s.rotation = fxRng.particles.signed(0.4) // spawn() randomises rotation; a flame must point up
   }
 
   // The enemy's own pixels fly apart along the hit direction, fall, and settle.
@@ -120,28 +121,28 @@ export class Particles {
     const fw = tex.frame.width, fh = tex.frame.height
     const step = 2
     for (let py = 0; py < fh; py += step) for (let px = 0; px < fw; px += step) {
-      if (Math.random() < 0.35) continue
+      if (fxRng.particles.next() < 0.35) continue
       const key = `${tex.uid}:${px}:${py}`
       let sub = this.subTex.get(key)
       if (!sub) { sub = new Texture({ source: tex.source, frame: new Rectangle(tex.frame.x + px, tex.frame.y + py, step, step) }); this.subTex.set(key, sub) }
       const ox = (px - fw / 2) * (body.scale.x < 0 ? -1 : 1), oy = py - fh
-      const a = angle + (Math.random() - 0.5) * 1.4
-      const sp = 40 + Math.random() * 90
-      this.spawn(sub, x + ox, y + body.height / 2 + oy, { vx: Math.cos(a) * sp + (Math.random() - 0.5) * 30, vy: Math.sin(a) * sp - 40 - Math.random() * 40, maxLife: 0.6 + Math.random() * 0.5, drag: 0.96, grav: 260, scale0: 64 * (step / 2), scale1: 64 * (step / 2), rot: (Math.random() - 0.5) * 12, alpha0: 1, alpha1: 0.6, ground: y + 6 + Math.random() * 6 })
+      const a = angle + fxRng.particles.signed(1.4)
+      const sp = fxRng.particles.range(40, 130)
+      this.spawn(sub, x + ox, y + body.height / 2 + oy, { vx: Math.cos(a) * sp + fxRng.particles.signed(30), vy: Math.sin(a) * sp - 40 - fxRng.particles.next() * 40, maxLife: fxRng.particles.range(0.6, 1.1), drag: 0.96, grav: 260, scale0: 64 * (step / 2), scale1: 64 * (step / 2), rot: fxRng.particles.signed(12), alpha0: 1, alpha1: 0.6, ground: y + fxRng.particles.range(6, 12) })
     }
   }
 
   blood(x: number, y: number, angle: number, tint: number) {
     if (!this.renderer) return
-    const n = 2 + Math.floor(Math.random() * 2)
+    const n = fxRng.particles.int(2, 3)
     for (let i = 0; i < n; i++) {
-      const d = 4 + Math.random() * 12
-      this.stamp.texture = this.atlas.decal('splat' + String(Math.floor(Math.random() * 12)).padStart(2, '0'))
+      const d = fxRng.particles.range(4, 16)
+      this.stamp.texture = this.atlas.decal('splat' + String(fxRng.particles.int(0, 11)).padStart(2, '0'))
       this.stamp.tint = tint; this.stamp.alpha = 0.75
-      this.stamp.rotation = Math.random() * 6.28
-      const sc = (12 + Math.random() * 12) / 32
+      this.stamp.rotation = fxRng.particles.next() * 6.28
+      const sc = fxRng.particles.range(12, 24) / 32
       this.stamp.scale.set(sc)
-      this.stamp.position.set(x + 32 + Math.cos(angle) * d + (Math.random() - 0.5) * 6, y + 15 + 4 + Math.sin(angle) * d * 0.6 + (Math.random() - 0.5) * 4)
+      this.stamp.position.set(x + 32 + Math.cos(angle) * d + fxRng.particles.signed(6), y + 15 + 4 + Math.sin(angle) * d * 0.6 + fxRng.particles.signed(4))
       this.renderer.render({ container: this.decalContainer, target: this.decalRt, clear: false })
     }
   }

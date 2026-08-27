@@ -6,6 +6,7 @@ import type { Particles } from './particles'
 import { tuning } from '@/tuning'
 import { noise } from './camera'
 import { lerp } from './anim'
+import { fxRng } from './fxRng'
 
 // Subtle 2.5D lighting. A lightmap is composed each frame (ambient fill + additive lights + vignette lift)
 // and multiplied over the world, so lit floor keeps its own colours and the edges only fall off gently.
@@ -115,7 +116,7 @@ export class Lighting {
     this.flameAcc += dtSec * L.flameRate * world.arena.braziers.length
     while (this.flameAcc >= 1) {
       this.flameAcc -= 1
-      const bz = world.arena.braziers[Math.floor(Math.random() * world.arena.braziers.length)]
+      const bz = world.arena.braziers[fxRng.light.int(0, world.arena.braziers.length - 1)]
       this.particles.flame(bz.x, bz.y - 6)
     }
 

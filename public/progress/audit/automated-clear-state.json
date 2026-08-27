@@ -1,0 +1,39 @@
+{
+  "bolts": 0,
+  "enemies": [],
+  "freeze": 5,
+  "metrics": {
+    "boltsCut": 2,
+    "boltsFired": 26,
+    "clearSeconds": 40.6,
+    "damageTaken": 4,
+    "deathSeconds": null,
+    "deaths": 0,
+    "dodges": 17,
+    "enemyAttacks": 45,
+    "hitsLanded": 34,
+    "kills": 15,
+    "seconds": 40.6,
+    "successfulDodges": 1,
+    "swings": 30,
+    "ticks": 2438,
+    "wavesCleared": 3,
+    "whiffSwings": 2
+  },
+  "player": {
+    "hp": 1,
+    "iframes": 21,
+    "state": "attack",
+    "stateTick": 7,
+    "x": 117.3,
+    "y": 152.4
+  },
+  "tick": 2438,
+  "wave": {
+    "groupIndex": 3,
+    "index": 2,
+    "state": "done",
+    "timer": 0,
+    "total": 3
+  }
+}

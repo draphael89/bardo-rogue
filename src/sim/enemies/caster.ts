@@ -38,8 +38,8 @@ export function updateCaster(world: World, e: Enemy): void {
       if (e.stateTick <= C.aimTicks - 8) { e.aimAngle = angleToPlayer(world, e); facePlayer(world, e) }
       if (e.stateTick >= C.aimTicks) {
         const ox = e.x + Math.cos(e.aimAngle) * (e.radius + 4), oy = e.y + Math.sin(e.aimAngle) * (e.radius + 4)
-        world.fireProjectile(ox, oy, e.aimAngle, C.boltSpeed, C.boltRadius, C.boltLifeTicks)
-        world.emit({ type: 'boltFired', x: ox, y: oy, angle: e.aimAngle })
+        const bolt = world.fireProjectile(ox, oy, e.aimAngle, C.boltSpeed, C.boltRadius, C.boltLifeTicks)
+        if (bolt) world.emit({ type: 'boltFired', x: ox, y: oy, angle: e.aimAngle })
         world.emit({ type: 'enemyAttack', id: e.id, kind: 'caster', x: e.x, y: e.y, angle: e.aimAngle })
         e.cooldown = C.cooldown
         e.state = 'recover'; e.stateTick = 0

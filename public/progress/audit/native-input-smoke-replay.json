@@ -1,0 +1,2407 @@
+{
+  "frames": [
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": true,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": true,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": true,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7698,
+      "aimY": -0.6383,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7691,
+      "aimY": -0.6391,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7672,
+      "aimY": -0.6414,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7648,
+      "aimY": -0.6443,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7635,
+      "aimY": -0.6458,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7635,
+      "aimY": -0.6458,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7635,
+      "aimY": -0.6458,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7635,
+      "aimY": -0.6458,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7635,
+      "aimY": -0.6458,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7603,
+      "aimY": -0.6496,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7576,
+      "aimY": -0.6527,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7552,
+      "aimY": -0.6555,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7531,
+      "aimY": -0.6579,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7513,
+      "aimY": -0.66,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7497,
+      "aimY": -0.6618,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7482,
+      "aimY": -0.6634,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.747,
+      "aimY": -0.6648,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7459,
+      "aimY": -0.666,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7449,
+      "aimY": -0.6671,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7441,
+      "aimY": -0.6681,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7434,
+      "aimY": -0.6689,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7427,
+      "aimY": -0.6696,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7422,
+      "aimY": -0.6702,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7417,
+      "aimY": -0.6708,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7412,
+      "aimY": -0.6713,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7408,
+      "aimY": -0.6717,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7405,
+      "aimY": -0.672,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7402,
+      "aimY": -0.6724,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.74,
+      "aimY": -0.6726,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7397,
+      "aimY": -0.6729,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7395,
+      "aimY": -0.6731,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7394,
+      "aimY": -0.6733,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7392,
+      "aimY": -0.6735,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7391,
+      "aimY": -0.6736,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.739,
+      "aimY": -0.6737,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7389,
+      "aimY": -0.6738,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7388,
+      "aimY": -0.6739,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7387,
+      "aimY": -0.674,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7386,
+      "aimY": -0.6741,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    },
+    {
+      "aimSoft": false,
+      "aimX": -0.7386,
+      "aimY": -0.6742,
+      "attack": false,
+      "dodge": false,
+      "moveX": 0,
+      "moveY": 0,
+      "restart": false
+    }
+  ],
+  "scenario": "full",
+  "seed": 11,
+  "v": 1
+}

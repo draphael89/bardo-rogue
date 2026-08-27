@@ -1,4 +1,4 @@
-import { Rng } from './rng'
+import { Rng, STREAM, streamSeed } from './rng'
 import { buildArena, type Arena } from './arena'
 import type { SimEvent, EnemyKind } from './events'
 import { tuning } from '@/tuning'
@@ -57,7 +57,8 @@ export const MAX_PROJECTILES = 64
 export class World {
   tick = 0
   readonly seed: number
-  rng: Rng
+  rng: Rng            // gameplay: every roll the run's outcome depends on
+  visualRng: Rng      // cosmetics only; never read by hashWorld, so decor is free to change
   arena: Arena
   player: Player
   enemies: Enemy[] = []
@@ -80,8 +81,9 @@ export class World {
   constructor(seed: number, scenario: string) {
     this.seed = seed
     this.scenario = scenario
-    this.rng = new Rng(seed)
-    this.arena = buildArena(this.rng)
+    this.rng = new Rng(streamSeed(seed, STREAM.gameplay))
+    this.visualRng = new Rng(streamSeed(seed, STREAM.visual))
+    this.arena = buildArena(this.visualRng)
     this.player = makePlayer(this.arena.playerStart.x, this.arena.playerStart.y)
     for (let i = 0; i < MAX_ENEMIES; i++) this.enemies.push(makeEnemy())
     for (let i = 0; i < MAX_PROJECTILES; i++) this.projectiles.push(makeProjectile())
@@ -91,7 +93,7 @@ export class World {
 
   spawnEnemy(kind: EnemyKind, x: number, y: number): Enemy | null {
     const e = this.enemies.find(e => !e.active)
-    if (!e) return null
+    if (!e) { this.emit({ type: 'poolOverflow', pool: 'enemy', kind, x, y }); return null }
     const def = kind === 'dummy' ? { hp: 9999, radius: 6 } : tuning[kind]
     Object.assign(e, makeEnemy())
     e.id = this.nextEnemyId++
@@ -111,7 +113,7 @@ export class World {
 
   fireProjectile(x: number, y: number, angle: number, speed: number, radius: number, life: number): Projectile | null {
     const p = this.projectiles.find(p => !p.active)
-    if (!p) return null
+    if (!p) { this.emit({ type: 'poolOverflow', pool: 'projectile', x, y, angle }); return null }
     p.id = this.nextProjectileId++
     p.active = true
     p.x = p.px = x; p.y = p.py = y

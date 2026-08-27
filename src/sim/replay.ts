@@ -65,15 +65,21 @@ export function replayFromJson(json: string): Replay {
   return isEncodedReplay(obj) ? decodeReplay(obj) : obj
 }
 
-// Fresh world from the replay header, then one frame per tick. Restart frames only set wantsRestart (nothing resets).
+// Fresh world from the replay header, then one frame per tick. A restart frame rebuilds the world and
+// the metrics and keeps feeding the remaining frames — the same rule as the tick loop in src/main.ts,
+// so one replay gives one hash whether it runs here or in the browser.
 export function runReplay(replay: Replay, onTick?: (world: World) => void): { world: World; hash: number; metrics: Metrics } {
-  const world = createWorld(replay.seed, replay.scenario, { god: replay.god })
-  const metrics = new Metrics()
+  let world = createWorld(replay.seed, replay.scenario, { god: replay.god })
+  let metrics = new Metrics()
   for (const f of replay.frames) {
     stepWorld(world, f)
     metrics.consume(world, world.events)
     world.events.length = 0
     onTick?.(world)
+    if (world.wantsRestart) {
+      world = createWorld(replay.seed, replay.scenario, { god: replay.god })
+      metrics = new Metrics()
+    }
   }
   return { world, hash: hashWorld(world), metrics }
 }

@@ -98,19 +98,54 @@ One gap. The builder fixes that one at the root. A gap without a `repro` is reje
 
 ## 5. Automated gates, run before any critic
 
-A failing gate is a loss and costs no critic tokens. Run them in this order.
+A failing gate is a loss and costs no critic tokens. Gates are **scoped**: universal gates run on
+every piece; balance gates run only on pieces whose `owns` includes `src/sim/waves.ts`,
+`src/sim/scenarios.ts`, `src/tuning.ts`, or an enemy file. A HUD or audio piece is never failed by a
+balance number it does not control.
+
+**Universal — every piece, every round.**
 
 - `pnpm typecheck && pnpm test` green. If `src/sim/` or `src/tuning.ts` changed, the replay hashes
   were re-pinned with `pnpm record-bots`, never by hand.
-- `pnpm sim -- --scenario full --bot kite --seeds 1-8`: `clearSeconds` in 60 to 120 on at least 6 of
-  8 seeds; `successfulDodges / dodges` between 0.6 and 0.8 (a dodge the player never lands is a
-  panic button, one that always lands is free).
-- `pnpm sim -- --scenario wave1 --bot idle --seeds 1-8`: `deaths` is 1 on every seed.
-- `pnpm sim -- --scenario full --bot naive-melee --seeds 1-8`: first death after tick 1800 (30 s).
-- Perf: `frameStats()` p95 at or under 16.6 ms and `maxTickUs` at or under 2000 on the heaviest
-  scenario in the piece's protocol.
 - Determinism: the fixture hash from `pnpm test` equals `__game.hash()` after `__game.replay()` of
   the same fixture in the browser.
+- Perf: `frameStats()` p95 at or under 16.6 ms and `maxTickUs` at or under 2000 on the heaviest
+  scenario in the piece's protocol.
+- No silent drops: zero `poolOverflow` events across the piece's scenario run. A pattern that looks
+  like it fired while bullets were dropped is an invisible correctness bug, and it appears exactly
+  when the screen is busiest.
+
+**Balance — only for pieces that own balance.**
+
+- Floor: `pnpm sim -- --scenario wave1 --bot idle --seeds 1-8` — `deaths` is 1 on every seed.
+- **Variance.** `pnpm sim -- --scenario full --bot kite --seeds 1-8` — `clearSeconds` spread
+  (max minus min) at or above 6 s, AND `damageTaken` not identical across all 8 seeds. Today the
+  spread is 5.5 s and `damageTaken` is exactly 4 on every seed: the room is solved and memorizable,
+  which is the deepest fun deficit in the slice. Seeds must change the fight, not the décor.
+- Dodge economy, measured directly rather than through a bot's policy: (a) roll travel speed
+  (`dodge.distance / dodge.ticks * 60`) must not exceed `player.maxSpeed` by more than 20 percent —
+  today it is 146.7 px/s against 95 px/s, a 54 percent free-travel bonus that makes rolling strictly
+  better than running; (b) a never-attacking dodge-spam bot must die in `full` within 60 s — today it
+  survives a 120 s cap because a rolling player is uncatchable by melee.
+  Report `successfulDodges / dodges` every round but never fail a piece on it. Measured at 0.03 for
+  the kite bot, because that bot rolls away from a telegraph rather than through an attack: the ratio
+  describes the bot's policy, not the game's design. The old skill asserted a 0.6–0.8 band that had
+  never been measured against a real run.
+- Skill gradient: `kite` clears at least 6 of 8; `naive-melee` clears at most 3 of 8. The room must
+  still separate a punish policy from a mash policy.
+
+**Struck, with the reason, so no future agent re-adds them.**
+
+- ~~`clearSeconds` in 60 to 120 on at least 6 of 8 seeds.~~ Measured 37.8–43.3 s by four independent
+  audits. The gate is unpassable, and the only ways to pass it are HP inflation or filler waves —
+  both forbidden by `VISION.md` §2 ("no padding, no filler rooms"). One room clearing in ~40 s is the
+  right order of magnitude inside a 25–45 minute run. Duration was never the defect; variance is.
+- ~~`naive-melee` first death after tick 1800.~~ Measured 19.5–21.8 s, but `bots.ts:44` only dodges
+  brute windups and never charger dashes, so the naive bot is a worse proxy than a new player.
+  Report the number every round; never fail a piece on it.
+
+Bots are regression probes, not players. No gate here proves fun. Fun is proven by a human playing
+five runs and reaching for the sixth unprompted — that is a checkpoint the loop cannot run for you.
 
 ## 6. Lanes and owns
 

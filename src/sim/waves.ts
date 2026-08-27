@@ -29,7 +29,8 @@ export function updateSpawnQueue(world: World): void {
   for (let i = world.spawnQueue.length - 1; i >= 0; i--) {
     const s = world.spawnQueue[i]
     s.ticksLeft--
-    if (s.ticksLeft <= 0) { world.spawnEnemy(s.kind, s.x, s.y); world.spawnQueue.splice(i, 1) }
+    // a full pool emits poolOverflow and returns null; keep the entry and retry next tick
+    if (s.ticksLeft <= 0 && world.spawnEnemy(s.kind, s.x, s.y)) world.spawnQueue.splice(i, 1)
   }
 }
 

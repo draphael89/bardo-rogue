@@ -1,0 +1,252 @@
+{
+  "goal": "Finish Bardo Rogue, a browser action-roguelike, so a blind critic cannot pick it out beside real Enter the Gungeon and Hades frames.",
+  "bar": "Enter the Gungeon and Hades",
+  "arena": "game",
+  "mix": "efficient",
+  "stopRule": "until the user stops it",
+  "wave": 1,
+  "status": "phase0",
+  "evidenceLimit": "Reference exhibits are 1920x1080 gameplay stills. Motion timing is judged against the rubric's feel-chain acceptance criteria using our own tick-labelled strips, not against the bar. Every motion verdict must say so.",
+  "phase0": "Repair batch run before wave 1: attack edge-trigger, camera-aware pointer, live metrics getter, widened state hash, visual/gameplay RNG stream split, pool-overflow telemetry, restart replay parity, tools/strip.ts motion exporter, ART_DIRECTION.md, per-entity views split, recalibrated balance gates.",
+  "lanes": [
+    {
+      "id": "feel",
+      "why": "sword, dodge and impact all read and write player.ts, combat.ts, tuning.ts, presenter.ts and camera.ts. One owner, in sequence.",
+      "pieces": [
+        "sword-swing",
+        "hit-impact",
+        "dodge-roll"
+      ]
+    },
+    {
+      "id": "brute",
+      "why": "own sim file plus its own view module after the views split; disjoint from every other lane.",
+      "pieces": [
+        "brute"
+      ]
+    },
+    {
+      "id": "caster",
+      "why": "own sim file plus its own view module; disjoint.",
+      "pieces": [
+        "caster"
+      ]
+    },
+    {
+      "id": "charger",
+      "why": "own sim file plus its own view module; disjoint.",
+      "pieces": [
+        "charger"
+      ]
+    },
+    {
+      "id": "ui",
+      "why": "hud.ts and damageNumbers.ts are touched by nothing else this wave; two pieces share hud.ts so they run in sequence.",
+      "pieces": [
+        "combat-hud",
+        "death-card"
+      ]
+    },
+    {
+      "id": "audio",
+      "why": "src/audio is fully disjoint from every other lane.",
+      "pieces": [
+        "audio-bed"
+      ]
+    }
+  ],
+  "pieces": {
+    "sword-swing": {
+      "spec": "The three-hit greatsword chain: anticipation, arc, contact, recovery, and a heavy third hit that reads as a commitment. Verified leads, do not spend a round rediscovering them: the heavy is only +4 startup ticks, +2 hit-stop, +60 degrees of arc and double damage \u2014 nothing in the world commits to it, so it reads as a big light hit rather than a greatsword. Movement is zeroed for 10 ticks during heavy startup (167 ms) and is barely perceived. The crescent arc with tapered trailing edge is already the best visual in the game; build on it, do not replace it. Consider hit-confirm recovery (connecting cancels earlier than missing), whiff commitment, aim steering during early startup only, and an authored lunge curve instead of the current uniform one. Responsive does not mean uncommitted: do not make all four phases equally cancellable.",
+      "owns": [
+        "src/sim/player.ts",
+        "src/sim/combat.ts",
+        "src/tuning.ts",
+        "src/render/views/player.ts",
+        "src/render/presenter.ts",
+        "src/render/particles.ts",
+        "src/render/camera.ts"
+      ],
+      "protocol": "Motion. Dev server must already be on :5173; never start a second. 1) `pnpm strip -- --scenario dummy --seed 1 --from the first attack press --frames 12 --every 2 --crop 176,88,128,96 --out <E>/strip.png` \u2014 tick-labelled, --stepwise discipline, NEAREST upscale only. 2) the sidecar `<E>/strip.png.json` state+event trace. 3) `pnpm poses -- --only swing --out <E>/poses.png`. 4) the single most load-bearing frame, 4x NEAREST crop, as `<E>/exhibit.png` \u2014 this is the blind-comparison exhibit and it must be the same medium as the reference. 5) startup/active/recovery tick counts read from the trace, written to `<E>/timing.json`. Same seed, same crop box, every round. DRIVE THE INPUT WITH DISCRETE PRESSES, never `--hold '{\"attack\":true}'`: the hold flag re-applies the input partial before every single step, which is mashing at 60 Hz and hides what a player's own timing produces. Attack is now a true edge (one press = one intention), so use the `--eval` hook to press once per swing at the earliest legal chain tick. A chain captured by per-tick re-pressing is a fiction.",
+      "reference": [
+        "gauntlet/evidence/reference/ref-melee-01.jpg",
+        "gauntlet/evidence/reference/ref-melee-02.jpg",
+        "gauntlet/evidence/reference/ref-melee-03.jpg"
+      ],
+      "status": "open",
+      "rounds": 0,
+      "stalls": 0,
+      "memo": [],
+      "latest": [],
+      "history": []
+    },
+    "hit-impact": {
+      "spec": "The moment a hit lands: freeze, flash, knockback, reaction, camera, sound. Verified leads: the camera is SILENT on light hits, which are ~90 percent of all swings. Shake is trauma squared times shakeMax, so traumaLight 0.22 yields 0.22^2 x 4px = 0.19 internal pixels \u2014 invisible at 480x270 \u2014 and the directional kick is gated on `ev.heavy || ev.killed` (presenter.ts:80) so light hits get none at all. Separately, TWO reward channels are dead code: `dodged` (a successful i-frame dodge-through, the most skill-expressive input in the game) and `enemyStagger` are both emitted by the sim and consumed ONLY by metrics \u2014 grep confirms zero presenter and zero audio consumers. The game says nothing when the player does the hardest thing in it. The kill shatter, blood decals that outlive the fight, and the poise rule (only the heavy staggers a brute) already work; keep them.",
+      "owns": [
+        "src/sim/combat.ts",
+        "src/tuning.ts",
+        "src/render/presenter.ts",
+        "src/render/particles.ts",
+        "src/render/camera.ts",
+        "src/render/views/player.ts"
+      ],
+      "protocol": "Motion. Dev server must already be on :5173; never start a second. 1) `pnpm strip -- --scenario wave1 --seed 1 --from 2 ticks before first contact --frames 12 --every 2 --crop 160,80,160,110 --out <E>/strip.png` \u2014 tick-labelled, --stepwise discipline, NEAREST upscale only. 2) the sidecar `<E>/strip.png.json` state+event trace. 3) `pnpm poses -- --only kill --out <E>/poses.png`. 4) the single most load-bearing frame, 4x NEAREST crop, as `<E>/exhibit.png` \u2014 this is the blind-comparison exhibit and it must be the same medium as the reference. 5) startup/active/recovery tick counts read from the trace, written to `<E>/timing.json`. Same seed, same crop box, every round. Additionally capture an idle strip with the SAME crop as `<E>/strip-idle.png`: a light-hit strip that is indistinguishable from idle is an automatic loss. DRIVE THE INPUT WITH DISCRETE PRESSES, never `--hold '{\"attack\":true}'`: the hold flag re-applies the input partial before every single step, which is mashing at 60 Hz and hides what a player's own timing produces. Attack is now a true edge (one press = one intention), so use the `--eval` hook to press once per swing at the earliest legal chain tick. A chain captured by per-tick re-pressing is a fiction.",
+      "reference": [
+        "gauntlet/evidence/reference/ref-melee-01.jpg",
+        "gauntlet/evidence/reference/ref-melee-02.jpg",
+        "gauntlet/evidence/reference/ref-melee-03.jpg"
+      ],
+      "status": "open",
+      "rounds": 0,
+      "stalls": 0,
+      "memo": [],
+      "latest": [],
+      "history": []
+    },
+    "dodge-roll": {
+      "spec": "The dodge as the other half of the combat language: launch, invulnerable traversal, landing. Verified leads: 18 ticks, 44 px, i-frames on ticks 2-12. The economics are broken \u2014 44px/18t = 146.7 px/s against a 95 px/s run speed, so rolling is strictly better travel, and a never-attacking dodge-spam bot stalls wave 1 indefinitely (brutes landed 2 attacks in 120 seconds because they can never catch a rolling player). The i-frame window itself is honest and pinned by an exact test; the surrounding economics are the defect. Consider a cost (cooldown or stamina), earlier i-frame onset so a correct read is rewarded rather than punished, direction latched at the exact input edge, and a landing with readable recovery instead of one generic easing curve. Preserve attack buffering through the roll. A generic 360-degree sprite spin reads as a programmer's roll.",
+      "owns": [
+        "src/sim/player.ts",
+        "src/tuning.ts",
+        "src/render/views/player.ts",
+        "src/render/presenter.ts",
+        "src/render/camera.ts"
+      ],
+      "protocol": "Motion. Dev server must already be on :5173; never start a second. 1) `pnpm strip -- --scenario wave1 --seed 1 --from the dodge press --frames 12 --every 2 --crop 176,88,128,96 --out <E>/strip.png` \u2014 tick-labelled, --stepwise discipline, NEAREST upscale only. 2) the sidecar `<E>/strip.png.json` state+event trace. 3) `pnpm poses -- --only dodge --out <E>/poses.png`. 4) the single most load-bearing frame, 4x NEAREST crop, as `<E>/exhibit.png` \u2014 this is the blind-comparison exhibit and it must be the same medium as the reference. 5) startup/active/recovery tick counts read from the trace, written to `<E>/timing.json`. Same seed, same crop box, every round. DRIVE THE INPUT WITH DISCRETE PRESSES, never `--hold '{\"attack\":true}'`: the hold flag re-applies the input partial before every single step, which is mashing at 60 Hz and hides what a player's own timing produces. Attack is now a true edge (one press = one intention), so use the `--eval` hook to press once per swing at the earliest legal chain tick. A chain captured by per-tick re-pressing is a fiction.",
+      "reference": [
+        "gauntlet/evidence/reference/ref-melee-01.jpg",
+        "gauntlet/evidence/reference/ref-melee-02.jpg",
+        "gauntlet/evidence/reference/ref-melee-03.jpg"
+      ],
+      "status": "open",
+      "rounds": 0,
+      "stalls": 0,
+      "memo": [],
+      "latest": [],
+      "history": []
+    },
+    "brute": {
+      "spec": "The brute's sentence is 'get out of the red, then hit me'. Chase, 20-tick windup with aim tracking that commits 6 ticks before release, committed lunge, 34-tick recovery, and stagger only from the heavy finisher. The timings already sit in a fair readability band \u2014 the defect is that readability is COLOUR MEMORY, not geometry. All three enemies share one red tint, the tell is tint plus squash on a 16px sprite, and there is no ground-projected geometry telling the player where the danger will be. Fix readability so it survives a sprite swap. NOTE: `src/tuning.ts` and `src/render/presenter.ts` belong to the feel lane this wave. If your fix needs either, stop and report rather than editing them. SHARED FILES, not yours: `src/render/views/shared.ts` (EntityView and the common helpers) and `src/render/views/enemies.ts` (the per-kind dispatcher) are owned by no lane this wave. If your fix needs either, stop and report rather than editing them \u2014 a second lane is very likely reading the same lines.",
+      "owns": [
+        "src/sim/enemies/brute.ts",
+        "src/render/views/enemy-brute.ts"
+      ],
+      "protocol": "Motion. Dev server must already be on :5173; never start a second. 1) `pnpm strip -- --scenario brute --seed 1 --from windup start --frames 12 --every 2 --crop 144,72,192,128 --out <E>/strip.png` \u2014 tick-labelled, --stepwise discipline, NEAREST upscale only. 2) the sidecar `<E>/strip.png.json` state+event trace. 3) `pnpm poses -- --only brute --out <E>/poses.png`. 4) the single most load-bearing frame, 4x NEAREST crop, as `<E>/exhibit.png` \u2014 this is the blind-comparison exhibit and it must be the same medium as the reference. 5) startup/active/recovery tick counts read from the trace, written to `<E>/timing.json`. Same seed, same crop box, every round. The strip must span tell through recovery so the punish window is visible and countable in ticks.",
+      "reference": [
+        "gauntlet/evidence/reference/ref-density-01.jpg",
+        "gauntlet/evidence/reference/ref-density-02.jpg",
+        "gauntlet/evidence/reference/ref-density-03.jpg"
+      ],
+      "status": "open",
+      "rounds": 0,
+      "stalls": 0,
+      "memo": [],
+      "latest": [],
+      "history": []
+    },
+    "caster": {
+      "spec": "The caster's sentence is 'cross the line or cut the bolt'. Range management, 24-tick aim with a dotted line that hardens at 66 percent, one cuttable bolt, cooldown, strafe. Bolt-cutting is the single best idea in this combat \u2014 melee answering ranged \u2014 and it is under-rewarded: it deletes a projectile and creates no offensive payoff, and metrics say it happens 0-3 times per full run. The whole aim state is punishable, which is good. Verified bug in your file: caster.ts calls `world.fireProjectile(...)` and then emits `boltFired` UNCONDITIONALLY, so a saturated caster claims a shot and enters recovery with no projectile (a harness agent is fixing that specific line right now \u2014 rebase on it, do not duplicate it). NOTE: `src/tuning.ts` and `src/render/presenter.ts` belong to the feel lane this wave; stop and report if you need them. SHARED FILES, not yours: `src/render/views/shared.ts` (EntityView and the common helpers) and `src/render/views/enemies.ts` (the per-kind dispatcher) are owned by no lane this wave. If your fix needs either, stop and report rather than editing them \u2014 a second lane is very likely reading the same lines. One coupling to know about: `BoltView` and `drawAimLine` live in your file but `BoltView` renders EVERY projectile, not just caster bolts. Changing it changes what other enemies' projectiles look like. Keep bolt visuals caster-specific unless the change is genuinely universal, and say which you did.",
+      "owns": [
+        "src/sim/enemies/caster.ts",
+        "src/render/views/enemy-caster.ts"
+      ],
+      "protocol": "Motion. Dev server must already be on :5173; never start a second. 1) `pnpm strip -- --scenario caster --seed 1 --from aim start --frames 12 --every 2 --crop 144,72,192,128 --out <E>/strip.png` \u2014 tick-labelled, --stepwise discipline, NEAREST upscale only. 2) the sidecar `<E>/strip.png.json` state+event trace. 3) `pnpm poses -- --only caster --out <E>/poses.png`. 4) the single most load-bearing frame, 4x NEAREST crop, as `<E>/exhibit.png` \u2014 this is the blind-comparison exhibit and it must be the same medium as the reference. 5) startup/active/recovery tick counts read from the trace, written to `<E>/timing.json`. Same seed, same crop box, every round. Include a bolt-cut in the captured range; the trace must show the cut event.",
+      "reference": [
+        "gauntlet/evidence/reference/ref-density-01.jpg",
+        "gauntlet/evidence/reference/ref-density-02.jpg",
+        "gauntlet/evidence/reference/ref-density-03.jpg"
+      ],
+      "status": "open",
+      "rounds": 0,
+      "stalls": 0,
+      "memo": [],
+      "latest": [],
+      "history": []
+    },
+    "charger": {
+      "spec": "The charger's sentence is 'count the tremble'. Orbit, 16-tick freeze with crouch and tremble, 80px dash, 30-tick recovery. Verified problem: the red only appears for roughly the last 147 ms of the tell, which is at the floor of fair, and in wave 3 four chargers read as four identical red blinks with no way to tell which lane each will take. This is the readability piece with the least margin. Ground-projected dash lanes are the obvious direction. NOTE: `src/tuning.ts` and `src/render/presenter.ts` belong to the feel lane this wave; stop and report if you need them. SHARED FILES, not yours: `src/render/views/shared.ts` (EntityView and the common helpers) and `src/render/views/enemies.ts` (the per-kind dispatcher) are owned by no lane this wave. If your fix needs either, stop and report rather than editing them \u2014 a second lane is very likely reading the same lines.",
+      "owns": [
+        "src/sim/enemies/charger.ts",
+        "src/render/views/enemy-charger.ts"
+      ],
+      "protocol": "Motion. Dev server must already be on :5173; never start a second. 1) `pnpm strip -- --scenario charger --seed 1 --from freeze start --frames 12 --every 2 --crop 144,72,192,128 --out <E>/strip.png` \u2014 tick-labelled, --stepwise discipline, NEAREST upscale only. 2) the sidecar `<E>/strip.png.json` state+event trace. 3) `pnpm poses -- --only charger --out <E>/poses.png`. 4) the single most load-bearing frame, 4x NEAREST crop, as `<E>/exhibit.png` \u2014 this is the blind-comparison exhibit and it must be the same medium as the reference. 5) startup/active/recovery tick counts read from the trace, written to `<E>/timing.json`. Same seed, same crop box, every round. Also capture a 4-charger frame from scenario wave3 as `<E>/exhibit-crowd.png`: if four tells are indistinguishable, that is the gap.",
+      "reference": [
+        "gauntlet/evidence/reference/ref-density-01.jpg",
+        "gauntlet/evidence/reference/ref-density-02.jpg",
+        "gauntlet/evidence/reference/ref-density-03.jpg"
+      ],
+      "status": "open",
+      "rounds": 0,
+      "stalls": 0,
+      "memo": [],
+      "latest": [],
+      "history": []
+    },
+    "combat-hud": {
+      "spec": "Hearts, wave counter, banners, place-name plate, control hint \u2014 everything on screen during a fight. What exists is already decent and crisp: all text is pixel webfont at resolution 1 inside the 480x270 target. Two verified defects to fix while you are here: banner timers run on wall-clock render time rather than sim time, so banners desync from sim state under slow-motion and stepwise capture (a death capture showed 'WAVE 1' still on screen); and there are no gamepad glyphs despite gamepad input being fully wired \u2014 the hint text says 'WASD / mouse / click / space' to a controller player. Judge the HUD as an inhabited combat frame, not an empty overlay.",
+      "owns": [
+        "src/render/hud.ts",
+        "src/render/damageNumbers.ts"
+      ],
+      "protocol": "Still. `pnpm shot -- --scenario wave3 --seed 1 --ticks 500 --bot kite --stepwise 1 --out <E>/still.png` (a busy frame, not an empty room), plus a 2x NEAREST crop of the HUD corners as `<E>/crop.png` with the SAME crop box every round, plus a room-clear frame and a death frame. Same seed and ticks each round.",
+      "reference": [
+        "gauntlet/evidence/reference/ref-ui-01.jpg",
+        "gauntlet/evidence/reference/ref-ui-02.jpg"
+      ],
+      "status": "open",
+      "rounds": 0,
+      "stalls": 0,
+      "memo": [],
+      "latest": [],
+      "history": []
+    },
+    "death-card": {
+      "spec": "The death moment and its card. The staging already works \u2014 30 ticks of 0.25 slow-motion, the player's own sprite shatters, a red vignette closes in \u2014 and several audits called it the most art-directed moment in the game. What is wrong is the words. The card says 'YOU DIED' and 'press R', which is developer UX wearing a game's clothes, and the loudest authored voice in the entire build is a stock fighter-game announcer shouting FLAWLESS VICTORY over an indigo death-realm. Read VISION.md: you are already dead, losing a run is being pulled back to the bardo, not a game over. This is the cheapest place in the whole project to put the fiction into the game instead of the filename, and there is a latent motif nobody wrote down \u2014 a room floating in a starfield void, doors and windows opening onto star-sky, THE THRESHOLD. Also add the run summary that is missing. `ART_DIRECTION.md` at the repo root is the aim; cite it.",
+      "owns": [
+        "src/render/hud.ts",
+        "src/render/atmosphere.ts"
+      ],
+      "protocol": "Still plus short motion. `pnpm strip -- --scenario wave1 --seed 5 --from <the killing blow> --frames 10 --every 3 --out <E>/strip.png` for the death sequence, plus the settled card as `<E>/exhibit.png` at 2x NEAREST. Same seed and start tick every round.",
+      "reference": [
+        "gauntlet/evidence/reference/ref-ui-01.jpg",
+        "gauntlet/evidence/reference/ref-ui-02.jpg"
+      ],
+      "status": "open",
+      "rounds": 0,
+      "stalls": 0,
+      "memo": [],
+      "latest": [],
+      "history": []
+    },
+    "audio-bed": {
+      "spec": "Give the room a floor of sound and give the mix somewhere to grow. Verified state: the Web Audio layer is competent Foley \u2014 round-robin variants with anti-repeat, pitch variance, a synthesized bandpass-noise swish layered under every sword whoosh, layered per-event mappings \u2014 but there is ONE master GainNode, `play()` exposes no loop flag so ambience literally cannot play today, `fight.ogg` ships in the manifest and is never played, the `duckUntil` field is written and never read, and `duck()` lowers the WHOLE mix including the impact it should be making room for. Ship: master/music/ambience/sfx bus split, a loop and crossfade helper, one drone ambience, one two-layer combat loop crossfaded on `aliveEnemies() > 0`, and delete the fighter announcer. Audio must stay presentation-only and must never touch sim state. Load the `audio-design` skill in this repo before you start.",
+      "owns": [
+        "src/audio/audio.ts",
+        "src/audio/sfxMap.ts"
+      ],
+      "protocol": "No image can judge sound; say so and grade with lowered confidence. Evidence: (1) the event-to-sound map rendered as a table, (2) the bus graph with gain and ducking curves as NUMBERS, (3) a 10-second OfflineAudioContext render of a full wave-1 fight written to `<E>/mix.wav` plus its waveform and peak/RMS per bus as `<E>/levels.json` \u2014 a mix that clips is a loss, (4) the event timeline from a replay. Judge structure and levels, not taste.",
+      "reference": [
+        "gauntlet/evidence/reference/ref-density-01.jpg",
+        "gauntlet/evidence/reference/ref-density-02.jpg",
+        "gauntlet/evidence/reference/ref-density-03.jpg"
+      ],
+      "status": "open",
+      "rounds": 0,
+      "stalls": 0,
+      "memo": [],
+      "latest": [],
+      "history": []
+    }
+  },
+  "waves": [],
+  "phase0Findings": [
+    "Attack is now a true edge on keyboard, mouse and gamepad; aim goes through the inverse world transform. 35 tests green (was 18).",
+    "The RNG stream split alone fixed the variance defect two audits called the deepest fun deficit: kite/full clearSeconds spread went 5.5s -> 8.9s and damageTaken went from 4 on every seed to [2,4,1,3,3,3,4,2]. The 'solved, memorizable room' was substantially an artifact of visual arena generation burning the gameplay RNG, not a wave-design problem.",
+    "Pinned hashes legitimately re-pinned to 389380115 / 2214371947 / 1420966770 with the sanity asserts intact.",
+    "pnpm strip ships: tick-labelled, state and event annotated, freeze marked, nearest-neighbour crops, trace sidecar. Nine unjudgeable pieces became judgeable.",
+    "ART_DIRECTION.md ships at 533 lines with an acceptance test, so a gap can be cited as 'violates SS N' rather than as taste.",
+    "views.ts split per entity behind a re-export barrel, so six lanes can run in parallel without three agents writing one file.",
+    "Found and fixed a gate of my own that was as unmeasured as the one I struck: successfulDodges/dodges measured 0.03, not the asserted 0.6-0.8, because the kite bot rolls away from telegraphs rather than through attacks. Replaced with direct measurement of roll speed against run speed.",
+    "Found 29 Math.random calls in the render layer, so the same strip captured twice differed (md5 392502cf vs b79c1681). A seventh agent is giving presentation its own seeded generator; without it every round-over-round visual diff is noise."
+  ]
+}

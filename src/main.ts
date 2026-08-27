@@ -74,7 +74,12 @@ async function boot() {
     metrics.consume(world, world.events)
     presenter.handleEvents(world.events)
     world.events.length = 0
-    if (world.wantsRestart) reset()
+    if (world.wantsRestart) {
+      // reset() clears replayFrames; a restart *inside* a replay keeps playing, matching runReplay()
+      const frames = replayFrames, idx = replayIdx
+      reset()
+      replayFrames = frames; replayIdx = idx
+    }
   }
 
   const record = (on = !recorder.recording) => {

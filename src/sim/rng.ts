@@ -13,3 +13,14 @@ export class Rng {
   pick<T>(arr: readonly T[]): T { return arr[Math.floor(this.next() * arr.length)] }
   get state(): number { return this.s }
 }
+
+// Named streams off one world seed. Cosmetic rolls live on their own stream so adding or
+// removing decoration can never shift enemy behaviour (see World.visualRng).
+export const STREAM = { gameplay: 0x9e3779b9, visual: 0x517cc1b7 } as const
+
+export function streamSeed(seed: number, key: number): number {
+  let h = (seed ^ key) >>> 0
+  h = Math.imul(h ^ (h >>> 16), 0x85ebca6b)
+  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35)
+  return (h ^ (h >>> 16)) >>> 0
+}

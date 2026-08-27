@@ -12,7 +12,10 @@
     "typecheck": "tsc --noEmit",
     "assets": "tsx tools/import-assets.ts",
     "sim": "tsx tools/headless.ts",
-    "shot": "tsx tools/shot.ts"
+    "shot": "tsx tools/shot.ts",
+    "poses": "tsx tools/poses.ts",
+    "record-bot": "tsx tools/record-bot.ts",
+    "record-bots": "tsx tools/record-bot.ts --all"
   },
   "dependencies": {
     "pixi.js": "^8.20.1"

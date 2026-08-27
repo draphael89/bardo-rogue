@@ -17,9 +17,9 @@ export class Hud {
     this.waveText = new Text({ text: '', style: { fontFamily: 'Kenney Pixel', fontSize: 16, fill: 0xf0e0c0 }, resolution: 1 })
     this.waveText.anchor.set(1, 0); this.waveText.position.set(tuning.view.width - 8, 4)
     this.banner = new Text({ text: '', style: { fontFamily: 'Kenney Blocks', fontSize: 24, fill: 0xfff0d0, stroke: { color: 0x2a1010, width: 3 } }, resolution: 1 })
-    this.banner.anchor.set(0.5); this.banner.position.set(tuning.view.width / 2, 40)
+    this.banner.anchor.set(0.5); this.banner.position.set(tuning.view.width / 2, 30)
     this.sub = new Text({ text: '', style: { fontFamily: 'Kenney Pixel', fontSize: 16, fill: 0xf0e0c0 }, resolution: 1 })
-    this.sub.anchor.set(0.5); this.sub.position.set(tuning.view.width / 2, 58)
+    this.sub.anchor.set(0.5); this.sub.position.set(tuning.view.width / 2, 49)
     layer.addChild(this.waveText, this.banner, this.sub)
   }
   showBanner(text: string, sub = '', seconds = 1.6) { this.banner.text = text; this.sub.text = sub; this.bannerTimer = seconds; this.banner.scale.set(1.4) }

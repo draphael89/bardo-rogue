@@ -64,7 +64,18 @@ export const tuning = {
     flashTicks: 4, squashTicks: 6,
     lookahead: 4, lookaheadLerp: 0.08,
     aberrationTicks: 3,
+    aberrationStrength: 2,  // screen px of red/blue split at the pulse peak
+    zoom: { roomClear: 1.06, kill: 1.015, heavyHit: 1.01, decay: 6 }, // decay = per-second ease rate back to 1
     damageNumbers: false,
+    light: {
+      ambientDarkness: 0.38,  // 0 = untouched, 1 = black at the arena edge
+      ambientTint: 0x6a7090, // colour the darkness leans toward (cool, so the warm floor never goes muddy)
+      vignette: 0.28,        // how much brighter the arena centre is than the edge
+      brazierRadius: 84, brazierFlicker: 0.18, brazierTint: 0xffa040,
+      playerLightRadius: 44, playerLightAlpha: 0.22,
+      flameRate: 14,         // flame particles per second per brazier
+      deathFadeSec: 1.6,     // slow red vignette after playerDeath
+    },
   },
 }
 

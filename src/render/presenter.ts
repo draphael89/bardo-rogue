@@ -10,6 +10,9 @@ import { Camera } from './camera'
 import { Hud } from './hud'
 import { Particles } from './particles'
 import { lerp } from './anim'
+import { Lighting } from './light'
+import { PostFx } from './postfx'
+import { DamageNumbers } from './damageNumbers'
 
 // Reads sim state + events every frame and drives everything visible. Never mutates the sim.
 export class Presenter {
@@ -25,6 +28,11 @@ export class Presenter {
   time = 0
   flashOverlay: Sprite
   onEvent: ((ev: SimEvent) => void) | null = null
+  // juice hooks: lighting, post-fx, damage numbers
+  lighting: Lighting
+  postfx: PostFx
+  damageNumbers: DamageNumbers
+  private lastHurtAngle = 0
 
   constructor(public ra: RenderApp, public atlas: Atlas, public world: World) {
     const L = ra.layers
@@ -37,6 +45,10 @@ export class Presenter {
     this.hud = new Hud(atlas, L.hud)
     this.flashOverlay = new Sprite(Texture.WHITE); this.flashOverlay.width = tuning.view.width; this.flashOverlay.height = tuning.view.height
     this.flashOverlay.alpha = 0; L.hud.addChild(this.flashOverlay)
+    // juice hooks
+    this.lighting = new Lighting(ra, atlas, this.particles, ra.app.renderer, world.arena)
+    this.postfx = new PostFx(ra)
+    this.damageNumbers = new DamageNumbers(L.fx)
   }
 
   // Called when the world object is replaced (restart).
@@ -48,6 +60,10 @@ export class Presenter {
     this.particles.clear()
     this.tilemap.setDoorOpen(false)
     this.playerView.body.tint = 0xffffff
+    // juice hooks: the player body is hidden after the death shatter
+    this.playerView.body.visible = this.playerView.shadow.visible = true
+    if (this.playerView.weapon) this.playerView.weapon.visible = true
+    this.damageNumbers.clear()
   }
 
   handleEvents(events: readonly SimEvent[]) {
@@ -61,6 +77,9 @@ export class Presenter {
           if (ev.heavy || ev.killed) this.camera.kick(ev.angle, ev.heavy ? 2.5 : 1.5)
           this.particles.hitSparks(ev.x, ev.y, ev.angle, ev.heavy ? 14 : 8, ev.kind === 'brute' ? 0xffe9a0 : 0xfff6d8)
           if (ev.killed) this.camera.addTrauma(J.traumaKill)
+          // juice hooks
+          if (ev.heavy) { this.postfx.pulse(); this.camera.punchZoom(J.zoom.heavyHit) }
+          if (J.damageNumbers) this.damageNumbers.show(ev.x, ev.y, ev.damage, ev.heavy)
           break
         }
         case 'kill': {
@@ -69,6 +88,7 @@ export class Presenter {
           this.particles.blood(ev.x, ev.y, ev.angle, ev.kind === 'charger' ? 0x6a3aa0 : 0x8a1a22)
           this.particles.puff(ev.x, ev.y, 6, 0x3a2a2a)
           this.flash(0.35, 0xffffff)
+          this.camera.punchZoom(J.zoom.kill) // juice hook
           break
         }
         case 'playerHurt':
@@ -76,8 +96,19 @@ export class Presenter {
           this.particles.hitSparks(ev.x, ev.y, ev.angle, 6, 0xff6060)
           this.playerView.squash = J.squashTicks
           this.flash(0.25, 0xff2020)
+          this.postfx.pulse(); this.lastHurtAngle = ev.angle // juice hook
           break
-        case 'playerDeath': this.camera.addTrauma(0.8); break
+        case 'playerDeath': {
+          this.camera.addTrauma(0.8)
+          // juice hook: the player shatters like an enemy and stays hidden until restart
+          const v = this.playerView
+          v.setFlash(false)
+          this.particles.shatter(v.body, ev.x, ev.y, this.lastHurtAngle)
+          this.particles.puff(ev.x, ev.y, 6, 0x3a2a2a)
+          v.body.visible = v.shadow.visible = false
+          if (v.weapon) v.weapon.visible = false
+          break
+        }
         case 'dodge': this.particles.dust(ev.x, ev.y + 4, ev.angle + Math.PI, 6); break
         case 'dodgeEnd': this.particles.dust(ev.x, ev.y + 4, 0, 3); break
         case 'footstep': this.particles.dust(ev.x, ev.y + 5, 0, 1); break
@@ -88,7 +119,7 @@ export class Presenter {
         case 'enemyAttack': if (ev.kind === 'brute') { this.particles.dust(ev.x, ev.y + 6, ev.angle + Math.PI, 5) } else if (ev.kind === 'charger') this.particles.dust(ev.x, ev.y + 6, ev.angle + Math.PI, 3); break
         case 'spawn': this.particles.spawnBurst(ev.x, ev.y); this.camera.addTrauma(0.08); break
         case 'waveStart': this.hud.showBanner(ev.wave === ev.total && ev.total > 1 ? 'FINAL WAVE' : `WAVE ${ev.wave}`, '', 1.3); break
-        case 'roomClear': this.camera.addTrauma(0.3); this.flash(0.6, 0xfff4d0); this.hud.showBanner('ROOM CLEARED', 'press R to run it again', 3); this.tilemap.setDoorOpen(true); break
+        case 'roomClear': this.camera.addTrauma(0.3); this.flash(0.6, 0xfff4d0); this.hud.showBanner('ROOM CLEARED', 'press R to run it again', 3); this.tilemap.setDoorOpen(true); this.postfx.pulse(); this.camera.punchZoom(J.zoom.roomClear); break
         case 'restart': break
       }
       this.onEvent?.(ev)
@@ -132,6 +163,7 @@ export class Presenter {
 
     if (this.playerView.squash > 0) this.playerView.squash -= dtSec * 60
     updatePlayerView(this.playerView, p, w, alpha, this.time)
+    if (p.state === 'dead' && this.playerView.weapon) this.playerView.weapon.visible = false // juice hook: shattered, not lying down
 
     // per-frame vector fx
     this.fxGraphics.clear()
@@ -139,14 +171,20 @@ export class Presenter {
     drawSwingArc(this.fxGraphics, p, alpha, w)
 
     this.particles.update(dtSec)
+    // juice hooks
+    this.lighting.update(w, dtSec, alpha)
+    this.damageNumbers.update(dtSec)
+    this.postfx.update(dtSec)
 
-    // camera
+    // camera: shake + zoom punch, both about the player so the player pixel never moves
     const aimX = Math.cos(p.aimAngle), aimY = Math.sin(p.aimAngle)
     this.camera.update(dtSec, aimX, aimY)
     const off = this.ra.arenaOffset
-    this.ra.world.position.set(Math.round(off.x + this.camera.offsetX), Math.round(off.y + this.camera.offsetY))
+    const pxr = Math.round(lerp(p.px, p.x, alpha)), pyr = Math.round(lerp(p.py, p.y, alpha))
+    this.ra.world.pivot.set(pxr, pyr)
+    this.ra.world.scale.set(this.camera.zoom)
+    this.ra.world.position.set(Math.round(off.x + pxr + this.camera.offsetX), Math.round(off.y + pyr + this.camera.offsetY))
     this.ra.world.rotation = this.camera.rotation
-    this.ra.world.pivot.set(0, 0)
 
     if (this.flashAlpha > 0) { this.flashOverlay.alpha = this.flashAlpha; this.flashAlpha = Math.max(0, this.flashAlpha - dtSec * 6) } else this.flashOverlay.alpha = 0
     this.hud.update(w, dtSec)

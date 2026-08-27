@@ -2,7 +2,7 @@ import { Container, Sprite, Texture, RenderTexture, Rectangle } from 'pixi.js'
 import type { Atlas } from './atlas'
 import { tuning } from '@/tuning'
 
-interface P { s: Sprite; vx: number; vy: number; life: number; maxLife: number; drag: number; grav: number; scale0: number; scale1: number; rot: number; alpha0: number; alpha1: number; ground: number | null }
+interface P { s: Sprite; vx: number; vy: number; life: number; maxLife: number; drag: number; grav: number; scale0: number; scale1: number; rot: number; alpha0: number; alpha1: number; ground: number | null; tint0: number; tint1: number | null }
 
 // Pooled sprite particles. Everything is drawn into the low-res target so soft shapes pixelate on their own.
 export class Particles {
@@ -30,14 +30,15 @@ export class Particles {
     if (this.renderer) this.renderer.render({ container: new Container(), target: this.decalRt, clear: true })
   }
 
-  private spawn(tex: Texture, x: number, y: number, o: Partial<P> & { tint?: number; blend?: 'add' | 'normal' } = {}): P | null {
+  private spawn(tex: Texture, x: number, y: number, o: Partial<P> & { tint?: number; tint1?: number; blend?: 'add' | 'normal' } = {}): P | null {
     if (this.live.length >= this.max) return null
     let p = this.pool.pop()
-    if (!p) { const s = new Sprite(); s.anchor.set(0.5); this.fx.addChild(s); p = { s, vx: 0, vy: 0, life: 0, maxLife: 1, drag: 1, grav: 0, scale0: 1, scale1: 1, rot: 0, alpha0: 1, alpha1: 0, ground: null } }
+    if (!p) { const s = new Sprite(); s.anchor.set(0.5); this.fx.addChild(s); p = { s, vx: 0, vy: 0, life: 0, maxLife: 1, drag: 1, grav: 0, scale0: 1, scale1: 1, rot: 0, alpha0: 1, alpha1: 0, ground: null, tint0: 0xffffff, tint1: null } }
     p.s.texture = tex; p.s.visible = true; p.s.position.set(x, y)
     p.vx = o.vx ?? 0; p.vy = o.vy ?? 0; p.life = p.maxLife = o.maxLife ?? 0.4; p.drag = o.drag ?? 1; p.grav = o.grav ?? 0
     p.scale0 = o.scale0 ?? 1; p.scale1 = o.scale1 ?? p.scale0; p.rot = o.rot ?? 0; p.alpha0 = o.alpha0 ?? 1; p.alpha1 = o.alpha1 ?? 0; p.ground = o.ground ?? null
-    p.s.tint = o.tint ?? 0xffffff; p.s.blendMode = o.blend ?? 'normal'; p.s.rotation = Math.random() * 6.28
+    p.tint0 = o.tint ?? 0xffffff; p.tint1 = o.tint1 ?? null
+    p.s.tint = p.tint0; p.s.blendMode = o.blend ?? 'normal'; p.s.rotation = Math.random() * 6.28
     p.s.scale.set(p.scale0 / 64)
     this.live.push(p)
     return p
@@ -57,6 +58,7 @@ export class Particles {
       const sc = p.scale0 + (p.scale1 - p.scale0) * u
       p.s.scale.set(sc / 64)
       p.s.alpha = p.alpha0 + (p.alpha1 - p.alpha0) * u
+      if (p.tint1 !== null) p.s.tint = lerpColor(p.tint0, p.tint1, u)
     }
   }
 
@@ -100,6 +102,17 @@ export class Particles {
     }
   }
 
+  // One brazier flame tongue (flame_05/06 are the solid shapes; 01-04 are wisps that vanish at this size).
+  // Normal blend on purpose: additive over the grey wall would bleach to white; the lightmap supplies the glow.
+  flame(x: number, y: number) {
+    const big = Math.random() < 0.3
+    const f = this.spawn(this.atlas.particle(Math.random() < 0.5 ? 'flame_05' : 'flame_06'), x + (Math.random() - 0.5) * 5, y + (Math.random() - 0.5) * 2, {
+      vx: (Math.random() - 0.5) * 6, vy: -16 - Math.random() * 14, maxLife: (big ? 0.5 : 0.3) + Math.random() * 0.15, drag: 0.94,
+      scale0: big ? 22 : 14 + Math.random() * 4, scale1: 5, rot: (Math.random() - 0.5) * 2, tint: 0xfff0a0, tint1: 0xff5a14, alpha0: 1, alpha1: 0.55,
+    })
+    if (f) f.s.rotation = (Math.random() - 0.5) * 0.4 // spawn() randomises rotation; a flame must point up
+  }
+
   // The enemy's own pixels fly apart along the hit direction, fall, and settle.
   shatter(body: Sprite, x: number, y: number, angle: number) {
     const tex = body.texture
@@ -131,3 +144,10 @@ export class Particles {
   }
 }
 void tuning
+
+function lerpColor(a: number, b: number, t: number): number {
+  const r = ((a >> 16) & 255) + (((b >> 16) & 255) - ((a >> 16) & 255)) * t
+  const g = ((a >> 8) & 255) + (((b >> 8) & 255) - ((a >> 8) & 255)) * t
+  const bl = (a & 255) + ((b & 255) - (a & 255)) * t
+  return (r << 16) | (g << 8) | bl
+}

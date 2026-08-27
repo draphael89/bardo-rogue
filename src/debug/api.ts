@@ -4,6 +4,7 @@ import { tuning } from '@/tuning'
 import { hashWorld } from '@/sim/hash'
 import { Metrics } from '@/sim/metrics'
 import { makeBot, type BotName } from '@/sim/bots'
+import type { Replay, EncodedReplay } from '@/sim/replay'
 import type { Loop } from '@/loop'
 
 // window.__game: what an agent (or Playwright) uses to drive and inspect the live game.
@@ -23,6 +24,10 @@ export interface GameApi {
   frameStats(): unknown
   mute(m?: boolean): boolean
   debug(v?: boolean): boolean
+  record(on?: boolean): boolean
+  stopRecord(): Replay
+  download(name?: string): void
+  replay(r: Replay | EncodedReplay): void
 }
 
 export function installApi(host: {
@@ -36,6 +41,10 @@ export function installApi(host: {
   metrics: Metrics
   mute(m?: boolean): boolean
   debug(v?: boolean): boolean
+  record(on?: boolean): boolean
+  stopRecord(): Replay
+  download(name?: string): void
+  replay(r: Replay | EncodedReplay): void
 }): GameApi {
   const api: GameApi = {
     get world() { return host.getWorld() },
@@ -62,6 +71,10 @@ export function installApi(host: {
     frameStats: () => host.loop.stats(),
     mute: m => host.mute(m),
     debug: v => host.debug(v),
+    record: on => host.record(on),
+    stopRecord: () => host.stopRecord(),
+    download: name => host.download(name),
+    replay: r => host.replay(r),
   }
   ;(window as unknown as { __game: GameApi }).__game = api
   return api

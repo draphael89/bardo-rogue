@@ -14,6 +14,10 @@ import { DebugOverlay } from '@/debug/overlay'
 import { installApi } from '@/debug/api'
 import { makeBot, type BotName } from '@/sim/bots'
 import { ARENA_COLS, ARENA_ROWS, TILE } from '@/sim/arena'
+import { decodeReplay, isEncodedReplay, quantizeFrame, replayToJson, type Replay, type EncodedReplay } from '@/sim/replay'
+import { Recorder } from '@/input/recorder'
+import { tuning } from '@/tuning'
+import { Text } from 'pixi.js'
 
 async function boot() {
   const q = new URLSearchParams(location.search)
@@ -41,17 +45,31 @@ async function boot() {
   const overlay = new DebugOverlay(ra.layers.debug, ra.layers.hud)
   overlay.setVisible(debug)
   let bot: ((w: World) => InputFrame) | null = botName ? makeBot(botName) : null
+  const recorder = new Recorder()
+  let replayFrames: InputFrame[] | null = null   // while set, these replace live/bot input
+  let replayIdx = 0
+  // R restarts whatever is currently running (not the URL scenario), so replays and __game.reset() restart correctly
+  let cur = { seed, scenario, god }
 
-  const reset = (s = seed, sc = scenario, opts: { god?: boolean } = { god }) => {
+  const reset = (s = cur.seed, sc = cur.scenario, opts: { god?: boolean } = { god: cur.god }) => {
+    cur = { seed: s, scenario: sc, god: !!opts.god }
     world = createWorld(s, sc, opts)
     metrics = new Metrics()
+    replayFrames = null
+    if (recorder.recording) { recorder.stop(); console.log('[replay] recording stopped by restart') }
     presenter.bindWorld(world)
     presenter.handleEvents([{ type: 'restart' }])
   }
 
   const tick = () => {
-    const frame = bot ? bot(world) : input.sample(world)
-    if (input.isDebugToggle()) overlay.toggle()
+    // always sample live input, even when a bot or replay drives the sim, so latched presses do not pile up
+    const live = input.sample(world)
+    let frame: InputFrame
+    if (replayFrames) {
+      frame = replayFrames[replayIdx++]
+      if (replayIdx >= replayFrames.length) { replayFrames = null; console.log('[replay] finished; back to live input') }
+    } else frame = quantizeFrame(bot ? bot(world) : live)
+    recorder.capture(frame)
     stepWorld(world, frame)
     metrics.consume(world, world.events)
     presenter.handleEvents(world.events)
@@ -59,9 +77,35 @@ async function boot() {
     if (world.wantsRestart) reset()
   }
 
+  const record = (on = !recorder.recording) => {
+    if (on && !recorder.recording) { reset(); recorder.start(cur.seed, cur.scenario, cur.god); console.log('[replay] recording (fresh run)') }
+    else if (!on && recorder.recording) stopRecord()
+    return recorder.recording
+  }
+  const stopRecord = () => {
+    const r = recorder.stop()
+    console.log(`[replay] ${r.frames.length} frames; suggested file replays/${recorder.suggestedName(r)}`)
+    console.log(replayToJson(r))
+    return r
+  }
+  const replay = (r: Replay | EncodedReplay) => {
+    const rep = isEncodedReplay(r) ? decodeReplay(r) : r
+    reset(rep.seed, rep.scenario, { god: rep.god })
+    replayFrames = rep.frames.length ? rep.frames : null
+    replayIdx = 0
+  }
+
+  const recText = new Text({ text: '', style: { fontFamily: 'Kenney Pixel', fontSize: 16, fill: 0xff5050 }, resolution: 1 })
+  recText.anchor.set(0.5, 0); recText.position.set(tuning.view.width / 2, 4)
+  ra.layers.hud.addChild(recText)
+  const updateRecText = () => {
+    recText.text = recorder.recording ? 'REC' : replayFrames ? 'REPLAY' : ''
+    recText.visible = !!recText.text && (replayFrames ? true : Math.floor(performance.now() / 500) % 2 === 0)
+  }
+
   const loop = new Loop({
     tick,
-    render: (alpha, dt) => { presenter.render(alpha, dt); overlay.update(world, loop); ra.renderFrame() },
+    render: (alpha, dt) => { presenter.render(alpha, dt); overlay.update(world, loop); updateRecText(); ra.renderFrame() },
     timeScale: () => world.timeScale,
   })
 
@@ -75,9 +119,15 @@ async function boot() {
     get metrics() { return metrics },
     mute: m => { audio.muted = m ?? !audio.muted; return audio.muted },
     debug: v => { overlay.setVisible(v ?? !overlay.visible); return overlay.visible },
+    record, stopRecord, replay,
+    download: name => { if (recorder.recording) stopRecord(); recorder.download(name) },
   })
 
-  window.addEventListener('keydown', e => { if (e.code === 'F1') { e.preventDefault(); overlay.toggle() } })
+  window.addEventListener('keydown', e => {
+    if (e.code === 'F1') { e.preventDefault(); overlay.toggle() }
+    if (e.code === 'F2') { e.preventDefault(); record() }
+    if (e.code === 'F3') { e.preventDefault(); if (recorder.recording) stopRecord(); recorder.download() }
+  })
   loop.start()
   presenter.hud.showBanner(scenario === 'full' ? 'BARDO' : scenario.toUpperCase(), 'WASD move · mouse aim · click attack · space dodge', 2.5)
 }

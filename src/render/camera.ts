@@ -7,9 +7,11 @@ export class Camera {
   lookX = 0; lookY = 0
   private t = 0
   offsetX = 0; offsetY = 0; rotation = 0
+  zoom = 1                 // punch scale about the player, eases back to 1
 
   addTrauma(amount: number) { this.trauma = Math.min(1, this.trauma + amount) }
   kick(angle: number, strength: number) { this.kickX += Math.cos(angle) * strength; this.kickY += Math.sin(angle) * strength }
+  punchZoom(z: number) { this.zoom = Math.max(this.zoom, z) }
 
   update(dtSec: number, aimX: number, aimY: number) {
     const J = tuning.juice
@@ -23,11 +25,12 @@ export class Camera {
     this.offsetX = nx * J.shakeMax * s + this.kickX - this.lookX
     this.offsetY = ny * J.shakeMax * s + this.kickY - this.lookY
     this.rotation = nr * (J.shakeRotMaxDeg * Math.PI / 180) * s
+    this.zoom += (1 - this.zoom) * Math.min(1, J.zoom.decay * dtSec)
   }
 }
 
 // cheap 1D value noise in [-1, 1]
-function noise(x: number): number {
+export function noise(x: number): number {
   const i = Math.floor(x), f = x - i
   const a = hash(i), b = hash(i + 1)
   const u = f * f * (3 - 2 * f)

@@ -1,0 +1,79 @@
+// Input recording + replay. Pure: a replay is (seed, scenario, frames) and replaying it is fully deterministic.
+import { createWorld } from './scenarios'
+import { stepWorld } from './step'
+import { hashWorld } from './hash'
+import { Metrics } from './metrics'
+import type { InputFrame } from './input'
+import type { World } from './world'
+
+export interface Replay { v: 1; seed: number; scenario: string; god?: boolean; frames: InputFrame[] }
+
+// On-disk form. Each run is [moveX, moveY, aimX, aimY, flags, count]: axes are ints scaled by Q,
+// flags is a bitmask (see FLAG), count is how many consecutive ticks used that exact frame.
+export type EncodedRun = [number, number, number, number, number, number]
+export interface EncodedReplay { v: 1; seed: number; scenario: string; god?: boolean; runs: EncodedRun[] }
+
+export const Q = 10000
+const FLAG = { aimSoft: 1, attack: 2, dodge: 4, restart: 8 } as const
+
+// Encoding rounds axes to 1/Q. Recorders feed the sim quantized frames so encode(decode()) is lossless.
+export function quantizeFrame(f: InputFrame): InputFrame {
+  const q = (v: number) => Math.round(v * Q) / Q
+  return { ...f, moveX: q(f.moveX), moveY: q(f.moveY), aimX: q(f.aimX), aimY: q(f.aimY) }
+}
+
+export function encodeReplay(r: Replay): EncodedReplay {
+  const runs: EncodedRun[] = []
+  for (const f of r.frames) {
+    const flags = (f.aimSoft ? FLAG.aimSoft : 0) | (f.attack ? FLAG.attack : 0) | (f.dodge ? FLAG.dodge : 0) | (f.restart ? FLAG.restart : 0)
+    const row: EncodedRun = [Math.round(f.moveX * Q), Math.round(f.moveY * Q), Math.round(f.aimX * Q), Math.round(f.aimY * Q), flags, 1]
+    const last = runs[runs.length - 1]
+    if (last && last[0] === row[0] && last[1] === row[1] && last[2] === row[2] && last[3] === row[3] && last[4] === row[4]) last[5]++
+    else runs.push(row)
+  }
+  const out: EncodedReplay = { v: 1, seed: r.seed, scenario: r.scenario, runs }
+  if (r.god) out.god = true
+  return out
+}
+
+export function decodeReplay(e: EncodedReplay): Replay {
+  if (e.v !== 1) throw new Error(`unsupported replay version ${String(e.v)}`)
+  const frames: InputFrame[] = []
+  for (const [mx, my, ax, ay, flags, count] of e.runs) {
+    const f: InputFrame = {
+      moveX: mx / Q, moveY: my / Q, aimX: ax / Q, aimY: ay / Q,
+      aimSoft: !!(flags & FLAG.aimSoft), attack: !!(flags & FLAG.attack), dodge: !!(flags & FLAG.dodge), restart: !!(flags & FLAG.restart),
+    }
+    for (let i = 0; i < count; i++) frames.push(f)
+  }
+  const out: Replay = { v: 1, seed: e.seed, scenario: e.scenario, frames }
+  if (e.god) out.god = true
+  return out
+}
+
+export function isEncodedReplay(x: Replay | EncodedReplay): x is EncodedReplay { return 'runs' in x }
+
+// One run per line: small on disk, still diffable.
+export function replayToJson(r: Replay): string {
+  const e = encodeReplay(r)
+  const head = JSON.stringify({ v: e.v, seed: e.seed, scenario: e.scenario, ...(e.god ? { god: true } : {}) }).slice(1, -1)
+  return `{${head},"runs":[\n${e.runs.map(run => JSON.stringify(run)).join(',\n')}\n]}\n`
+}
+
+export function replayFromJson(json: string): Replay {
+  const obj = JSON.parse(json) as Replay | EncodedReplay
+  return isEncodedReplay(obj) ? decodeReplay(obj) : obj
+}
+
+// Fresh world from the replay header, then one frame per tick. Restart frames only set wantsRestart (nothing resets).
+export function runReplay(replay: Replay, onTick?: (world: World) => void): { world: World; hash: number; metrics: Metrics } {
+  const world = createWorld(replay.seed, replay.scenario, { god: replay.god })
+  const metrics = new Metrics()
+  for (const f of replay.frames) {
+    stepWorld(world, f)
+    metrics.consume(world, world.events)
+    world.events.length = 0
+    onTick?.(world)
+  }
+  return { world, hash: hashWorld(world), metrics }
+}

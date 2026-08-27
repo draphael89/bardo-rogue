@@ -12,7 +12,7 @@ export const ROOM_WAVES: WaveDef[] = [
   { groups: [{ delay: 0, spawns: [{ kind: 'brute', x: 12.5, y: 5 }, { kind: 'caster', x: 2.5, y: 3 }, { kind: 'caster', x: 23.5, y: 3 }] }] },
   {
     groups: [
-      { delay: 0, spawns: [{ kind: 'brute', x: 12.5, y: 4.5 }, { kind: 'caster', x: 2.5, y: 3 }, { kind: 'caster', x: 23.5, y: 3 }] },
+      { delay: 0, spawns: [{ kind: 'brute', x: 9, y: 4.5 }, { kind: 'brute', x: 16, y: 4.5 }, { kind: 'caster', x: 2.5, y: 3 }, { kind: 'caster', x: 23.5, y: 3 }] },
       { delay: 180, spawns: [{ kind: 'charger', x: 2.5, y: 8 }, { kind: 'charger', x: 23.5, y: 8 }, { kind: 'charger', x: 6, y: 3 }, { kind: 'charger', x: 20, y: 3 }] },
       { delay: 0, whenRemainingAtMost: 2, spawns: [{ kind: 'charger', x: 12.5, y: 3 }, { kind: 'charger', x: 12.5, y: 12.5 }] },
     ],

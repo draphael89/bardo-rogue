@@ -21,7 +21,8 @@ export interface RenderApp {
 export async function createRenderApp(parent: HTMLElement, arenaPx: { w: number; h: number }): Promise<RenderApp> {
   const { width, height } = tuning.view
   const app = new Application()
-  await app.init({ background: 0x0b0608, antialias: false, resolution: 1, autoDensity: false, preference: 'webgl', powerPreference: 'high-performance' })
+  const dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1))
+  await app.init({ background: 0x0b0608, antialias: false, resolution: dpr, autoDensity: true, preference: 'webgl', powerPreference: 'high-performance' })
   parent.appendChild(app.canvas)
   app.ticker.maxFPS = 0
 
@@ -36,7 +37,7 @@ export async function createRenderApp(parent: HTMLElement, arenaPx: { w: number;
     entities: new Container(), fx: new Container(), light: new Container(), debug: new Container(), hud: new Container(),
   }
   layers.entities.sortableChildren = true
-  world.addChild(layers.floor, layers.decals, layers.shadows, layers.entities, layers.fx, layers.light, layers.debug)
+  world.addChild(layers.floor, layers.decals, layers.shadows, layers.entities, layers.light, layers.fx, layers.debug)
   root.addChild(world, layers.hud)
 
   const arenaOffset = { x: Math.floor((width - arenaPx.w) / 2), y: Math.floor((height - arenaPx.h) / 2) }
@@ -45,12 +46,17 @@ export async function createRenderApp(parent: HTMLElement, arenaPx: { w: number;
   const ra: RenderApp = {
     app, root, world, layers, rt, screen, scale: 1, arenaOffset,
     resize() {
+      // integer scale in PHYSICAL pixels (crisp on 2x displays); fall back to a fractional fit when the integer
+      // scale would waste more than ~30% of the window
       const w = parent.clientWidth || window.innerWidth, h = parent.clientHeight || window.innerHeight
-      const s = Math.max(1, Math.floor(Math.min(w / width, h / height)))
+      const fit = Math.min(w * dpr / width, h * dpr / height)
+      let phys = Math.max(1, Math.floor(fit))
+      if (phys / fit < 0.7) phys = fit
+      const s = phys / dpr
       ra.scale = s
       app.renderer.resize(w, h)
       screen.scale.set(s)
-      screen.position.set(Math.floor((w - width * s) / 2), Math.floor((h - height * s) / 2))
+      screen.position.set(Math.floor((w - width * s) / 2 * dpr) / dpr, Math.floor((h - height * s) / 2 * dpr) / dpr)
     },
     renderFrame() {
       app.renderer.render({ container: root, target: rt, clear: true })

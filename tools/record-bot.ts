@@ -1,0 +1,45 @@
+// Record a bot's input frames as a replay fixture.
+//   pnpm record-bot -- --bot kite --scenario full --seed 1 --out replays/kite-full-s1.json [--ticks 10800]
+//   pnpm record-bots            (regenerates the fixture set used by tests/sim/replay.test.ts; then update its hashes)
+import { mkdirSync, writeFileSync } from 'node:fs'
+import { createWorld } from '../src/sim/scenarios'
+import { stepWorld } from '../src/sim/step'
+import { hashWorld } from '../src/sim/hash'
+import { makeBot, type BotName } from '../src/sim/bots'
+import { quantizeFrame, replayToJson, type Replay } from '../src/sim/replay'
+import type { InputFrame } from '../src/sim/input'
+
+const FIXTURES: Array<{ bot: BotName; scenario: string; seed: number; out: string }> = [
+  { bot: 'kite', scenario: 'full', seed: 1, out: 'replays/kite-full-s1.json' },
+  { bot: 'naive-melee', scenario: 'wave1', seed: 3, out: 'replays/naive-wave1-s3.json' },
+  { bot: 'idle', scenario: 'wave1', seed: 5, out: 'replays/idle-wave1-s5.json' },
+]
+
+const args = Object.fromEntries(process.argv.slice(2).map((a, i, arr) => a.startsWith('--') ? [a.slice(2), arr[i + 1] ?? '1'] : []).filter(x => x.length))
+const maxTicks = +(args.ticks ?? 60 * 180)
+
+// Same stop rule as tools/headless.ts. Frames are quantized before the sim sees them so the file replays bit-exact.
+function record(bot: BotName, scenario: string, seed: number, out: string) {
+  const world = createWorld(seed, scenario)
+  const b = makeBot(bot)
+  const frames: InputFrame[] = []
+  for (let i = 0; i < maxTicks; i++) {
+    const f = quantizeFrame(b(world))
+    frames.push(f)
+    stepWorld(world, f)
+    world.events.length = 0
+    if (world.wave.state === 'done' && world.tick - world.roomClearTick > 120) break
+    if (world.player.state === 'dead' && world.tick - world.player.deathTick > 120) break
+  }
+  const replay: Replay = { v: 1, seed, scenario, frames }
+  mkdirSync('replays', { recursive: true })
+  const json = replayToJson(replay)
+  writeFileSync(out, json)
+  console.log(JSON.stringify({ out, bot, scenario, seed, ticks: frames.length, bytes: json.length, hash: hashWorld(world) }))
+}
+
+if (args.all) for (const f of FIXTURES) record(f.bot, f.scenario, f.seed, f.out)
+else {
+  const bot = (args.bot ?? 'kite') as BotName, scenario = args.scenario ?? 'full', seed = +(args.seed ?? 1)
+  record(bot, scenario, seed, args.out ?? `replays/${bot}-${scenario}-s${seed}.json`)
+}

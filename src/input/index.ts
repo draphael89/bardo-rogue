@@ -78,5 +78,4 @@ export class InputSystem {
     return f
   }
 
-  isDebugToggle(): boolean { return this.pressed.has('F1') }
 }

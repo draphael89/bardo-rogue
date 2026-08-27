@@ -1,14 +1,33 @@
 // Headless scenario runner. Example: pnpm sim -- --scenario full --bot kite --seeds 1-10 --ticks 10800
+// Replay mode:                       pnpm sim -- --replay replays/kite-full-s1.json [--ticks 300]
+import { readFileSync } from 'node:fs'
 import { createWorld } from '../src/sim/scenarios'
 import { stepWorld } from '../src/sim/step'
 import { makeBot, type BotName } from '../src/sim/bots'
 import { Metrics } from '../src/sim/metrics'
+import { replayFromJson, runReplay } from '../src/sim/replay'
 
 const args = Object.fromEntries(process.argv.slice(2).map((a, i, arr) => a.startsWith('--') ? [a.slice(2), arr[i + 1]] : []).filter(x => x.length))
 const scenario = args.scenario ?? 'full'
 const bot = (args.bot ?? 'kite') as BotName
 const ticks = +(args.ticks ?? 60 * 180)
 const [s0, s1] = (args.seeds ?? '1-5').split('-').map(Number)
+
+if (args.replay) {
+  const r = replayFromJson(readFileSync(args.replay, 'utf8'))
+  const total = r.frames.length
+  if (args.ticks) r.frames = r.frames.slice(0, ticks)   // stop early to compare against a browser run at the same tick
+  const t0 = performance.now()
+  const { world, hash, metrics } = runReplay(r)
+  const ms = performance.now() - t0
+  const p = world.player
+  console.log(JSON.stringify({
+    replay: args.replay, seed: r.seed, scenario: r.scenario, god: !!r.god, framesInFile: total, ticksRun: world.tick, hash,
+    player: { x: +p.x.toFixed(1), y: +p.y.toFixed(1), hp: p.hp, state: p.state },
+    metrics: metrics.summary(), avgTickUs: +(ms * 1000 / Math.max(1, world.tick)).toFixed(1),
+  }, null, 2))
+  process.exit(0)
+}
 
 const rows: Array<Record<string, unknown>> = []
 for (let seed = s0; seed <= (s1 ?? s0); seed++) {

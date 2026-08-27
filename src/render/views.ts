@@ -5,7 +5,7 @@ import { tuning } from '@/tuning'
 import { lerp, clamp01, easeOutCubic, easeInCubic, easeOutBack, lerpAngle } from './anim'
 import { T } from '@/sim/arena'
 
-const SPRITE = { player: 96, brute: 109, caster: 84, charger: 120, dummy: 54 } as const
+const SPRITE = { player: 96, brute: 109, caster: 84, charger: 122, dummy: 54 } as const
 const WEAPON = { player: 106, brute: 118, caster: 129 } as const
 const HALF_PI = Math.PI / 2
 
@@ -113,8 +113,9 @@ function updateSword(v: EntityView, p: Player, x: number, y: number, alpha: numb
       a = lerpAngle(s.heavy ? -HALF_PI : start, end, u)
       r = s.heavy ? lerp(6, 12, u) : 10
     } else {
+      // two-stage return: swing end -> aim direction -> shoulder, so the blade never sweeps around the back
       const u = easeOutCubic((tk - s.startup - s.active) / s.recovery)
-      a = lerpAngle(end, restAngle, u)
+      a = u < 0.4 ? lerpAngle(end, p.swingAngle, u / 0.4) : lerpAngle(p.swingAngle, restAngle, (u - 0.4) / 0.6)
       r = lerp(10, 3, u)
     }
     angle = a; wx = x + Math.cos(a) * r; wy = y + Math.sin(a) * r * 0.8
@@ -173,19 +174,21 @@ export function updateEnemyView(v: EntityView, e: Enemy, world: World, alpha: nu
       break
     }
     case 'charger': {
+      // spider: skitters, crouches, pounces
       const C = tuning.charger
-      hop = 6 + Math.sin(time * 11 + e.id) * 2
-      if (e.state === 'freeze') {
+      if (e.state === 'hover') { if (speed > 5) { hop = Math.abs(Math.sin(time * 22)) * 1.5; sx = 1 + Math.sin(time * 22) * 0.08 } }
+      else if (e.state === 'freeze') {
         const u = tk / C.freezeTicks
-        sx = 1 - 0.25 * u; sy = 1 + 0.35 * u
-        hop = 6 + Math.sin(time * 40) * (1 + u * 2)
-        if (u > 0.6) tint = 0xff5a5a
-        b.position.x += 0
+        sx = 1 + 0.35 * u; sy = 1 - 0.3 * u                       // crouch wide and low
+        rot = Math.sin(time * 50) * 0.06 * u                       // tremble
+        if (u > 0.55) tint = 0xff5a5a
       } else if (e.state === 'dash') {
-        sx = 1.35; sy = 0.7; rot = Math.atan2(Math.sin(e.aimAngle), Math.cos(e.aimAngle) * e.facing) * 0.5
-        hop = 4
-      } else if (e.state === 'recover') { const u = tk / C.recovery; hop = 2 + u * 4; sy = 0.9; rot = Math.sin(time * 6) * 0.2 }
-      else if (e.state === 'stagger') { rot = 0.5; hop = 2 }
+        const u = Math.min(1, tk / Math.max(1, e.dashTicks))
+        sx = 1.4; sy = 0.7
+        rot = Math.atan2(Math.sin(e.aimAngle), Math.cos(e.aimAngle) * e.facing) * 0.6
+        hop = Math.sin(u * Math.PI) * 7                            // pounce arc
+      } else if (e.state === 'recover') { const u = easeOutCubic(tk / C.recovery); sx = lerp(1.3, 1, u); sy = lerp(0.75, 1, u); rot = Math.sin(time * 8) * 0.15 * (1 - u) }
+      else if (e.state === 'stagger') { rot = 0.5; sx = 0.9; sy = 1.1 }
       break
     }
     case 'dummy': sy = 1 + Math.sin(time * 2) * 0.01; break
@@ -200,8 +203,7 @@ export function updateEnemyView(v: EntityView, e: Enemy, world: World, alpha: nu
   b.tint = tint
   b.zIndex = feetY
   v.setFlash(e.flash > 0)
-  const flying = e.kind === 'charger'
-  v.setShadow(x, feetY - 1, flying ? 8 : 14, flying ? 3 : 6, flying ? 0.22 : 0.35)
+  v.setShadow(x, feetY - 1, 14 - hop * 0.5, 6 - hop * 0.2, 0.35 - hop * 0.02)
 }
 
 function updateEnemyWeapon(v: EntityView, e: Enemy, x: number, y: number, alpha: number, time: number): void {
@@ -245,17 +247,20 @@ export class SpawnMarkerView {
 }
 
 export class BoltView {
-  glow: Sprite; core: Sprite
+  glow: Sprite; rim: Sprite; core: Sprite
   constructor(atlas: Atlas, parent: Container) {
-    this.glow = new Sprite(atlas.particle('circle_04')); this.glow.anchor.set(0.5); this.glow.tint = 0xd050ff; this.glow.blendMode = 'add'; this.glow.scale.set(16 / 64)
-    this.core = new Sprite(atlas.particle('circle_01')); this.core.anchor.set(0.5); this.core.tint = 0xfff0ff; this.core.scale.set(7 / 64)
-    parent.addChild(this.glow, this.core)
+    this.glow = new Sprite(atlas.particle('circle_04')); this.glow.anchor.set(0.5); this.glow.tint = 0xff40ff; this.glow.blendMode = 'add'; this.glow.scale.set(22 / 64)
+    this.rim = new Sprite(atlas.particle('circle_01')); this.rim.anchor.set(0.5); this.rim.tint = 0x2a0a30; this.rim.scale.set(11 / 64)
+    this.core = new Sprite(atlas.particle('circle_01')); this.core.anchor.set(0.5); this.core.tint = 0xff8cff; this.core.scale.set(8 / 64)
+    parent.addChild(this.glow, this.rim, this.core)
   }
   update(x: number, y: number, time: number) {
-    this.glow.position.set(Math.round(x), Math.round(y)); this.core.position.set(Math.round(x), Math.round(y))
-    this.glow.scale.set((15 + Math.sin(time * 30) * 2) / 64)
+    const px = Math.round(x), py = Math.round(y)
+    this.glow.position.set(px, py); this.rim.position.set(px, py); this.core.position.set(px, py)
+    this.glow.scale.set((22 + Math.sin(time * 30) * 3) / 64)
+    this.core.tint = (Math.floor(time * 20) & 1) ? 0xffffff : 0xff8cff
   }
-  destroy() { this.glow.destroy(); this.core.destroy() }
+  destroy() { this.glow.destroy(); this.rim.destroy(); this.core.destroy() }
 }
 
 // Telegraph line for the caster, drawn into a shared Graphics each frame.
@@ -283,12 +288,17 @@ export function drawSwingArc(g: Graphics, p: Player, alpha: number, world: World
   const u = Math.min(1, easeOutCubic((tk - s.startup) / s.active))
   const end = start + s.sweep * half * 2 * u
   const fade = tk > s.startup + s.active ? 1 - (tk - s.startup - s.active) / fadeTicks : 1
-  const outer = s.radius, inner = s.radius * (s.heavy ? 0.45 : 0.55)
+  const outer = s.radius
   const x = lerp(p.px, p.x, alpha), y = lerp(p.py, p.y, alpha)
   const pts: number[] = []
-  const n = 12
+  const n = 14
+  const thick = s.heavy ? 7 : 5
   for (let i = 0; i <= n; i++) { const a = start + (end - start) * i / n; pts.push(x + Math.cos(a) * outer, y + Math.sin(a) * outer * 0.9) }
-  for (let i = n; i >= 0; i--) { const a = start + (end - start) * i / n; const r = inner * (0.6 + 0.4 * i / n); pts.push(x + Math.cos(a) * r, y + Math.sin(a) * r * 0.9) }
-  g.poly(pts).fill({ color: s.heavy ? 0xfff2c0 : 0xffffff, alpha: (s.heavy ? 0.85 : 0.7) * fade })
+  // inner edge tapers toward the trailing end so the crescent reads as motion, not a filled sector
+  for (let i = n; i >= 0; i--) { const a = start + (end - start) * i / n; const r = outer - thick * (0.25 + 0.75 * i / n); pts.push(x + Math.cos(a) * r, y + Math.sin(a) * r * 0.9) }
+  g.poly(pts).fill({ color: s.heavy ? 0xfff2c0 : 0xffffff, alpha: (s.heavy ? 0.7 : 0.55) * fade })
+  // bright leading edge
+  const lead = end
+  g.moveTo(x + Math.cos(lead) * (outer - thick), y + Math.sin(lead) * (outer - thick) * 0.9).lineTo(x + Math.cos(lead) * outer, y + Math.sin(lead) * outer * 0.9).stroke({ color: 0xffffff, width: 1.5, alpha: fade })
   void world
 }

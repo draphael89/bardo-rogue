@@ -4,6 +4,10 @@ Build a web-based roguelike action RPG / bullet hell at the level of Enter the G
 
 **The bar is the real games.** For every piece, find actual Enter the Gungeon and Hades footage of the same moment (official press kits, wiki GIFs, frame-by-frame breakdowns) and judge ours next to it, blind. Pick whichever of the two is the fairer comparison for that piece. Reference only: never copy their art, names, characters, or lore.
 
+## How to run it
+
+Run the loop with `/gauntlet` (the harness: blind critics, both exhibit orders, one gap per round, PARKED after two stalls, `gauntlet/state.json` as the durable truth). Use `.claude/skills/bardo-critic` for this repo's evidence protocols, rubric axes, automated gates, lanes, and the stall-then-split rule. `VISION.md` section 5 fixes the order: prove the sword before the room is pretty.
+
 ## What exists
 
 `pnpm dev` (port 5173) runs a deterministic 60 Hz sim with a Pixi 8 renderer and placeholder Kenney art. Inspection harness: `pnpm shot` (Playwright screenshot: `--scenario --seed --ticks --bot --stepwise --eval`), `window.__game` (`step`, `reset`, `setInput`, `bot`, `state`, `hash`, `frameStats`), `pnpm sim` (headless runs with metrics), `pnpm test`, `tools/contact-sheet.mjs` (frame strips for motion). The Chrome and PixelLab MCP tools are available. Keep the sim deterministic and the tests green; every tool above depends on it. Everything else, including the art direction and the run structure, is yours to decide and replace.

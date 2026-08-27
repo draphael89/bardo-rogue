@@ -8,6 +8,7 @@ interface P { s: Sprite; vx: number; vy: number; life: number; maxLife: number; 
 export class Particles {
   private pool: P[] = []
   private live: P[] = []
+  private subTex = new Map<string, Texture>()   // shatter chips, sliced once per (texture, cell); a new Texture per kill leaks GPU-side views
   private decalRt: RenderTexture
   private decalSprite: Sprite
   private stamp = new Sprite()
@@ -120,7 +121,9 @@ export class Particles {
     const step = 2
     for (let py = 0; py < fh; py += step) for (let px = 0; px < fw; px += step) {
       if (Math.random() < 0.35) continue
-      const sub = new Texture({ source: tex.source, frame: new Rectangle(tex.frame.x + px, tex.frame.y + py, step, step) })
+      const key = `${tex.uid}:${px}:${py}`
+      let sub = this.subTex.get(key)
+      if (!sub) { sub = new Texture({ source: tex.source, frame: new Rectangle(tex.frame.x + px, tex.frame.y + py, step, step) }); this.subTex.set(key, sub) }
       const ox = (px - fw / 2) * (body.scale.x < 0 ? -1 : 1), oy = py - fh
       const a = angle + (Math.random() - 0.5) * 1.4
       const sp = 40 + Math.random() * 90

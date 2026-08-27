@@ -20,8 +20,10 @@ export class Camera {
     const s = this.trauma * this.trauma
     const nx = noise(this.t * 0.9), ny = noise(this.t * 0.9 + 100), nr = noise(this.t * 0.7 + 200)
     this.kickX *= Math.pow(0.001, dtSec * 4); this.kickY *= Math.pow(0.001, dtSec * 4)
-    this.lookX += (aimX * J.lookahead - this.lookX) * J.lookaheadLerp
-    this.lookY += (aimY * J.lookahead - this.lookY) * J.lookaheadLerp
+    // lookaheadLerp is tuned per 60 Hz frame; rescale by dt so 144 Hz displays don't snap harder
+    const lk = 1 - Math.pow(1 - J.lookaheadLerp, dtSec * 60)
+    this.lookX += (aimX * J.lookahead - this.lookX) * lk
+    this.lookY += (aimY * J.lookahead - this.lookY) * lk
     this.offsetX = nx * J.shakeMax * s + this.kickX - this.lookX
     this.offsetY = ny * J.shakeMax * s + this.kickY - this.lookY
     this.rotation = nr * (J.shakeRotMaxDeg * Math.PI / 180) * s

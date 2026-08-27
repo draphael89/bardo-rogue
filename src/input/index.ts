@@ -53,9 +53,15 @@ export class InputSystem {
     const pads = typeof navigator !== 'undefined' && navigator.getGamepads ? navigator.getGamepads() : []
     const pad = pads && pads[0]
     if (pad) {
-      const dz = (v: number, t: number) => Math.abs(v) < t ? 0 : v
-      const lx = dz(pad.axes[0] ?? 0, 0.25), ly = dz(pad.axes[1] ?? 0, 0.25)
-      const rx = dz(pad.axes[2] ?? 0, 0.3), ry = dz(pad.axes[3] ?? 0, 0.3)
+      // radial deadzone on the vector, rescaled from the deadzone edge; per-axis clipping snaps diagonals to the axes
+      const dz = (x: number, y: number, t: number): [number, number] => {
+        const m = Math.hypot(x, y)
+        if (m < t) return [0, 0]
+        const k = Math.min(1, (m - t) / (1 - t)) / m
+        return [x * k, y * k]
+      }
+      const [lx, ly] = dz(pad.axes[0] ?? 0, pad.axes[1] ?? 0, 0.25)
+      const [rx, ry] = dz(pad.axes[2] ?? 0, pad.axes[3] ?? 0, 0.3)
       if (lx || ly) { mx = lx; my = ly }
       if (rx || ry) { const l = Math.hypot(rx, ry); ax = rx / l; ay = ry / l; aimSoft = false }
       else if (lx || ly) { const l = Math.hypot(lx, ly); ax = lx / l; ay = ly / l; aimSoft = true }

@@ -6,6 +6,24 @@
       "sourceType": "github",
       "skillPath": "skills/find-skills/SKILL.md",
       "computedHash": "b146008599c31057cef1c145774cea5d5afb30e8f43fa802e47a4b461419aaaf"
+    },
+    "pixijs-custom-rendering": {
+      "source": "pixijs/pixijs-skills",
+      "sourceType": "github",
+      "skillPath": "skills/pixijs-custom-rendering/SKILL.md",
+      "computedHash": "94fa97b95ff8642c2575f65c911e3bb666ce5f785fcc2d4c9535db88ac39db9e"
+    },
+    "pixijs-filters": {
+      "source": "pixijs/pixijs-skills",
+      "sourceType": "github",
+      "skillPath": "skills/pixijs-filters/SKILL.md",
+      "computedHash": "a144f8d96f351c1836e1635709d862feb05a69c1c95a48f86242794a114d557a"
+    },
+    "pixijs-scene-particle-container": {
+      "source": "pixijs/pixijs-skills",
+      "sourceType": "github",
+      "skillPath": "skills/pixijs-scene-particle-container/SKILL.md",
+      "computedHash": "f5de449f067e81cf8fbe2acca0ecac318aa54f9f3f8f705398f223885fa218a6"
     }
   }
 }

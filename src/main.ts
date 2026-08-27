@@ -129,7 +129,8 @@ async function boot() {
     if (e.code === 'F3') { e.preventDefault(); if (recorder.recording) stopRecord(); recorder.download() }
   })
   loop.start()
-  presenter.hud.showBanner(scenario === 'full' ? 'BARDO' : scenario.toUpperCase(), 'WASD move · mouse aim · click attack · space dodge', 2.5)
+  if (scenario === 'full' || scenario === 'empty') presenter.hud.showBanner('THE THRESHOLD', '', 1.5)
+  else presenter.hud.showBanner(scenario.toUpperCase(), '', 1.2)
 }
 
 boot().catch(err => { console.error(err); document.body.innerHTML = `<pre style="color:#f88;padding:16px">${String(err?.stack ?? err)}</pre>` })

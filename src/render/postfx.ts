@@ -51,15 +51,40 @@ void main(void)
 }
 `
 
-// Chromatic-aberration pulse on the final upscaled quad. The filter is only attached while a pulse runs,
-// so idle frames pay nothing.
+const gradeFragment = `in vec2 vTextureCoord;
+out vec4 finalColor;
+
+uniform sampler2D uTexture;
+uniform float uStrength;
+uniform vec3 uShadowTint;
+uniform vec3 uHighlightTint;
+uniform float uContrast;
+uniform float uSat;
+
+void main(void)
+{
+    vec4 src = texture(uTexture, vTextureCoord);
+    vec3 c = src.rgb;
+    float luma = dot(c, vec3(0.2126, 0.7152, 0.0722));
+    c = mix(uShadowTint * max(luma, 0.02), c, 0.70);
+    float hi = smoothstep(0.72, 0.96, luma);
+    c = mix(c, c * uHighlightTint, hi * 0.38);
+    c = (c - 0.5) * uContrast + 0.5;
+    c = mix(vec3(luma), c, uSat);
+    c = mix(src.rgb, clamp(c, 0.0, 1.0), uStrength);
+    finalColor = vec4(c, src.a);
+}
+`
+
+// Color grade is always on the upscaled quad. Aberration stacks on top only while a pulse runs.
 export class PostFx {
   private filter: Filter
   private uniforms: UniformGroup
+  private grade: Filter
   private left = 0
   private total = 1
   private strength = 0
-  private attached = false
+  private aberrated = false
 
   constructor(private ra: RenderApp) {
     this.uniforms = new UniformGroup({ uOffset: { value: new Float32Array([0, 0]), type: 'vec2<f32>' } })
@@ -67,6 +92,19 @@ export class PostFx {
       glProgram: GlProgram.from({ vertex, fragment, name: 'aberration-filter' }),
       resources: { aberrationUniforms: this.uniforms },
     })
+    const G = tuning.juice.grade
+    const gradeUniforms = new UniformGroup({
+      uStrength: { value: G.strength, type: 'f32' },
+      uShadowTint: { value: new Float32Array([G.shadowR, G.shadowG, G.shadowB]), type: 'vec3<f32>' },
+      uHighlightTint: { value: new Float32Array([G.highlightR, G.highlightG, G.highlightB]), type: 'vec3<f32>' },
+      uContrast: { value: G.contrast, type: 'f32' },
+      uSat: { value: G.sat, type: 'f32' },
+    })
+    this.grade = new Filter({
+      glProgram: GlProgram.from({ vertex, fragment: gradeFragment, name: 'grade-filter' }),
+      resources: { gradeUniforms },
+    })
+    this.ra.screen.filters = [this.grade]
   }
 
   pulse(strength = tuning.juice.aberrationStrength, ticks = tuning.juice.aberrationTicks) {
@@ -75,9 +113,14 @@ export class PostFx {
     this.strength = Math.max(this.strength, strength)
   }
 
+  private syncFilters(aberrate: boolean) {
+    this.ra.screen.filters = aberrate ? [this.grade, this.filter] : [this.grade]
+    this.aberrated = aberrate
+  }
+
   update(dtSec: number) {
     if (this.left <= 0) {
-      if (this.attached) { this.ra.screen.filters = null; this.attached = false; this.strength = 0 }
+      if (this.aberrated) { this.syncFilters(false); this.strength = 0 }
       return
     }
     this.left -= dtSec
@@ -85,6 +128,6 @@ export class PostFx {
     const off = this.uniforms.uniforms.uOffset as Float32Array
     off[0] = this.strength * k; off[1] = this.strength * k * 0.35
     this.uniforms.update()
-    if (!this.attached) { this.ra.screen.filters = [this.filter]; this.attached = true }
+    if (!this.aberrated) this.syncFilters(true)
   }
 }

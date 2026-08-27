@@ -68,13 +68,27 @@ export const tuning = {
     zoom: { roomClear: 1.06, kill: 1.015, heavyHit: 1.01, decay: 6 }, // decay = per-second ease rate back to 1
     damageNumbers: false,
     light: {
-      ambientDarkness: 0.38,  // 0 = untouched, 1 = black at the arena edge
-      ambientTint: 0x6a7090, // colour the darkness leans toward (cool, so the warm floor never goes muddy)
-      vignette: 0.28,        // how much brighter the arena centre is than the edge
-      brazierRadius: 84, brazierFlicker: 0.18, brazierTint: 0xffa040,
-      playerLightRadius: 44, playerLightAlpha: 0.22,
-      flameRate: 14,         // flame particles per second per brazier
+      ambientDarkness: 0.28,  // 0 = untouched, 1 = black at the arena edge
+      ambientTint: 0x1e1c38, // indigo void; warm floor is graded out, ember stays on the lights
+      vignette: 0.32,        // how much brighter the arena centre is than the edge
+      brazierRadius: 108, brazierFlicker: 0.30, brazierTint: 0xff7a18,
+      playerLightRadius: 32, playerLightAlpha: 0.12,
+      flameRate: 16,         // flame particles per second per brazier
       deathFadeSec: 1.6,     // slow red vignette after playerDeath
+      doorRadius: 64, doorFlicker: 0.10, doorTint: 0xffe8c0, doorAlpha: 0.36,
+      windowRadius: 88, windowFlicker: 0.10, windowTint: 0xc8d8ff, windowAlpha: 0.70,
+    },
+    atmosphere: {
+      moteCount: 28, moteSpeed: 7, moteAlpha: 0.55, moteTint: 0xffe4b0,
+      fogCount: 5, fogAlpha: 0.10, fogTint: 0x5a6080,
+      rayCount: 2, rayAlpha: 0.06, rayTint: 0xffd8a0,
+      doorGlowRadius: 36, doorGlowAlpha: 0.10, doorGlowTint: 0xffe8b8,
+    },
+    grade: {
+      strength: 1,
+      shadowR: 0.07, shadowG: 0.08, shadowB: 0.20,
+      highlightR: 0.98, highlightG: 0.94, highlightB: 0.90,
+      contrast: 1.06, sat: 0.82,
     },
   },
 }

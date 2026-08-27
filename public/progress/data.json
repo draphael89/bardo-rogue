@@ -1,0 +1,317 @@
+{
+  "title": "Bardo Rogue",
+  "subtitle": "Gauntlet against Enter the Gungeon & Hades",
+  "updated": "2026-08-27T17:49:00-04:00",
+  "now": "arena-first-look",
+  "round": 11,
+  "timeline": [
+    {
+      "t": "16:54",
+      "text": "Goal armed. Inventoryed the Kenney vertical slice."
+    },
+    {
+      "t": "16:57",
+      "text": "Baseline captured. First piece: The Threshold (arena first look)."
+    },
+    {
+      "t": "16:59",
+      "text": "Round 1 build in — lighting, grade, ritual floor, living air."
+    },
+    {
+      "t": "17:04",
+      "text": "Blind critic lane blocked (billing). Same unlabeled stills read here: the bar won."
+    },
+    {
+      "t": "17:05",
+      "text": "NOT YET. Biggest gap: stock Kenney box with a ring on dirt vs an authored chamber (plate, carpets, furniture)."
+    },
+    {
+      "t": "17:09",
+      "text": "Round 2 in — seal plate, nave, side aisles, wall furniture, side braziers."
+    },
+    {
+      "t": "17:10",
+      "text": "R2 still lost: tan dirt + HUD-reticle seal. Approach change — opaque plate, floor wash, no ticks."
+    },
+    {
+      "t": "17:13",
+      "text": "Round 3 in — slate floor, gold seal + chevron, purple diamond rugs, graves/chest/table, wall windows."
+    },
+    {
+      "t": "17:19",
+      "text": "Round 4 build — original bardo_room tileset. Kenney leaves the floor."
+    },
+    {
+      "t": "17:26",
+      "text": "R4 recaptured: flagstones, purple runners, steel plate + chevron, tall planters, velvet benches, window lights."
+    },
+    {
+      "t": "17:28",
+      "text": "Blind critic picked the bar. Gap: lighting pass over a brick-banner kit vs a furnished place with a signature inlay."
+    },
+    {
+      "t": "17:32",
+      "text": "Round 5 in — still pool in the steel plate, ash-leaf planters, velvet armchairs. Banner kit stripped."
+    },
+    {
+      "t": "17:34",
+      "text": "Round 6 in — aisles packed with plants, well-lip on the pool, hotter window lights. Critic on the still."
+    },
+    {
+      "t": "17:36",
+      "text": "Blind critic still on the bar. Gap: tiled layout dressed with identical plants vs an interior with materials, motifs, a memorable center."
+    },
+    {
+      "t": "17:37",
+      "text": "Round 7 in — star well + broken ring, three plant kinds, richer runners."
+    },
+    {
+      "t": "17:38",
+      "text": "Blind critic still on the bar. Gap: schematic tiles and a graphic hole vs material weight, shadow, lived-in density."
+    },
+    {
+      "t": "17:39",
+      "text": "Round 8 in — raised well lip, contact shadows under every prop. Still building."
+    },
+    {
+      "t": "17:40",
+      "text": "Blind critic still on the bar. Gap: dim brick box + portal sticker vs furniture mass, contrasting materials, a thematic floor."
+    },
+    {
+      "t": "17:44",
+      "text": "Round 9 in — 32px plants and chairs, wine runners, brass threshold inlay, north counters. Critic on the still."
+    },
+    {
+      "t": "17:45",
+      "text": "Blind critic still on the bar. Gap: prefab lobby with a crest vs a furnished interior built around one architectural object."
+    },
+    {
+      "t": "17:47",
+      "text": "Round 10 in — Keep-light walls, bigger steel plate, quieter door. Furniture can actually be named in the wide shot."
+    },
+    {
+      "t": "17:48",
+      "text": "Blind critic still on the bar. Gap: tiled kit in bilateral symmetry, no lighting hierarchy, no authored monument."
+    },
+    {
+      "t": "17:49",
+      "text": "Round 11 in — carved dais with relief threshold, restored vignette, slight furniture asymmetry."
+    },
+    {
+      "t": "17:50",
+      "text": "Blind critic still on the bar. Gap: brick box of grid-snapped props and flat light vs materials, volume, a floor you remember."
+    }
+  ],
+  "pieces": [
+    {
+      "id": "arena-first-look",
+      "take": "01",
+      "name": "The Threshold",
+      "blurb": "The room you wake in. Empty. Before anyone swings.",
+      "bar": "Gungeon Keep chamber",
+      "status": "building",
+      "rounds": 11,
+      "verdict": "theirs",
+      "gap": "Brick box of grid-snapped props and flat light vs materials, volume, and a floor you would remember.",
+      "before": "shots/arena-before.png",
+      "after": "shots/arena-after-r11.png",
+      "ref": "ref/gungeon-2.jpg"
+    },
+    {
+      "id": "combat-hud",
+      "take": "02",
+      "name": "Combat HUD",
+      "blurb": "Hearts, wave, death and clear cards.",
+      "bar": "Hades HUD",
+      "status": "queued",
+      "rounds": 0,
+      "verdict": null,
+      "gap": null,
+      "before": null,
+      "after": null,
+      "ref": "ref/hades-0.jpg"
+    },
+    {
+      "id": "sword-swing",
+      "take": "03",
+      "name": "Sword swing",
+      "blurb": "Startup, arc, contact. The core verb.",
+      "bar": "Hades Stygian Blade",
+      "status": "queued",
+      "rounds": 0,
+      "verdict": null,
+      "gap": null,
+      "before": null,
+      "after": null,
+      "ref": null
+    },
+    {
+      "id": "dodge-roll",
+      "take": "04",
+      "name": "Dodge roll",
+      "blurb": "I-frames, hop, recovery.",
+      "bar": "Gungeon dodge roll",
+      "status": "queued",
+      "rounds": 0,
+      "verdict": null,
+      "gap": null,
+      "before": null,
+      "after": null,
+      "ref": null
+    },
+    {
+      "id": "hit-impact",
+      "take": "05",
+      "name": "Hit impact",
+      "blurb": "Hit-stop, sparks, knockback, juice.",
+      "bar": "Gungeon contact",
+      "status": "queued",
+      "rounds": 0,
+      "verdict": null,
+      "gap": null,
+      "before": null,
+      "after": null,
+      "ref": null
+    },
+    {
+      "id": "brute",
+      "take": "06",
+      "name": "Brute",
+      "blurb": "Telegraph, lunge, punish window.",
+      "bar": "Hades Thug",
+      "status": "queued",
+      "rounds": 0,
+      "verdict": null,
+      "gap": null,
+      "before": null,
+      "after": null,
+      "ref": null
+    },
+    {
+      "id": "caster",
+      "take": "07",
+      "name": "Caster & bolts",
+      "blurb": "Aim line, fire, cuttable bolts.",
+      "bar": "Gungeon wizard",
+      "status": "queued",
+      "rounds": 0,
+      "verdict": null,
+      "gap": null,
+      "before": null,
+      "after": null,
+      "ref": null
+    },
+    {
+      "id": "charger",
+      "take": "08",
+      "name": "Charger",
+      "blurb": "Orbit, freeze, dash.",
+      "bar": "Gungeon shotgun kin",
+      "status": "queued",
+      "rounds": 0,
+      "verdict": null,
+      "gap": null,
+      "before": null,
+      "after": null,
+      "ref": null
+    },
+    {
+      "id": "waves",
+      "take": "09",
+      "name": "Wave pacing",
+      "blurb": "Three waves that teach, then press.",
+      "bar": "Gungeon room clear",
+      "status": "queued",
+      "rounds": 0,
+      "verdict": null,
+      "gap": null,
+      "before": null,
+      "after": null,
+      "ref": null
+    },
+    {
+      "id": "boss",
+      "take": "10",
+      "name": "Boss",
+      "blurb": "A named fight with phases.",
+      "bar": "Gungeon boss chamber",
+      "status": "queued",
+      "rounds": 0,
+      "verdict": null,
+      "gap": null,
+      "before": null,
+      "after": null,
+      "ref": "ref/gungeon-0.jpg"
+    },
+    {
+      "id": "run",
+      "take": "11",
+      "name": "Run structure",
+      "blurb": "Rooms, floors, doors, map.",
+      "bar": "Hades chambers",
+      "status": "queued",
+      "rounds": 0,
+      "verdict": null,
+      "gap": null,
+      "before": null,
+      "after": null,
+      "ref": null
+    },
+    {
+      "id": "gear",
+      "take": "12",
+      "name": "Weapons & items",
+      "blurb": "A kit that changes how you move.",
+      "bar": "Gungeon guns / Hades boons",
+      "status": "queued",
+      "rounds": 0,
+      "verdict": null,
+      "gap": null,
+      "before": null,
+      "after": null,
+      "ref": null
+    },
+    {
+      "id": "death",
+      "take": "13",
+      "name": "Death & return",
+      "blurb": "The bardo. Die, wake, go again.",
+      "bar": "Hades House of Hades",
+      "status": "queued",
+      "rounds": 0,
+      "verdict": null,
+      "gap": null,
+      "before": null,
+      "after": null,
+      "ref": "ref/hades-1.jpg"
+    },
+    {
+      "id": "audio",
+      "take": "14",
+      "name": "Sound & music",
+      "blurb": "Hits, air, a theme that belongs here.",
+      "bar": "Hades score / Gungeon Foley",
+      "status": "queued",
+      "rounds": 0,
+      "verdict": null,
+      "gap": null,
+      "before": null,
+      "after": null,
+      "ref": null
+    },
+    {
+      "id": "meta-ui",
+      "take": "15",
+      "name": "Title & meta UI",
+      "blurb": "The first screen. Pause. Return.",
+      "bar": "Hades title",
+      "status": "queued",
+      "rounds": 0,
+      "verdict": null,
+      "gap": null,
+      "before": null,
+      "after": null,
+      "ref": null
+    }
+  ]
+}

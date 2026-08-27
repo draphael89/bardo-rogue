@@ -4,7 +4,9 @@ import { Assets, Texture, Rectangle, TextureSource } from 'pixi.js'
 TextureSource.defaultOptions.scaleMode = 'nearest'
 
 export interface Atlas {
-  tile(i: number): Texture          // Tiny Dungeon 16x16 by index (12 columns)
+  tile(i: number): Texture          // Tiny Dungeon 16x16 by index (12 columns) — characters, weapons
+  room(i: number): Texture          // Bardo room sheet 16x16 by index (8 columns)
+  prop(i: number): Texture          // Bardo furniture sheet 32x32 by index (4 columns)
   white(i: number): Texture         // same tile as a white silhouette (hit flash)
   micro(i: number): Texture         // Micro Roguelike 8x8 by index (16 columns)
   particle(name: string): Texture
@@ -15,6 +17,8 @@ export interface Atlas {
 export async function loadAtlas(manifest: Record<string, string[]>): Promise<Atlas> {
   const base = '/assets/'
   const tiny = await Assets.load<Texture>(base + 'sprites/tiny_dungeon.png')
+  const room = await Assets.load<Texture>(base + 'sprites/bardo_room.png')
+  const props = await Assets.load<Texture>(base + 'sprites/bardo_props.png')
   const micro = await Assets.load<Texture>(base + 'sprites/micro.png')
   const particles = new Map<string, Texture>()
   const decals = new Map<string, Texture>()
@@ -26,6 +30,8 @@ export async function loadAtlas(manifest: Record<string, string[]>): Promise<Atl
   ])
 
   const tiles = new Map<number, Texture>()
+  const rooms = new Map<number, Texture>()
+  const propTiles = new Map<number, Texture>()
   const whites = new Map<number, Texture>()
   const micros = new Map<number, Texture>()
   const sub = (src: Texture, i: number, cols: number, size: number) =>
@@ -45,6 +51,8 @@ export async function loadAtlas(manifest: Record<string, string[]>): Promise<Atl
 
   return {
     tile: i => tiles.get(i) ?? (tiles.set(i, sub(tiny, i, 12, 16)), tiles.get(i)!),
+    room: i => rooms.get(i) ?? (rooms.set(i, sub(room, i, 8, 16)), rooms.get(i)!),
+    prop: i => propTiles.get(i) ?? (propTiles.set(i, sub(props, i, 4, 32)), propTiles.get(i)!),
     white: i => whites.get(i) ?? (whites.set(i, sub(whiteSheet, i, 12, 16)), whites.get(i)!),
     micro: i => micros.get(i) ?? (micros.set(i, sub(micro, i, 16, 8)), micros.get(i)!),
     particle: n => particles.get(n) ?? Texture.WHITE,

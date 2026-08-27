@@ -229,13 +229,16 @@ function updateEnemyWeapon(v: EntityView, e: Enemy, x: number, y: number, alpha:
 }
 
 // ---------- one-off scene objects ----------
-export function makePropSprite(atlas: Atlas, tile: number, x: number, y: number, sortY: number): Sprite {
-  const s = new Sprite(atlas.tile(tile)); s.position.set(x, y); s.zIndex = sortY; return s
+export function makePropSprite(atlas: Atlas, p: { tile: number; x: number; y: number; sortY: number; sheet: 'room' | 'prop' }): Sprite {
+  const s = new Sprite(p.sheet === 'prop' ? atlas.prop(p.tile) : atlas.room(p.tile))
+  s.position.set(p.x, p.y)
+  s.zIndex = p.sortY
+  return s
 }
 
 export class SpawnMarkerView {
   sprite: Sprite
-  constructor(atlas: Atlas, parent: Container) { this.sprite = new Sprite(atlas.tile(T.spawnMark)); this.sprite.anchor.set(0.5); parent.addChild(this.sprite) }
+  constructor(atlas: Atlas, parent: Container) { this.sprite = new Sprite(atlas.tile(60)); this.sprite.anchor.set(0.5); parent.addChild(this.sprite) }
   update(x: number, y: number, ticksLeft: number, total: number) {
     const u = 1 - ticksLeft / total
     this.sprite.position.set(Math.round(x), Math.round(y))

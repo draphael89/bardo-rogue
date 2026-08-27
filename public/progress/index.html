@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Bardo Rogue — dailies</title>
+  <!--
+    THESIS: a film-dailies book for watching a game get forged against a real bar. Refuses a Jira board.
+    OWN-WORLD: underexposed charcoal, amber grease-pencil, cold projector cyan. Punch-hole slate.
+    STORY: which take is live, the two frames, the critic stamp, the named gap.
+    FIRST VIEWPORT: TAKE 01 + piece name, then before/after stacked, then the stamp.
+    FORM: color-timer's book / dailies slate.
+  -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Azeret+Mono:wght@400;600&family=Big+Shoulders+Display:wght@700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --ink: #e6dcc4;
+      --mute: #8a8070;
+      --amber: #e8a23a;
+      --cyan: #7eb0c4;
+      --void: #0b0a0e;
+      --slate: #16140f;
+      --line: #2a261c;
+      --wow: #3d9a6a;
+      --loss: #c44a3a;
+      --build: #e8a23a;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; background: var(--void); color: var(--ink); font-family: "Azeret Mono", ui-monospace, monospace; }
+    body {
+      min-height: 100dvh;
+      background:
+        radial-gradient(1200px 600px at 50% -10%, #1a160e 0%, transparent 55%),
+        var(--void);
+      padding: 18px 16px 48px;
+    }
+    .slate {
+      max-width: 560px;
+      margin: 0 auto;
+    }
+    .holes {
+      display: flex; gap: 18px; justify-content: center; margin-bottom: 14px;
+    }
+    .holes i {
+      width: 14px; height: 14px; border-radius: 50%;
+      background: #050508;
+      box-shadow: inset 0 1px 0 #2a2a30, 0 0 0 3px #121018;
+    }
+    header h1 {
+      font-family: "Big Shoulders Display", sans-serif;
+      font-weight: 800;
+      font-size: clamp(42px, 12vw, 64px);
+      letter-spacing: 0.02em;
+      line-height: 0.85;
+      margin: 0 0 6px;
+      color: var(--ink);
+    }
+    header .sub { color: var(--mute); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; }
+    header .clock { margin-top: 10px; color: var(--cyan); font-size: 11px; }
+    .take {
+      margin: 22px 0 16px;
+      padding: 16px 16px 14px;
+      background: var(--slate);
+      border: 1px solid var(--line);
+      box-shadow: 0 0 0 1px #0a0907;
+    }
+    .take .kicker {
+      display: flex; justify-content: space-between; align-items: baseline;
+      color: var(--amber); font-size: 11px; letter-spacing: 0.16em;
+    }
+    .take h2 {
+      font-family: "Big Shoulders Display", sans-serif;
+      font-size: clamp(36px, 10vw, 52px);
+      margin: 4px 0 2px; line-height: 0.9; letter-spacing: 0.01em;
+    }
+    .take p { margin: 8px 0 0; color: var(--mute); font-size: 12px; line-height: 1.45; }
+    .frames { display: grid; gap: 10px; margin-top: 16px; }
+    figure {
+      margin: 0; background: #08070a; border: 1px solid var(--line); overflow: hidden;
+    }
+    figure img { display: block; width: 100%; height: auto; image-rendering: pixelated; background: #111; }
+    figure figcaption {
+      padding: 6px 8px; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--mute); border-top: 1px solid var(--line);
+    }
+    figure.empty {
+      min-height: 88px; display: grid; place-items: center;
+      color: #3a3428; font-size: 11px; letter-spacing: 0.12em;
+    }
+    .stamp {
+      margin-top: 12px; padding: 10px 12px;
+      border: 2px dashed #3a3428; color: var(--mute); font-size: 12px;
+      letter-spacing: 0.12em; text-transform: uppercase; text-align: center;
+    }
+    .stamp.wow { border-color: var(--wow); color: var(--wow); }
+    .stamp.loss { border-color: var(--loss); color: var(--loss); }
+    .stamp.build { border-color: var(--build); color: var(--build); }
+    .gap { margin-top: 10px; font-size: 12px; color: var(--ink); line-height: 1.5; }
+    .gap b { color: var(--amber); font-weight: 600; }
+    .board { margin-top: 28px; }
+    .board h3 {
+      font-family: "Big Shoulders Display", sans-serif;
+      font-size: 28px; margin: 0 0 10px; letter-spacing: 0.04em;
+    }
+    .row {
+      display: grid; grid-template-columns: 36px 1fr auto; gap: 10px;
+      align-items: baseline; padding: 9px 0; border-top: 1px solid var(--line);
+      font-size: 12px;
+    }
+    .row .n { color: var(--amber); letter-spacing: 0.08em; }
+    .row .name { color: var(--ink); }
+    .row.live .name { color: var(--amber); }
+    .row .st { color: var(--mute); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; }
+    .row.wow .st { color: var(--wow); }
+    .row.loss .st { color: var(--loss); }
+    .row.building .st { color: var(--build); }
+    .log { margin-top: 28px; }
+    .log h3 {
+      font-family: "Big Shoulders Display", sans-serif;
+      font-size: 28px; margin: 0 0 10px;
+    }
+    .log li { list-style: none; padding: 7px 0; border-top: 1px solid var(--line); font-size: 12px; color: var(--ink); }
+    .log time { color: var(--cyan); margin-right: 10px; }
+    .log ul { margin: 0; padding: 0; }
+    footer { margin-top: 28px; color: #4a4438; font-size: 10px; letter-spacing: 0.08em; }
+  </style>
+</head>
+<body>
+  <div class="slate">
+    <div class="holes" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+    <header>
+      <h1>BARDO<br>ROGUE</h1>
+      <div class="sub" id="sub">Gauntlet against the real games</div>
+      <div class="clock" id="clock">updating…</div>
+    </header>
+    <section class="take" id="take"></section>
+    <section class="board">
+      <h3>THE BOARD</h3>
+      <div id="board"></div>
+    </section>
+    <section class="log">
+      <h3>SLATE</h3>
+      <ul id="log"></ul>
+    </section>
+    <footer>open /progress/index.html on :5173 — refreshes every 12s — do not wait</footer>
+  </div>
+  <script>
+    const $ = (id) => document.getElementById(id)
+    const stampClass = (s, v) => v === 'ours' ? 'wow' : v === 'theirs' ? 'loss' : s === 'building' ? 'build' : ''
+    const stampText = (p) => {
+      if (p.verdict === 'ours') return 'WOWED  ·  ours'
+      if (p.verdict === 'theirs') return 'NOT YET  ·  the bar won'
+      if (p.status === 'building') return `ROUND ${p.rounds}  ·  building`
+      return 'IN THE CAN  ·  queued'
+    }
+    const statusWord = (p) => {
+      if (p.verdict === 'ours') return 'wowed'
+      if (p.verdict === 'theirs') return 'gap'
+      return p.status
+    }
+    function frame(src, cap) {
+      if (!src) return `<figure class="empty">${cap} — waiting</figure>`
+      return `<figure><img src="${src}?t=${Date.now()}" alt="${cap}" /><figcaption>${cap}</figcaption></figure>`
+    }
+    function render(d) {
+      $('sub').textContent = d.subtitle
+      const t = new Date(d.updated)
+      $('clock').textContent = `last slate  ${t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+      const p = d.pieces.find(x => x.id === d.now) || d.pieces[0]
+      $('take').innerHTML = `
+        <div class="kicker"><span>TAKE ${p.take}</span><span>vs ${p.bar}</span></div>
+        <h2>${p.name.toUpperCase()}</h2>
+        <p>${p.blurb}</p>
+        <div class="frames">
+          ${frame(p.before, 'before')}
+          ${frame(p.after, 'after  ·  r' + p.rounds)}
+          ${frame(p.ref, 'the bar')}
+        </div>
+        <div class="stamp ${stampClass(p.status, p.verdict)}">${stampText(p)}</div>
+        ${p.gap ? `<div class="gap"><b>Biggest gap.</b> ${p.gap}</div>` : ''}
+      `
+      $('board').innerHTML = d.pieces.map(x => `
+        <div class="row ${x.id === d.now ? 'live' : ''} ${x.verdict === 'ours' ? 'wow' : x.verdict === 'theirs' ? 'loss' : x.status}">
+          <span class="n">${x.take}</span>
+          <span class="name">${x.name}</span>
+          <span class="st">${statusWord(x)}</span>
+        </div>
+      `).join('')
+      $('log').innerHTML = d.timeline.slice().reverse().map(e => `<li><time>${e.t}</time>${e.text}</li>`).join('')
+    }
+    async function pull() {
+      try {
+        const d = await (await fetch('data.json?t=' + Date.now(), { cache: 'no-store' })).json()
+        render(d)
+      } catch (e) {
+        $('clock').textContent = 'slate unreachable'
+      }
+    }
+    pull()
+    setInterval(pull, 12000)
+  </script>
+</body>
+</html>

@@ -13,6 +13,7 @@ import { lerp } from './anim'
 import { Lighting } from './light'
 import { PostFx } from './postfx'
 import { DamageNumbers } from './damageNumbers'
+import { Atmosphere } from './atmosphere'
 
 // Reads sim state + events every frame and drives everything visible. Never mutates the sim.
 export class Presenter {
@@ -32,15 +33,17 @@ export class Presenter {
   lighting: Lighting
   postfx: PostFx
   damageNumbers: DamageNumbers
+  atmosphere: Atmosphere
   private lastHurtAngle = 0
 
   constructor(public ra: RenderApp, public atlas: Atlas, public world: World) {
     const L = ra.layers
     this.tilemap = buildTilemap(ra.app.renderer, atlas, world.arena, ra.arenaOffset)
     L.floor.addChild(this.tilemap.voidLayer, this.tilemap.sprite, this.tilemap.door)
-    for (const p of world.arena.props) L.entities.addChild(makePropSprite(atlas, p.tile, p.x, p.y, p.sortY))
+    for (const p of world.arena.props) L.entities.addChild(makePropSprite(atlas, p))
     this.playerView = createPlayerView(atlas, L)
     this.particles = new Particles(atlas, L.fx, L.decals, L.floor)
+    this.atmosphere = new Atmosphere(atlas, L.fx, world.arena)
     L.fx.addChild(this.fxGraphics)
     this.hud = new Hud(atlas, L.hud)
     this.flashOverlay = new Sprite(Texture.WHITE); this.flashOverlay.width = tuning.view.width; this.flashOverlay.height = tuning.view.height
@@ -171,6 +174,7 @@ export class Presenter {
     drawSwingArc(this.fxGraphics, p, alpha, w)
 
     this.particles.update(dtSec)
+    this.atmosphere.update(w, dtSec)
     // juice hooks
     this.lighting.update(w, dtSec, alpha)
     this.damageNumbers.update(dtSec)

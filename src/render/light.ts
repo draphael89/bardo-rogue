@@ -15,6 +15,8 @@ export class Lighting {
   private base: Sprite
   private vignette: Sprite
   private braziers: Sprite[] = []
+  private windows: Sprite[] = []
+  private door: Sprite
   private player: Sprite
   private out: Sprite
   private t = 0
@@ -37,6 +39,17 @@ export class Lighting {
       s.position.set(b.x + this.pad + ra.arenaOffset.x, b.y - 4 + this.pad + ra.arenaOffset.y)
       this.scene.addChild(s); this.braziers.push(s)
     }
+    for (const w of arena.windows) {
+      const s = new Sprite(atlas.light('circle')); s.anchor.set(0.5); s.blendMode = 'add'
+      s.position.set(w.x + this.pad + ra.arenaOffset.x, w.y + this.pad + ra.arenaOffset.y)
+      this.scene.addChild(s); this.windows.push(s)
+    }
+    this.door = new Sprite(atlas.light('circle')); this.door.anchor.set(0.5); this.door.blendMode = 'add'
+    this.door.position.set(
+      (arena.door.col + 0.5) * 16 + this.pad + ra.arenaOffset.x,
+      (arena.door.row + 0.7) * 16 + this.pad + ra.arenaOffset.y,
+    )
+    this.scene.addChild(this.door)
     this.scene.addChild(this.player)
 
     const arenaW = arena.cols * 16, arenaH = arena.rows * 16
@@ -76,6 +89,21 @@ export class Lighting {
       s.tint = L.brazierTint
       s.rotation = i * 1.7 + this.t * 0.15
     }
+
+    for (let i = 0; i < this.windows.length; i++) {
+      const s = this.windows[i]
+      const n = noise(this.t * 4 + i * 21) * 0.5 + noise(this.t * 11 + i * 8) * 0.5
+      const f = 1 + n * L.windowFlicker
+      s.scale.set((L.windowRadius * 2 * f) / 128)
+      s.alpha = L.windowAlpha * (1 - d * 0.75)
+      s.tint = L.windowTint
+    }
+
+    const doorN = noise(this.t * 7 + 11) * 0.55 + noise(this.t * 19 + 4) * 0.45
+    const doorF = 1 + doorN * L.doorFlicker
+    this.door.scale.set((L.doorRadius * 2 * doorF) / 128)
+    this.door.alpha = L.doorAlpha * (1 - d * 0.85)
+    this.door.tint = L.doorTint
 
     const px = lerp(p.px, p.x, alpha), py = lerp(p.py, p.y, alpha)
     this.player.position.set(Math.round(px) + this.pad + this.ra.arenaOffset.x, Math.round(py) + this.pad + this.ra.arenaOffset.y)

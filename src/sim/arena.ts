@@ -5,9 +5,9 @@ export const TILE = 16
 
 export const T = {
   void: 0, rubbleA: 12, rubbleB: 24,
-  wallTop: [36, 37, 38, 39], wallFace: [57, 58, 59],
+  wallTop: 37, wallTopLeftEdge: 38, wallTopRightEdge: 36, wallTopBoth: 39, wallFace: 40,
   floor: 48, floorVar: [49, 50, 51, 42],
-  pillarTop: 6, pillarBase: 18,
+  pillarTop: 39, pillarBase: 40,
   brazier: 29, gargoyle: 7, gargoyleLit: 8, faceCarving: 19,
   doorClosed: 46, doorOpen: 21,
   spawnMark: 60, dummy: 54, crate: 63, barrel: 82,
@@ -37,10 +37,12 @@ export function buildArena(rng: Rng): Arena {
   const idx = (c: number, r: number) => r * cols + c
   const set = (c: number, r: number, t: number, s: boolean) => { base[idx(c, r)] = t; solid[idx(c, r)] = s ? 1 : 0 }
 
+  // wall tops are the light stone; 38/36 carry a dark edge on the floor side so vertical walls read as raised
   for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
-    const edgeCol = c === 0 || c === cols - 1
-    if (r === 0 || r === rows - 1 || edgeCol) set(c, r, rng.pick(T.wallTop), true)
-    else if (r === 1) set(c, r, rng.pick(T.wallFace), true)
+    if (r === 0 || r === rows - 1) set(c, r, T.wallTop, true)
+    else if (c === 0) set(c, r, T.wallTopLeftEdge, true)
+    else if (c === cols - 1) set(c, r, T.wallTopRightEdge, true)
+    else if (r === 1) set(c, r, T.wallFace, true)
     else set(c, r, rng.next() < 0.12 ? rng.pick(T.floorVar) : T.floor, false)
   }
 

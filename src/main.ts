@@ -71,6 +71,7 @@ async function boot() {
     setOverride: f => { input.override = f },
     setBot: b => { bot = b },
     loop,
+    presenter,
     get metrics() { return metrics },
     mute: m => { audio.muted = m ?? !audio.muted; return audio.muted },
     debug: v => { overlay.setVisible(v ?? !overlay.visible); return overlay.visible },

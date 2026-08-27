@@ -31,9 +31,13 @@ if (stepwise) {
 } else {
   await page.waitForFunction((n) => (window as any).__game.world.tick >= n, ticks, { timeout: 60000 })
 }
-if (evalJs) { await page.evaluate((js) => { new Function(js)() }, evalJs); await page.waitForTimeout(80) }
+if (evalJs) await page.evaluate((js) => { new Function(js)() }, evalJs)
+// headless rAF can be slow; make sure at least two frames rendered after the last sim change
+const f0 = await page.evaluate(() => (window as any).__game.loop.frameTimes.length)
+await page.waitForFunction((n) => (window as any).__game.loop.frameTimes.length >= n + 2, f0, { timeout: 10000 })
 const state = await page.evaluate(() => (window as any).__game.state())
 const stats = await page.evaluate(() => (window as any).__game.frameStats())
+const extra = await page.evaluate(() => (window as any).__out ?? null)
 await page.screenshot({ path: out })
-console.log(JSON.stringify({ out, stats, state, errors }, null, 2))
+console.log(JSON.stringify({ out, stats, extra, state, errors }, null, 2))
 await browser.close()

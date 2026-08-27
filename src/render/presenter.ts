@@ -1,4 +1,4 @@
-import { Container, Graphics, Sprite } from 'pixi.js'
+import { Container, Graphics, Sprite, Texture } from 'pixi.js'
 import type { RenderApp } from './app'
 import type { Atlas } from './atlas'
 import type { World, Enemy } from '@/sim/world'
@@ -35,7 +35,7 @@ export class Presenter {
     this.particles = new Particles(atlas, L.fx, L.decals, L.floor)
     L.fx.addChild(this.fxGraphics)
     this.hud = new Hud(atlas, L.hud)
-    this.flashOverlay = new Sprite(); this.flashOverlay.width = tuning.view.width; this.flashOverlay.height = tuning.view.height
+    this.flashOverlay = new Sprite(Texture.WHITE); this.flashOverlay.width = tuning.view.width; this.flashOverlay.height = tuning.view.height
     this.flashOverlay.alpha = 0; L.hud.addChild(this.flashOverlay)
   }
 

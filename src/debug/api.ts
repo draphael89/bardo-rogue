@@ -12,6 +12,7 @@ export interface GameApi {
   tuning: typeof tuning
   metrics: Metrics
   loop: Loop
+  presenter: unknown
   reset(seed?: number, scenario?: string, opts?: { god?: boolean }): void
   step(n?: number): void
   setInput(frame: Partial<InputFrame> | null): void
@@ -31,6 +32,7 @@ export function installApi(host: {
   setOverride(f: InputFrame | null): void
   setBot(b: ((w: World) => InputFrame) | null): void
   loop: Loop
+  presenter: unknown
   metrics: Metrics
   mute(m?: boolean): boolean
   debug(v?: boolean): boolean
@@ -40,6 +42,7 @@ export function installApi(host: {
     tuning,
     metrics: host.metrics,
     loop: host.loop,
+    presenter: host.presenter,
     reset: (seed, scenario, opts) => host.reset(seed, scenario, opts),
     step: (n = 1) => { for (let i = 0; i < n; i++) host.tick() },
     setInput: f => host.setOverride(f ? { moveX: 0, moveY: 0, aimX: 1, aimY: 0, aimSoft: false, attack: false, dodge: false, restart: false, ...f } : null),

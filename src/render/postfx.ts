@@ -66,12 +66,19 @@ void main(void)
     vec4 src = texture(uTexture, vTextureCoord);
     vec3 c = src.rgb;
     float luma = dot(c, vec3(0.2126, 0.7152, 0.0722));
-    c = mix(uShadowTint * max(luma, 0.02), c, 0.70);
+    // Lift shadows toward the indigo tint, weighted by darkness. A flat 0.70 mix here applied the
+    // pull at every luma, so the brightest colour the art bible allows (#ECF0F6, L240) rendered at
+    // L173 and no lane could emit a bright event. Shadows still get the full lift.
+    float sw = 0.30 * (1.0 - smoothstep(0.0, 0.45, luma));
+    c = mix(uShadowTint * max(luma, 0.02), c, 1.0 - sw);
     float hi = smoothstep(0.72, 0.96, luma);
     c = mix(c, c * uHighlightTint, hi * 0.38);
     c = (c - 0.5) * uContrast + 0.5;
     c = mix(vec3(luma), c, uSat);
-    c = mix(src.rgb, clamp(c, 0.0, 1.0), uStrength);
+    // ART_DIRECTION.md 1.3.4 fixes the ends of the scale at #08070E and #ECF0F6 and bans pure black
+    // and pure white pixels outright. The grade is the one place that can enforce that globally, so
+    // it clamps to those endpoints rather than to 0..1.
+    c = mix(src.rgb, clamp(c, vec3(0.0314, 0.0275, 0.0549), vec3(0.9255, 0.9412, 0.9647)), uStrength);
     finalColor = vec4(c, src.a);
 }
 `

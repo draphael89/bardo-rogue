@@ -7,7 +7,7 @@ the 0.19 px camera shake and the unseeded presentation RNG from Phase 0.
 These land at a WAVE BOUNDARY, never mid-wave: changing a global changes every lane's baseline at
 once and breaks the round-over-round comparison the whole loop depends on.
 
-## R1 — The colour grade crushes the whole range by ~30 %  (OPEN, land at end of wave 1)
+## R1 — The colour grade crushes the whole range by ~30 %  (LANDED, measured)
 
 Found by the ui-lane builder, which correctly noticed the critic's "reference reserves the top of
 its range for events, p99 232, pushes to white on the hit spark" gap could not be answered from
@@ -53,3 +53,38 @@ at L33, well inside it).
 **Do not** hand this to a lane as a piece. `src/render/postfx.ts` is owned by no lane, and the first
 capture taken after it lands is not comparable to any capture taken before it. When it lands, every
 visual piece's baseline moves and wave 2 round 1 is the new reference point. Say so in the wave note.
+
+
+### R1 outcome, measured on real frames
+
+`pnpm shot --scenario wave3 --seed 1 --bot kite --ticks 500 --stepwise 1`, luminance over every pixel:
+
+| | mean | p50 | p99 | max | pixels over 72 % |
+| --- | --- | --- | --- | --- | --- |
+| before | 56 | 40 | **178** | 197 | 0.9 % |
+| after the lift fix | 71 | 46 | **230** | 255 | 10.0 % |
+| after clamping to the bible's ends | 73 | 46 | **229** | **240** | 10.0 % |
+
+p99 178 → 229 against the reference's 232. The gap the critics kept naming is closed, and it was one
+shader line. `max` needed the second change: restoring the range let additive blending reach pure
+white, which §1.3.4 bans outright, so the grade now clamps to `#08070E`–`#ECF0F6` instead of 0–1.
+The grade is the only place that can enforce the palette's endpoints globally.
+
+## R2 — The static art, not events, occupies the top of the range  (OPEN)
+
+R1 was masking this. With the crush gone, measure a QUIET frame against a busy one:
+
+| | p99 | max | over 72 % |
+| --- | --- | --- | --- |
+| quiet, `--scenario dummy --ticks 60`, no combat | 227 | 240 | **8.7 %** |
+| busy wave-3 combat, particles and 7 enemies | 229 | 240 | 10.0 % |
+
+A combat frame full of hit sparks is barely brighter than an empty room. So the top of the range is
+not reserved for events at all — the room's own lights (brazier, door, window glow) already live
+there, and §5's highlight budget of 8 % of static-art pixels is already spent before anything
+happens. The critic's "reserves the top of its range for events" is therefore still unanswered, and
+still not answerable by a combat lane: it is a lighting problem in `src/render/light.ts`.
+
+Caveat on the numbers: these frames were captured while another agent had in-flight rooms-as-data
+work touching `light.ts` and `tilemap.ts`, so part of the quiet-frame brightness may be theirs.
+Re-measure in isolation before assigning R2.

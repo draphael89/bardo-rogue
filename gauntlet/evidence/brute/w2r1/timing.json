@@ -1,0 +1,46 @@
+{
+  "piece": "brute",
+  "wave": 2,
+  "round": 1,
+  "note": "New baseline. Every wave-1 capture predates repair R1 (global colour grade p99 178 -> 229) and is non-comparable.",
+  "capture": {
+    "scenario": "brute-only", "seed": 1, "bot": "idle",
+    "crop": "172,136,168,120",
+    "cropChangedThisRound": true,
+    "cropWas": "144,72,192,128",
+    "whyCropChanged": "The protocol crop bottom edge is view y=200. The brute's feet render at view y=182 and the ground telegraph occupies y=182..231, so the old box clipped the entire ground-projected geometry out of frame and every wave-1 verdict on 'readability is colour, not geometry' was made on evidence that could not show the geometry. strip-legacycrop.png in this folder is the same 12 frames at the old box, for comparison.",
+    "cycle": "first attack cycle"
+  },
+  "source": "strip.png.json + strip-fullspan.png.json event/state trace (sim ticks, 60 Hz)",
+  "ticks": {
+    "windupStart_tellOn": 129,
+    "aimCommitLock": 143,
+    "release_enemyAttack": 149,
+    "firstDamage_playerHurt": 156,
+    "activeHitWindow": [156, 160],
+    "recoverStart": 164,
+    "recoverEnd_backToChase": 198,
+    "nextWindup": 199
+  },
+  "counts": {
+    "tellToDamageTicks": 27,
+    "tellToDamageMs": 450,
+    "trackingTellTicks": 14,
+    "committedTellTicks": 6,
+    "releaseToDamageTicks": 7,
+    "activeTicks": 5,
+    "punishWindowTicks": 34,
+    "punishWindowMs": 567,
+    "staggerTicksIfHit": 20,
+    "hitStopFreezeTicksOnContact": 4,
+    "cycleTicks": 70
+  },
+  "notes": [
+    "Sim untouched this round: src/sim/enemies/brute.ts is byte-identical to wave 1, so every tick count above matches w1r1 and no replay hash moved.",
+    "Tell-to-damage measured from the enemyWindup event to the playerHurt event. The telegraph tracks the player for 14 ticks (dashed rim) and hardens for the last 6 (BRUTE_COMMIT_LEAD, solid rim).",
+    "Punish window = the recover state: 34 ticks from the end of the active window to the return to chase. Countable in strip-fullspan.png frames #05-#10.",
+    "What changed this round is the shape and value of the ground mark, not its schedule: the danger boundary is now the hammer's own 120-degree pie slice (straight edges out of the landing spot, hard far arc) instead of the arc inflated by the player radius, which rounded into a featureless dome; the inflated graze boundary is kept as a thin dotted line outside the cone. Interior wash alpha went 0.16-0.26 -> 0.34-0.52 and the outer black outline 0.55 -> 0.85, because the mark lives in the shadows layer under the light multiply and has almost no headroom upward on a lum-185 floor.",
+    "Readability check: greyscale the exhibit and the cone still reads (dark body, hard black edge, bright rim, density clock). That is the sprite-swap test the piece asks for.",
+    "poses.png is cropped by tools/poses.ts above the floor plane, so the ground mark is cut off in it. Judge the mark from strip.png and exhibit.png."
+  ]
+}

@@ -7,7 +7,8 @@ import { BRUTE_COMMIT_LEAD as COMMIT_LEAD } from '@/sim/enemies/brute'
 import { EntityView, HALF_PI, type EnemyFrame, type Pose } from './shared'
 
 // The brute reads as GEOMETRY, not as a colour.
-//   - a ground fan, drawn where the lunge will land him, covering exactly the arc his hammer tests;
+//   - a ground CONE, drawn where the lunge will land him: two straight edges out of the landing spot
+//     and a hard far arc, so the silhouette alone says which way the hammer is going;
 //   - dashed rim while he is still tracking you, solid rim the tick his aim locks;
 //   - a fill that grows from the middle out and is full on the tick he releases.
 // Swap the sprite for a different one and every read above survives. The body pose carries the same
@@ -117,33 +118,38 @@ function updateBruteTell(v: EntityView, e: Enemy, x: number, y: number, tk: numb
   // Four dials, one per phase. Density is the clock: an ordered dither that thickens tick by tick and
   // is solid on the frame the hammer lands. It is a value ramp, so it still counts down in greyscale.
   let density = 1, dashed = false, blowout = 0
-  let washAlpha = 0.12, stipple = 0xff5a26, hot = 0xffb257, stippleAlpha = 0.55, rim = 0xffe6c2, rimAlpha = 0.9
+  let washAlpha = 0.34, stipple = 0xff5a26, hot = 0xffb257, stippleAlpha = 0.55, rim = 0xffe6c2, rimAlpha = 0.9
   if (s === 'windup') {
     const u = clamp01(tk / B.windup)
     const bloom = clamp01(tk / 3)          // 3 ticks to strike the mark on, so it arrives rather than pops
     dashed = tk < B.windup - COMMIT_LEAD
     density = (0.12 + 0.88 * u) * bloom
-    washAlpha = (0.16 + 0.10 * u) * bloom
+    washAlpha = (0.34 + 0.16 * u) * bloom
     stippleAlpha = 0.52 + 0.28 * u
     rim = dashed ? 0xffa864 : 0xfff2e0
-    rimAlpha = (dashed ? 0.6 : 1) * bloom
+    rimAlpha = (dashed ? 0.65 : 1) * bloom
   } else if (s === 'attack') {
     blowout = clamp01(1 - (tk - B.lungeTicks) / 3) * (tk > B.lungeTicks ? 1 : 0)   // the contact frame
     stipple = 0xff8a3a; hot = 0xffe7bd; rim = 0xffffff
-    washAlpha = 0.26 + 0.34 * blowout
+    washAlpha = 0.52 + 0.24 * blowout
     stippleAlpha = 0.75 + 0.25 * blowout
     rimAlpha = 1
   } else {
     const fade = 1 - tk / SCORCH_TICKS
     density = fade
     stipple = 0x50200f; hot = 0x7a3a1c; rim = 0x8a3a18
-    washAlpha = 0.22 * fade; stippleAlpha = 0.6 * fade; rimAlpha = 0.5 * fade
+    washAlpha = 0.36 * fade; stippleAlpha = 0.6 * fade; rimAlpha = 0.5 * fade
   }
 
   const R = B.hitRadius, tr = tuning.player.radius, half = (B.hitArcDeg * Math.PI) / 360
-  // The honest boundary: the hammer arc grown by the player's own radius (exactly what arcHits tests),
-  // then cut off at the walls so the mark never paints over stone.
-  const rAt = (dTheta: number, dirX: number, dirY: number): number => {
+  // The hammer's own arc, as a pie slice: radius inside the arc, nothing outside it. Straight edges
+  // out of the landing spot are what give the mark a direction.
+  const rHit = (dTheta: number, dirX: number, dirY: number): number =>
+    dTheta > half ? 0 : Math.min(R, wallLimit(cx, cy, dirX, dirY))
+  // The graze boundary: the same arc grown by the player's own radius, which is exactly what arcHits
+  // tests. Filling to here rounds the cone into a featureless dome, so it is drawn as a thin dotted
+  // line outside the cone instead: still honest about the last pixel that hurts, silent about shape.
+  const rGraze = (dTheta: number, dirX: number, dirY: number): number => {
     let r: number
     if (dTheta <= half) r = R + tr
     else {
@@ -153,23 +159,28 @@ function updateBruteTell(v: EntityView, e: Enemy, x: number, y: number, tk: numb
     return Math.min(r, wallLimit(cx, cy, dirX, dirY))
   }
 
-  ring(g, cx, cy, e.aimAngle, rAt, 'path')
-  g.fill({ color: 0x2a0c08, alpha: washAlpha })
-  stippleFan(g, cx, cy, e.aimAngle, rAt, density, 0)
+  cone(g, cx, cy, e.aimAngle, half, rHit, 'path')
+  g.fill({ color: 0x160a14, alpha: washAlpha })
+  stippleFan(g, cx, cy, e.aimAngle, rHit, density, 0)
   g.fill({ color: stipple, alpha: stippleAlpha })
-  stippleFan(g, cx, cy, e.aimAngle, rAt, density, 1)
+  stippleFan(g, cx, cy, e.aimAngle, rHit, density, 1)
   g.fill({ color: hot, alpha: stippleAlpha })
-  ring(g, cx, cy, e.aimAngle, rAt, 'under')
-  g.fill({ color: 0x18080c, alpha: 0.55 * rimAlpha })
-  ring(g, cx, cy, e.aimAngle, rAt, dashed ? 'dashed' : 'solid')
+  ring(g, cx, cy, e.aimAngle, rGraze, 'dashed')
+  g.fill({ color: rim, alpha: rimAlpha * 0.4 })
+  // Hard dark outline OUTSIDE the light rim. The mark is floor paint under the light multiply, so its
+  // top value is capped near the floor's own; the black edge is where the contrast actually comes from
+  // and it is the half of the read that survives greyscale.
+  cone(g, cx, cy, e.aimAngle, half, rHit, 'under')
+  g.fill({ color: 0x0b0409, alpha: 0.85 * rimAlpha })
+  cone(g, cx, cy, e.aimAngle, half, rHit, dashed ? 'dashed' : 'solid')
   g.fill({ color: rim, alpha: rimAlpha })
   // contact: the rim itself kicks 2px outward for two frames, so the landing has a shape and not
   // only a brightness.
-  if (blowout > 0.4) { ring(g, cx, cy, e.aimAngle, rAt, 'kick'); g.fill({ color: 0xffffff, alpha: 0.8 * blowout }) }
+  if (blowout > 0.4) { cone(g, cx, cy, e.aimAngle, half, rHit, 'kick'); g.fill({ color: 0xffffff, alpha: 0.8 * blowout }) }
 
-  // Footprint: the spot the lunge puts him on, so the fan reads as "he arrives here and swings
+  // Footprint: the spot the lunge puts him on, so the cone reads as "he arrives here and swings
   // across that", not as a glow leaking out of whoever happens to stand in it.
-  if (s === 'windup') {
+  if (s !== 'recover') {
     for (let i = 0; i < 16; i++) {
       if ((i & 3) === 3) continue
       const a = (i / 16) * TAU
@@ -178,13 +189,21 @@ function updateBruteTell(v: EntityView, e: Enemy, x: number, y: number, tk: numb
     g.fill({ color: rim, alpha: rimAlpha * 0.8 })
   }
 
-  // Spine: the lunge itself, dashed from his feet into the fan.
-  if (s === 'windup' && ahead > 2) {
-    const fx = Math.round(x), fy = Math.round(y + foot)
-    for (let d = 3; d < ahead; d += 4) {
-      g.rect(Math.round(fx + Math.cos(e.aimAngle) * d), Math.round(fy + Math.sin(e.aimAngle) * d), 2, 1)
+  // The lunge corridor: two dashed rails from his feet, converging on the footprint. Without them the
+  // cone is a puddle 20px in front of nobody. With them the whole mark is one sentence -- he stands
+  // here, he lands there, he swings across that -- and every clause of it is geometry.
+  if (s !== 'recover' && ahead > 3) {
+    const cos = Math.cos(e.aimAngle), sin = Math.sin(e.aimAngle), nx = -sin, ny = cos
+    const fx = x, fy = y + foot
+    for (const side of [-1, 1]) {
+      for (let d = 2; d < ahead - 1; d += 4) {
+        const w = 6 * (1 - d / ahead) + 1
+        for (let k = 0; k < 2; k++) {
+          g.rect(Math.round(fx + cos * (d + k) + nx * side * w), Math.round(fy + sin * (d + k) + ny * side * w), 1, 1)
+        }
+      }
     }
-    g.fill({ color: rim, alpha: rimAlpha * 0.65 })
+    g.fill({ color: rim, alpha: rimAlpha * 0.85 })
   }
 }
 
@@ -217,6 +236,38 @@ function stippleFan(g: Graphics, cx: number, cy: number, aim: number, rAt: (d: n
       const t = (b + 0.5) / 16
       if (density > t && (b & 1) === phase) g.rect(px, py, 1, 1)   // two tones: the ember and its heat
     }
+  }
+}
+
+// The danger boundary as a pie slice: the far arc plus the two straight edges back to the apex.
+// Same emit modes as ring(), same reason for pixels over a 1px vector stroke.
+function cone(g: Graphics, cx: number, cy: number, aim: number, half: number, rAt: (d: number, dx: number, dy: number) => number, mode: 'path' | 'solid' | 'dashed' | 'under' | 'kick'): void {
+  const out = mode === 'under' ? 1 : mode === 'kick' ? 3 : 0
+  const a0 = aim - half, a1 = aim + half
+  const rOf = (th: number): number => {
+    const c = Math.cos(th), s = Math.sin(th)
+    return Math.max(1, rAt(Math.abs(Math.atan2(Math.sin(th - aim), Math.cos(th - aim))), c, s)) + out
+  }
+  if (mode === 'path') {
+    g.moveTo(cx, cy)
+    const steps = Math.max(8, Math.round((a1 - a0) / 0.06))
+    for (let i = 0; i <= steps; i++) { const th = a0 + (a1 - a0) * (i / steps), r = rOf(th); g.lineTo(cx + Math.cos(th) * r, cy + Math.sin(th) * r) }
+    g.closePath()
+    return
+  }
+  let px = -999, py = -999, n = 0
+  const put = (x: number, y: number): void => {
+    const nx = Math.round(x), ny = Math.round(y)
+    if (nx === px && ny === py) return
+    if (mode !== 'dashed' || (n & 7) < 4) g.rect(nx, ny, 1, 1)
+    px = nx; py = ny; n++
+  }
+  const arcSteps = Math.max(8, Math.round((a1 - a0) * rOf(aim)))
+  for (let i = 0; i <= arcSteps; i++) { const th = a0 + (a1 - a0) * (i / arcSteps), r = rOf(th); put(cx + Math.cos(th) * r, cy + Math.sin(th) * r) }
+  for (const th of [a0, a1]) {                      // edges drawn apex-outward so the corners close
+    const c = Math.cos(th), s = Math.sin(th), r = rOf(th)
+    px = -999; py = -999
+    for (let d = 0; d <= r; d++) put(cx + c * d, cy + s * d)
   }
 }
 

@@ -1,0 +1,777 @@
+{
+  "cmd": "pnpm strip -- --scenario brute-only --seed 1 --bot idle --from 129 --frames 12 --every 7 --zoom 2 --crop 172,136,168,120 --out gauntlet/evidence/brute/w2r1/strip-fullspan.png",
+  "out": "gauntlet/evidence/brute/w2r1/strip-fullspan.png",
+  "scenario": "brute-only",
+  "seed": 1,
+  "from": 129,
+  "frames": 12,
+  "every": 7,
+  "zoom": 2,
+  "crop": {
+    "x": 172,
+    "y": 136,
+    "w": 168,
+    "h": 120
+  },
+  "bot": "idle",
+  "hold": null,
+  "eval": "",
+  "shots": [
+    {
+      "i": 0,
+      "tick": 129,
+      "freeze": 0,
+      "state": {
+        "tick": 129,
+        "freeze": 0,
+        "wave": {
+          "index": -1,
+          "state": "idle",
+          "groupIndex": 0,
+          "timer": 0,
+          "total": 0
+        },
+        "room": {
+          "index": 0,
+          "name": "THE THRESHOLD",
+          "doorOpen": false,
+          "kind": "threshold"
+        },
+        "player": {
+          "x": 208,
+          "y": 184,
+          "hp": 5,
+          "state": "free",
+          "stateTick": 129,
+          "iframes": 0
+        },
+        "enemies": [
+          {
+            "id": 1,
+            "kind": "brute",
+            "x": 208,
+            "y": 158.4,
+            "hp": 8,
+            "state": "windup",
+            "stateTick": 0
+          }
+        ],
+        "bolts": 0,
+        "metrics": {
+          "ticks": 129,
+          "seconds": 2.1,
+          "swings": 0,
+          "hitsLanded": 0,
+          "whiffSwings": 0,
+          "kills": 0,
+          "dodges": 0,
+          "successfulDodges": 0,
+          "boltsFired": 0,
+          "boltsCut": 0,
+          "enemyAttacks": 0,
+          "damageTaken": 0,
+          "deaths": 0,
+          "wavesCleared": 0,
+          "clearSeconds": null,
+          "deathSeconds": null
+        }
+      }
+    },
+    {
+      "i": 1,
+      "tick": 136,
+      "freeze": 0,
+      "state": {
+        "tick": 136,
+        "freeze": 0,
+        "wave": {
+          "index": -1,
+          "state": "idle",
+          "groupIndex": 0,
+          "timer": 0,
+          "total": 0
+        },
+        "room": {
+          "index": 0,
+          "name": "THE THRESHOLD",
+          "doorOpen": false,
+          "kind": "threshold"
+        },
+        "player": {
+          "x": 208,
+          "y": 184,
+          "hp": 5,
+          "state": "free",
+          "stateTick": 136,
+          "iframes": 0
+        },
+        "enemies": [
+          {
+            "id": 1,
+            "kind": "brute",
+            "x": 208,
+            "y": 158.4,
+            "hp": 8,
+            "state": "windup",
+            "stateTick": 7
+          }
+        ],
+        "bolts": 0,
+        "metrics": {
+          "ticks": 136,
+          "seconds": 2.3,
+          "swings": 0,
+          "hitsLanded": 0,
+          "whiffSwings": 0,
+          "kills": 0,
+          "dodges": 0,
+          "successfulDodges": 0,
+          "boltsFired": 0,
+          "boltsCut": 0,
+          "enemyAttacks": 0,
+          "damageTaken": 0,
+          "deaths": 0,
+          "wavesCleared": 0,
+          "clearSeconds": null,
+          "deathSeconds": null
+        }
+      }
+    },
+    {
+      "i": 2,
+      "tick": 143,
+      "freeze": 0,
+      "state": {
+        "tick": 143,
+        "freeze": 0,
+        "wave": {
+          "index": -1,
+          "state": "idle",
+          "groupIndex": 0,
+          "timer": 0,
+          "total": 0
+        },
+        "room": {
+          "index": 0,
+          "name": "THE THRESHOLD",
+          "doorOpen": false,
+          "kind": "threshold"
+        },
+        "player": {
+          "x": 208,
+          "y": 184,
+          "hp": 5,
+          "state": "free",
+          "stateTick": 143,
+          "iframes": 0
+        },
+        "enemies": [
+          {
+            "id": 1,
+            "kind": "brute",
+            "x": 208,
+            "y": 158.4,
+            "hp": 8,
+            "state": "windup",
+            "stateTick": 14
+          }
+        ],
+        "bolts": 0,
+        "metrics": {
+          "ticks": 143,
+          "seconds": 2.4,
+          "swings": 0,
+          "hitsLanded": 0,
+          "whiffSwings": 0,
+          "kills": 0,
+          "dodges": 0,
+          "successfulDodges": 0,
+          "boltsFired": 0,
+          "boltsCut": 0,
+          "enemyAttacks": 0,
+          "damageTaken": 0,
+          "deaths": 0,
+          "wavesCleared": 0,
+          "clearSeconds": null,
+          "deathSeconds": null
+        }
+      }
+    },
+    {
+      "i": 3,
+      "tick": 150,
+      "freeze": 0,
+      "state": {
+        "tick": 150,
+        "freeze": 0,
+        "wave": {
+          "index": -1,
+          "state": "idle",
+          "groupIndex": 0,
+          "timer": 0,
+          "total": 0
+        },
+        "room": {
+          "index": 0,
+          "name": "THE THRESHOLD",
+          "doorOpen": false,
+          "kind": "threshold"
+        },
+        "player": {
+          "x": 208,
+          "y": 184,
+          "hp": 5,
+          "state": "free",
+          "stateTick": 150,
+          "iframes": 0
+        },
+        "enemies": [
+          {
+            "id": 1,
+            "kind": "brute",
+            "x": 208,
+            "y": 162.4,
+            "hp": 8,
+            "state": "attack",
+            "stateTick": 1
+          }
+        ],
+        "bolts": 0,
+        "metrics": {
+          "ticks": 150,
+          "seconds": 2.5,
+          "swings": 0,
+          "hitsLanded": 0,
+          "whiffSwings": 0,
+          "kills": 0,
+          "dodges": 0,
+          "successfulDodges": 0,
+          "boltsFired": 0,
+          "boltsCut": 0,
+          "enemyAttacks": 1,
+          "damageTaken": 0,
+          "deaths": 0,
+          "wavesCleared": 0,
+          "clearSeconds": null,
+          "deathSeconds": null
+        }
+      }
+    },
+    {
+      "i": 4,
+      "tick": 157,
+      "freeze": 3,
+      "state": {
+        "tick": 157,
+        "freeze": 3,
+        "wave": {
+          "index": -1,
+          "state": "idle",
+          "groupIndex": 0,
+          "timer": 0,
+          "total": 0
+        },
+        "room": {
+          "index": 0,
+          "name": "THE THRESHOLD",
+          "doorOpen": false,
+          "kind": "threshold"
+        },
+        "player": {
+          "x": 208,
+          "y": 186.6,
+          "hp": 4,
+          "state": "free",
+          "stateTick": 156,
+          "iframes": 40
+        },
+        "enemies": [
+          {
+            "id": 1,
+            "kind": "brute",
+            "x": 208,
+            "y": 176.3,
+            "hp": 8,
+            "state": "attack",
+            "stateTick": 7
+          }
+        ],
+        "bolts": 0,
+        "metrics": {
+          "ticks": 157,
+          "seconds": 2.6,
+          "swings": 0,
+          "hitsLanded": 0,
+          "whiffSwings": 0,
+          "kills": 0,
+          "dodges": 0,
+          "successfulDodges": 0,
+          "boltsFired": 0,
+          "boltsCut": 0,
+          "enemyAttacks": 1,
+          "damageTaken": 1,
+          "deaths": 0,
+          "wavesCleared": 0,
+          "clearSeconds": null,
+          "deathSeconds": null
+        }
+      }
+    },
+    {
+      "i": 5,
+      "tick": 164,
+      "freeze": 0,
+      "state": {
+        "tick": 164,
+        "freeze": 0,
+        "wave": {
+          "index": -1,
+          "state": "idle",
+          "groupIndex": 0,
+          "timer": 0,
+          "total": 0
+        },
+        "room": {
+          "index": 0,
+          "name": "THE THRESHOLD",
+          "doorOpen": false,
+          "kind": "threshold"
+        },
+        "player": {
+          "x": 208,
+          "y": 190.7,
+          "hp": 4,
+          "state": "free",
+          "stateTick": 160,
+          "iframes": 36
+        },
+        "enemies": [
+          {
+            "id": 1,
+            "kind": "brute",
+            "x": 208,
+            "y": 176.1,
+            "hp": 8,
+            "state": "recover",
+            "stateTick": 0
+          }
+        ],
+        "bolts": 0,
+        "metrics": {
+          "ticks": 164,
+          "seconds": 2.7,
+          "swings": 0,
+          "hitsLanded": 0,
+          "whiffSwings": 0,
+          "kills": 0,
+          "dodges": 0,
+          "successfulDodges": 0,
+          "boltsFired": 0,
+          "boltsCut": 0,
+          "enemyAttacks": 1,
+          "damageTaken": 1,
+          "deaths": 0,
+          "wavesCleared": 0,
+          "clearSeconds": null,
+          "deathSeconds": null
+        }
+      }
+    },
+    {
+      "i": 6,
+      "tick": 171,
+      "freeze": 0,
+      "state": {
+        "tick": 171,
+        "freeze": 0,
+        "wave": {
+          "index": -1,
+          "state": "idle",
+          "groupIndex": 0,
+          "timer": 0,
+          "total": 0
+        },
+        "room": {
+          "index": 0,
+          "name": "THE THRESHOLD",
+          "doorOpen": false,
+          "kind": "threshold"
+        },
+        "player": {
+          "x": 208,
+          "y": 194.1,
+          "hp": 4,
+          "state": "free",
+          "stateTick": 167,
+          "iframes": 29
+        },
+        "enemies": [
+          {
+            "id": 1,
+            "kind": "brute",
+            "x": 208,
+            "y": 176.1,
+            "hp": 8,
+            "state": "recover",
+            "stateTick": 7
+          }
+        ],
+        "bolts": 0,
+        "metrics": {
+          "ticks": 171,
+          "seconds": 2.9,
+          "swings": 0,
+          "hitsLanded": 0,
+          "whiffSwings": 0,
+          "kills": 0,
+          "dodges": 0,
+          "successfulDodges": 0,
+          "boltsFired": 0,
+          "boltsCut": 0,
+          "enemyAttacks": 1,
+          "damageTaken": 1,
+          "deaths": 0,
+          "wavesCleared": 0,
+          "clearSeconds": null,
+          "deathSeconds": null
+        }
+      }
+    },
+    {
+      "i": 7,
+      "tick": 178,
+      "freeze": 0,
+      "state": {
+        "tick": 178,
+        "freeze": 0,
+        "wave": {
+          "index": -1,
+          "state": "idle",
+          "groupIndex": 0,
+          "timer": 0,
+          "total": 0
+        },
+        "room": {
+          "index": 0,
+          "name": "THE THRESHOLD",
+          "doorOpen": false,
+          "kind": "threshold"
+        },
+        "player": {
+          "x": 208,
+          "y": 195.4,
+          "hp": 4,
+          "state": "free",
+          "stateTick": 174,
+          "iframes": 22
+        },
+        "enemies": [
+          {
+            "id": 1,
+            "kind": "brute",
+            "x": 208,
+            "y": 176.1,
+            "hp": 8,
+            "state": "recover",
+            "stateTick": 14
+          }
+        ],
+        "bolts": 0,
+        "metrics": {
+          "ticks": 178,
+          "seconds": 3,
+          "swings": 0,
+          "hitsLanded": 0,
+          "whiffSwings": 0,
+          "kills": 0,
+          "dodges": 0,
+          "successfulDodges": 0,
+          "boltsFired": 0,
+          "boltsCut": 0,
+          "enemyAttacks": 1,
+          "damageTaken": 1,
+          "deaths": 0,
+          "wavesCleared": 0,
+          "clearSeconds": null,
+          "deathSeconds": null
+        }
+      }
+    },
+    {
+      "i": 8,
+      "tick": 185,
+      "freeze": 0,
+      "state": {
+        "tick": 185,
+        "freeze": 0,
+        "wave": {
+          "index": -1,
+          "state": "idle",
+          "groupIndex": 0,
+          "timer": 0,
+          "total": 0
+        },
+        "room": {
+          "index": 0,
+          "name": "THE THRESHOLD",
+          "doorOpen": false,
+          "kind": "threshold"
+        },
+        "player": {
+          "x": 208,
+          "y": 196,
+          "hp": 4,
+          "state": "free",
+          "stateTick": 181,
+          "iframes": 15
+        },
+        "enemies": [
+          {
+            "id": 1,
+            "kind": "brute",
+            "x": 208,
+            "y": 176.1,
+            "hp": 8,
+            "state": "recover",
+            "stateTick": 21
+          }
+        ],
+        "bolts": 0,
+        "metrics": {
+          "ticks": 185,
+          "seconds": 3.1,
+          "swings": 0,
+          "hitsLanded": 0,
+          "whiffSwings": 0,
+          "kills": 0,
+          "dodges": 0,
+          "successfulDodges": 0,
+          "boltsFired": 0,
+          "boltsCut": 0,
+          "enemyAttacks": 1,
+          "damageTaken": 1,
+          "deaths": 0,
+          "wavesCleared": 0,
+          "clearSeconds": null,
+          "deathSeconds": null
+        }
+      }
+    },
+    {
+      "i": 9,
+      "tick": 192,
+      "freeze": 0,
+      "state": {
+        "tick": 192,
+        "freeze": 0,
+        "wave": {
+          "index": -1,
+          "state": "idle",
+          "groupIndex": 0,
+          "timer": 0,
+          "total": 0
+        },
+        "room": {
+          "index": 0,
+          "name": "THE THRESHOLD",
+          "doorOpen": false,
+          "kind": "threshold"
+        },
+        "player": {
+          "x": 208,
+          "y": 196.2,
+          "hp": 4,
+          "state": "free",
+          "stateTick": 188,
+          "iframes": 8
+        },
+        "enemies": [
+          {
+            "id": 1,
+            "kind": "brute",
+            "x": 208,
+            "y": 176.1,
+            "hp": 8,
+            "state": "recover",
+            "stateTick": 28
+          }
+        ],
+        "bolts": 0,
+        "metrics": {
+          "ticks": 192,
+          "seconds": 3.2,
+          "swings": 0,
+          "hitsLanded": 0,
+          "whiffSwings": 0,
+          "kills": 0,
+          "dodges": 0,
+          "successfulDodges": 0,
+          "boltsFired": 0,
+          "boltsCut": 0,
+          "enemyAttacks": 1,
+          "damageTaken": 1,
+          "deaths": 0,
+          "wavesCleared": 0,
+          "clearSeconds": null,
+          "deathSeconds": null
+        }
+      }
+    },
+    {
+      "i": 10,
+      "tick": 199,
+      "freeze": 0,
+      "state": {
+        "tick": 199,
+        "freeze": 0,
+        "wave": {
+          "index": -1,
+          "state": "idle",
+          "groupIndex": 0,
+          "timer": 0,
+          "total": 0
+        },
+        "room": {
+          "index": 0,
+          "name": "THE THRESHOLD",
+          "doorOpen": false,
+          "kind": "threshold"
+        },
+        "player": {
+          "x": 208,
+          "y": 196.2,
+          "hp": 4,
+          "state": "free",
+          "stateTick": 195,
+          "iframes": 1
+        },
+        "enemies": [
+          {
+            "id": 1,
+            "kind": "brute",
+            "x": 208,
+            "y": 176.1,
+            "hp": 8,
+            "state": "windup",
+            "stateTick": 0
+          }
+        ],
+        "bolts": 0,
+        "metrics": {
+          "ticks": 199,
+          "seconds": 3.3,
+          "swings": 0,
+          "hitsLanded": 0,
+          "whiffSwings": 0,
+          "kills": 0,
+          "dodges": 0,
+          "successfulDodges": 0,
+          "boltsFired": 0,
+          "boltsCut": 0,
+          "enemyAttacks": 1,
+          "damageTaken": 1,
+          "deaths": 0,
+          "wavesCleared": 0,
+          "clearSeconds": null,
+          "deathSeconds": null
+        }
+      }
+    },
+    {
+      "i": 11,
+      "tick": 206,
+      "freeze": 0,
+      "state": {
+        "tick": 206,
+        "freeze": 0,
+        "wave": {
+          "index": -1,
+          "state": "idle",
+          "groupIndex": 0,
+          "timer": 0,
+          "total": 0
+        },
+        "room": {
+          "index": 0,
+          "name": "THE THRESHOLD",
+          "doorOpen": false,
+          "kind": "threshold"
+        },
+        "player": {
+          "x": 208,
+          "y": 196.2,
+          "hp": 4,
+          "state": "free",
+          "stateTick": 202,
+          "iframes": 0
+        },
+        "enemies": [
+          {
+            "id": 1,
+            "kind": "brute",
+            "x": 208,
+            "y": 176.1,
+            "hp": 8,
+            "state": "windup",
+            "stateTick": 7
+          }
+        ],
+        "bolts": 0,
+        "metrics": {
+          "ticks": 206,
+          "seconds": 3.4,
+          "swings": 0,
+          "hitsLanded": 0,
+          "whiffSwings": 0,
+          "kills": 0,
+          "dodges": 0,
+          "successfulDodges": 0,
+          "boltsFired": 0,
+          "boltsCut": 0,
+          "enemyAttacks": 1,
+          "damageTaken": 1,
+          "deaths": 0,
+          "wavesCleared": 0,
+          "clearSeconds": null,
+          "deathSeconds": null
+        }
+      }
+    }
+  ],
+  "events": [
+    {
+      "tick": 129,
+      "type": "enemyWindup",
+      "id": 1,
+      "kind": "brute",
+      "x": 208,
+      "y": 158.40000000000023
+    },
+    {
+      "tick": 149,
+      "type": "enemyAttack",
+      "id": 1,
+      "kind": "brute",
+      "x": 208,
+      "y": 158.40000000000023,
+      "angle": 1.5707963267948966
+    },
+    {
+      "tick": 156,
+      "type": "playerHurt",
+      "x": 208,
+      "y": 186.13000000000005,
+      "angle": 1.5707963267948966,
+      "hp": 4
+    },
+    {
+      "tick": 199,
+      "type": "enemyWindup",
+      "id": 1,
+      "kind": "brute",
+      "x": 208,
+      "y": 176.11750000000006
+    }
+  ],
+  "errors": []
+}

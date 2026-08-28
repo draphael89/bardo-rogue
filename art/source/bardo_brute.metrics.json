@@ -1,0 +1,112 @@
+{
+  "input": "art/source/bardo_brute_alpha_v1.png",
+  "output": "public/assets/sprites/bardo_brute.png",
+  "source": {
+    "width": 1254,
+    "height": 1254
+  },
+  "atlas": {
+    "cols": 4,
+    "rows": 2,
+    "cell": 48,
+    "width": 192,
+    "height": 96,
+    "colors": 15,
+    "partialAlpha": 0,
+    "shadowLift": 0,
+    "midtoneFloor": 90,
+    "fit": "pose",
+    "margin": 2
+  },
+  "pass": true,
+  "frames": [
+    {
+      "index": 0,
+      "opaque": 1230,
+      "colors": 15,
+      "bounds": {
+        "x": 2,
+        "y": 3,
+        "w": 44,
+        "h": 43
+      }
+    },
+    {
+      "index": 1,
+      "opaque": 925,
+      "colors": 15,
+      "bounds": {
+        "x": 2,
+        "y": 7,
+        "w": 44,
+        "h": 39
+      }
+    },
+    {
+      "index": 2,
+      "opaque": 655,
+      "colors": 15,
+      "bounds": {
+        "x": 9,
+        "y": 2,
+        "w": 29,
+        "h": 44
+      }
+    },
+    {
+      "index": 3,
+      "opaque": 589,
+      "colors": 15,
+      "bounds": {
+        "x": 12,
+        "y": 2,
+        "w": 24,
+        "h": 44
+      }
+    },
+    {
+      "index": 4,
+      "opaque": 871,
+      "colors": 15,
+      "bounds": {
+        "x": 2,
+        "y": 12,
+        "w": 44,
+        "h": 34
+      }
+    },
+    {
+      "index": 5,
+      "opaque": 749,
+      "colors": 15,
+      "bounds": {
+        "x": 2,
+        "y": 17,
+        "w": 44,
+        "h": 29
+      }
+    },
+    {
+      "index": 6,
+      "opaque": 1061,
+      "colors": 15,
+      "bounds": {
+        "x": 2,
+        "y": 4,
+        "w": 44,
+        "h": 42
+      }
+    },
+    {
+      "index": 7,
+      "opaque": 885,
+      "colors": 15,
+      "bounds": {
+        "x": 2,
+        "y": 11,
+        "w": 44,
+        "h": 35
+      }
+    }
+  ]
+}

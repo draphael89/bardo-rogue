@@ -12,9 +12,71 @@ import { restoreSword, updateBow } from './bow'
 
 const deg = (d: number): number => d * Math.PI / 180
 
+// Sheet order is the production contract documented by tools/process-sprite-sheet.mjs. The body and
+// blade are one authored drawing: semantic simulation phases select semantic frames; no full-body
+// rotation or squash is needed to invent an attack pose after the fact.
+const HERO = {
+  idle: 0, runA: 1, runB: 2, hurt: 3,
+  light1Start: 4, light1Contact: 5, light1Recover: 6,
+  light2Start: 7, light2Contact: 8, light2Recover: 9,
+  heavyStart: 10, heavyContact: 11, heavyRecover: 10,
+  dodgeStart: 12, dodgeTravel: 13, dodgeLand: 14, dead: 15,
+} as const
+
+// Source cells carry poses with very different silhouettes. Their logical feet are not all at row
+// 32 (especially the horizontal dodge), so the pivot is part of the clip metadata rather than a
+// hidden per-frame correction in the renderer.
+const HERO_PIVOT_Y = [28, 28, 28, 28, 26, 26, 32, 26, 25, 25, 25, 25, 21, 14, 21, 23] as const
+type PlayerArt = { stock: Texture; stockWhite: Texture; hero: Texture[]; heroWhite: Texture[] }
+const playerArt = new WeakMap<EntityView, PlayerArt>()
+type ClipSelection = { key: string; authored: boolean; stateTick: number }
+const clipSelection = new WeakMap<EntityView, ClipSelection>()
+
+function heroFrame(p: Player, world: World, time: number): number {
+  if (p.state === 'dead') return HERO.dead
+  if (p.flash > 0) return HERO.hurt
+  if (p.state === 'free') return Math.hypot(p.vx, p.vy) > 10 ? (Math.floor(time * 9) & 1 ? HERO.runA : HERO.runB) : HERO.idle
+  if (p.state === 'dodge') return p.stateTick < 3 ? HERO.dodgeStart : p.stateTick < tuning.player.dodge.travel ? HERO.dodgeTravel : HERO.dodgeLand
+  if (p.state !== 'attack' || armOf(world) !== ARM.blade) return HERO.idle
+  const s = tuning.player.attack.swings[p.swingIndex]
+  if (p.swingIndex === 0) return p.stateTick < s.startup ? HERO.light1Start : p.stateTick < s.startup + s.active ? HERO.light1Contact : HERO.light1Recover
+  if (p.swingIndex === 1) return p.stateTick < s.startup ? HERO.light2Start : p.stateTick < s.startup + s.active ? HERO.light2Contact : HERO.light2Recover
+  // The first sheet deliberately bookends the heavy with its planted frame: contact releases into
+  // the same heavy-specific stance rather than borrowing the second light attack's recovery.
+  return p.stateTick < s.startup ? HERO.heavyStart : p.stateTick < s.startup + s.active ? HERO.heavyContact : HERO.heavyRecover
+}
+
+function authoredBladeFor(v: EntityView, p: Player, bladeEquipped: boolean): boolean {
+  if (!bladeEquipped) { clipSelection.delete(v); return false }
+  if (p.state === 'free' || p.state === 'dead') { clipSelection.delete(v); return true }
+  if (p.state !== 'attack' && p.state !== 'dodge') return false
+
+  const key = p.state === 'attack' ? `attack:${p.swingId}` : 'dodge'
+  const previous = clipSelection.get(v)
+  // swingAngle may track the pointer during early startup. Choose the renderer once per action (or
+  // combo swing) and retain it until stateTick resets, so crossing the horizontal threshold cannot
+  // swap between a 32px authored body and the 16px puppet in the middle of a clip.
+  if (!previous || previous.key !== key || p.stateTick < previous.stateTick) {
+    const authored = p.state === 'attack'
+      ? Math.abs(Math.cos(p.swingAngle)) >= 0.92
+      : Math.abs(p.dodgeDirX) >= 0.92
+    clipSelection.set(v, { key, authored, stateTick: p.stateTick })
+    return authored
+  }
+  previous.stateTick = p.stateTick
+  return previous.authored
+}
+
 export function createPlayerView(atlas: Atlas, layers: { entities: Container; shadows: Container }): EntityView {
   const v = new EntityView(atlas, SPRITE.player, WEAPON.player, layers)
+  const art = {
+    stock: atlas.tile(SPRITE.player), stockWhite: atlas.white(SPRITE.player),
+    hero: Array.from({ length: 16 }, (_, i) => atlas.hero(i)),
+    heroWhite: Array.from({ length: 16 }, (_, i) => atlas.heroWhite(i)),
+  }
+  playerArt.set(v, art)
   whiteFor.set(atlas.tile(SPRITE.player), atlas.white(SPRITE.player))
+  for (let i = 0; i < art.hero.length; i++) whiteFor.set(art.hero[i], art.heroWhite[i])
   for (let i = 0; i < RIM_OFFSETS.length; i++) {
     const s = new Sprite(); s.anchor.set(0.5, 1); s.visible = false
     rimSprites.push(s); layers.entities.addChild(s)
@@ -40,6 +102,9 @@ export function updatePlayerRim(v: EntityView, on: boolean, color: number): void
     if (!s.visible) continue
     s.texture = tex
     s.tint = color
+    // Authored frames carry a per-pose foot pivot. The rim must share it or the four white
+    // silhouettes expose whole shifted chunks of a horizontal dodge instead of a one-pixel edge.
+    s.anchor.copyFrom(b.anchor)
     s.position.set(b.position.x + RIM_OFFSETS[i][0], b.position.y + RIM_OFFSETS[i][1])
     s.scale.copyFrom(b.scale)
     s.rotation = b.rotation
@@ -357,8 +422,27 @@ export function updatePlayerView(v: EntityView, p: Player, world: World, alpha: 
   let moveKey = ''
   const b = v.body
   const speed = Math.hypot(p.vx, p.vy)
+  const bladeEquipped = armOf(world) === ARM.blade
+  // This first production sheet proves the horizontal combat sentence. Until matching diagonal and
+  // vertical clips exist, preserve the legacy directional renderer rather than make an authored
+  // right-facing sword lie about a northward attack or dodge.
+  const authoredBlade = authoredBladeFor(v, p, bladeEquipped)
+  const art = playerArt.get(v)
 
-  if (p.state === 'free') {
+  b.tint = 0xffffff
+  if (art && authoredBlade) {
+    const frame = heroFrame(p, world, time)
+    v.bindBody(art.hero[frame], art.heroWhite[frame])
+    b.anchor.set(0.5, HERO_PIVOT_Y[frame] / 32)
+  } else if (art) {
+    v.bindBody(art.stock, art.stockWhite)
+    b.anchor.set(0.5, 1)
+  }
+
+  if (authoredBlade) {
+    // Translation is simulation truth. The authored frame already contains the pose; secondary
+    // camera/particles remain elsewhere, but the renderer does not bend the complete body drawing.
+  } else if (p.state === 'free') {
     if (speed > 10) {
       // Two authored silhouettes per plane: profile for lateral movement, front for vertical
       // movement. Facing still follows aim, so retreating and circle-strafing never flip the sword
@@ -422,13 +506,19 @@ export function updatePlayerView(v: EntityView, p: Player, world: World, alpha: 
     rot = HALF_PI * p.facing; b.tint = 0x777777
   }
 
-  if (v.squash > 0) { const q = v.squash / tuning.juice.squashTicks; sx *= 1 + 0.25 * q; sy *= 1 - 0.25 * q }
+  if (!authoredBlade && v.squash > 0) { const q = v.squash / tuning.juice.squashTicks; sx *= 1 + 0.25 * q; sy *= 1 - 0.25 * q }
 
   b.position.set(Math.round(x), Math.round(feetY - hop))
   b.scale.set(sx * p.facing, sy)
   b.rotation = rot
-  b.zIndex = feetY
-  v.setFlash(p.flash > 0)
+  // Horizontal authored melee is intentionally drawn a fraction above an equal-footed victim. At
+  // exact contact both sprites otherwise share z and enemy insertion order deletes the attacker;
+  // the fraction does not disturb normal north/south depth sorting.
+  b.zIndex = feetY + (authoredBlade && p.state === 'attack' ? 0.25 : 0)
+  // The authored clip already spends the hurt event on a distinct recoiling pose. Whitening that
+  // entire 32px drawing for the four frozen ticks turns the victim into the impact core and removes
+  // attribution; legacy sprites still need their texture flash because they have no hurt frame.
+  v.setFlash(p.flash > 0 && !authoredBlade)
   // the roll's own drawing wins over the standing sprite, but never over the hurt flash
   if (rollKey && p.flash <= 0) { const t = rollTexture(rollKey); if (t) b.texture = t }
   else if (attackKey && p.flash <= 0) { const t = rollTexture(attackKey); if (t) b.texture = t }
@@ -442,6 +532,7 @@ export function updatePlayerView(v: EntityView, p: Player, world: World, alpha: 
   } else v.setShadow(x, feetY - 1, 12 - hop * 0.4, 5 - hop * 0.2, 0.35 - hop * 0.02)
 
   if (armOf(world) === ARM.bow) updateBow(v, p, x, y, alpha, time)
+  else if (authoredBlade) { if (v.weapon) v.weapon.visible = false }
   else { restoreSword(v); updateSword(v, p, world, x, y, alpha, time) }
 }
 

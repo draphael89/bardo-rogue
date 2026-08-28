@@ -4,7 +4,7 @@ import type { Container } from 'pixi.js'
 import { tuning } from '@/tuning'
 import { lerp } from '../anim'
 import { EntityView, SPRITE, WEAPON, type EnemyFrame, type Pose } from './shared'
-import { updateBruteView } from './enemy-brute'
+import { bindBruteArt, updateBruteView } from './enemy-brute'
 import { updateCasterView } from './enemy-caster'
 import { updateChargerView } from './enemy-charger'
 import { updateDummyView } from './enemy-dummy'
@@ -12,7 +12,9 @@ import { updateWardenView } from './enemy-warden'
 
 export function createEnemyView(atlas: Atlas, e: Enemy, layers: { entities: Container; shadows: Container }): EntityView {
   const w = e.kind === 'brute' ? WEAPON.brute : e.kind === 'caster' ? WEAPON.caster : null
-  return new EntityView(atlas, SPRITE[e.kind], w, layers)
+  const v = new EntityView(atlas, SPRITE[e.kind], w, layers)
+  if (e.kind === 'brute') bindBruteArt(v, atlas)
+  return v
 }
 
 // Scratch instances reused every call: this runs per enemy per frame, so it must not allocate.
@@ -49,8 +51,11 @@ export function updateEnemyView(v: EntityView, e: Enemy, world: World, alpha: nu
   b.rotation = rot
   b.tint = tint
   b.zIndex = feetY
-  if (e.kind !== 'warden') v.setFlash(e.flash > 0 && e.kind !== 'dummy')
+  // The Brute owns an authored recoil frame; a full white replacement would delete that pose on
+  // precisely the contact ticks it was drawn for. Puppet enemies retain their silhouette flash.
+  if (e.kind !== 'warden') v.setFlash(e.flash > 0 && e.kind !== 'dummy' && e.kind !== 'brute')
   if (e.kind === 'warden') v.setShadow(x, feetY - 1, 32 - hop * 0.35, 11 - hop * 0.15, 0.48 - hop * 0.02)
+  else if (e.kind === 'brute') v.setShadow(x, feetY - 1, 25, 8, 0.43)
   else v.setShadow(x, feetY - 1, 14 - hop * 0.5, 6 - hop * 0.2, 0.35 - hop * 0.02)
   void world
 }

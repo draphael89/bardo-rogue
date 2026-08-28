@@ -27,9 +27,9 @@ export class EntityView {
   }
   setFlash(on: boolean) { this.body.texture = on ? this.whiteTex : this.normalTex }
   // Authored bodies: replace both flash slots so a later setFlash(false) cannot restore Kenney.
-  bindBody(tex: Texture) {
+  bindBody(tex: Texture, whiteTex: Texture = tex) {
     this.normalTex = tex
-    this.whiteTex = tex
+    this.whiteTex = whiteTex
     this.body.texture = tex
   }
   setShadow(x: number, y: number, w: number, h: number, alpha = 0.35) {

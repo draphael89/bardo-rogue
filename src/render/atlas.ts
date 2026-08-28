@@ -8,6 +8,10 @@ export interface Atlas {
   room(i: number): Texture          // Bardo room sheet 16x16 by index (8 columns)
   prop(i: number): Texture          // Bardo furniture sheet 32x32 by index (4 columns)
   white(i: number): Texture         // same tile as a white silhouette (hit flash)
+  hero(i: number): Texture          // authored Bardo hero sheet, 32x32, four columns
+  heroWhite(i: number): Texture     // matching white silhouettes for hurt flash / perfect-read rim
+  brute(i: number): Texture         // authored Bardo Brute sheet, 48x48, four columns
+  bruteWhite(i: number): Texture    // matching silhouettes (kept for the shared feedback contract)
   micro(i: number): Texture         // Micro Roguelike 8x8 by index (16 columns)
   particle(name: string): Texture
   decal(name: string): Texture
@@ -19,6 +23,8 @@ export async function loadAtlas(manifest: Record<string, string[]>): Promise<Atl
   const tiny = await Assets.load<Texture>(base + 'sprites/tiny_dungeon.png')
   const room = await Assets.load<Texture>(base + 'sprites/bardo_room.png')
   const props = await Assets.load<Texture>(base + 'sprites/bardo_props.png')
+  const hero = await Assets.load<Texture>(base + 'sprites/bardo_hero.png')
+  const brute = await Assets.load<Texture>(base + 'sprites/bardo_brute.png')
   const micro = await Assets.load<Texture>(base + 'sprites/micro.png')
   const particles = new Map<string, Texture>()
   const decals = new Map<string, Texture>()
@@ -33,27 +39,42 @@ export async function loadAtlas(manifest: Record<string, string[]>): Promise<Atl
   const rooms = new Map<number, Texture>()
   const propTiles = new Map<number, Texture>()
   const whites = new Map<number, Texture>()
+  const heroTiles = new Map<number, Texture>()
+  const heroWhites = new Map<number, Texture>()
+  const bruteTiles = new Map<number, Texture>()
+  const bruteWhites = new Map<number, Texture>()
   const micros = new Map<number, Texture>()
   const sub = (src: Texture, i: number, cols: number, size: number) =>
     new Texture({ source: src.source, frame: new Rectangle((i % cols) * size, Math.floor(i / cols) * size, size, size) })
 
-  // white silhouettes are baked once on a canvas (hit flash without a shader)
-  const tinyImg = tiny.source.resource as HTMLImageElement | ImageBitmap
-  const canvas = document.createElement('canvas')
-  canvas.width = tiny.width; canvas.height = tiny.height
-  const ctx = canvas.getContext('2d')!
-  ctx.drawImage(tinyImg as CanvasImageSource, 0, 0)
-  ctx.globalCompositeOperation = 'source-in'
-  ctx.fillStyle = '#ffffff'
-  ctx.fillRect(0, 0, canvas.width, canvas.height)
-  const whiteSheet = Texture.from(canvas)
-  whiteSheet.source.scaleMode = 'nearest'
+  // White silhouettes are baked once per sheet (hit flash without a shader). Authored frames use
+  // the same path as the legacy tiles, so changing art does not change the feedback contract.
+  const whiteSheet = (src: Texture): Texture => {
+    const image = src.source.resource as HTMLImageElement | ImageBitmap
+    const canvas = document.createElement('canvas')
+    canvas.width = src.width; canvas.height = src.height
+    const ctx = canvas.getContext('2d')!
+    ctx.drawImage(image as CanvasImageSource, 0, 0)
+    ctx.globalCompositeOperation = 'source-in'
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    const out = Texture.from(canvas)
+    out.source.scaleMode = 'nearest'
+    return out
+  }
+  const tinyWhite = whiteSheet(tiny)
+  const heroWhite = whiteSheet(hero)
+  const bruteWhite = whiteSheet(brute)
 
   return {
     tile: i => tiles.get(i) ?? (tiles.set(i, sub(tiny, i, 12, 16)), tiles.get(i)!),
     room: i => rooms.get(i) ?? (rooms.set(i, sub(room, i, 8, 16)), rooms.get(i)!),
     prop: i => propTiles.get(i) ?? (propTiles.set(i, sub(props, i, 4, 32)), propTiles.get(i)!),
-    white: i => whites.get(i) ?? (whites.set(i, sub(whiteSheet, i, 12, 16)), whites.get(i)!),
+    white: i => whites.get(i) ?? (whites.set(i, sub(tinyWhite, i, 12, 16)), whites.get(i)!),
+    hero: i => heroTiles.get(i) ?? (heroTiles.set(i, sub(hero, i, 4, 32)), heroTiles.get(i)!),
+    heroWhite: i => heroWhites.get(i) ?? (heroWhites.set(i, sub(heroWhite, i, 4, 32)), heroWhites.get(i)!),
+    brute: i => bruteTiles.get(i) ?? (bruteTiles.set(i, sub(brute, i, 4, 48)), bruteTiles.get(i)!),
+    bruteWhite: i => bruteWhites.get(i) ?? (bruteWhites.set(i, sub(bruteWhite, i, 4, 48)), bruteWhites.get(i)!),
     micro: i => micros.get(i) ?? (micros.set(i, sub(micro, i, 16, 8)), micros.get(i)!),
     particle: n => particles.get(n) ?? Texture.WHITE,
     decal: n => decals.get(n) ?? Texture.WHITE,

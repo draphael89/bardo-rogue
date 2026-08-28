@@ -24,21 +24,22 @@ per tick: `stepWorld(world, inputFrame)`.
 
 `pnpm sim -- --scenario wave3 --bot naive-melee --seeds 1-20 --ticks 10800` prints one row per seed:
 swings, hitsLanded, whiffSwings, kills, dodges, successfulDodges, boltsFired, boltsCut, enemyAttacks, damageTaken,
-deaths, wavesCleared, clearSeconds, deathSeconds, avgTickUs, maxTickUs. A run stops 2 s after room clear or death.
+deaths, wavesCleared, roomsEntered, boonsChosen, runResult, runSeconds, clear/death time, final room/phase, and timing.
+A stock combat scenario stops 2 s after clear or death; the production `loop` stops after its return to the Bardo.
 
 ## URL params
 
 `http://localhost:5173/?scenario=wave2&seed=7&debug=1&mute=1&god=1&bot=kite`
 
-- `scenario`: `empty`, `dummy` (3 static targets), `blessed` (dummy room with the cleave blessing on), `bow` (dummy room, already armed with the bow), `boss` (one warden: plant, radial slam, veil-break at half life), `brute-only`, `caster-only`, `charger-swarm`, `wave1`, `wave2`, `wave3`, `full` (default), `run` (Threshold fight → two marked doors → Crossing fight north, or The Far Shore east; death then R returns to The Bardo), `loop` (starts in The Bardo; the north door begins a run), `shore` (quiet gift room, a life vessel to walk into).
-- Death then R: scenarios whose room graph includes The Bardo (`run`, `loop`) revive in that hub — same world, not a rebuild. Every other scenario still sets `wantsRestart` and rebuilds the same fight.
+- `scenario`: `loop` is the default production game: Bardo rack → Threshold → one of two branches → Black Step → Warden → Bardo, with three deterministic boon offers. Debug scenarios remain: `empty`, `dummy`, `blessed`, `bow`, `boss`, `brute-only`, `caster-only`, `charger-swarm`, `wave1`, `wave2`, `wave3`, `full`, `run`, and `shore`.
+- Death or victory then confirm: `loop` returns to the Bardo in the same world and clears run power. Legacy `run` also returns on death. Stock combat scenarios still set `wantsRestart` and rebuild the same fight.
 - `seed`: integer, default 1. Same seed + same inputs = same run.
-- `debug=1`: F1 overlay on. `mute=1`: no audio. `god=1`: player cannot take damage.
-- `bot=idle|naive-melee|kite`: a scripted player drives the sim instead of the keyboard.
+- `debug=1`: F1 overlay on. `mute=1`: no audio. `god=1`: player cannot take damage. `reduced=1` caps flashes, camera movement, zoom, and disables chromatic pulses (`reduced=0` overrides an OS preference).
+- `bot=idle|naive-melee|kite|slice-naive|slice-kite`: a scripted player drives the sim. The `slice-*` bots physically prepare, navigate either branch by seed parity, choose boons, fight the Warden, and return; their suffix selects the combat policy.
 
 Combat slow-motion: `__game.state().slow` is `{ rate, ticks }` — rate is per-mille, 1000 is full speed. Force it with `__game.world.slowRate = 250; __game.world.slowTicks = 120`.
 
-Keys in the game: WASD move, arrows aim (8-way, and holding one pins the facing so you strafe), mouse aim, click/J attack, Space/Shift/K dodge, R restart. With no arrow and an untouched mouse, aim follows movement.
+Keys in the game: WASD move, arrows aim (8-way, and holding one pins the facing so you strafe), mouse aim, click/J/Z attack, Space/Shift/K/X dodge, P/Escape pause, V reduced effects, F fullscreen. With no arrow and an untouched mouse, aim follows movement. Rewards use A/D or left/right, then Enter/Space/attack to claim. The same confirm returns after death or victory.
 F1 toggles the debug overlay, F2 toggles recording, F3 downloads the last recording.
 
 ## `window.__game` (src/debug/api.ts)
@@ -51,11 +52,11 @@ Available once the page has booted (`await page.waitForFunction(() => !!window._
 - `loop`: the fixed-step loop; `loop.paused`, `loop.frameTimes`.
 - `reset(seed?, scenario?, { god? })`: fresh world. Omitted args keep the current run's seed/scenario.
 - `step(n = 1)`: advance the sim n ticks by hand (pause first, or the loop keeps ticking too).
-- `setInput(partial | null)`: force an `InputFrame` (`moveX moveY aimX aimY aimSoft attack dodge restart`). Edge fields (`attack`, `dodge`, `restart`) fire once, then clear. `null` returns control to the keyboard.
-- `bot(name | null)`: swap in or remove a bot.
+- `setInput(partial | null)`: force an `InputFrame` (`moveX moveY aimX aimY aimSoft attack dodge restart choiceDelta confirm`). Forced action/modal fields fire once, then clear. `null` returns control to the keyboard.
+- `bot(name | null)`: swap in or remove any bot listed above.
 - `pause(p?)`: pause/unpause the loop, returns the new state.
 - `hash()`: FNV hash of the sim state. Equal hashes = identical worlds.
-- `state()`: compact JSON snapshot: tick, freeze, wave, player, offering, boons, enemies (id, kind, x, y, hp, state, stateTick), bolts, metrics.
+- `state()`: compact JSON snapshot: tick, freeze/slow, room and phase, player/armed state, session/meta/run/reward/history, rack/offering, boons, enemies, bolts, and metrics.
 - `frameStats()`: `{ frames, p50, p95, max }` render frame time in ms over the last 240 frames.
 - `mute(m?)`, `debug(v?)`: toggle audio / overlay, return the new state.
 - `record(on?)`: start (resets to a fresh run of the current seed/scenario) or stop recording. Returns whether recording.
@@ -77,7 +78,7 @@ Available once the page has booted (`await page.waitForFunction(() => !!window._
 
 A replay is `{ v: 1, seed, scenario, god?, frames: InputFrame[] }` (`src/sim/replay.ts`). On disk it is run-length
 encoded: `runs: [moveX, moveY, aimX, aimY, flags, count]` with axes as ints x10000 and flags bits
-`1 aimSoft, 2 attack, 4 dodge, 8 restart`. The browser quantizes every frame to 1/10000 before the sim sees it, so
+`1 aimSoft, 2 attack, 4 dodge, 8 restart, 16 confirm, 32 choice-left, 64 choice-right`. The browser quantizes every frame to 1/10000 before the sim sees it, so
 what was played and what is stored are identical.
 
 - Browser: F2 starts a fresh run and records; F2 again stops; F3 downloads `<scenario>-<seed>-<ticks>.json`. Move the
@@ -103,9 +104,10 @@ pins the hash of each fixture in `replays/`. If a hash test fails, the sim chang
 
 ## Where things are
 
-- `src/sim/`: `world.ts` (state), `step.ts` (the tick), `player.ts`, `combat.ts`, `enemies/`, `projectiles.ts`,
-  `waves.ts`, `scenarios.ts`, `bots.ts`, `metrics.ts`, `hash.ts`, `replay.ts`, `rng.ts` (never `Math.random`).
-- `src/render/`: `presenter.ts` reads world + events and drives sprites, particles, shake, decals, hud.
+- `src/sim/`: `world.ts` (state), `session.ts` (run/meta boundary), `rooms.ts` + `waves.ts` (graph/encounters),
+  `rewards.ts` + `boons.ts` (offers/build effects), `preparation.ts`, `storage.ts`, `step.ts`, `player.ts`, `combat.ts`,
+  `enemies/`, `projectiles.ts`, `scenarios.ts`, `bots.ts`, `metrics.ts`, `hash.ts`, `replay.ts`, `rng.ts` (never `Math.random`).
+- `src/render/`: `presenter.ts` reads world + events and drives sprites, particles, shake, decals, HUD; `reward.ts` owns rewards, victory, pause, build, and meta overlays.
 - `src/input/`: keyboard/mouse/gamepad to `InputFrame`; `recorder.ts` captures frames.
 - `src/debug/`: `api.ts` (`window.__game`), `overlay.ts` (F1).
 - `src/main.ts` wires it all; `src/loop.ts` is the fixed 60 Hz accumulator with interpolation and a 5-step catch-up cap.

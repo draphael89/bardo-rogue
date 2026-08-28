@@ -19,8 +19,9 @@ import { PostFx } from './postfx'
 import { DamageNumbers } from './damageNumbers'
 import { Atmosphere } from './atmosphere'
 import { seedFx } from './fxRng'
-import { hasBoon } from '@/sim/boons'
+import { BOONS, hasBoon } from '@/sim/boons'
 import { ActionFeedbackGate, crowdScreenMultiplier } from './feedback'
+import { RewardOverlay } from './reward'
 
 interface ImpactStamp {
   t: number; r: number; a: number; snap: number; sweep: number
@@ -50,6 +51,7 @@ export class Presenter {
   postfx: PostFx
   damageNumbers: DamageNumbers
   atmosphere: Atmosphere
+  reward: RewardOverlay
   private lastHurtAngle = 0
   private emberAcc = 0
   // contact reaction on real time, so it plays out *inside* the hit-stop instead of waiting for it
@@ -65,6 +67,7 @@ export class Presenter {
   // hit flash on real time, not sim ticks: hit-stop must not hold a target white for its whole freeze
   private hitFlash = new Map<number, number>()
   private propSprites: Sprite[] = []
+  private reducedEffects = false
 
   constructor(public ra: RenderApp, public atlas: Atlas, public world: World) {
     seedFx(world.seed)
@@ -84,11 +87,20 @@ export class Presenter {
     this.hud = new Hud(atlas, L.hud)
     this.flashOverlay = new Sprite(Texture.WHITE); this.flashOverlay.width = tuning.view.width; this.flashOverlay.height = tuning.view.height
     this.flashOverlay.alpha = 0; L.hud.addChild(this.flashOverlay)
+    this.reward = new RewardOverlay(L.hud)
     // juice hooks
     this.lighting = new Lighting(ra, atlas, this.particles, ra.app.renderer, world.arena)
     this.postfx = new PostFx(ra)
     this.damageNumbers = new DamageNumbers(L.fx)
     this.tilemap.setDoorOpen(world.doorOpen)
+  }
+
+  setReducedEffects(reduced: boolean) {
+    this.reducedEffects = reduced
+    this.camera.setReducedEffects(reduced)
+    this.postfx.setReducedEffects(reduced)
+    this.reward.setReducedEffects(reduced)
+    if (reduced) this.flashAlpha = Math.min(this.flashAlpha, 0.12)
   }
 
   // Called when the world object is replaced (restart).
@@ -296,8 +308,11 @@ export class Presenter {
         case 'waveStart': this.hud.showBanner(ev.wave === ev.total && ev.total > 1 ? 'FINAL WAVE' : `WAVE ${ev.wave}`, '', 1.3); break
         case 'roomClear':
           this.camera.addTrauma(0.3); this.flash(0.6, 0xfff4d0)
-          this.hud.showBanner('ROOM CLEARED', ev.hasNext ? 'the door is open' : 'press R to run it again', 3)
-          this.tilemap.setDoorOpen(true); this.postfx.pulse(); this.camera.punchZoom(J.zoom.roomClear)
+          this.hud.showBanner(ev.victory ? 'THE JUDGE FALLS' : 'ROOM CLEARED', ev.reward ? 'choose what the sword remembers' : ev.hasNext ? 'the door is open' : '', 3)
+          this.tilemap.setDoorOpen(this.world.doorOpen); this.postfx.pulse(); this.camera.punchZoom(J.zoom.roomClear)
+          break
+        case 'roomTransition':
+          this.flash(0.8, 0x08070e)
           break
         case 'roomEnter':
           this.rebuildRoom()
@@ -323,7 +338,7 @@ export class Presenter {
           this.camera.addTrauma(0.22)
           this.camera.punchZoom(J.zoom.roomClear)
           this.postfx.pulse()
-          this.hud.showBanner(ev.name, 'not yet reborn', 1.8)
+          this.hud.showBanner(ev.name, 'the blade waits', 1.8)
           this.hud.place.text = ev.name
           break
         }
@@ -335,6 +350,43 @@ export class Presenter {
           this.particles.puff(ev.x, ev.y, 5, 0xffe090)
           this.postfx.pulse()
           this.tilemap.setDoorOpen(this.world.doorOpen)
+          break
+        case 'weaponPrepared':
+          this.tilemap.setDoorOpen(this.world.doorOpen)
+          this.flash(0.32, 0xffd080)
+          this.particles.ring(ev.x, ev.y, 0xff9a30)
+          this.hud.showBanner('THE BLADE REMEMBERS', 'the threshold wakes', 1.5)
+          break
+        case 'runStarted':
+          this.hud.showBanner('DESCEND', 'return with your name', 1.4)
+          break
+        case 'rewardOffered':
+        case 'rewardFocus':
+          break
+        case 'boonChosen': {
+          const def = BOONS[ev.boon]
+          this.flash(0.46, def.family === 'blade' ? 0xff7a30 : 0xa878ff)
+          this.particles.ring(ev.x, ev.y, def.family === 'blade' ? 0xff9a30 : 0xb888ff)
+          this.postfx.pulse()
+          this.tilemap.setDoorOpen(this.world.doorOpen)
+          this.hud.showBanner(def.name, def.vow.toLowerCase(), 1.8)
+          break
+        }
+        case 'brandApplied':
+          this.particles.ring(ev.x, ev.y, ev.stacks >= 3 ? 0xff9a30 : 0xb03010)
+          break
+        case 'brandConsumed':
+          this.particles.ring(ev.x, ev.y, 0xffe090)
+          this.particles.puff(ev.x, ev.y, 4 + ev.stacks * 2, 0xff7a18)
+          this.camera.addTrauma(0.12 + ev.stacks * 0.05)
+          this.postfx.pulse()
+          break
+        case 'runWon':
+          this.flash(0.7, 0xffd080)
+          this.camera.addTrauma(0.5)
+          this.postfx.pulse()
+          break
+        case 'runLost':
           break
         case 'draw':
           this.camera.lean(ev.angle + Math.PI, J.bow.drawLean)
@@ -569,8 +621,9 @@ export class Presenter {
   // The loudest flash this frame owns the colour too. Taking the max alpha but the last tint meant a
   // kill repainted the warm contact flash white, so every death read the same regardless of how it landed.
   flash(alpha: number, color: number) {
-    if (alpha <= this.flashAlpha) return
-    this.flashAlpha = alpha
+    const scaled = alpha * (this.reducedEffects ? 0.18 : 1)
+    if (scaled <= this.flashAlpha) return
+    this.flashAlpha = scaled
     this.flashOverlay.tint = color
   }
 
@@ -621,13 +674,13 @@ export class Presenter {
       } else if (!this.boltViews.has(b.id)) this.boltViews.set(b.id, new BoltView(this.atlas, L.fx))
     }
     for (const [id, v] of this.boltViews) {
-      const b = w.projectiles.find(x => x.id === id && x.active)
+      const b = w.projectiles.find(x => x.id === id && x.active && x.team === 0)
       if (!b) { v.destroy(); this.boltViews.delete(id); continue }
       v.update(lerp(b.px, b.x, slowAlpha), lerp(b.py, b.y, slowAlpha), this.time)
       this.stampTrail(v, b, dtSec, tuning.juice.trail.boltPx, (x, y) => this.particles.boltTrail(x, y))
     }
     for (const [id, v] of this.arrowViews) {
-      const b = w.projectiles.find(x => x.id === id && x.active)
+      const b = w.projectiles.find(x => x.id === id && x.active && x.team === 1)
       if (!b) { v.destroy(); this.arrowViews.delete(id); continue }
       v.update(lerp(b.px, b.x, slowAlpha), lerp(b.py, b.y, slowAlpha), b.angle)
       this.stampTrail(v, b, dtSec, tuning.juice.trail.arrowPx, (x, y) => this.particles.arrowTrail(x, y))
@@ -641,6 +694,7 @@ export class Presenter {
 
     if (w.freeze <= 0 && this.playerView.squash > 0) this.playerView.squash -= dtSec * 60
     updatePlayerView(this.playerView, p, w, alpha, this.time)
+    if (!p.armed && this.playerView.weapon) this.playerView.weapon.visible = false
     this.contactReaction(dtSec)
     this.rollMotion(p)
     this.heavyWindup(p, dtSec)
@@ -649,7 +703,12 @@ export class Presenter {
     // per-frame vector fx
     this.fxGraphics.clear()
     this.groundFx.clear()
-    for (const e of w.enemies) if (e.active && e.kind === 'caster' && e.state === 'aim') drawAimLine(this.fxGraphics, e, slowAlpha)
+    for (const e of w.enemies) {
+      if (!e.active) continue
+      if (e.kind === 'caster' && e.state === 'aim') drawAimLine(this.fxGraphics, e, slowAlpha)
+      if (e.brand > 0) drawBrandPips(this.fxGraphics, e, slowAlpha)
+    }
+    if (w.session.run?.primedBrand) drawPrimedEdge(this.fxGraphics, p, alpha)
     if (armOf(w) === ARM.bow) drawBowAim(this.fxGraphics, p, alpha)
     else {
       // smear under the fighters so body and blade occupy the frame; the hot tip stays in air
@@ -685,7 +744,27 @@ export class Presenter {
 
     if (this.flashAlpha > 0) { this.flashOverlay.alpha = this.flashAlpha; this.flashAlpha = Math.max(0, this.flashAlpha - dtSec * 6) } else this.flashOverlay.alpha = 0
     this.hud.update(w, dtSec)
+    this.reward.update(w)
   }
+}
+
+function drawBrandPips(g: Graphics, e: Enemy, alpha: number): void {
+  const x = Math.round(lerp(e.px, e.x, alpha))
+  const y = Math.round(lerp(e.py, e.y, alpha) - e.radius - 10)
+  for (let i = 0; i < 3; i++) {
+    const px = x - 7 + i * 6
+    g.rect(px - 1, y - 1, 5, 5).fill(0x08070e)
+    g.rect(px, y, 3, 3).fill(i < e.brand ? (e.brand === 3 ? 0xffcc56 : 0xff7a18) : 0x3a2018)
+    if (i < e.brand) g.rect(px + 1, y, 1, 2).fill(0xfff0c0)
+  }
+}
+
+function drawPrimedEdge(g: Graphics, p: World['player'], alpha: number): void {
+  const x = Math.round(lerp(p.px, p.x, alpha))
+  const y = Math.round(lerp(p.py, p.y, alpha) - p.radius - 13)
+  g.rect(x - 6, y, 13, 1).fill(0xff7a18)
+  g.rect(x - 3, y - 2, 7, 1).fill(0xffcc56)
+  g.rect(x, y - 4, 1, 3).fill(0xfff0c0)
 }
 
 // ---- authored contact shapes -------------------------------------------------------------------

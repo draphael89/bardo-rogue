@@ -6,13 +6,75 @@ import { hasLineOfSight } from './arena'
 import { overlapsSolid } from './collision'
 
 export type Bot = (world: World) => InputFrame
-export type BotName = 'idle' | 'naive-melee' | 'kite'
+export type BotName = 'idle' | 'naive-melee' | 'kite' | 'slice-naive' | 'slice-kite'
 
 export function makeBot(name: BotName): Bot {
   switch (name) {
     case 'idle': return () => emptyInput()
     case 'naive-melee': return naiveMelee
     case 'kite': return kite
+    case 'slice-naive': return makeSliceBot(naiveMelee)
+    case 'slice-kite': return makeSliceBot(kite)
+  }
+}
+
+function moveToward(inp: InputFrame, world: World, x: number, y: number): number {
+  const dx = x - world.player.x, dy = y - world.player.y
+  const d = Math.hypot(dx, dy) || 1
+  inp.moveX = dx / d; inp.moveY = dy / d
+  inp.aimX = inp.moveX; inp.aimY = inp.moveY
+  return d
+}
+
+// Full-loop regression driver. It obeys the same physical rack, reward input, and door overlaps as a
+// player; combat delegates to the requested policy. It is intentionally stateful so one invocation
+// means one attempt, which makes pacing regressions easy to compare across seeds.
+function makeSliceBot(combat: Bot): Bot {
+  let finished = false
+  let lastX = NaN, lastY = NaN, stuck = 0, orbit: 1 | -1 = 1
+  return world => {
+    const inp = emptyInput()
+    if (finished) return inp
+    if (world.player.state === 'dead') {
+      if (world.tick - world.player.deathTick > 55) { inp.confirm = true; finished = true }
+      return inp
+    }
+    if (world.session.run?.result === 'won') { inp.confirm = true; finished = true; return inp }
+    if (world.roomPhase === 'transitioning') return inp
+    if (world.roomPhase === 'reward') { inp.confirm = true; return inp }
+    if (world.roomPhase === 'town') {
+      if (!world.session.preparedWeapon && world.arena.rack) moveToward(inp, world, world.arena.rack.x, world.arena.rack.y)
+      else {
+        const door = world.arena.doors.find(d => d.dir === 'north')!
+        moveToward(inp, world, (door.col + 0.5) * 16, 24)
+      }
+      return inp
+    }
+    if (world.roomPhase === 'exits') {
+      const room = world.rooms[world.roomIndex]
+      const dir = room.id === 'threshold' && (world.seed & 1) === 0 ? 'east' : 'north'
+      const door = world.arena.doors.find(d => d.dir === dir) ?? world.arena.doors[0]
+      const tx = dir === 'east' ? door.col * 16 + 4 : (door.col + 0.5) * 16
+      const ty = dir === 'east' ? (door.row + 0.5) * 16 : 24
+      moveToward(inp, world, tx, ty)
+      return inp
+    }
+    const out = combat(world)
+    const moving = Math.hypot(out.moveX, out.moveY) > 0.5
+    const moved = Number.isFinite(lastX) ? Math.hypot(world.player.x - lastX, world.player.y - lastY) : 1
+    if (moving && moved < 0.08) stuck++
+    else stuck = Math.max(0, stuck - 2)
+    lastX = world.player.x; lastY = world.player.y
+    if (stuck > 24) {
+      const e = nearest(world)
+      if (e) {
+        aimAt(out, world, e)
+        out.moveX = -out.aimY * orbit
+        out.moveY = out.aimX * orbit
+        if (stuck > 80) { stuck = 0; orbit = orbit === 1 ? -1 : 1 }
+      }
+    }
+    return out
   }
 }
 
@@ -93,7 +155,7 @@ function kite(world: World): InputFrame {
   const punishable = e.state === 'recover' || e.state === 'stagger' || e.state === 'aim' || e.state === 'idle' || e.kind === 'caster'
   if (punishable || e.kind === 'charger') {
     if (d > 20) { inp.moveX = inp.aimX; inp.moveY = inp.aimY }
-    if (d <= 26) inp.attack = world.tick % 3 === 0
+    if (d <= 42) inp.attack = world.tick % 3 === 0
   } else {
     // Close to a real punish distance. The old 34–44 px dead band could stare at a brute across a
     // pillar forever; a human routes around it, so the control probe must keep expressing intent too.

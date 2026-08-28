@@ -3,7 +3,7 @@ import type { Player, World } from './world'
 import type { InputFrame } from './input'
 import { moveWithWalls } from './collision'
 import { arcHits, damageEnemy, addFreeze, addBulletTime, swingProgress, swingStep } from './combat'
-import { swingReach } from './boons'
+import { hasBoon, resolveWeaponOnHit, swingReach } from './boons'
 import { ARM, armOf } from './weapons'
 import { bowMoveScale, bowSteer, looseArrow, startDraw } from './bow'
 import { backlash } from './enemies/caster'
@@ -192,17 +192,28 @@ export function updatePlayer(world: World, input: InputFrame): void {
         if (arcHits(p.x, p.y, mid, reach.radius, spanDeg, e.x, e.y, e.radius)) {
           e.lastHitSwingId = p.swingId
           const toward = Math.atan2(e.y - p.y, e.x - p.x)
+          const brandBefore = e.brand
           damageEnemy(world, e, reach.damage, toward, s.knockback, s.heavy, s.hitstop)
+          resolveWeaponOnHit(world, e, s.heavy, brandBefore, toward)
         }
       }
       for (const b of world.projectiles) {
-        if (!b.active) continue
+        if (!b.active || b.team !== 0) continue
         if (arcHits(p.x, p.y, mid, reach.radius, spanDeg, b.x, b.y, b.radius)) {
-          b.active = false
           // Punish the caster that owns this bolt here and now. Deferring it until the caster next
           // runs needs the news to survive as world state, which cannot represent two bolts cut on
           // one tick and goes stale when a hub return recycles projectile ids.
           punishBoltOwner(world, b.id, b.x, b.y)
+          if (hasBoon(world, 'mirrorSteel')) {
+            b.team = 1
+            b.kind = 'mirror'
+            b.actionId = p.swingId
+            b.angle += Math.PI
+            b.vx = -b.vx
+            b.vy = -b.vy
+            b.damage = tuning.boons.mirrorDamage
+            b.life = Math.max(b.life, tuning.boons.mirrorLife)
+          } else b.active = false
           addFreeze(world, tuning.hitstop.boltCut)
           addBulletTime(world, tuning.bullet.cutTicks, tuning.bullet.cutRate)
           world.emit({ type: 'boltCut', x: b.x, y: b.y })

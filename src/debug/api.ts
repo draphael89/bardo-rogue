@@ -76,14 +76,28 @@ export function installApi(host: {
           kind: w.arena.kind,
           hasNext: w.hasNextRoom(),
           exits: w.rooms[w.roomIndex]?.exits ?? [],
+          phase: w.roomPhase,
         },
         player: {
           x: +w.player.x.toFixed(1), y: +w.player.y.toFixed(1), hp: w.player.hp, maxHp: w.player.maxHp,
           state: w.player.state, stateTick: w.player.stateTick, dodgeTick: w.player.dodgeTick,
           iframes: w.player.iframes, assistTargetId: w.player.assistTargetId,
-          arm: armOf(w) === ARM.bow ? 'bow' : 'blade',
+          arm: armOf(w) === ARM.bow ? 'bow' : 'blade', armed: w.player.armed,
         },
         returns: w.returns,
+        session: {
+          preparedWeapon: w.session.preparedWeapon,
+          meta: { ...w.session.meta },
+          run: w.session.run ? {
+            seed: w.session.run.seed,
+            depth: w.session.run.depth,
+            roomId: w.session.run.roomId,
+            history: w.session.run.roomHistory.map(v => v.id),
+            result: w.session.run.result,
+            reward: w.session.run.pendingReward ? { ...w.session.run.pendingReward } : null,
+          } : null,
+        },
+        rack: w.arena.rack ? { ...w.arena.rack, taken: !!w.arena.rackTaken } : null,
         offering: w.arena.offering
           ? { kind: w.arena.offering.kind, x: +w.arena.offering.x.toFixed(1), y: +w.arena.offering.y.toFixed(1), taken: !!w.arena.offeringTaken }
           : null,

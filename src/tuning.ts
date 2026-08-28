@@ -114,10 +114,24 @@ export const tuning = {
     doorEnterMaxY: 32,    // px: north wall-face row; overlapping it while the door is open enters
     offeringRadius: 16,   // px: walk into the vessel to take it
     offeringHp: 1,        // extra max life, and a heal of the same
+    rackRadius: 18,       // px: generous enough to read as a physical pickup, not pixel hunting
+    transitionTicks: 8,   // 133 ms: enough for a threshold blink, never enough to break momentum
   },
 
   boons: {
-    cleave: { radiusAdd: 8, arcAdd: 40, damageAdd: 1, smearAdd: 2 },
+    cleave: { radiusAdd: 9, arcAdd: 44, damageAdd: 0, smearAdd: 3 },
+    brandMax: 3,
+    brandTicks: 60 * 12,
+    judgmentDamage: 2,
+    judgmentRadius: 34,
+    judgmentKnockback: 120,
+    judgmentHitstop: 4,
+    mirrorDamage: 2,
+    mirrorLife: 90,
+    echoSpeed: 210,
+    echoRadius: 9,
+    echoLife: 10,
+    echoDamage: 1,
   },
 
   brute: {
@@ -138,7 +152,7 @@ export const tuning = {
   // veil breaks and the slam throws a ring of bolts. Poise: lights bounce; heavies stagger only
   // while he is not committed.
   warden: {
-    hp: 24, radius: 10, speed: 28, orbitMin: 52, orbitMax: 76, orbitSpeed: 0.9,
+    hp: 36, radius: 10, speed: 28, orbitMin: 52, orbitMax: 76, orbitSpeed: 0.9,
     windup: 36, windup2: 24, commitLead: 8,
     slamRadius: 42, slamTicks: 4, slamDamage: 2,
     recover: 48, recover2: 32, cooldown: 18,

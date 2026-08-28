@@ -1,9 +1,10 @@
 import { Rng, STREAM, streamSeed } from './rng'
-import { buildArena, setDoorWalkable, type Arena } from './arena'
+import { buildArena, setDoorWalkable, type Arena, type DoorMark } from './arena'
 import type { SimEvent, EnemyKind } from './events'
 import { tuning } from '@/tuning'
 import type { WaveDef } from './waves'
 import { roomsFor, type RoomDef } from './rooms'
+import { makeSessionState, type GameSessionState, type MetaStateV1, type RoomPhase } from './session'
 
 export const SLOW_FULL = 1000   // scale unit for slowRate, not a tunable
 
@@ -35,7 +36,9 @@ export interface Player extends Body {
   deathTick: number
   god: boolean
   arm: number                 // ARM.blade | ARM.bow; 0 is stock so hashes stay put
+  armed: boolean              // town starts unarmed; debug scenarios keep the historical armed default
   dodgeRead: number           // 0 stock; 1 this roll already grazed; 2 this roll already announced a pass-through
+  dodgeProcTick: number       // exact tick of a successful i-frame read; boon triggers consume this edge
 }
 
 export interface Enemy extends Body {
@@ -53,13 +56,18 @@ export interface Enemy extends Body {
   dashTicks: number
   spawnTick: number
   phase: number                 // 0 stock; bosses write 1+ so hashes stay put
+  brand: number                 // 0..3 stacks from Ashen Edge
+  brandTicks: number            // status expiry; refreshed whenever Brand is applied
 }
+
+export type ProjectileKind = 'bolt' | 'arrow' | 'mirror' | 'echo'
 
 export interface Projectile extends Body {
   id: number; active: boolean; life: number; angle: number
   team: 0 | 1                 // 0 hostile (hurts the player), 1 friendly (hurts enemies)
   damage: number
   actionId: number            // player action that launched it; survives later draws before impact
+  kind: ProjectileKind
 }
 
 export interface SpawnEntry { kind: EnemyKind; x: number; y: number; ticksLeft: number }
@@ -100,24 +108,33 @@ export class World {
   rooms: RoomDef[]
   roomIndex = 0
   roomName = 'THE THRESHOLD'
+  roomPhase: RoomPhase = 'entering'
+  phaseTick = 0
+  transitionTarget: string | null = null
+  transitionMark: DoorMark | null = null
+  transitionTicks = 0
   boonBits = 0
   returns = 0
   attemptStart = 0
+  session: GameSessionState
 
-  constructor(seed: number, scenario: string) {
+  constructor(seed: number, scenario: string, meta?: MetaStateV1) {
     this.seed = seed
     this.scenario = scenario
     this.rng = new Rng(streamSeed(seed, STREAM.gameplay))
     this.visualRng = new Rng(streamSeed(seed, STREAM.visual))
+    this.session = makeSessionState(meta)
     this.rooms = roomsFor(scenario)
     const room = this.rooms[0]
     this.roomName = room.name
+    this.roomPhase = room.kind === 'bardo' ? 'town' : room.waves?.length ? 'fighting' : room.exits?.length ? 'exits' : 'resolved'
     this.arena = buildArena(this.visualRng, room.kind)
     if (room.startDoorOpen && this.hasNextRoom()) {
       this.doorOpen = true
       setDoorWalkable(this.arena, true)
     }
     this.player = makePlayer(this.arena.playerStart.x, this.arena.playerStart.y)
+    this.player.armed = room.kind !== 'bardo'
     for (let i = 0; i < MAX_ENEMIES; i++) this.enemies.push(makeEnemy())
     for (let i = 0; i < MAX_PROJECTILES; i++) this.projectiles.push(makeProjectile())
   }
@@ -146,7 +163,7 @@ export class World {
     return e
   }
 
-  fireProjectile(x: number, y: number, angle: number, speed: number, radius: number, life: number, team: 0 | 1 = 0, damage = 1, actionId = 0): Projectile | null {
+  fireProjectile(x: number, y: number, angle: number, speed: number, radius: number, life: number, team: 0 | 1 = 0, damage = 1, actionId = 0, kind: ProjectileKind = team === 1 ? 'arrow' : 'bolt'): Projectile | null {
     const p = this.projectiles.find(p => !p.active)
     if (!p) { this.emit({ type: 'poolOverflow', pool: 'projectile', x, y, angle }); return null }
     p.id = this.nextProjectileId++
@@ -157,6 +174,7 @@ export class World {
     p.team = team
     p.damage = damage
     p.actionId = actionId
+    p.kind = kind
     return p
   }
 
@@ -175,7 +193,7 @@ export function makePlayer(x: number, y: number): Player {
     dodgeDirX: 1, dodgeDirY: 0, swingIndex: 0, swingAngle: 0, swingId: 0, assistTargetId: 0,
     controlTick: 0, attackQueuedAt: -1, dodgeQueuedAt: -1, dodgeTick: -1,
     iframes: 0, flash: 0, moveX: 0, moveY: 0, footTick: 0, deathTick: -1, god: false,
-    arm: 0, dodgeRead: 0,
+    arm: 0, armed: true, dodgeRead: 0, dodgeProcTick: -1,
   }
 }
 
@@ -184,10 +202,10 @@ export function makeEnemy(): Enemy {
     id: 0, active: false, kind: 'brute', x: 0, y: 0, px: 0, py: 0, vx: 0, vy: 0, kbx: 0, kby: 0, radius: 6,
     hp: 1, maxHp: 1, state: 'idle', stateTick: 0, facing: 1, aimAngle: 0, targetX: 0, targetY: 0,
     lastHitSwingId: -1, flash: 0, hitDone: false, orbitAngle: 0, orbitDir: 1, hoverTicks: 0, cooldown: 0, dashTicks: 0, spawnTick: 0,
-    phase: 0,
+    phase: 0, brand: 0, brandTicks: 0,
   }
 }
 
 export function makeProjectile(): Projectile {
-  return { id: 0, active: false, x: 0, y: 0, px: 0, py: 0, vx: 0, vy: 0, kbx: 0, kby: 0, radius: 3, life: 0, angle: 0, team: 0, damage: 1, actionId: 0 }
+  return { id: 0, active: false, x: 0, y: 0, px: 0, py: 0, vx: 0, vy: 0, kbx: 0, kby: 0, radius: 3, life: 0, angle: 0, team: 0, damage: 1, actionId: 0, kind: 'bolt' }
 }

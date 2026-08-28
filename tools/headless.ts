@@ -42,10 +42,17 @@ for (let seed = s0; seed <= (s1 ?? s0); seed++) {
     maxTickUs = Math.max(maxTickUs, (performance.now() - a) * 1000)
     m.consume(world, world.events)
     world.events.length = 0
-    if (world.wave.state === 'done' && world.tick - world.roomClearTick > 120) break
+    if (scenario === 'loop' && world.returns > 0) break
+    if (scenario !== 'loop' && world.wave.state === 'done' && world.tick - world.roomClearTick > 120) break
     if (world.player.state === 'dead' && world.tick - world.player.deathTick > 120) break
   }
   const ms = performance.now() - t0
-  rows.push({ seed, ...m.summary(), avgTickUs: +(ms * 1000 / world.tick).toFixed(1), maxTickUs: +maxTickUs.toFixed(0) })
+  rows.push({
+    seed, ...m.summary(),
+    room: world.rooms[world.roomIndex]?.id, phase: world.roomPhase,
+    player: { x: +world.player.x.toFixed(1), y: +world.player.y.toFixed(1), hp: world.player.hp, state: world.player.state },
+    enemiesAlive: world.aliveEnemies(),
+    avgTickUs: +(ms * 1000 / world.tick).toFixed(1), maxTickUs: +maxTickUs.toFixed(0),
+  })
 }
 console.log(JSON.stringify({ scenario, bot, ticks, runs: rows }, null, 2))

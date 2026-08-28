@@ -4,20 +4,23 @@ import { capturePlayerInput, updatePlayer } from './player'
 import { updateEnemies } from './enemies'
 import { updateProjectiles } from './projectiles'
 import { updateSpawnQueue, updateWaves } from './waves'
-import { tryEnterDoor } from './rooms'
+import { tryEnterDoor, updateRoomTransition } from './rooms'
 import { tryCollectOffering } from './offering'
+import { tryPrepareWeapon } from './preparation'
 import { canReturn, returnToHub } from './return'
 import { separate } from './collision'
 import { clearBulletTime } from './combat'
 import { SLOW_FULL } from './world'
+import { triggerPerfectDodge } from './boons'
+import { updateReward } from './rewards'
 import { tuning } from '@/tuning'
 
 // One deterministic tick. Presentation must never call anything else on the sim.
 export function stepWorld(world: World, input: InputFrame): void {
   world.tick++
-  if (input.restart) {
+  if (input.restart || (input.confirm && canReturn(world))) {
     if (canReturn(world)) returnToHub(world)
-    else world.wantsRestart = true
+    else if (world.scenario !== 'loop') world.wantsRestart = true
   }
 
   // snapshot previous positions for render interpolation. Enemies and projectiles are snapshotted
@@ -26,8 +29,19 @@ export function stepWorld(world: World, input: InputFrame): void {
   const p = world.player
   p.px = p.x; p.py = p.y
 
+  if (world.roomPhase === 'transitioning') {
+    updateRoomTransition(world)
+    return
+  }
+  if (world.roomPhase === 'reward') {
+    updateReward(world, input)
+    return
+  }
+
   // presses during hit-stop still buffer; that is what makes chaining feel responsive
-  capturePlayerInput(world, input)
+  const peaceful = world.roomPhase === 'town'
+  const playerInput = peaceful ? { ...input, attack: false, dodge: false } : input
+  capturePlayerInput(world, playerInput)
 
   if (world.freeze > 0) {
     world.freeze--
@@ -43,7 +57,8 @@ export function stepWorld(world: World, input: InputFrame): void {
   if (world.slowmoTicks > 0 && --world.slowmoTicks === 0) world.timeScale = 1
   if (world.slowTicks > 0 && --world.slowTicks === 0) clearBulletTime(world)
 
-  updatePlayer(world, input)
+  updatePlayer(world, playerInput)
+  tryPrepareWeapon(world)
   tryEnterDoor(world)
   tryCollectOffering(world)
 
@@ -62,6 +77,7 @@ export function stepWorld(world: World, input: InputFrame): void {
   updateSpawnQueue(world)
   updateWaves(world)
   resolveOverlaps(world, worldMoves)
+  if (world.player.dodgeProcTick === world.tick) triggerPerfectDodge(world)
 }
 
 // `moved` is false on a tick the slow-motion gate skipped. The player still has to be pushed out of

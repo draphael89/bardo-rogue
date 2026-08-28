@@ -94,6 +94,7 @@ export class PostFx {
   private total = 1
   private strength = 0
   private aberrated = false
+  private reducedEffects = false
 
   constructor(private ra: RenderApp) {
     this.uniforms = new UniformGroup({ uOffset: { value: new Float32Array([0, 0]), type: 'vec2<f32>' } })
@@ -116,7 +117,17 @@ export class PostFx {
     this.ra.screen.filters = [this.grade]
   }
 
+  setReducedEffects(reduced: boolean) {
+    this.reducedEffects = reduced
+    if (reduced) {
+      this.left = 0
+      this.strength = 0
+      if (this.aberrated) this.syncFilters(false)
+    }
+  }
+
   pulse(strength = tuning.juice.aberrationStrength, ticks = tuning.juice.aberrationTicks) {
+    if (this.reducedEffects) return
     this.total = ticks * TICK_MS / 1000
     this.left = Math.max(this.left, this.total)
     this.strength = Math.max(this.strength, strength)

@@ -1,6 +1,9 @@
 // Sim -> presentation messages. The sim pushes; presenter/audio/metrics consume and clear each frame.
 export type EnemyKind = 'brute' | 'caster' | 'charger' | 'dummy' | 'warden'
 
+import type { ArmId } from './weapons'
+import type { BoonId } from './boons'
+
 export type SimEvent =
   | { type: 'swing'; x: number; y: number; angle: number; swing: number; heavy: boolean }
   | { type: 'hit'; x: number; y: number; angle: number; damage: number; heavy: boolean; targetId: number; kind: EnemyKind; killed: boolean; actionId: number }
@@ -21,10 +24,19 @@ export type SimEvent =
   | { type: 'spawn'; id: number; kind: EnemyKind; x: number; y: number }
   | { type: 'waveStart'; wave: number; total: number }
   | { type: 'waveClear'; wave: number }
-  | { type: 'roomClear'; hasNext: boolean }
+  | { type: 'roomClear'; hasNext: boolean; reward?: boolean; victory?: boolean }
   | { type: 'roomEnter'; name: string; index: number; total: number }
+  | { type: 'roomTransition'; from: string; to: string }
   | { type: 'returned'; name: string; x: number; y: number }
   | { type: 'offeringTaken'; kind: 'life'; x: number; y: number }
+  | { type: 'weaponPrepared'; weapon: ArmId; x: number; y: number }
+  | { type: 'runStarted'; weapon: ArmId }
+  | { type: 'rewardOffered'; options: [BoonId, BoonId, BoonId] }
+  | { type: 'rewardFocus'; focus: 0 | 1 | 2 }
+  | { type: 'boonChosen'; boon: BoonId; x: number; y: number }
+  | { type: 'brandApplied'; id: number; stacks: number; x: number; y: number }
+  | { type: 'brandConsumed'; id: number; stacks: number; x: number; y: number }
+  | { type: 'runWon' | 'runLost'; depth: number; ticks: number; boons: BoonId[] }
   | { type: 'draw'; x: number; y: number; angle: number }
   | { type: 'arrowLoose'; x: number; y: number; angle: number }
   | { type: 'arrowHitWall'; x: number; y: number }

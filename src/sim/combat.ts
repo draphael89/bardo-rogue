@@ -2,6 +2,7 @@ import { tuning, type SwingDef } from '@/tuning'
 import { angleDiff, deg } from './math'
 import { SLOW_FULL } from './world'
 import type { World, Enemy } from './world'
+import { finishRun } from './session'
 
 // --- swing curves -------------------------------------------------------------------------------
 // Sim and renderer read the same three functions, so the hitbox is exactly where the crescent is.
@@ -133,6 +134,7 @@ export function hurtPlayer(world: World, angle: number, damage: number): boolean
   if (isPlayerInvulnerable(world)) {
     if (p.dodgeTick >= 0 && p.dodgeRead < 2) {
       p.dodgeRead = 2
+      p.dodgeProcTick = world.tick
       // the read is the reward: the world drops to a crawl and the player's clock does not
       addBulletTime(world, tuning.bullet.ticks, tuning.bullet.rate)
       world.emit({ type: 'dodged', x: p.x, y: p.y })
@@ -155,6 +157,7 @@ export function hurtPlayer(world: World, angle: number, damage: number): boolean
     world.slowmoTicks = tuning.player.deathSlowmoTicks
     clearBulletTime(world)   // death owns the clock; composing the two would crawl at 1/16 speed
     world.emit({ type: 'playerDeath', x: p.x, y: p.y })
+    finishRun(world, 'lost')
   }
   return true
 }

@@ -11,7 +11,9 @@ import type { RenderApp } from '@/render/app'
 const PAD_ATTACK = [2, 5, 7]      // X / RB / RT
 const PAD_DODGE = [0, 1, 4]       // A / B / LB
 const PAD_RESTART = [9]           // start
-const PAD_EDGE = new Set([...PAD_ATTACK, ...PAD_DODGE, ...PAD_RESTART])
+const PAD_CHOICE_LEFT = 14
+const PAD_CHOICE_RIGHT = 15
+const PAD_EDGE = new Set([...PAD_ATTACK, ...PAD_DODGE, ...PAD_RESTART, PAD_CHOICE_LEFT, PAD_CHOICE_RIGHT])
 
 // Keyboard + mouse + gamepad -> one InputFrame per sim tick. Presses between ticks are latched so nothing is dropped.
 export class InputSystem {
@@ -51,7 +53,7 @@ export class InputSystem {
   }
 
   sample(world: World): InputFrame {
-    if (this.override) { const f = { ...this.override }; this.override = { ...this.override, attack: false, dodge: false, restart: false }; this.pressed.clear(); this.mousePressed = false; return f }
+    if (this.override) { const f = { ...this.override }; this.override = { ...this.override, attack: false, dodge: false, restart: false, choiceDelta: 0, confirm: false }; this.pressed.clear(); this.mousePressed = false; return f }
     const f = emptyInput()
     const d = this.down
     // A complete keydown/keyup pair can occur between two 60 Hz samples. `pressed` latches that
@@ -90,6 +92,8 @@ export class InputSystem {
 
     // gamepad
     let padAimX = 0, padAimY = 0
+    let padChoiceDelta: -1 | 0 | 1 = 0
+    let padAttackEdge = false
     const pads = typeof navigator !== 'undefined' && navigator.getGamepads ? navigator.getGamepads() : []
     const pad = pads && pads[0]
     if (pad) {
@@ -110,9 +114,12 @@ export class InputSystem {
       // no short-circuit: every listed button must be sampled or padPrev goes stale and it double-fires next tick
       const anyEdge = (ids: readonly number[]) => { let hit = false; for (const i of ids) if (edge(i)) hit = true; return hit }
       for (const i of PAD_ATTACK) if (b(i)) attackHeld = true
-      if (anyEdge(PAD_ATTACK)) attack = true
+      padAttackEdge = anyEdge(PAD_ATTACK)                   // a modal must never inherit a combat hold
+      if (padAttackEdge) attack = true
       if (anyEdge(PAD_DODGE)) dodge = true
       if (anyEdge(PAD_RESTART)) restart = true
+      const choiceLeft = edge(PAD_CHOICE_LEFT), choiceRight = edge(PAD_CHOICE_RIGHT)
+      padChoiceDelta = choiceLeft === choiceRight ? 0 : choiceLeft ? -1 : 1
       for (let i = 0; i < 16; i++) if (!PAD_EDGE.has(i)) this.padPrev[i] = b(i)
     }
 
@@ -147,6 +154,15 @@ export class InputSystem {
     f.aimX = aim.x; f.aimY = aim.y; f.aimSoft = aim.soft
     this.lastAim = { x: aim.x, y: aim.y }
     f.attack = attack; f.attackHeld = attackHeld; f.dodge = dodge; f.restart = restart
+    if (world.roomPhase === 'reward') {
+      const left = this.pressed.has('ArrowLeft') || this.pressed.has('KeyA')
+      const right = this.pressed.has('ArrowRight') || this.pressed.has('KeyD')
+      f.choiceDelta = left === right ? padChoiceDelta : left ? -1 : 1
+      f.confirm = this.pressed.has('Enter') || this.pressed.has('Space') || this.pressed.has('KeyJ') || this.pressed.has('KeyZ') || this.mousePressed || padAttackEdge || dodge
+      f.moveX = 0; f.moveY = 0; f.attack = false; f.attackHeld = false; f.dodge = false
+    } else if (world.player.state === 'dead' || (world.roomPhase === 'resolved' && world.session.run?.result !== 'active')) {
+      f.confirm = this.pressed.has('Enter') || this.pressed.has('Space') || this.pressed.has('KeyJ') || this.pressed.has('KeyZ') || this.mousePressed || padAttackEdge || dodge
+    }
     this.pressed.clear(); this.mousePressed = false
     return f
   }

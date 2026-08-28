@@ -181,6 +181,22 @@ describe('dodge stays edge-triggered', () => {
   })
 })
 
+describe('modal input', () => {
+  it('accepts a fresh gamepad attack press but never inherits a held combat attack', () => {
+    const pad: FakePad = { axes: [0, 0, 0, 0], buttons: Array.from({ length: 16 }, () => ({ pressed: false })) }
+    const h = harness(pad)
+    const w = createWorld(1, 'empty')
+    pad.buttons[2]!.pressed = true
+    expect(h.input.sample(w).attack).toBe(true)
+    w.roomPhase = 'reward'
+    expect(h.input.sample(w).confirm).toBe(false)
+    pad.buttons[2]!.pressed = false
+    expect(h.input.sample(w).confirm).toBe(false)
+    pad.buttons[2]!.pressed = true
+    expect(h.input.sample(w).confirm).toBe(true)
+  })
+})
+
 describe('keyboard aim', () => {
   const aimDeg = (f: { aimX: number; aimY: number }) => Math.round(Math.atan2(f.aimY, f.aimX) * 180 / Math.PI)
 

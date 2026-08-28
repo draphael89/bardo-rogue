@@ -10,12 +10,26 @@ export class Camera {
   private t = 0
   offsetX = 0; offsetY = 0; rotation = 0
   zoom = 1                 // punch scale about the player, eases back to 1
+  private reducedEffects = false
 
-  addTrauma(amount: number, cap = 1) { this.trauma = Math.min(cap, this.trauma + amount) }
+  setReducedEffects(reduced: boolean) {
+    this.reducedEffects = reduced
+    if (reduced) {
+      this.trauma = Math.min(this.trauma, 0.12)
+      this.kickX *= 0.15; this.kickY *= 0.15
+      this.zoom = 1 + (this.zoom - 1) * 0.15
+    }
+  }
+
+  addTrauma(amount: number, cap = 1) {
+    const scale = this.reducedEffects ? 0.15 : 1
+    this.trauma = Math.min(this.reducedEffects ? Math.min(cap, 0.12) : cap, this.trauma + amount * scale)
+  }
   kick(angle: number, strength: number, cap = Infinity) {
+    const scale = this.reducedEffects ? 0.15 : 1
     const beforeX = this.kickX, beforeY = this.kickY
     const before = Math.hypot(beforeX, beforeY)
-    this.kickX += Math.cos(angle) * strength; this.kickY += Math.sin(angle) * strength
+    this.kickX += Math.cos(angle) * strength * scale; this.kickY += Math.sin(angle) * strength * scale
     const m = Math.hypot(this.kickX, this.kickY)
     // `cap` limits what this priority of effect may build, never what a stronger effect already
     // earned. In particular, a 1.2 px graze cannot normalize a 6 px hit down to 1.2. If its vector
@@ -28,7 +42,7 @@ export class Camera {
       else { this.kickX = beforeX; this.kickY = beforeY }
     }
   }
-  punchZoom(z: number) { this.zoom = Math.max(this.zoom, z) }
+  punchZoom(z: number) { this.zoom = Math.max(this.zoom, 1 + (z - 1) * (this.reducedEffects ? 0.15 : 1)) }
   // Anticipation, not impact: eases in while it is fed and eases back out the moment it stops.
   lean(angle: number, strength: number) { this.leanTX = Math.cos(angle) * strength; this.leanTY = Math.sin(angle) * strength }
 
@@ -48,9 +62,10 @@ export class Camera {
     const lr = 1 - Math.pow(0.001, dtSec * 2.5)
     this.leanX += (this.leanTX - this.leanX) * lr; this.leanY += (this.leanTY - this.leanY) * lr
     this.leanTX = 0; this.leanTY = 0
-    this.offsetX = nx * J.shakeMax * s + this.kickX + this.leanX - this.lookX
-    this.offsetY = ny * J.shakeMax * s + this.kickY + this.leanY - this.lookY
-    this.rotation = nr * (J.shakeRotMaxDeg * Math.PI / 180) * s
+    const motion = this.reducedEffects ? 0.15 : 1
+    this.offsetX = (nx * J.shakeMax * s + this.kickX + this.leanX - this.lookX) * motion
+    this.offsetY = (ny * J.shakeMax * s + this.kickY + this.leanY - this.lookY) * motion
+    this.rotation = nr * (J.shakeRotMaxDeg * Math.PI / 180) * s * motion
     this.zoom += (1 - this.zoom) * Math.min(1, J.zoom.decay * dtSec)
   }
 }

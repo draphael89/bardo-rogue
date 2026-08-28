@@ -285,6 +285,14 @@ export class Presenter {
         case 'swing':
           // the greatsword's wind-up plants the feet and drags the camera back off the swing line
           if (ev.heavy) { this.camera.addTrauma(J.swing.heavyWindTrauma); this.particles.dust(ev.x, ev.y + 5, ev.angle + Math.PI, J.swing.heavyPlantDust) }
+          // A swing thrown out of a roll is its own verb, so it gets its own mark: the roll's cold
+          // colour thrown forward along the blade. It borrows the dodge's language rather than
+          // inventing a third one, because that is what it is — the roll, continued.
+          if (ev.dash) {
+            const DG = tuning.juice.dodged
+            this.particles.dodgeSlip(ev.x, ev.y, 5, DG.rimTint)
+            this.particles.hitSparks(ev.x, ev.y, ev.angle, 4, DG.ringMid)
+          }
           break
         case 'boltCut': this.particles.hitSparks(ev.x, ev.y, 0, 10, 0xe0a0ff); this.camera.addTrauma(0.15); break
         case 'boltHitWall': this.particles.puff(ev.x, ev.y, 3, 0xb070ff); break

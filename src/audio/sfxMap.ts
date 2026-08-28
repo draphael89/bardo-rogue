@@ -41,7 +41,8 @@ export function playEventSfx(a: AudioSystem, ev: SimEvent): void {
       // The bed leans back 5 dB for the length of the string; the woosh itself stays on SFX.
       a.duck(...MIX.duck.by.playerCommit)
       a.play('woosh', { ...at, gain: ev.heavy ? 1.35 : 1.2, pitch: ev.heavy ? 0.8 : 1.1, pitchVar: 0.1, lead: true })
-      a.swish(ev.heavy ? 1.4 : 1.3, ev.heavy ? 170 : 110, ev.heavy ? 1.2 : 1.45, ev, true)
+      // A swing out of a roll rides higher and tighter: the same blade, carried by the dodge.
+      a.swish(ev.heavy ? 1.4 : 1.3, ev.heavy ? 170 : 110, ev.dash ? 1.7 : ev.heavy ? 1.2 : 1.45, ev, true)
       break
     case 'hit':
       // the consequence, deliberately under the cause: a landed hit is confirmation, not news.

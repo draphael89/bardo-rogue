@@ -1,5 +1,6 @@
 import { tuning, type SwingDef } from '@/tuning'
 import { angleDiff, deg } from './math'
+import { SLOW_FULL } from './world'
 import type { World, Enemy } from './world'
 
 // --- swing curves -------------------------------------------------------------------------------
@@ -43,6 +44,20 @@ export function arcHits(cx: number, cy: number, angle: number, radius: number, a
 
 export function addFreeze(world: World, ticks: number): void {
   world.freeze = Math.min(tuning.hitstop.max, Math.max(world.freeze, ticks))
+}
+
+// Strongest rate wins, longest tail wins, and the total is capped. Two triggers in the same beat can
+// deepen or extend the effect; they can never stack into a permanent slow.
+export function addBulletTime(world: World, ticks: number, rate: number): void {
+  if (ticks <= 0) return   // or slowRate would be set with no countdown to ever restore it
+  world.slowRate = world.slowTicks > 0 ? Math.min(world.slowRate, rate) : rate
+  world.slowTicks = Math.min(tuning.bullet.maxTicks, Math.max(world.slowTicks, ticks))
+}
+
+export function clearBulletTime(world: World): void {
+  world.slowRate = SLOW_FULL
+  world.slowAcc = 0
+  world.slowTicks = 0
 }
 
 export function damageEnemy(world: World, e: Enemy, damage: number, angle: number, knockback: number, heavy: boolean, hitstop: number): void {
@@ -104,6 +119,8 @@ export function hurtPlayer(world: World, angle: number, damage: number): boolean
   if (isPlayerInvulnerable(world)) {
     if (p.state === 'dodge' && !p.dodgeRead) {
       p.dodgeRead = 1
+      // the read is the reward: the world drops to a crawl and the player's clock does not
+      addBulletTime(world, tuning.bullet.ticks, tuning.bullet.rate)
       world.emit({ type: 'dodged', x: p.x, y: p.y })
     }
     return false
@@ -122,6 +139,7 @@ export function hurtPlayer(world: World, angle: number, damage: number): boolean
     p.deathTick = world.tick
     world.timeScale = tuning.player.deathSlowmo
     world.slowmoTicks = tuning.player.deathSlowmoTicks
+    clearBulletTime(world)   // death owns the clock; composing the two would crawl at 1/16 speed
     world.emit({ type: 'playerDeath', x: p.x, y: p.y })
   }
   return true

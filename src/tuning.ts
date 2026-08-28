@@ -83,6 +83,13 @@ export const tuning = {
 
   hitstop: { killBonus: 2, max: 12, boltCut: 3 },
   knockbackDecayTicks: 8,
+
+  // Combat slow-motion. The player and the input poll stay welded to 60 Hz; only enemies and
+  // projectiles run on the stretched clock, so your own swing is full speed while the world crawls.
+  // `rate` is per-mille of normal speed and should divide 1000, or the stretched clock is not exact.
+  // Short on purpose: at rate 250 the player gets four times the real time to act AND four times the
+  // real-time damage, so the window is the lever, not the depth.
+  bullet: { rate: 250, ticks: 24, maxTicks: 24 },
   spawnTelegraphTicks: 40,
   waveGapTicks: 60,
   roomClearSlowmoTicks: 12,

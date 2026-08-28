@@ -47,12 +47,6 @@ function boltClosing(world: World, b: Projectile): boolean {
   return (world.player.x - b.x) * b.vx + (world.player.y - b.y) * b.vy > 0
 }
 
-function cutThisTick(world: World): { x: number; y: number } | null {
-  for (const ev of world.events) if (ev.type === 'boltCut') return ev
-  return null
-}
-
-// Player input runs before enemies in stepWorld, so a cut made this tick is already on world.events.
 function backlash(world: World, e: Enemy, cx: number, cy: number): void {
   const toCut = Math.atan2(cy - e.y, cx - e.x)
   damageEnemy(world, e, CUT.damage, toCut, CUT.pull, false, CUT.hitstop)
@@ -69,9 +63,12 @@ export function updateCaster(world: World, e: Enemy): void {
 
   // did my bolt end this tick, and was it cut?
   if (e.targetX > 0 && !myBolt(world, e)) {
-    const cut = cutThisTick(world)
+    // Was MY bolt the one the blade cut? Reading world.cutBoltId rather than scanning world.events
+    // for any boltCut: ids are never reused, so this cannot mistake another caster's cut for its own,
+    // and it survives the ticks slow-motion skips. Events are cleared by the host every tick.
+    const cut = world.cutBoltId === e.targetX
     e.targetX = 0
-    if (cut) { backlash(world, e, cut.x, cut.y); return }
+    if (cut) { backlash(world, e, world.cutBoltX, world.cutBoltY); return }
   }
 
   switch (e.state) {

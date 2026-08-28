@@ -67,6 +67,7 @@ export function installApi(host: {
       const w = host.getWorld()
       return {
         tick: w.tick, freeze: w.freeze, wave: { ...w.wave },
+        slow: { rate: w.slowRate, ticks: w.slowTicks },
         room: {
           index: w.roomIndex,
           id: w.rooms[w.roomIndex]?.id,

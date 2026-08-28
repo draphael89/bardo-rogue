@@ -177,6 +177,9 @@ export function updatePlayer(world: World, input: InputFrame): void {
         if (!b.active) continue
         if (arcHits(p.x, p.y, mid, reach.radius, spanDeg, b.x, b.y, b.radius)) {
           b.active = false
+          // latch it: the caster that owns this bolt may not get a tick for a while under slow-motion,
+          // and world.events is cleared by the host every tick
+          world.cutBoltId = b.id; world.cutBoltX = b.x; world.cutBoltY = b.y
           addFreeze(world, tuning.hitstop.boltCut)
           world.emit({ type: 'boltCut', x: b.x, y: b.y })
         }

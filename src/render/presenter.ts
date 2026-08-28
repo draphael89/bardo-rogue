@@ -1,6 +1,7 @@
 import { Container, Graphics, Sprite, Texture } from 'pixi.js'
 import type { RenderApp } from './app'
 import type { Atlas } from './atlas'
+import { slowAlphaFor } from './slowAlpha'
 import type { World, Enemy } from '@/sim/world'
 import type { SimEvent } from '@/sim/events'
 import { tuning } from '@/tuning'
@@ -492,6 +493,11 @@ export class Presenter {
   render(alpha: number, dtSec: number) {
     const w = this.world
     this.time += dtSec
+    // Everything on the far side of the slow-motion gate advances on a stretched clock, so it needs a
+    // stretched alpha or it holds still for three frames and jumps on the fourth. slowAcc is where the
+    // gate's accumulator stands after this tick, so this sweeps 0..1 across the whole stretched
+    // interval. At full speed slowAcc is always 0 and slowRate is SLOW_FULL, so this IS alpha.
+    const slowAlpha = slowAlphaFor(w.slowAcc, w.slowRate, alpha)
     const p = w.player
     const L = this.ra.layers
 
@@ -508,7 +514,7 @@ export class Presenter {
         if (v.squash > 0) v.squash -= dtSec * 60
         if (v.redFlash > 0) v.redFlash -= dtSec * 60
       }
-      updateEnemyView(v, e, w, alpha, this.time)
+      updateEnemyView(v, e, w, slowAlpha, this.time)
       const hf = (this.hitFlash.get(id) ?? 0) - dtSec
       if (hf > 0) this.hitFlash.set(id, hf); else this.hitFlash.delete(id)
       v.setFlash(hf > 0)
@@ -523,13 +529,13 @@ export class Presenter {
     for (const [id, v] of this.boltViews) {
       const b = w.projectiles.find(x => x.id === id && x.active)
       if (!b) { v.destroy(); this.boltViews.delete(id); continue }
-      v.update(lerp(b.px, b.x, alpha), lerp(b.py, b.y, alpha), this.time)
+      v.update(lerp(b.px, b.x, slowAlpha), lerp(b.py, b.y, slowAlpha), this.time)
       if (fxRng.ui.next() < 0.5) this.particles.boltTrail(b.x, b.y)
     }
     for (const [id, v] of this.arrowViews) {
       const b = w.projectiles.find(x => x.id === id && x.active)
       if (!b) { v.destroy(); this.arrowViews.delete(id); continue }
-      v.update(lerp(b.px, b.x, alpha), lerp(b.py, b.y, alpha), b.angle)
+      v.update(lerp(b.px, b.x, slowAlpha), lerp(b.py, b.y, slowAlpha), b.angle)
       if (fxRng.ui.next() < 0.4) this.particles.arrowTrail(b.x, b.y)
     }
     while (this.spawnMarkers.length < w.spawnQueue.length) this.spawnMarkers.push(new SpawnMarkerView(this.atlas, L.fx))
@@ -549,7 +555,7 @@ export class Presenter {
     // per-frame vector fx
     this.fxGraphics.clear()
     this.groundFx.clear()
-    for (const e of w.enemies) if (e.active && e.kind === 'caster' && e.state === 'aim') drawAimLine(this.fxGraphics, e, alpha)
+    for (const e of w.enemies) if (e.active && e.kind === 'caster' && e.state === 'aim') drawAimLine(this.fxGraphics, e, slowAlpha)
     if (armOf(w) === ARM.bow) drawBowAim(this.fxGraphics, p, alpha)
     else {
       // smear under the fighters so body and blade occupy the frame; the hot tip stays in air

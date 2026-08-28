@@ -22,6 +22,8 @@ export function hashWorld(world: World): number {
   const flag = (b: boolean) => byte(b ? 1 : 0)
 
   int(world.tick); int(world.freeze); num(world.timeScale); int(world.slowmoTicks)
+  if (world.slowTicks) { int(world.slowTicks); int(world.slowRate); int(world.slowAcc) }
+  if (world.cutBoltId) int(world.cutBoltId)
   int(world.swingCounter); int(world.nextEnemyId); int(world.nextProjectileId)
   int(world.roomClearTick); flag(world.doorOpen); flag(world.wantsRestart)
   if (world.boonBits) int(world.boonBits)

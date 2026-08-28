@@ -7,8 +7,8 @@ import { decodeReplay, encodeReplay, quantizeFrame, replayFromJson, replayToJson
 // Expected hashes for the fixtures under replays/. A changed hash means the sim changed (tuning, rules, rng use).
 // If that change is intended: run `pnpm record-bots`, paste the printed hashes here, and re-check the sanity asserts.
 const FIXTURES = [
-  { file: 'kite-full-s2.json', hash: 3587502839, check: (m: Record<string, unknown>) => expect(m.clearSeconds).not.toBeNull() },
-  { file: 'naive-wave1-s3.json', hash: 2140121520, check: (m: Record<string, unknown>) => expect(m.wavesCleared).toBe(1) },
+  { file: 'kite-full-s2.json', hash: 4172314803, check: (m: Record<string, unknown>) => expect(m.clearSeconds).not.toBeNull() },
+  { file: 'naive-wave1-s3.json', hash: 3487756806, check: (m: Record<string, unknown>) => expect(m.wavesCleared).toBe(1) },
   { file: 'idle-wave1-s5.json', hash: 2472639399, check: (m: Record<string, unknown>) => expect(m.deaths).toBe(1) },
 ]
 

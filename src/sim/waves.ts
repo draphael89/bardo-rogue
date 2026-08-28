@@ -2,6 +2,7 @@ import { tuning } from '@/tuning'
 import type { World } from './world'
 import type { EnemyKind } from './events'
 import { TILE, setDoorWalkable } from './arena'
+import { clearBulletTime } from './combat'
 
 export interface SpawnDef { kind: EnemyKind; x: number; y: number } // in tiles
 export interface WaveGroup { delay: number; spawns: SpawnDef[]; whenRemainingAtMost?: number }
@@ -83,6 +84,7 @@ export function updateWaves(world: World): void {
       world.roomClearTick = world.tick
       world.timeScale = 0.2
       world.slowmoTicks = tuning.roomClearSlowmoTicks
+      clearBulletTime(world)   // the clear owns the clock from here
       // The fight is over the instant the last body drops. A bolt already in flight would otherwise
       // keep hunting for up to three seconds, stretched fivefold by the clear slow-mo.
       for (const b of world.projectiles) {

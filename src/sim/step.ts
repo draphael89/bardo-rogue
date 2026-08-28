@@ -8,6 +8,8 @@ import { tryEnterDoor } from './rooms'
 import { tryCollectOffering } from './offering'
 import { canReturn, returnToHub } from './return'
 import { separate } from './collision'
+import { clearBulletTime } from './combat'
+import { SLOW_FULL } from './world'
 import { tuning } from '@/tuning'
 
 // One deterministic tick. Presentation must never call anything else on the sim.
@@ -18,11 +20,11 @@ export function stepWorld(world: World, input: InputFrame): void {
     else world.wantsRestart = true
   }
 
-  // snapshot previous positions for render interpolation
+  // snapshot previous positions for render interpolation. Enemies and projectiles are snapshotted
+  // inside the slow-motion gate below, next to the update that actually moves them: snapshotting a
+  // body that is not going to move this tick would make it hold still and then jump a whole tick.
   const p = world.player
   p.px = p.x; p.py = p.y
-  for (const e of world.enemies) if (e.active) { e.px = e.x; e.py = e.y }
-  for (const b of world.projectiles) if (b.active) { b.px = b.x; b.py = b.y }
 
   // presses during hit-stop still buffer; that is what makes chaining feel responsive
   capturePlayerInput(world, input)
@@ -30,18 +32,33 @@ export function stepWorld(world: World, input: InputFrame): void {
   if (world.freeze > 0) { world.freeze--; return }
 
   if (world.slowmoTicks > 0 && --world.slowmoTicks === 0) world.timeScale = 1
+  if (world.slowTicks > 0 && --world.slowTicks === 0) clearBulletTime(world)
 
   updatePlayer(world, input)
   tryEnterDoor(world)
   tryCollectOffering(world)
-  updateEnemies(world)
-  updateProjectiles(world)
+
+  // Combat slow-motion lives here and nowhere else. The player and the input frame above already ran
+  // at a full 60 Hz; only the world on the other side of the sword is stretched. Integer per-mille,
+  // so the accumulator is exactly hashable and a changing rate has no phase discontinuity.
+  world.slowAcc += world.slowRate
+  const worldMoves = world.slowAcc >= SLOW_FULL
+  if (worldMoves) {
+    world.slowAcc -= SLOW_FULL
+    for (const e of world.enemies) if (e.active) { e.px = e.x; e.py = e.y }
+    for (const b of world.projectiles) if (b.active) { b.px = b.x; b.py = b.y }
+    updateEnemies(world)
+    updateProjectiles(world)
+  }
   updateSpawnQueue(world)
   updateWaves(world)
-  resolveOverlaps(world)
+  resolveOverlaps(world, worldMoves)
 }
 
-function resolveOverlaps(world: World): void {
+// `moved` is false on a tick the slow-motion gate skipped. The player still has to be pushed out of
+// bodies at 60 Hz or they sink into one for three ticks and get spat out on the fourth, but a frozen
+// enemy must not be shoved: its displacement would smear across the whole stretched interval.
+function resolveOverlaps(world: World, moved: boolean): void {
   const p = world.player
   const es = world.enemies
   // A roll ghosts for its whole travel phase, not just its i-frame window. Being hittable on the
@@ -50,7 +67,11 @@ function resolveOverlaps(world: World): void {
   for (let i = 0; i < es.length; i++) {
     const a = es[i]
     if (!a.active || a.state === 'dead') continue
-    if (!playerGhost && p.state !== 'dead' && a.state !== 'dash') separate(world.arena, p, p.radius, a, a.radius, 0.3, 0.7)
+    if (!playerGhost && p.state !== 'dead' && a.state !== 'dash') {
+      if (moved) separate(world.arena, p, p.radius, a, a.radius, 0.3, 0.7)
+      else separate(world.arena, p, p.radius, a, a.radius, 1, 0)
+    }
+    if (!moved) continue
     for (let j = i + 1; j < es.length; j++) {
       const b = es[j]
       if (!b.active || b.state === 'dead') continue

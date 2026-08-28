@@ -354,6 +354,14 @@ try {
   })
   await close(l3.app)
 
+  // The error array collects renderer warnings and page errors across ALL THREE launches, but until
+  // here it was only asserted during the first boot -- a throw during recovery or relaunch would ride
+  // along in the JSON under ok:true. Nothing after boot may log an error and still pass.
+  await check('no errors across any launch', 5_000, async () => {
+    assert(errors.length === 0, `late errors: ${errors.slice(0, 3).join(' | ')}`)
+    return 'clean across 3 launches'
+  })
+
   clearTimeout(watchdog)
   cleanup()
   console.log(JSON.stringify({

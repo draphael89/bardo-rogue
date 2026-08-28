@@ -113,6 +113,9 @@ export function createSaveStore(dir: string, opts: SaveStoreOptions = {}) {
     const p = savePaths(dir, id); assertInside(dir, p.current)
     await mkdir(dir, { recursive: true })
     const tmp = p.temp(++seq)
+    // Any failure before the commit rename must take its staging file with it: every autosave uses a
+    // fresh sequence number, so under a persistent quota or I/O failure the orphans would otherwise
+    // accumulate one per attempt -- eating the very space whose shortage is making the saves fail.
     let fh: FileHandle | undefined
     try {
       fh = await open(tmp, 'wx')          // never adopt a temp file another process owns
@@ -122,7 +125,13 @@ export function createSaveStore(dir: string, opts: SaveStoreOptions = {}) {
       // So this orders the write before the rename rather than guaranteeing it survives a power cut.
       // The rotation is what actually protects a player: the previous generation is still in ~bak.
       await fh.sync()
-    } finally { await fh?.close() }
+      await fh.close()
+      fh = undefined
+    } catch (e) {
+      await fh?.close().catch(() => undefined)
+      await unlink(tmp).catch(() => undefined)
+      throw e
+    }
     try { await rename(p.current, p.backup) }                    // rotate; ENOENT = the first write ever
     catch (e) { if (code(e) !== 'ENOENT') { await unlink(tmp).catch(() => undefined); throw e } }
     try { await rename(tmp, p.current) }                         // atomic: same directory, same filesystem

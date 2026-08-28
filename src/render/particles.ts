@@ -3,7 +3,7 @@ import type { Atlas } from './atlas'
 import { tuning } from '@/tuning'
 import { fxRng } from './fxRng'
 
-interface P { s: Sprite; vx: number; vy: number; life: number; maxLife: number; drag: number; grav: number; scale0: number; scale1: number; rot: number; alpha0: number; alpha1: number; ground: number | null; tint0: number; tint1: number | null }
+interface P { s: Sprite; vx: number; vy: number; life: number; maxLife: number; drag: number; grav: number; scale0: number; scale1: number; rot: number; alpha0: number; alpha1: number; ground: number | null; tint0: number; tint1: number | null; sgn: number }
 
 // Pooled sprite particles. Everything is drawn into the low-res target so soft shapes pixelate on their own.
 export class Particles {
@@ -35,13 +35,13 @@ export class Particles {
   private spawn(tex: Texture, x: number, y: number, o: Partial<P> & { tint?: number; tint1?: number; blend?: 'add' | 'normal' } = {}): P | null {
     if (this.live.length >= this.max) return null
     let p = this.pool.pop()
-    if (!p) { const s = new Sprite(); s.anchor.set(0.5); this.fx.addChild(s); p = { s, vx: 0, vy: 0, life: 0, maxLife: 1, drag: 1, grav: 0, scale0: 1, scale1: 1, rot: 0, alpha0: 1, alpha1: 0, ground: null, tint0: 0xffffff, tint1: null } }
+    if (!p) { const s = new Sprite(); s.anchor.set(0.5); this.fx.addChild(s); p = { s, vx: 0, vy: 0, life: 0, maxLife: 1, drag: 1, grav: 0, scale0: 1, scale1: 1, rot: 0, alpha0: 1, alpha1: 0, ground: null, tint0: 0xffffff, tint1: null, sgn: 1 } }
     p.s.texture = tex; p.s.visible = true; p.s.position.set(x, y)
     p.vx = o.vx ?? 0; p.vy = o.vy ?? 0; p.life = p.maxLife = o.maxLife ?? 0.4; p.drag = o.drag ?? 1; p.grav = o.grav ?? 0
     p.scale0 = o.scale0 ?? 1; p.scale1 = o.scale1 ?? p.scale0; p.rot = o.rot ?? 0; p.alpha0 = o.alpha0 ?? 1; p.alpha1 = o.alpha1 ?? 0; p.ground = o.ground ?? null
-    p.tint0 = o.tint ?? 0xffffff; p.tint1 = o.tint1 ?? null
+    p.tint0 = o.tint ?? 0xffffff; p.tint1 = o.tint1 ?? null; p.sgn = o.sgn ?? 1
     p.s.tint = p.tint0; p.s.blendMode = o.blend ?? 'normal'; p.s.rotation = fxRng.particles.next() * 6.28
-    p.s.scale.set(p.scale0 / 64)
+    p.s.scale.set(p.scale0 / 64 * p.sgn, p.scale0 / 64)
     this.live.push(p)
     return p
   }
@@ -58,7 +58,7 @@ export class Particles {
       if (p.ground !== null && p.s.y > p.ground) { p.s.y = p.ground; p.vy = -Math.abs(p.vy) * 0.3; p.vx *= 0.6 }
       p.s.rotation += p.rot * dt
       const sc = p.scale0 + (p.scale1 - p.scale0) * u
-      p.s.scale.set(sc / 64)
+      p.s.scale.set(sc / 64 * p.sgn, sc / 64)
       p.s.alpha = p.alpha0 + (p.alpha1 - p.alpha0) * u
       if (p.tint1 !== null) p.s.tint = lerpColor(p.tint0, p.tint1, u)
     }
@@ -70,7 +70,7 @@ export class Particles {
       const sp = fxRng.particles.range(60, 220)
       this.spawn(this.atlas.particle(fxRng.particles.next() < 0.5 ? 'spark_02' : 'star_04'), x, y, { vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, maxLife: fxRng.particles.range(0.18, 0.38), drag: 0.86, scale0: fxRng.particles.range(6, 12), scale1: 1, tint, blend: 'add', alpha0: 1, alpha1: 0.4 })
     }
-    this.spawn(this.atlas.particle('circle_04'), x, y, { maxLife: 0.12, scale0: 10, scale1: 26, tint, blend: 'add', alpha0: 0.9, alpha1: 0 })
+    this.spawn(this.atlas.particle('circle_04'), x, y, { maxLife: 0.10, scale0: 4, scale1: 12, tint, blend: 'add', alpha0: 0.6, alpha1: 0 })
   }
 
   dust(x: number, y: number, angle: number, n: number) {
@@ -94,6 +94,47 @@ export class Particles {
 
   boltTrail(x: number, y: number) {
     this.spawn(this.atlas.particle('circle_01'), x + fxRng.particles.signed(2), y + fxRng.particles.signed(2), { maxLife: 0.25, scale0: 5, scale1: 1, tint: 0xb060ff, blend: 'add', alpha0: 0.7, alpha1: 0 })
+  }
+
+  // Embers dragged in toward the blade while the greatsword is up. Nothing else in the game moves
+  // inward, so the pull alone reads as the swing gathering.
+  ember(x: number, y: number) {
+    const a = fxRng.particles.next() * 6.28
+    const r = fxRng.particles.range(13, 26)
+    const life = fxRng.particles.range(0.16, 0.28)
+    this.spawn(this.atlas.particle('spark_01'), x + Math.cos(a) * r, y + Math.sin(a) * r * 0.7, {
+      vx: -Math.cos(a) * r / life, vy: -Math.sin(a) * r * 0.7 / life,
+      maxLife: life, scale0: fxRng.particles.range(4, 9), scale1: 1, tint: 0xffd070, blend: 'add', alpha0: 0.95, alpha1: 0.2,
+    })
+  }
+
+  // A one-frame glow redrawn every frame, so the blade looks lit rather than sprinkled.
+  chargeGlow(x: number, y: number, size: number) {
+    this.spawn(this.atlas.particle('circle_05'), x, y, { maxLife: 0.02, scale0: size, scale1: size, tint: 0xffd890, blend: 'add', alpha0: 0.8, alpha1: 0.8 })
+  }
+
+  // Grit and sparks thrown outward along the line the greatsword just cut.
+  slashWave(x: number, y: number, angle: number, spread: number, n: number) {
+    for (let i = 0; i < n; i++) {
+      const a = angle + fxRng.particles.signed(spread)
+      const sp = fxRng.particles.range(140, 320)
+      const spark = fxRng.particles.next() < 0.6
+      this.spawn(this.atlas.particle(spark ? 'spark_02' : 'smoke_0' + fxRng.particles.int(1, 5)), x + Math.cos(a) * 6, y + Math.sin(a) * 4, {
+        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp * 0.55, maxLife: fxRng.particles.range(0.14, 0.30), drag: 0.8,
+        scale0: fxRng.particles.range(6, 14), scale1: 1, tint: spark ? 0xfff2c8 : 0xd8b088,
+        blend: spark ? 'add' : 'normal', alpha0: spark ? 1 : 0.6, alpha1: 0,
+      })
+    }
+  }
+
+  // The cut mark: a crescent thrown square to the blade at the contact point. This is the frame the
+  // player reads as "that landed", so it is bright, brief, and oriented.
+  cut(x: number, y: number, angle: number, heavy: boolean) {
+    const c = this.spawn(this.atlas.particle(heavy ? 'slash_02' : 'slash_03'), x, y, {
+      maxLife: heavy ? 0.13 : 0.07, scale0: heavy ? 15 : 8, scale1: heavy ? 28 : 15,
+      tint: 0xfffaf0, blend: 'add', alpha0: 1, alpha1: 0,
+    })
+    if (c) c.s.rotation = angle + Math.PI / 2
   }
 
   spawnBurst(x: number, y: number) {
@@ -132,6 +173,47 @@ export class Particles {
     }
   }
 
+  // A ghost of a body left exactly where it stood, in its own pose. Cheap: it reuses the sprite's texture.
+  afterimage(body: Sprite, tint: number, alpha: number, life: number) {
+    const g = this.spawn(body.texture, body.position.x, body.position.y - body.height / 2, {
+      maxLife: life, scale0: 64, scale1: 64, tint, blend: 'add', alpha0: alpha, alpha1: 0, sgn: body.scale.x < 0 ? -1 : 1,
+    })
+    if (g) g.s.rotation = body.rotation
+  }
+
+  // The reward for phasing through an attack: one cold ring and a spray of cold sparks. Nothing else
+  // in the fight is this colour, so the player never confuses it with a hit or with being hit.
+  dodgeSlip(x: number, y: number, n: number, tint: number) {
+    this.spawn(this.atlas.particle('circle_02'), x, y, { maxLife: 0.22, scale0: 6, scale1: 34, tint, blend: 'add', alpha0: 0.9, alpha1: 0 })
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * 6.28 + fxRng.particles.signed(0.3)
+      const sp = fxRng.particles.range(50, 130)
+      this.spawn(this.atlas.particle('spark_01'), x, y, {
+        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp * 0.6 - 8, maxLife: fxRng.particles.range(0.22, 0.4), drag: 0.88,
+        scale0: fxRng.particles.range(4, 8), scale1: 1, tint, blend: 'add', alpha0: 0.95, alpha1: 0,
+      })
+    }
+  }
+
+  // Poise break: the guard comes apart. Steel ring, chips that fall, dust at the feet. The brute's
+  // version is the only one big enough to see across the room, because only the heavy earns it.
+  poiseBreak(x: number, y: number, big: boolean) {
+    // a slow, cold shockwave — the hit chain is fast and amber, so this cannot be mistaken for it
+    this.spawn(this.atlas.particle('circle_02'), x, y - 2, { maxLife: big ? 0.34 : 0.16, scale0: big ? 10 : 5, scale1: big ? 58 : 22, tint: 0xcfd8ff, blend: 'add', alpha0: big ? 1 : 0.5, alpha1: 0 })
+    if (big) this.spawn(this.atlas.particle('circle_02'), x, y - 2, { maxLife: 0.22, scale0: 6, scale1: 34, tint: 0xffffff, blend: 'add', alpha0: 0.8, alpha1: 0 })
+    const n = big ? 8 : 3
+    for (let i = 0; i < n; i++) {
+      const a = -Math.PI / 2 + fxRng.particles.signed(1.1)
+      const sp = fxRng.particles.range(30, big ? 110 : 60)
+      this.spawn(this.atlas.particle('spark_02'), x + fxRng.particles.signed(4), y - 4, {
+        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, maxLife: fxRng.particles.range(0.3, 0.6), drag: 0.94, grav: 300,
+        scale0: fxRng.particles.range(4, big ? 10 : 7), scale1: 2, tint: 0xe8ecff, blend: 'add', alpha0: 0.9, alpha1: 0.2,
+        ground: y + fxRng.particles.range(4, 9),
+      })
+    }
+    if (big) this.dust(x, y + 5, 0, 4)
+  }
+
   blood(x: number, y: number, angle: number, tint: number) {
     if (!this.renderer) return
     const n = fxRng.particles.int(2, 3)
@@ -147,7 +229,6 @@ export class Particles {
     }
   }
 }
-void tuning
 
 function lerpColor(a: number, b: number, t: number): number {
   const r = ((a >> 16) & 255) + (((b >> 16) & 255) - ((a >> 16) & 255)) * t

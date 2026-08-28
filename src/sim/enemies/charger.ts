@@ -5,6 +5,12 @@ import { hurtPlayer } from '../combat'
 
 const IDLE_TICKS = 20
 
+// The last freeze ticks are already committed: the aim stops tracking and whatever the lane covers
+// is what gets hit. The renderer needs the same tick to harden the floor telegraph on it, so it is
+// derived here rather than copied there. Changing LOCK_LEAD changes the sim (and the replay hashes).
+const LOCK_LEAD = 3
+export const chargerLockTick = (): number => tuning.charger.freezeTicks - LOCK_LEAD
+
 export function updateCharger(world: World, e: Enemy): void {
   const C = tuning.charger
   const p = world.player
@@ -28,7 +34,7 @@ export function updateCharger(world: World, e: Enemy): void {
     }
     case 'freeze':
       e.vx = 0; e.vy = 0
-      if (e.stateTick <= C.freezeTicks - 4) { e.aimAngle = angleToPlayer(world, e); facePlayer(world, e) }
+      if (e.stateTick < chargerLockTick()) { e.aimAngle = angleToPlayer(world, e); facePlayer(world, e) }
       if (e.stateTick >= C.freezeTicks) {
         e.state = 'dash'; e.stateTick = 0; e.hitDone = false
         e.dashTicks = Math.round(C.dashDist / C.dashSpeed / DT)

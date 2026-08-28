@@ -8,9 +8,15 @@ export const DT = 1 / TICK_RATE
 export interface SwingDef {
   startup: number; active: number; recovery: number
   damage: number; radius: number; arcDeg: number
-  lunge: number; hitstop: number; knockback: number
+  lunge: number           // px the body travels forward across the active window, on the blade's own curve
+  windup: number          // px the body drifts backward across startup — the coil you can see
+  hitstop: number; knockback: number
   chainFrom: number       // recovery tick from which a buffered attack chains into the next swing
   dodgeCancelFrom: number // recovery tick from which a dodge can cancel
+  whiffPenalty: number    // extra recovery ticks, and a later chain, when the swing touched nothing
+  moveCommit: number      // movement scale through startup + active (0 = planted)
+  moveRecover: number     // movement scale at the first recovery tick; eases back to 1 by the end
+  steerTicks: number      // startup ticks during which the swing angle still tracks the aim
   sweep: 1 | -1           // visual sweep direction
   heavy: boolean
 }
@@ -26,18 +32,19 @@ export const tuning = {
     dodge: { total: 18, distance: 44, iStart: 2, iEnd: 12, attackCancelFrom: 14, buffer: 8 },
     attack: {
       buffer: 8,
-      moveScaleLight: 0.35,
+      steerRateDeg: 9,      // max deg/tick the swing angle may still be steered, during steerTicks only
+      heavyChargeTicks: 5,  // startup ticks before the heavy's blade-glow telegraph lights up (presentation)
       swings: [
-        { startup: 6, active: 4, recovery: 14, damage: 2, radius: 24, arcDeg: 140, lunge: 10, hitstop: 3, knockback: 90, chainFrom: 4, dodgeCancelFrom: 2, sweep: 1, heavy: false },
-        { startup: 6, active: 4, recovery: 14, damage: 2, radius: 24, arcDeg: 140, lunge: 10, hitstop: 3, knockback: 90, chainFrom: 4, dodgeCancelFrom: 2, sweep: -1, heavy: false },
-        { startup: 10, active: 5, recovery: 22, damage: 4, radius: 28, arcDeg: 200, lunge: 6, hitstop: 6, knockback: 180, chainFrom: 999, dodgeCancelFrom: 6, sweep: 1, heavy: true },
+        { startup: 5, active: 4, recovery: 13, damage: 2, radius: 25, arcDeg: 130, lunge: 13, windup: 2, hitstop: 3, knockback: 90, chainFrom: 2, dodgeCancelFrom: 1, whiffPenalty: 7, moveCommit: 0.45, moveRecover: 0.7, steerTicks: 3, sweep: 1, heavy: false },
+        { startup: 5, active: 4, recovery: 13, damage: 2, radius: 25, arcDeg: 150, lunge: 15, windup: 2, hitstop: 3, knockback: 95, chainFrom: 2, dodgeCancelFrom: 1, whiffPenalty: 7, moveCommit: 0.45, moveRecover: 0.7, steerTicks: 3, sweep: -1, heavy: false },
+        { startup: 12, active: 7, recovery: 24, damage: 4, radius: 31, arcDeg: 215, lunge: 30, windup: 8, hitstop: 8, knockback: 260, chainFrom: 999, dodgeCancelFrom: 9, whiffPenalty: 14, moveCommit: 0, moveRecover: 0.1, steerTicks: 4, sweep: 1, heavy: true },
       ] as SwingDef[],
     },
     aimAssistDeg: 20,
     deathSlowmoTicks: 30, deathSlowmo: 0.25,
   },
 
-  hitstop: { killBonus: 2, max: 8, boltCut: 3 },
+  hitstop: { killBonus: 2, max: 12, boltCut: 3 },
   knockbackDecayTicks: 8,
   spawnTelegraphTicks: 40,
   waveGapTicks: 60,
@@ -60,12 +67,53 @@ export const tuning = {
 
   juice: {
     shakeMax: 4, shakeRotMaxDeg: 0.5, shakeDecay: 1.6,
-    traumaLight: 0.22, traumaHeavy: 0.45, traumaHurt: 0.6, traumaKill: 0.15,
+    traumaLight: 0.40, traumaHeavy: 0.58, traumaHurt: 0.6, traumaKill: 0.22,
     flashTicks: 4, squashTicks: 6,
+    hitFlashSec: 0.05,      // enemy white-flash on real time: hit-stop must not hold a target white for its whole freeze
     lookahead: 4, lookaheadLerp: 0.08,
     aberrationTicks: 3,
     aberrationStrength: 2,  // screen px of red/blue split at the pulse peak
-    zoom: { roomClear: 1.06, kill: 1.015, heavyHit: 1.01, decay: 6 }, // decay = per-second ease rate back to 1
+    zoom: { roomClear: 1.06, kill: 1.015, heavyHit: 1.035, decay: 6 }, // decay = per-second ease rate back to 1
+    // Contact. The light hit is ~90% of all contact, so it gets the whole chain, only smaller: the
+    // camera is shoved along the blade, the body is shoved back off it, the screen blinks once.
+    hit: {
+      lightKick: 2.6, heavyKick: 5.2,       // px the camera travels along the blade at contact
+      kickDecay: 5.5,                       // per-second ease rate; ~3 frames to snap back
+      lightZoom: 1.018,                     // punch-in on a light hit (the heavy uses zoom.heavyHit)
+      lightFlash: 0.11, heavyFlash: 0.20, flashTint: 0xfff0d0,
+      recoil: 2.2, recoilDecay: 12,         // px the player's own body jolts back, and its decay rate
+      lightSparks: 10, heavySparks: 16,
+      lightWave: 4,                         // grit thrown along a light contact (heavy uses swing.waveParticles)
+      // The contact stamp: hard pixel values, no interpolation. Soft additive blobs cannot make a
+      // contact frame at 480x270 over a pale floor; a shape with a dark rim can.
+      star: { stepSec: 0.022, tiers: 3, heavyTiers: 4, core: 4, spikeLong: 11, spikeSide: 7, width: 3, rim: 2, darkR: 9, darkAlpha: 0.7 },
+      // amber from the first frame: the target's own flash is pure white, so the stamp has to be a
+      // different colour or the two merge into one white mass
+      starTiers: [0xffeec0, 0xffb85c, 0xe07828, 0xa04c18],
+      contactBack: 11,                       // px back along the blow: the accent belongs on the contact
+                                            // EDGE, not on the target's centre, where its white flash eats it
+    },
+    // A successful i-frame dodge-through is the hardest input in the game. It is the only cold-coloured
+    // feedback in the fight, so it can never be mistaken for a hit or for damage taken.
+    dodged: { flash: 0.16, tint: 0x9fd8ff, zoom: 1.035, trauma: 0.10, glowSec: 0.09, ghostAlpha: 0.55, sparks: 12 },
+    // Poise break. Only the heavy breaks a brute, so only that one earns the camera.
+    stagger: { trauma: 0.10, bruteTrauma: 0.26, bruteZoom: 1.02, bruteFlash: 0.10 },
+    // the greatsword's own feedback chain: the wind-up pulls the camera back, contact shoves it through
+    swing: {
+      heavyWindTrauma: 0.12, heavyWindKick: 1.7,   // camera drifts opposite the swing while the blade is up
+      heavyEmberRate: 110,                          // embers/s drawn into the blade during the heavy wind-up
+      heavyPlantDust: 7,                           // dust puffed at the feet when the heavy plants
+      waveParticles: 12,                           // ground wave thrown along a heavy contact
+    },
+    // the crescent: build on it, do not replace it
+    arc: {
+      lightThick: 6, heavyThick: 12,
+      spanLight: 100, spanHeavy: 125,   // degrees of smear kept behind the leading edge
+      lightAlpha: 0.70, heavyAlpha: 0.90,
+      lightFade: 5, heavyFade: 6,
+      ghostAlpha: 0.30,      // warm inner glow the greatsword adds under its crescent
+      rimColor: 0x150f1e, rimAlpha: 0.55,   // dark rim behind the crescent, so steel reads on any floor
+    },
     damageNumbers: false,
     light: {
       ambientDarkness: 0.28,  // 0 = untouched, 1 = black at the arena edge

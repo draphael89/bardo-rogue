@@ -4,6 +4,10 @@ import { angleToPlayer, distToPlayer, moveToward, moveAlong, facePlayer, enemyAr
 
 const IDLE_TICKS = 20
 
+// Ticks before the release when the aim stops tracking. The renderer imports this so the ground
+// telegraph hardens on exactly the tick the sim commits; do not duplicate the number.
+export const BRUTE_COMMIT_LEAD = 6
+
 export function updateBrute(world: World, e: Enemy): void {
   const B = tuning.brute
   const p = world.player
@@ -23,7 +27,7 @@ export function updateBrute(world: World, e: Enemy): void {
     }
     case 'windup':
       e.vx = 0; e.vy = 0
-      if (e.stateTick <= B.windup - 6) { e.aimAngle = angleToPlayer(world, e); facePlayer(world, e) } // tracks, then commits
+      if (e.stateTick <= B.windup - BRUTE_COMMIT_LEAD) { e.aimAngle = angleToPlayer(world, e); facePlayer(world, e) } // tracks, then commits
       if (e.stateTick >= B.windup) {
         e.state = 'attack'; e.stateTick = 0; e.hitDone = false
         world.emit({ type: 'enemyAttack', id: e.id, kind: 'brute', x: e.x, y: e.y, angle: e.aimAngle })

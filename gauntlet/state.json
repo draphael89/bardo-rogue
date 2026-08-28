@@ -5,7 +5,7 @@
   "mix": "efficient",
   "stopRule": "until the user stops it",
   "wave": 1,
-  "status": "phase0",
+  "status": "running",
   "evidenceLimit": "Reference exhibits are 1920x1080 gameplay stills. Motion timing is judged against the rubric's feel-chain acceptance criteria using our own tick-labelled strips, not against the bar. Every motion verdict must say so.",
   "phase0": "Repair batch run before wave 1: attack edge-trigger, camera-aware pointer, live metrics getter, widened state hash, visual/gameplay RNG stream split, pool-overflow telemetry, restart replay parity, tools/strip.ts motion exporter, ART_DIRECTION.md, per-entity views split, recalibrated balance gates.",
   "lanes": [
@@ -247,6 +247,7 @@
     "ART_DIRECTION.md ships at 533 lines with an acceptance test, so a gap can be cited as 'violates SS N' rather than as taste.",
     "views.ts split per entity behind a re-export barrel, so six lanes can run in parallel without three agents writing one file.",
     "Found and fixed a gate of my own that was as unmeasured as the one I struck: successfulDodges/dodges measured 0.03, not the asserted 0.6-0.8, because the kite bot rolls away from telegraphs rather than through attacks. Replaced with direct measurement of roll speed against run speed.",
-    "Found 29 Math.random calls in the render layer, so the same strip captured twice differed (md5 392502cf vs b79c1681). A seventh agent is giving presentation its own seeded generator; without it every round-over-round visual diff is noise."
+    "Found 29 Math.random calls in the render layer, so the same strip captured twice differed (md5 392502cf vs b79c1681). A seventh agent is giving presentation its own seeded generator; without it every round-over-round visual diff is noise.",
+    "Capture determinism proven: the same strip captured twice is byte-identical, including a busy wave3 scene with particles, lights and seven enemies (md5 aba2500a both runs). Round-over-round visual diffs are now signal, not noise."
   ]
 }

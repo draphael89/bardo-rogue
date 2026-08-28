@@ -2,7 +2,7 @@ import { tuning, DT } from '@/tuning'
 import type { World } from './world'
 import type { InputFrame } from './input'
 import { moveWithWalls } from './collision'
-import { arcHits, damageEnemy, addFreeze } from './combat'
+import { arcHits, damageEnemy, addFreeze, sweepEase, swingStep } from './combat'
 import { angleDiff, deg, len } from './math'
 
 export function capturePlayerInput(world: World, input: InputFrame): void {
@@ -26,8 +26,18 @@ export function updatePlayer(world: World, input: InputFrame): void {
   if (mlen > 0.01) p.moveAngle = Math.atan2(input.moveY, input.moveX)
   let aim = Math.atan2(input.aimY, input.aimX)
   if (input.aimSoft) aim = aimAssist(world, mlen > 0.01 ? p.moveAngle : p.aimAngle)
-  if (p.state !== 'attack') p.aimAngle = aim
+  p.aimAngle = aim // intent always tracks the stick, so a chained swing can be redirected
   if (p.state === 'free' || p.state === 'dodge') p.facing = Math.cos(p.aimAngle) >= 0 ? 1 : -1
+  // steering: the swing angle follows the aim for the first few startup ticks, then it is committed
+  if (p.state === 'attack') {
+    const s = P.attack.swings[p.swingIndex]
+    if (p.stateTick < s.steerTicks) {
+      const max = deg(P.attack.steerRateDeg)
+      const d = angleDiff(p.swingAngle, aim)
+      p.swingAngle += d > max ? max : d < -max ? -max : d
+      p.facing = Math.cos(p.swingAngle) >= 0 ? 1 : -1
+    }
+  }
 
   if (p.state === 'dead') { applyKnockback(world); return }
 
@@ -40,12 +50,14 @@ export function updatePlayer(world: World, input: InputFrame): void {
     else if (p.attackBuffer > 0 && p.stateTick >= P.dodge.attackCancelFrom) startSwing(world, 0)
   } else if (p.state === 'attack') {
     const s = P.attack.swings[p.swingIndex]
-    const total = s.startup + s.active + s.recovery
+    // hit-confirm: a swing that touched something recovers on its own clock; a whiff pays for the miss
+    const wp = swingConnected(world) ? 0 : s.whiffPenalty
+    const total = s.startup + s.active + s.recovery + wp
     const recoveryTick = p.stateTick - s.startup - s.active
     if (p.stateTick >= total) { p.state = 'free'; p.stateTick = 0 }
     else if (recoveryTick >= 0) {
       if (p.dodgeBuffer > 0 && recoveryTick >= s.dodgeCancelFrom) startDodge(world)
-      else if (p.attackBuffer > 0 && recoveryTick >= s.chainFrom && p.swingIndex < P.attack.swings.length - 1) startSwing(world, p.swingIndex + 1)
+      else if (p.attackBuffer > 0 && recoveryTick >= s.chainFrom + wp && p.swingIndex < P.attack.swings.length - 1) startSwing(world, p.swingIndex + 1)
     }
   }
 
@@ -70,27 +82,31 @@ export function updatePlayer(world: World, input: InputFrame): void {
     p.vx = dx / DT; p.vy = dy / DT
   } else if (p.state === 'attack') {
     const s = P.attack.swings[p.swingIndex]
-    const inStartupOrActive = p.stateTick < s.startup + s.active
-    const scale = s.heavy && p.stateTick < s.startup ? 0 : P.attack.moveScaleLight
+    // committed through startup + active, then control bleeds back in across recovery
+    const rec = p.stateTick - s.startup - s.active
+    const recLen = s.recovery + (swingConnected(world) ? 0 : s.whiffPenalty)
+    const scale = rec < 0 ? s.moveCommit : s.moveRecover + (1 - s.moveRecover) * Math.min(1, rec / recLen)
     const tx = mlen > 0.01 ? input.moveX / mlen * P.maxSpeed * scale : 0
     const ty = mlen > 0.01 ? input.moveY / mlen * P.maxSpeed * scale : 0
     p.vx = approach(p.vx, tx, P.maxSpeed / P.accelTicks); p.vy = approach(p.vy, ty, P.maxSpeed / P.accelTicks)
     dx = p.vx * DT; dy = p.vy * DT
-    if (inStartupOrActive) {
-      const lunge = s.lunge / (s.startup + s.active)
-      dx += Math.cos(p.swingAngle) * lunge; dy += Math.sin(p.swingAngle) * lunge
-    }
+    const travel = swingStep(s, p.stateTick)
+    dx += Math.cos(p.swingAngle) * travel; dy += Math.sin(p.swingAngle) * travel
   }
   moveWithWalls(world.arena, p, dx, dy, p.radius)
   applyKnockback(world)
 
-  // --- active hit window ---
+  // --- active hit window: only the arc the blade has actually swept through is live ---
   if (p.state === 'attack') {
     const s = P.attack.swings[p.swingIndex]
-    if (p.stateTick > s.startup && p.stateTick <= s.startup + s.active) {
+    const k = p.stateTick - s.startup
+    if (k >= 0 && k < s.active) {
+      // the live sector runs from the swing's start edge to wherever the blade has reached this tick
+      const spanDeg = s.arcDeg * sweepEase((k + 1) / s.active, s.heavy)
+      const mid = p.swingAngle + s.sweep * (deg(spanDeg) - deg(s.arcDeg)) / 2
       for (const e of world.enemies) {
         if (!e.active || e.state === 'dead' || e.lastHitSwingId === p.swingId) continue
-        if (arcHits(p.x, p.y, p.swingAngle, s.radius, s.arcDeg, e.x, e.y, e.radius)) {
+        if (arcHits(p.x, p.y, mid, s.radius, spanDeg, e.x, e.y, e.radius)) {
           e.lastHitSwingId = p.swingId
           const toward = Math.atan2(e.y - p.y, e.x - p.x)
           damageEnemy(world, e, s.damage, toward, s.knockback, s.heavy, s.hitstop)
@@ -98,7 +114,7 @@ export function updatePlayer(world: World, input: InputFrame): void {
       }
       for (const b of world.projectiles) {
         if (!b.active) continue
-        if (arcHits(p.x, p.y, p.swingAngle, s.radius, s.arcDeg, b.x, b.y, b.radius)) {
+        if (arcHits(p.x, p.y, mid, s.radius, spanDeg, b.x, b.y, b.radius)) {
           b.active = false
           addFreeze(world, tuning.hitstop.boltCut)
           world.emit({ type: 'boltCut', x: b.x, y: b.y })
@@ -106,6 +122,14 @@ export function updatePlayer(world: World, input: InputFrame): void {
       }
     }
   }
+}
+
+// Did the swing now in flight touch anything? Enemies stamp the swing id they were last hit by, and
+// swing ids are never reused, so this needs no extra player state.
+function swingConnected(world: World): boolean {
+  const id = world.player.swingId
+  for (const e of world.enemies) if (e.lastHitSwingId === id) return true
+  return false
 }
 
 function startDodge(world: World): void {

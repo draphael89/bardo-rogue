@@ -6,9 +6,10 @@
 //        pnpm strip -- --scenario wave1 --bot kite --from 300 --frames 12 --every 2
 //        pnpm strip -- --replay replays/kite-full-s1.json --from 600 --frames 12
 //
-// Determinism: the rAF loop is stopped and every tick is stepped by hand, one render per tick at a fixed dt.
-// Math.random (presentation only: particles, flicker) is replaced by a seeded PRNG before the page boots, so
-// two runs with the same args produce byte-identical PNGs.
+// Determinism: rAF is swallowed before boot and every tick is stepped by hand, one render per tick at a fixed dt.
+// That is the whole mechanism — presentation is a wall-clock dt accumulator (presenter.time, camera.t, lighting.t,
+// atmosphere.t), so free-running frames are what make `pnpm shot` unreproducible. Render randomness is already
+// seeded in src/render/fxRng.ts off the world seed. Two runs of the same args give byte-identical PNGs.
 import { chromium } from '@playwright/test'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
@@ -86,8 +87,9 @@ await page.addInitScript({ content: 'window.__name = f => f' })
 // From here nothing renders unless this tool asks for it; render() below also does pixi's screen blit by hand.
 await page.addInitScript({ content: '(() => { const q = []; window.__rafQ = q; window.requestAnimationFrame = cb => q.push(cb); window.cancelAnimationFrame = () => {} })()' })
 
-// Seed presentation randomness before any page script runs (the sim never calls Math.random; particles and
-// light flicker do). Injected as source, not a callback, so esbuild cannot rewrite it.
+// Backstop only: src/render/fxRng.ts seeds every render RNG stream, so this changes nothing today (verified:
+// --rng 0 gives the same hash). It exists to catch a stray Math.random creeping back into presentation.
+// Injected as source, not a callback, so esbuild cannot rewrite it.
 if (seedRng) await page.addInitScript({
   content: `(() => { let s = 1;
     window.__seedRandom = n => { s = (n >>> 0) || 1 };

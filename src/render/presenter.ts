@@ -167,7 +167,7 @@ export class Presenter {
           if (v) { this.particles.shatter(v.body, ev.x, ev.y, ev.angle); v.destroy(); this.enemyViews.delete(ev.id) }
           this.particles.blood(ev.x, ev.y, ev.angle, ev.kind === 'charger' ? 0x6a3aa0 : 0x8a1a22)
           this.particles.puff(ev.x, ev.y, 6, 0x3a2a2a)
-          this.flash(0.35, 0xffffff)
+          this.flash(J.killFlash, 0xffffff)
           this.camera.punchZoom(J.zoom.kill) // juice hook
           break
         }
@@ -481,7 +481,13 @@ export class Presenter {
   }
 
   private flashAlpha = 0
-  flash(alpha: number, color: number) { this.flashOverlay.tint = color; this.flashAlpha = Math.max(this.flashAlpha, alpha) }
+  // The loudest flash this frame owns the colour too. Taking the max alpha but the last tint meant a
+  // kill repainted the warm contact flash white, so every death read the same regardless of how it landed.
+  flash(alpha: number, color: number) {
+    if (alpha <= this.flashAlpha) return
+    this.flashAlpha = alpha
+    this.flashOverlay.tint = color
+  }
 
   render(alpha: number, dtSec: number) {
     const w = this.world

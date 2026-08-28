@@ -133,6 +133,10 @@ export const tuning = {
     lookahead: 4, lookaheadLerp: 0.08,
     aberrationTicks: 3,
     aberrationStrength: 2,  // screen px of red/blue split at the pulse peak
+    // Screen flash on an ordinary kill. It has to sit UNDER heavy contact (0.20) and under getting
+    // hurt (0.25), or the most routine event in the fight is also the loudest and the next telegraph
+    // is washed out by the last thing you killed. The shatter and the punch-zoom carry the release.
+    killFlash: 0.12,
     zoom: { roomClear: 1.06, kill: 1.015, heavyHit: 1.035, decay: 6 }, // decay = per-second ease rate back to 1
     // Contact. The light hit is ~90% of all contact, so it gets the whole chain, only smaller: the
     // camera is shoved along the blade, the body is shoved back off it, the screen blinks once.

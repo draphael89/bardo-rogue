@@ -305,7 +305,10 @@ export class Hud {
     this.cardTitle.anchor.set(0.5); this.cardTitle.position.set(CARD_CX, CARD.top + 92)
     this.cardSub = new Text({
       text: 'THE THRESHOLD PULLS YOU BACK',
-      style: { fontFamily: 'Kenney Mini', fontSize: 8, fill: C.boneDim, letterSpacing: 1, dropShadow: drop },
+      // No drop shadow: it is a second offset semi-transparent copy of the glyph, which is exactly
+      // what stops a label being thresholded onto the pixel grid. The card's other rows never had one
+      // and they are the crisp ones. The panel behind this line supplies all the contrast it needs.
+      style: { fontFamily: 'Kenney Mini', fontSize: 8, fill: C.boneDim, letterSpacing: 1 },
       resolution: 1,
     })
     this.cardSub.anchor.set(0.5); this.cardSub.position.set(CARD_CX, CARD.top + 108)
@@ -318,7 +321,7 @@ export class Hud {
     }
     this.cardKey = new Text({ text: 'R', style: { fontFamily: 'Kenney Mini', fontSize: 8, fill: C.bone }, resolution: 1 })
     this.cardKey.anchor.set(0.5, 0)
-    this.cardAct = new Text({ text: 'BEGIN AGAIN', style: { fontFamily: 'Kenney Mini', fontSize: 8, fill: C.bone, letterSpacing: 1, dropShadow: drop }, resolution: 1 })
+    this.cardAct = new Text({ text: 'BEGIN AGAIN', style: { fontFamily: 'Kenney Mini', fontSize: 8, fill: C.bone, letterSpacing: 1 }, resolution: 1 })
     this.cardAct.anchor.set(0, 0)
 
     layer.addChild(this.markG, this.crownG, this.hurtG, this.bandG, this.banner, this.sub,
@@ -1255,6 +1258,9 @@ export class Hud {
   // 8px, so "WASD" came out as "L^S:". Anything added here must be looked at, not assumed.
   private applyCrisp(): void {
     this.cardTitle.filters = [crispText]
+    this.cardSub.filters = [crispText]
+    this.cardKey.filters = [crispText]
+    this.cardAct.filters = [crispText]
     for (const r of this.cardRows) { r.label.filters = [crispText]; r.value.filters = [crispText] }
   }
 

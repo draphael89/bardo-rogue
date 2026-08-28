@@ -7,10 +7,17 @@ import { overlapsSolid } from './collision'
 //
 // A complete 4-neighbour search over a 26x15 room is bounded and cheap, so this is a full BFS with a
 // best-effort fallback: if the goal tile is unreachable (a body standing in the doorway, a goal
-// inside masonry), it still returns the step toward the closest tile it did reach. Scratch arrays
-// are module-level and reused, so a tick that routes costs no allocation.
+// inside masonry), it still returns the step toward the closest tile it did reach. Everything is
+// module-level and reused — the scratch arrays, the direction tables, and the returned waypoint,
+// which is a packed tile index rather than an object — so a tick that routes allocates nothing.
 let pathParent = new Int16Array(0)
 let pathQueue = new Int16Array(0)
+const DIRS_CW = [[1, 0], [0, 1], [-1, 0], [0, -1]] as const
+const DIRS_CCW = [[-1, 0], [0, -1], [1, 0], [0, 1]] as const
+
+/** The waypoint a routed step should walk toward, from a pathWaypoint result. */
+export function waypointX(arena: Arena, idx: number): number { return (idx % arena.cols + 0.5) * TILE }
+export function waypointY(arena: Arena, idx: number): number { return (Math.floor(idx / arena.cols) + 0.5) * TILE }
 
 // `side` is a stable preference (an enemy's seeded orbit direction, a bot's current lane) so that a
 // body picks one way around an obstacle and commits, instead of oscillating at the midpoint.
@@ -19,7 +26,7 @@ export function pathWaypoint(
   fromX: number, fromY: number, radius: number,
   toX: number, toY: number,
   side: 1 | -1,
-): { x: number; y: number } | null {
+): number {
   const n = arena.cols * arena.rows
   if (pathParent.length < n) { pathParent = new Int16Array(n); pathQueue = new Int16Array(n) }
   pathParent.fill(-1, 0, n)
@@ -34,9 +41,7 @@ export function pathWaypoint(
   pathParent[start] = -2
   let best = start
   let bestD = (sc - gc) ** 2 + (sr - gr) ** 2
-  const dirs = side > 0
-    ? [[1, 0], [0, 1], [-1, 0], [0, -1]] as const
-    : [[-1, 0], [0, -1], [1, 0], [0, 1]] as const
+  const dirs = side > 0 ? DIRS_CW : DIRS_CCW
   while (head < tail) {
     const at = pathQueue[head++]!
     if (at === goal) { best = at; break }
@@ -54,11 +59,10 @@ export function pathWaypoint(
       if (dd < bestD) { bestD = dd; best = ni }
     }
   }
-  if (best === start) return null
+  if (best === start) return -1
   let step = best
   while (pathParent[step] !== start && pathParent[step] >= 0) step = pathParent[step]!
-  const c = step % arena.cols, r = Math.floor(step / arena.cols)
-  return { x: (c + 0.5) * TILE, y: (r + 0.5) * TILE }
+  return step
 }
 
 function clampTile(v: number, span: number): number {

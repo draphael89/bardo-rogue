@@ -21,7 +21,7 @@ describe('harness documentation', () => {
   it('lists every input field the debug API accepts', () => {
     const setInput = harness.split('\n').find(l => l.includes('`setInput(partial | null)`'))
     expect(setInput).toBeDefined()
-    for (const field of ['moveX', 'moveY', 'aimX', 'aimY', 'aimSoft', 'attack', 'attackHeld', 'dodge', 'restart', 'choiceDelta', 'confirm']) {
+    for (const field of ['moveX', 'moveY', 'aimX', 'aimY', 'aimSoft', 'attack', 'attackHeld', 'heavy', 'dodge', 'restart', 'choiceDelta', 'confirm']) {
       expect(setInput, `setInput docs should mention ${field}`).toContain(field)
     }
   })

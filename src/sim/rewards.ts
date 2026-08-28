@@ -1,7 +1,7 @@
 import { setDoorWalkable } from './arena'
 import { BOONS, BOON_IDS, DEITIES, grantBoon, hasBoon, type BoonId, type Deity } from './boons'
 import type { InputFrame } from './input'
-import type { RewardFamily } from './session'
+import { parkForModal, type RewardFamily } from './session'
 import type { World } from './world'
 
 function shuffled(world: World, ids: BoonId[]): BoonId[] {
@@ -77,25 +77,14 @@ export function offerReward(world: World, family: RewardFamily, fromRite = false
   if (followup && available.includes(followup)) picked.push(followup)
   if (!picked.includes(promised)) picked.push(promised)
   for (const id of [...preferred, ...others]) if (!picked.includes(id) && picked.length < 3) picked.push(id)
-  // With twelve vows and three offers a run can never exhaust the pool, so this is an invariant.
+  // With twelve vows and at most four offers a run can never exhaust the pool, so this is an invariant.
   // Keeping the guard explicit makes a future content edit fail loudly instead of showing a blank card.
   if (picked.length < 3) throw new Error('reward pool exhausted before three choices could be offered')
   const options = picked.slice(0, 3) as [BoonId, BoonId, BoonId]
   run.pendingReward = { family, options, focus: 0, deity: speaker, fromRite }
   world.roomPhase = 'reward'
   world.phaseTick = world.tick
-  world.timeScale = 1
-  world.slowmoTicks = 0
-  world.freeze = 0
-  world.player.state = 'free'
-  world.player.stateTick = 0
-  world.player.attackQueuedAt = -1
-  world.player.heavyQueuedAt = -1
-  world.player.dodgeQueuedAt = -1
-  world.player.dodgeTick = -1
-  world.player.dodgeRead = 0
-  world.player.dodgeProcTick = -1
-  world.player.vx = world.player.vy = 0
+  parkForModal(world)
   world.doorOpen = false
   setDoorWalkable(world.arena, false)
   world.emit({ type: 'rewardOffered', options, deity: speaker })
@@ -108,6 +97,10 @@ export function updateReward(world: World, input: InputFrame): void {
   if (delta) {
     offer.focus = ((offer.focus + delta + 3) % 3) as 0 | 1 | 2
     world.emit({ type: 'rewardFocus', focus: offer.focus })
+    // A nudge and a confirm can land in the same 16.7 ms input sample. Taking both would claim a
+    // vow the player never saw highlighted, so a frame that moves the selection cannot also take it.
+    // The rite's modal (rites.ts) holds the same rule.
+    return
   }
   if (!input.confirm) return
   const id = offer.options[offer.focus]

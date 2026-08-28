@@ -4,7 +4,7 @@ import { emptyInput, type InputFrame } from './input'
 import { tuning } from '@/tuning'
 import { hasLineOfSight } from './arena'
 import { overlapsSolid } from './collision'
-import { pathWaypoint } from './nav'
+import { pathWaypoint, waypointX, waypointY } from './nav'
 import { guardUp } from './enemies/oathbound'
 
 export type Bot = (world: World) => InputFrame
@@ -37,7 +37,7 @@ function routeToward(inp: InputFrame, world: World, x: number, y: number, side: 
   const direct = Math.hypot(x - p.x, y - p.y)
   if (direct < 12 || !blocked(world, x, y)) return moveToward(inp, world, x, y)
   const way = pathWaypoint(world.arena, p.x, p.y, p.radius, x, y, side)
-  if (way) moveToward(inp, world, way.x, way.y)
+  if (way >= 0) moveToward(inp, world, waypointX(world.arena, way), waypointY(world.arena, way))
   else moveToward(inp, world, x, y)
   return direct
 }

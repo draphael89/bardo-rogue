@@ -13,6 +13,18 @@ const args = Object.fromEntries(process.argv.slice(2).map((a, i, arr) => a.start
 const [s0, s1] = (args.seeds ?? '1-100').split('-').map(Number)
 const ticks = +(args.ticks ?? 18000)
 
+// A gate that can be argued into running nothing is not a gate: `--bot typo` used to filter every
+// spec away and `--seeds 100-1` used to run an empty loop, and both then printed "matrix passed".
+// Bad arguments die here, before a single world is built, and the bottom of the file additionally
+// refuses to pass on zero rows.
+function usage(msg: string): never {
+  console.error(`matrix: ${msg}`)
+  process.exit(2)
+}
+if (!Number.isInteger(s0) || (s1 !== undefined && !Number.isInteger(s1))) usage(`--seeds must be N or N-M, got "${args.seeds}"`)
+if (s1 !== undefined && s1 < s0) usage(`--seeds range is empty: ${s0}-${s1}`)
+if (!Number.isFinite(ticks) || ticks <= 0) usage(`--ticks must be a positive number, got "${args.ticks}"`)
+
 // Two different kinds of claim, kept apart on purpose.
 //
 // The HARD gate is structural: no seed may strand a player. Every attempt has to resolve and hand
@@ -26,6 +38,10 @@ const SPECS: Array<{ bot: BotName; minWin: number; maxWin: number; note: string 
   { bot: 'slice-kite', minWin: 0.8, maxWin: 1, note: 'spacing and punishes should clear the run' },
   { bot: 'slice-naive', minWin: 0, maxWin: 0.2, note: 'mashing should rarely survive the Warden' },
 ]
+
+if (args.bot && !SPECS.some(s => s.bot === args.bot)) {
+  usage(`--bot "${args.bot}" is not a matrix bot; expected one of: ${SPECS.map(s => s.bot).join(', ')}`)
+}
 
 interface Row { seed: number; bot: string; ok: boolean; why: string; seconds: number; won: boolean }
 const rows: Row[] = []
@@ -85,4 +101,6 @@ if (drifted.length) {
   for (const d of drifted) console.error(`  ${d}`)
 }
 if (stranded.length || drifted.length) process.exit(1)
+// Belt to the argument validation's braces: "passed" must always mean "ran something and it held".
+if (!rows.length) { console.error('\nmatrix FAILED: zero cases executed'); process.exit(1) }
 console.log('\nmatrix passed')

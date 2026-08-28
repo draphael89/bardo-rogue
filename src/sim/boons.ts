@@ -1,5 +1,5 @@
 import { tuning, type SwingDef } from '@/tuning'
-import type { Enemy, World } from './world'
+import type { Enemy, EnemyState, World } from './world'
 import type { RewardFamily } from './session'
 import { damageEnemy } from './combat'
 import { applyBrand, applyBurn } from './status'
@@ -171,7 +171,7 @@ export { applyBrand, applyBurn }
 
 // Called by any friendly weapon result: blade, reflected bolt, or afterimage. Keeping one hook is
 // what makes the interactions discoverable instead of a list of exceptions.
-export function resolveWeaponOnHit(world: World, enemy: Enemy, heavy: boolean, brandBefore: number, angle: number, targetState?: string): void {
+export function resolveWeaponOnHit(world: World, enemy: Enemy, heavy: boolean, brandBefore: number, angle: number, targetState?: EnemyState): void {
   // Trigger priority is part of the combo contract: Between-Step marks first, then a heavy may cash
   // that mark through Final Judgment on the very same hit. The prime is spent by any weapon hit.
   const run = world.session.run

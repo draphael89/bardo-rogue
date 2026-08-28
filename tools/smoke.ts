@@ -1,9 +1,11 @@
 // Browser smoke: play the whole production loop in a real browser and assert the golden path.
 //
-// The Node suite proves the simulation. It cannot prove that the page boots, that the atlas and
-// fonts load, that the presenter survives six room rebuilds, or that a run reaches its summary
-// without throwing — which is exactly the class of break that reaches a player first. This drives
-// the real build through both endings and fails loudly on any console error along the way.
+// The Node suite proves the simulation. This proves what it cannot: the page boots, the title holds
+// over the hub and a real keypress dismisses it, the atlas and fonts load, and a run reaches its
+// summary without throwing. The sim is stepped by hand (so CI never depends on wall-clock frame
+// pacing) while the render loop keeps drawing — and at each of the run's key screens (the hub, the
+// toll, an offer, the boss mid-fight, the death or victory card) the smoke stops stepping and
+// requires real frames to render over that exact state, failing loudly on any console error.
 //
 //   pnpm smoke                       both paths against http://localhost:5173
 //   pnpm smoke -- --url http://localhost:4173
@@ -16,6 +18,15 @@ const only = args.path ?? ''
 const seed = +(args.seed ?? 1)
 const MAX_TICKS = 20000
 
+// A smoke that can be argued into checking nothing is not a smoke: `--path typo` used to filter
+// both paths away and print "smoke passed". Bad arguments die before the browser launches, and the
+// bottom of the file additionally refuses to pass unless at least one path actually ran.
+function usage(msg: string): never {
+  console.error(`smoke: ${msg}`)
+  process.exit(2)
+}
+if (!Number.isInteger(seed)) usage(`--seed must be an integer, got "${args.seed}"`)
+
 // The two paths deliberately run different seeds. The slice bot answers the toll off the seed's
 // second bit, so one seed only ever exercises one side of a permanent choice; splitting them means
 // the browser drives PAY and SWIM, and both consequences, on every smoke run.
@@ -25,10 +36,15 @@ const PATHS: PathSpec[] = [
   { name: 'death', bot: 'slice-naive', expect: 'lost', seed: seed + 2, toll: 'refused' },
 ]
 
+if (only && !PATHS.some(p => p.name === only)) {
+  usage(`--path "${only}" is not a smoke path; expected one of: ${PATHS.map(p => p.name).join(', ')}`)
+}
+
 type GameState = {
   tick: number
   room: { id: string; phase: string }
-  player: { maxHp: number }
+  player: { maxHp: number; state: string }
+  enemies: Array<{ kind: string }>
   session: {
     meta: { attempts: number; victories: number }
     run: {
@@ -61,9 +77,27 @@ async function play(page: Page, spec: PathSpec): Promise<void> {
   const start = await page.evaluate(() => (window as any).__game.state() as GameState)
   check(start.room.id === 'bardo' && start.room.phase === 'town', 'boots into the Bardo, unarmed and at rest')
 
+  // Two fresh frames over the current (frozen) state, or false after 8 s of none. Installed as a
+  // raw string because tsx's esbuild pass decorates any NAMED function inside page.evaluate with a
+  // `__name` helper that does not exist in the page — a string reaches the browser untransformed.
+  await page.evaluate(`window.__renderHere = (loop) => new Promise((res) => {
+    const f0 = loop.frameTimes.length
+    const t0 = performance.now()
+    const poll = () => {
+      if (loop.frameTimes.length >= f0 + 2) return res(true)
+      if (performance.now() - t0 > 8000) return res(false)
+      requestAnimationFrame(poll)
+    }
+    requestAnimationFrame(poll)
+  })`)
+
   // Run to the return: roomsEntered climbs, the run resolves, and the player is home in the hub.
+  // The loop keeps RENDERING while the sim is paused, so at each key screen the driver stops
+  // stepping and requires real frames to draw over that exact state — the sim asserting a rite is
+  // pending proves nothing about whether the rite's screen can paint without throwing.
   const outcome = await page.evaluate(async (max) => {
     const g = (window as any).__game
+    const renderHere = (window as any).__renderHere as (loop: unknown) => Promise<boolean>
     const seenRooms: string[] = []
     let sawReward = 0
     let sawRite = 0
@@ -72,13 +106,23 @@ async function play(page: Page, spec: PathSpec): Promise<void> {
     let resolved: string | null = null
     let killedBy: string | null = null
     let boons: string[] = []
+    const rendered: Record<string, boolean> = {}
+    let deadAt = -1
     for (let i = 0; i < max; i++) {
+      if (i === 0) rendered['the hub'] = await renderHere(g.loop)
       g.step(1)
       const s = g.state() as GameState
       const id = s.room.id
       if (seenRooms[seenRooms.length - 1] !== id) seenRooms.push(id)
       if (s.room.phase === 'reward') sawReward++
       if (s.session.run?.rite) sawRite++
+      if (s.session.run?.rite && rendered['the toll'] === undefined) rendered['the toll'] = await renderHere(g.loop)
+      if (s.room.phase === 'reward' && rendered['an offer'] === undefined) rendered['an offer'] = await renderHere(g.loop)
+      if (id === 'warden' && s.enemies.some(e => e.kind === 'warden') && rendered['the boss mid-fight'] === undefined) rendered['the boss mid-fight'] = await renderHere(g.loop)
+      if (s.player.state === 'dead' && deadAt < 0) deadAt = i
+      // The death card settles over ~40 ticks; render it composed, not mid-veil.
+      if (deadAt >= 0 && i === deadAt + 40 && rendered['the death card'] === undefined) rendered['the death card'] = await renderHere(g.loop)
+      if (s.session.run?.result === 'won' && rendered['the victory card'] === undefined) rendered['the victory card'] = await renderHere(g.loop)
       if (s.session.run?.riteAnswer && !tollAnswer) {
         tollAnswer = s.session.run.riteAnswer
         maxHpAfterToll = s.player.maxHp
@@ -88,12 +132,20 @@ async function play(page: Page, spec: PathSpec): Promise<void> {
         if (run.boons.length > boons.length) boons = run.boons
         if (run.result !== 'active' && !resolved) { resolved = run.result; killedBy = run.killedBy }
       } else if (resolved && s.room.id === 'bardo' && s.room.phase === 'town') {
-        return { seenRooms, sawReward, sawRite, tollAnswer, maxHpAfterToll, resolved, killedBy, boons, ticks: s.tick, meta: s.session.meta, done: true }
+        return { seenRooms, sawReward, sawRite, tollAnswer, maxHpAfterToll, resolved, killedBy, boons, rendered, ticks: s.tick, meta: s.session.meta, done: true }
       }
     }
     const s = g.state() as GameState
-    return { seenRooms, sawReward, sawRite, tollAnswer, maxHpAfterToll, resolved, killedBy, boons, ticks: s.tick, meta: s.session.meta, done: false }
+    return { seenRooms, sawReward, sawRite, tollAnswer, maxHpAfterToll, resolved, killedBy, boons, rendered, ticks: s.tick, meta: s.session.meta, done: false }
   }, MAX_TICKS)
+
+  // Which screens this path must have rendered real frames over. The death path dies at the
+  // Landing, so the boss and the victory card belong to the winning path alone.
+  const mustRender = ['the hub', 'the toll', 'an offer',
+    ...(spec.expect === 'won' ? ['the boss mid-fight', 'the victory card'] : ['the death card'])]
+  for (const state of mustRender) {
+    check(outcome.rendered[state] === true, `renders frames over ${state}`)
+  }
 
   check(outcome.done, `returns to the Bardo (${outcome.ticks} ticks)`)
   check(outcome.resolved === spec.expect, `run resolves as ${spec.expect} (got ${String(outcome.resolved)})`)
@@ -125,14 +177,49 @@ async function play(page: Page, spec: PathSpec): Promise<void> {
   page.off('pageerror', onError)
 }
 
+// The two bot paths skip the title on purpose (measurements, not first impressions) — which means
+// nothing above exercises the one screen every real player sees first. This boots without a bot,
+// requires the title to hold over the living hub with the sim stopped, dismisses it with a real
+// keypress, and requires the game to be running afterwards.
+async function bootTitle(page: Page): Promise<void> {
+  console.log('\n[title] no bot, real keyboard')
+  const errors: string[] = []
+  const onConsole = (m: { type(): string; text(): string }) => { if (m.type() === 'error') errors.push(m.text()) }
+  const onError = (e: Error) => errors.push('pageerror: ' + e.message)
+  page.on('console', onConsole)
+  page.on('pageerror', onError)
+
+  await page.goto(`${url}/?scenario=loop&seed=${seed}&mute=1`)
+  await page.waitForFunction(() => !!(window as unknown as { __game?: unknown }).__game, null, { timeout: 30000 })
+  const held = await page.evaluate(() => {
+    const g = (window as any).__game
+    return { title: !!g.presenter.title.visible, paused: !!g.loop.paused }
+  })
+  check(held.title && held.paused, 'the title holds over the hub with the simulation stopped')
+  const f0 = await page.evaluate(() => (window as any).__game.loop.frameTimes.length)
+  await page.waitForFunction((n) => (window as any).__game.loop.frameTimes.length >= n + 2, f0, { timeout: 15000 })
+  check(true, 'renders frames under the title')
+  await page.keyboard.press('Enter')
+  await page.waitForFunction(() => !(window as any).__game.presenter.title.visible, null, { timeout: 5000 })
+  const after = await page.evaluate(() => ({ paused: !!(window as any).__game.loop.paused }))
+  check(!after.paused, 'Enter dismisses the title and the game runs — not the pause card')
+  check(errors.length === 0, `no console errors on boot${errors.length ? `: ${errors.slice(0, 3).join(' | ')}` : ''}`)
+  page.off('console', onConsole)
+  page.off('pageerror', onError)
+}
+
 const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] })
 const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } })
+if (!only) await bootTitle(page)
+let ran = 0
 for (const spec of PATHS) {
   if (only && only !== spec.name) continue
   await play(page, spec)
+  ran++
 }
 await browser.close()
 
+if (!ran) { console.error('\nsmoke FAILED: zero paths executed'); process.exit(1) }
 if (failures.length) {
   console.error(`\nsmoke FAILED: ${failures.length} check(s)\n  - ${failures.join('\n  - ')}`)
   process.exit(1)

@@ -23,23 +23,33 @@ const RITE: Record<RiteId, number> = { toll: 0 }
 // re-dressing a room cannot move a gameplay hash. The arena's `solid` mask IS hashed: it is
 // collision, not decoration, and a builder edit that moves a wall would otherwise surface only
 // indirectly, hundreds of ticks later, as drifted trajectories.
+//
+// EVERY field is written unconditionally, at a fixed offset in its record. This file used to guard
+// "usually zero" fields with `if (x) write(x)` to keep old pinned hashes stable when a new feature
+// went unused — and that guard is an aliasing machine: two adjacent conditionals of the same width
+// let (phase=1, attackId=0) and (phase=0, attackId=1) feed the digest identical bytes, so two
+// different worlds hashed the same and a replay of one "verified" against the other. An audit
+// reproduced three such collisions. Variable-length data (strings, lists) is always length-prefixed
+// for the same reason. If a change here is intended, re-record the fixtures (`pnpm record-bots`);
+// never buy hash stability back with a conditional write.
 export function hashWorld(world: World): number {
   let h = 0x811c9dc5
   const byte = (v: number) => { h ^= v & 0xff; h = Math.imul(h, 0x01000193) }
   const int = (n: number) => { const v = n | 0; byte(v); byte(v >>> 8); byte(v >>> 16); byte(v >>> 24) }
   const num = (n: number) => int(Math.round(n * 1000))   // px/angles to 1/1000
   const flag = (b: boolean) => byte(b ? 1 : 0)
+  const str = (s: string) => { int(s.length); for (let i = 0; i < s.length; i++) byte(s.charCodeAt(i)) }
 
   int(world.tick); int(world.freeze); num(world.timeScale); int(world.slowmoTicks)
-  if (world.slowTicks) { int(world.slowTicks); int(world.slowRate); int(world.slowAcc) }
+  int(world.slowTicks); int(world.slowRate); int(world.slowAcc)
   int(world.swingCounter); int(world.nextEnemyId); int(world.nextProjectileId)
   int(world.roomClearTick); flag(world.doorOpen); flag(world.wantsRestart)
-  if (world.boonBits) int(world.boonBits)
-  if (world.returns) int(world.returns)
-  if (world.roomIndex) int(world.roomIndex)
+  int(world.boonBits)
+  int(world.returns)
+  int(world.roomIndex)
   if (world.scenario === 'loop') {
     byte(ROOM_PHASE[world.roomPhase]); int(world.phaseTick); int(world.transitionTicks)
-    if (world.transitionTarget) for (let i = 0; i < world.transitionTarget.length; i++) byte(world.transitionTarget.charCodeAt(i))
+    str(world.transitionTarget ?? '')
   }
   int(world.rng.state)
 
@@ -52,18 +62,15 @@ export function hashWorld(world: World): number {
     if (run) {
       int(run.seed); int(run.hp); int(run.maxHp); int(run.depth); int(run.startedTick); byte(run.result === 'active' ? 0 : run.result === 'won' ? 1 : 2)
       flag(run.primedBrand); int(run.boonBits); int(run.roomHistory.length)
-      for (const visit of run.roomHistory) { for (let i = 0; i < visit.id.length; i++) byte(visit.id.charCodeAt(i)); int(visit.enteredTick) }
+      for (const visit of run.roomHistory) { str(visit.id); int(visit.enteredTick) }
+      // A flag-then-body block is the one legal shape for optional data: the flag discriminates, so
+      // the body's bytes can never be mistaken for a neighbour's.
       flag(!!run.pendingReward)
       if (run.pendingReward) {
         byte(run.pendingReward.family === 'blade' ? 0 : 1); byte(run.pendingReward.focus); flag(run.pendingReward.fromRite)
         for (const id of run.pendingReward.options) int(BOON[id])
       }
-      if (run.killedBy !== 'none') { byte(ENEMY_KIND[run.killedBy] + 1); flag(run.killedRanged) }
-      // The toll: what is being asked, how it was answered, and both halves of what it left behind.
-      // Every one of these is written UNCONDITIONALLY. Guarding them the way the fields above are
-      // guarded aliases them: two `if (x) flag(true)` lines both emit the byte 1, so a run that paid
-      // and a run that refused feed the digest identical bytes and a replay of one validates against
-      // the other until the divergence surfaces rooms later.
+      byte(run.killedBy === 'none' ? 0 : ENEMY_KIND[run.killedBy] + 1); flag(run.killedRanged)
       flag(!!run.pendingRite)
       if (run.pendingRite) { byte(RITE[run.pendingRite.id]); byte(run.pendingRite.focus) }
       byte(run.riteAnswer === 'paid' ? 1 : run.riteAnswer === 'refused' ? 2 : 0)
@@ -80,8 +87,7 @@ export function hashWorld(world: World): number {
   int(p.controlTick); int(p.attackQueuedAt); int(p.heavyQueuedAt); int(p.dodgeQueuedAt); int(p.dodgeTick)
   int(p.iframes); num(p.flash); int(p.dodgeRead)
   num(p.moveX); num(p.moveY); int(p.footTick); int(p.deathTick); flag(p.god)
-  if (p.arm) byte(p.arm)
-  if (!p.armed) flag(false)
+  byte(p.arm); flag(p.armed)
 
   let active = 0
   for (const e of world.enemies) if (e.active) active++
@@ -94,10 +100,9 @@ export function hashWorld(world: World): number {
     num(e.aimAngle); num(e.targetX); num(e.targetY)
     int(e.lastHitSwingId); num(e.flash); flag(e.hitDone)
     num(e.orbitAngle); int(e.orbitDir); int(e.hoverTicks); int(e.cooldown); int(e.dashTicks); int(e.spawnTick)
-    if (e.phase) byte(e.phase)
-    if (e.attackId) byte(e.attackId)
-    if (e.brand) { byte(e.brand); int(e.brandTicks) }
-    if (e.burn) { byte(e.burn); int(e.burnTicks); int(e.burnAcc) }
+    byte(e.phase); byte(e.attackId)
+    byte(e.brand); int(e.brandTicks)
+    byte(e.burn); int(e.burnTicks); int(e.burnAcc)
   }
 
   let bolts = 0
@@ -107,9 +112,11 @@ export function hashWorld(world: World): number {
     if (!b.active) continue
     int(b.id); num(b.x); num(b.y); num(b.px); num(b.py); num(b.vx); num(b.vy)
     num(b.radius); int(b.life); num(b.angle)
-    if (b.team) { byte(b.team); int(b.damage); int(b.actionId) }
-    if (b.kind !== 'bolt' && b.kind !== 'arrow') byte(PROJECTILE_KIND[b.kind])
-    if (b.srcKind !== 'player') byte(ENEMY_KIND[b.srcKind] + 1)
+    // Damage rides the projectile, not its kind: two hostile bolts differing only in what they will
+    // do to the player used to hash identically, because damage was only written for team 1.
+    byte(b.team); int(b.damage); int(b.actionId)
+    byte(PROJECTILE_KIND[b.kind])
+    byte(b.srcKind === 'player' ? 0 : ENEMY_KIND[b.srcKind] + 1)
   }
 
   // Collision geometry, run-length folded: walls move the fight, so a builder edit must show here.

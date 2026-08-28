@@ -36,6 +36,33 @@ describe('determinism', () => {
     run(a, 600, makeBot('kite')); run(b, 600, makeBot('kite'))
     expect(hashWorld(a)).not.toBe(hashWorld(b))
   })
+
+  // The digest writes every field unconditionally, at a fixed offset in its record. The old
+  // `if (x) write(x)` guards were an aliasing machine: two adjacent conditionals of the same width
+  // let two DIFFERENT worlds feed identical bytes, so a replay of one "verified" against the other.
+  // An external audit reproduced the first two of these; the third is the same class one level up.
+  describe('no adjacent-field aliasing', () => {
+    it('separates a boss by which attack he is committed to, not only that he is in one', () => {
+      const a = createWorld(1, 'boss'), b = createWorld(1, 'boss')
+      const ea = a.spawnEnemy('warden', 160, 96)!
+      const eb = b.spawnEnemy('warden', 160, 96)!
+      ea.phase = 1; ea.attackId = 0
+      eb.phase = 0; eb.attackId = 1
+      expect(hashWorld(a)).not.toBe(hashWorld(b))
+    })
+    it('separates two hostile bolts by the damage they carry', () => {
+      const a = createWorld(1, 'boss'), b = createWorld(1, 'boss')
+      a.fireProjectile(100, 100, 0, 96, 3, 60, 0, 1, 0, 'bolt', 'warden')
+      b.fireProjectile(100, 100, 0, 96, 3, 60, 0, 4, 0, 'bolt', 'warden')
+      expect(hashWorld(a)).not.toBe(hashWorld(b))
+    })
+    it('separates the world-level counters that share a neighbourhood', () => {
+      const a = createWorld(1, 'boss'), b = createWorld(1, 'boss')
+      a.boonBits = 3; a.returns = 0
+      b.boonBits = 0; b.returns = 3
+      expect(hashWorld(a)).not.toBe(hashWorld(b))
+    })
+  })
 })
 
 describe('movement authority', () => {

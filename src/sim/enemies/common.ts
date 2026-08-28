@@ -3,7 +3,7 @@ import type { World, Enemy } from '../world'
 import { moveWithWalls, overlapsSolid } from '../collision'
 import { hurtPlayer, noteNearMiss } from '../combat'
 import { arcHits } from '../combat'
-import { pathWaypoint } from '../nav'
+import { pathWaypoint, waypointX, waypointY } from '../nav'
 
 export function distToPlayer(world: World, e: Enemy): number {
   return Math.hypot(world.player.x - e.x, world.player.y - e.y)
@@ -23,8 +23,8 @@ export function moveToward(world: World, e: Enemy, tx: number, ty: number, speed
   // seeded orbit direction picks a stable side; it flips only when that side is blocked too.
   if ((hit.hitX && Math.abs(e.vy) < speed * 0.2) || (hit.hitY && Math.abs(e.vx) < speed * 0.2) || (hit.hitX && hit.hitY)) {
     const waypoint = pathWaypoint(world.arena, e.x, e.y, e.radius, tx, ty, e.orbitDir)
-    if (waypoint) {
-      const wx = waypoint.x - e.x, wy = waypoint.y - e.y
+    if (waypoint >= 0) {
+      const wx = waypointX(world.arena, waypoint) - e.x, wy = waypointY(world.arena, waypoint) - e.y
       const wd = Math.hypot(wx, wy) || 1
       e.vx = wx / wd * speed; e.vy = wy / wd * speed
       moveWithWalls(world.arena, e, e.vx * DT, e.vy * DT, e.radius)

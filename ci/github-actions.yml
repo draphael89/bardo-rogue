@@ -8,6 +8,9 @@
 # To turn it on:  git mv ci/github-actions.yml .github/workflows/ci.yml && git commit && git push
 # Or grant the Claude GitHub App the `workflows` scope and move it back in one commit.
 #
+# pnpm/action-setup reads its pnpm version from package.json's `packageManager` field, which this
+# repo pins; without one the action fails at setup, so keep that field when bumping pnpm.
+#
 name: ci
 
 on:

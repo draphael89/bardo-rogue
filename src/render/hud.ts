@@ -1,4 +1,5 @@
 import { Container, Graphics, Text } from 'pixi.js'
+import { crispText } from './textCrisp'
 import type { Atlas } from './atlas'
 import type { EnemyKind } from '@/sim/events'
 import type { World } from '@/sim/world'
@@ -326,6 +327,7 @@ export class Hud {
       this.scrimG, this.cardG, this.cardTitle, this.cardSub, this.cardKey, this.cardAct)
     for (const r of this.cardRows) layer.addChild(r.label, r.value)
     this.hideDeathCard()
+    this.applyCrisp()
 
     // a pad already plugged in only announces itself on its first button press; either way the row rebuilds and
     // shows again, so a controller player never reads "click / space".
@@ -1243,6 +1245,19 @@ export class Hud {
   // The render target's width follows the window's aspect and changes on fullscreen, so anything
   // placed against V.width once in the constructor has to be placed again. Everything not listed
   // here already re-positions itself every frame in update().
+  // canvas2d anti-aliases every glyph and cannot be asked not to, so the death card's largest type is
+  // snapped back onto the pixel grid by a threshold filter (see textCrisp.ts for the measurements).
+  //
+  // OPT-IN, never a sweep over every label, because thresholding is only safe where the strokes are
+  // heavy enough to survive it. Two labels proved that: the card's 8px subtitle carries a drop
+  // shadow, which is a second offset semi-transparent copy of the glyph, and thresholding broke it
+  // into fragments; and the hint row's Kenney Pixel keycaps are thinner than Kenney Mini at the same
+  // 8px, so "WASD" came out as "L^S:". Anything added here must be looked at, not assumed.
+  private applyCrisp(): void {
+    this.cardTitle.filters = [crispText]
+    for (const r of this.cardRows) { r.label.filters = [crispText]; r.value.filters = [crispText] }
+  }
+
   relayout(): void {
     this.waveText.position.set(V.width - 12, 2)
     this.bossName.position.set(Math.round(V.width / 2), 4)
@@ -1287,7 +1302,7 @@ export class Hud {
       x += Math.round(labels[i].width)
       if (i < items.length - 1) { diamond(g, x + Math.round(SEP / 2), 7, C.boneLo); x += SEP }
     }
-  }
+    }
 
   private measure(s: string): number {
     const t = new Text({ text: s, style: { fontFamily: 'Kenney Mini', fontSize: 8 }, resolution: 1 })

@@ -28,3 +28,12 @@ itself a gap under Originality, not progress.
 After each wave, one fresh agent inspects the whole game and smooths the seams: one art style, one
 feel, no joins. Keep the progress page current so I can watch it from my phone. Don't stop until
 every critic is utterly wowed, or until I stop the run.
+
+The worktree is shared and every other lane's work in it is uncommitted. Never run `git stash`,
+`git reset --hard`, or `git checkout -- <path>` here. This is not a style rule: at 21:07 on wave 1 a
+capture agent ran `git stash && <capture three frames> && git stash pop` to get a clean "before"
+baseline, and for two minutes every lane in the run was reverted to the pre-gauntlet commit. Work
+came back; the frames captured inside that window did not, and they showed old code while claiming
+to show new. If you need a baseline capture, make a throwaway worktree
+(`git worktree add /tmp/bardo-base <commit>`) and capture there. If you need to know what changed,
+read `git diff`.

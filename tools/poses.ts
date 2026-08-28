@@ -2,13 +2,14 @@
 // usage: pnpm poses [--only swing,brute] [--out shots/poses.png]
 import { chromium } from '@playwright/test'
 import { mkdirSync } from 'node:fs'
+import { dirname } from 'node:path'
 import sharp from 'sharp'
 
 const args = Object.fromEntries(process.argv.slice(2).map((a, i, arr) => a.startsWith('--') ? [a.slice(2), arr[i + 1] ?? '1'] : []).filter(x => x.length))
 const only = args.only ? args.only.split(',') : null
 const out = args.out ?? 'shots/poses.png'
 const url = args.url ?? 'http://localhost:5173'
-mkdirSync('shots', { recursive: true })
+mkdirSync(dirname(out), { recursive: true })
 
 // helpers injected into every eval: g = api, w = world, p = player, hold(frame, n), until(pred, max), near(enemy, dx, dy)
 const PRELUDE = `
@@ -33,7 +34,7 @@ const POSES: Pose[] = [
   { name: 'swing1-startup', scenario: 'dummy', run: 'near(first(), -18, 0); hold({attack:true,aimX:1,aimY:0}, 4)' },
   { name: 'swing1-active', scenario: 'dummy', run: 'near(first(), -18, 0); hold({attack:true,aimX:1,aimY:0}, 8)' },
   { name: 'swing1-recover', scenario: 'dummy', run: 'near(first(), -18, 0); hold({attack:true,aimX:1,aimY:0}, 1); hold({aimX:1,aimY:0}, 15)' },
-  { name: 'swing2-active', scenario: 'dummy', run: 'near(first(), -18, 0); hold({attack:true,aimX:1,aimY:0}, 22); until(() => p().swingIndex === 1 && p().stateTick === 8)' },
+  { name: 'swing2-active', scenario: 'dummy', run: 'near(first(), -18, 0); holdUntil({attack:true,aimX:1,aimY:0}, () => p().state === "attack" && p().swingIndex === 1 && p().stateTick === 8, 200)' },
   { name: 'swing3-startup', scenario: 'dummy', run: 'near(first(), -18, 0); holdUntil({attack:true,aimX:1,aimY:0}, () => p().state === "attack" && p().swingIndex === 2 && p().stateTick === 7, 200)' },
   { name: 'swing3-active', scenario: 'dummy', run: 'near(first(), -18, 0); holdUntil({attack:true,aimX:1,aimY:0}, () => p().state === "attack" && p().swingIndex === 2 && p().stateTick === 13, 200)' },
   { name: 'swing3-recover', scenario: 'dummy', run: 'near(first(), -18, 0); holdUntil({attack:true,aimX:1,aimY:0}, () => p().state === "attack" && p().swingIndex === 2 && p().stateTick === 22, 200)' },
@@ -88,8 +89,9 @@ for (const pose of POSES) {
       const x = Math.max(0, Math.round((vx - CROP / 2) * s + ra.screen.x)), y = Math.max(0, Math.round((vy - CROP / 2) * s + ra.screen.y))
       return { x, y, width: CROP * s, height: CROP * s, state: `${w.player.state}:${w.player.stateTick}` }
     }, { scenario: pose.scenario, seed, god: pose.god, run: pose.run, focus, CROP, PRELUDE })
-    const f0 = await page.evaluate(() => (window as any).__game.loop.frameTimes.length)
-    await page.waitForFunction((n) => (window as any).__game.loop.frameTimes.length >= n + 2, f0, { timeout: 10000 })
+    // frameTimes is a 240-sample ring, so waiting for length >= 242 deadlocks late in a full sheet.
+    // Await two actual browser frames instead; the paused loop still renders on every rAF.
+    await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))))
     const buf = await page.screenshot({ clip: { x: clip.x, y: clip.y, width: clip.width, height: clip.height }, timeout: 15000 })
     tiles.push({ name: `${pose.name} (${clip.state})`, buf })
     console.log('posed', pose.name, clip.state)

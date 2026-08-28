@@ -144,7 +144,7 @@ const VEIL_STEPS = 8                                 // the aperture closes in w
 const VEIL_BAND = 5                                  // row quantum: the veil's edge is stepped, like everything else
 const STARS = 34                                    // ~2 % of the opening's area: a deep sky, not a starfield poster
 const FEET = 6                                       // player.radius + 1: the row the sprite's feet stand on
-const CROWN_UP = 20                                  // rows above the player pixel: the crown clears the sprite's head by ~4
+const CROWN_UP = 32                                  // authored 32px hero: keep the life crown clear of crest and raised blade
 const HEART_X = 8, HEART_Y = 6, STEP = 9            // flame pitch in unscaled px; the rig is drawn at 2x
 const HURT_SHAKE = [1, -1, 1, 0, -1, 1, 0, 0]       // authored 8-tick rig shake, never a random jitter
 

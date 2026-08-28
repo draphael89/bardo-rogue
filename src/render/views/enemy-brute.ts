@@ -1,4 +1,6 @@
 import { Graphics, type Container } from 'pixi.js'
+import type { Texture } from 'pixi.js'
+import type { Atlas } from '../atlas'
 import type { Enemy } from '@/sim/world'
 import { tuning } from '@/tuning'
 import { TILE, ARENA_COLS, ARENA_ROWS } from '@/sim/arena'
@@ -27,6 +29,36 @@ const TAU = Math.PI * 2
 const CONTACT_LEAD = 1     // attack stateTick on which the sim's arc first tests (stateTick > lungeTicks)
 const WINDUP_RISE = 7      // px the body climbs across the wind-up — monotone, and the shadow shrinks with it
 const RUNG_GAP = 7         // px between the marching rungs: three of them span 14px of "time to arrival"
+
+const BRUTE = {
+  idle: 0, chase: 1, windupEarly: 2, windupCommit: 3,
+  release: 4, contact: 5, recover: 6, hurt: 7,
+} as const
+
+// Generated cells preserve the drawing, not a uniform registration point. These pivots locate the
+// planted foot under the simulation body; without them the low contact/recovery poses jump upward.
+const BRUTE_PIVOT: readonly (readonly [number, number])[] = [
+  [18, 42], [28, 42], [23, 42], [25, 42],
+  [18, 32], [19, 33], [18, 33], [18, 32],
+]
+type BruteArt = { frames: Texture[]; whites: Texture[] }
+const bruteArt = new WeakMap<EntityView, BruteArt>()
+
+export function bindBruteArt(v: EntityView, atlas: Atlas): void {
+  bruteArt.set(v, {
+    frames: Array.from({ length: 8 }, (_, i) => atlas.brute(i)),
+    whites: Array.from({ length: 8 }, (_, i) => atlas.bruteWhite(i)),
+  })
+}
+
+export function bruteFrameIndex(e: Enemy): number {
+  if (e.flash > 0 || e.state === 'stagger') return BRUTE.hurt
+  if (e.state === 'windup') return e.stateTick < Math.ceil(tuning.brute.windup * 0.55) ? BRUTE.windupEarly : BRUTE.windupCommit
+  if (e.state === 'attack') return e.stateTick <= tuning.brute.lungeTicks ? BRUTE.release : BRUTE.contact
+  if (e.state === 'recover') return BRUTE.recover
+  if (e.state === 'chase' && Math.hypot(e.vx, e.vy) > 5) return BRUTE.chase
+  return BRUTE.idle
+}
 
 function tellSpan(): number { return tuning.brute.windup + tuning.brute.lungeTicks + CONTACT_LEAD }
 function tellProgress(e: Enemy, tk: number): number {
@@ -73,6 +105,16 @@ export function updateBruteView(v: EntityView, e: Enemy, f: EnemyFrame, out: Pos
   updateBruteWeapon(v, e, f.x, f.y, f.alpha, hop)
   updateBruteTell(v, e, f.x, f.y, tk)
   updateBruteImpact(v, e, f)
+  const art = bruteArt.get(v)
+  if (art) {
+    const frame = bruteFrameIndex(e)
+    v.bindBody(art.frames[frame], art.whites[frame])
+    v.body.anchor.set(BRUTE_PIVOT[frame][0] / 48, BRUTE_PIVOT[frame][1] / 48)
+    if (v.weapon) v.weapon.visible = false
+    // Each semantic frame already contains body, hands, and maul. The old transforms would bend the
+    // complete drawing back into a puppet and move the contact pose away from the real hit tick.
+    sx = 1; sy = 1; rot = 0; hop = 0
+  }
   // no tint channel at all: the brute never announces himself with a colour.
   out.sx = sx; out.sy = sy; out.rot = rot; out.hop = hop; out.tint = 0xffffff
 }

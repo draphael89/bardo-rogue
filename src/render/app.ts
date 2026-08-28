@@ -7,7 +7,7 @@ export interface RenderApp {
   root: Container          // low-res scene root (world + hud)
   world: Container         // offset by camera/shake
   layers: {
-    floor: Container; decals: Container; shadows: Container; entities: Container
+    floor: Container; decals: Container; shadows: Container; projectiles: Container; entities: Container
     fx: Container; light: Container; debug: Container; hud: Container
   }
   rt: RenderTexture
@@ -54,10 +54,12 @@ export async function createRenderApp(parent: HTMLElement, arenaPx: { w: number;
   const world = new Container()
   const layers = {
     floor: new Container(), decals: new Container(), shadows: new Container(),
-    entities: new Container(), fx: new Container(), light: new Container(), debug: new Container(), hud: new Container(),
+    projectiles: new Container(), entities: new Container(), fx: new Container(), light: new Container(), debug: new Container(), hud: new Container(),
   }
   layers.entities.sortableChildren = true
-  world.addChild(layers.floor, layers.decals, layers.shadows, layers.entities, layers.light, layers.fx, layers.debug)
+  // Threat geometry stays visible but cannot erase the actor traversing it. Air/contact FX still
+  // live above entities; projectile bodies live on their own floor-adjacent plane.
+  world.addChild(layers.floor, layers.decals, layers.shadows, layers.projectiles, layers.entities, layers.light, layers.fx, layers.debug)
   root.addChild(world, layers.hud)
 
   const arenaOffset = { x: Math.floor((width - arenaPx.w) / 2), y: Math.floor((height - arenaPx.h) / 2) }

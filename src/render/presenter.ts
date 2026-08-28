@@ -676,18 +676,20 @@ export class Presenter {
       updateEnemyView(v, e, w, slowAlpha, this.time)
       const hf = (this.hitFlash.get(id) ?? 0) - dtSec
       if (hf > 0) this.hitFlash.set(id, hf); else this.hitFlash.delete(id)
-      v.setFlash(hf > 0)
-      if (v.squash > 0 || v.redFlash > 0) this.flinchBody(v)
+      // The authored Brute hit frame carries the reaction in its body drawing. Whitening it here
+      // would turn the victim into the impact core for most of hit-stop and erase attribution.
+      v.setFlash(hf > 0 && e.kind !== 'brute')
+      if (id === this.impactId && (v.squash > 0 || v.redFlash > 0)) this.flinchBody(v)
     }
     for (const b of w.projectiles) {
       if (!b.active) continue
       if (b.kind === 'arrow') {
-        if (!this.arrowViews.has(b.id)) this.arrowViews.set(b.id, new ArrowView(this.atlas, L.fx))
+        if (!this.arrowViews.has(b.id)) this.arrowViews.set(b.id, new ArrowView(this.atlas, L.projectiles))
       } else if (b.kind === 'mirror') {
         if (!this.mirrorViews.has(b.id)) this.mirrorViews.set(b.id, new MirrorBoltView(L.fx))
       } else if (b.kind === 'echo') {
         if (!this.echoViews.has(b.id)) this.echoViews.set(b.id, new EchoView(L.fx))
-      } else if (!this.boltViews.has(b.id)) this.boltViews.set(b.id, new BoltView(this.atlas, L.fx))
+      } else if (!this.boltViews.has(b.id)) this.boltViews.set(b.id, new BoltView(this.atlas, L.projectiles))
     }
     for (const [id, v] of this.boltViews) {
       const b = w.projectiles.find(x => x.id === id && x.active && x.kind === 'bolt')

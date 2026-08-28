@@ -36,6 +36,15 @@ function forceRoomClear(world: ReturnType<typeof createWorld>): void {
   stepWorld(world, emptyInput())
 }
 
+/** Answer the room's rite. `pay` takes the left card, `swim` the right. */
+function answerRite(world: ReturnType<typeof createWorld>, choice: 'pay' | 'swim'): void {
+  expect(world.roomPhase).toBe('entering')
+  if (choice === 'swim') stepWorld(world, { ...emptyInput(), choiceDelta: 1 })
+  expect(world.session.run?.pendingRite?.focus).toBe(choice === 'pay' ? 0 : 1)
+  stepWorld(world, { ...emptyInput(), confirm: true })
+  expect(world.session.run?.pendingRite).toBeNull()
+}
+
 function chooseFocusedReward(world: ReturnType<typeof createWorld>): void {
   expect(world.roomPhase).toBe('reward')
   stepWorld(world, { ...emptyInput(), confirm: true })
@@ -130,8 +139,12 @@ describe('production vertical slice', () => {
     expect(['veil-path', 'blade-path']).toContain(world.rooms[world.roomIndex].id)
     forceRoomClear(world); chooseFocusedReward(world); takeDoor(world, 'north')
     expect(world.rooms[world.roomIndex].id).toBe('black-step')
+    // The Landing asks before it fights. Refusing here is what puts a body in the Hall of Minos.
+    answerRite(world, 'swim')
     forceRoomClear(world); chooseFocusedReward(world); takeDoor(world, 'north')
     expect(world.rooms[world.roomIndex].id).toBe('warden')
+    expect(world.spawnQueue.some(s => s.kind === tuning.rites.toll.debtKind)).toBe(true)
+    expect(world.session.run?.riteDebt).toBe(false)
     forceRoomClear(world)
     expect(world.session.run?.result).toBe('won')
     expect(world.roomPhase).toBe('resolved')

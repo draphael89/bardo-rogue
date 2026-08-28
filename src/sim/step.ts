@@ -13,6 +13,7 @@ import { clearBulletTime } from './combat'
 import { SLOW_FULL } from './world'
 import { triggerPerfectDodge } from './boons'
 import { updateReward } from './rewards'
+import { updateRite } from './rites'
 import { tuning } from '@/tuning'
 
 // One deterministic tick. Presentation must never call anything else on the sim.
@@ -35,6 +36,11 @@ export function stepWorld(world: World, input: InputFrame): void {
   }
   if (world.roomPhase === 'reward') {
     updateReward(world, input)
+    return
+  }
+  // A rite holds the room the same way an offer does: nothing moves until it is answered.
+  if (world.roomPhase === 'entering') {
+    updateRite(world, input)
     return
   }
 

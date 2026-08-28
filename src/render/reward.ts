@@ -1,7 +1,9 @@
 import { Container, Graphics, Text } from 'pixi.js'
 import { BOONS, DEITIES, type BoonId, type Deity } from '@/sim/boons'
-import { drawDeityMask, MASK_W } from './views/deity'
+import { RITES, type RiteDef } from '@/sim/rites'
+import { drawPortrait, MASK_W, type PortraitId } from './views/deity'
 import type { World } from '@/sim/world'
+import type { RewardOffer } from '@/sim/session'
 import { tuning } from '@/tuning'
 import { label, P } from './ui'
 
@@ -43,23 +45,27 @@ export class RewardOverlay {
       return
     }
     const offer = this.paused ? null : world.session.run?.pendingReward
+    const rite = this.paused ? null : world.session.run?.pendingRite
     const victory = !this.paused && world.session.run?.result === 'won'
-    this.root.visible = !!offer || victory || this.paused
+    this.root.visible = !!offer || !!rite || victory || this.paused
     this.build.visible = !!world.session.run && world.roomPhase !== 'town' && !this.root.visible
     this.updateMeta(world)
     this.updateBuild(world)
     if (!this.root.visible) return
     const nextKey = this.paused
       ? `pause|${this.reducedEffects ? 1 : 0}|${tuning.view.width}`
+      : rite
+      ? `rite|${rite.id}|${rite.focus}|${tuning.view.width}`
       : offer
-      ? `offer|${offer.options.join('|')}|${offer.focus}|${offer.deity}|${tuning.view.width}`
+      ? `offer|${offer.options.join('|')}|${offer.focus}|${offer.deity}|${offer.fromRite ? 1 : 0}|${tuning.view.width}`
       : victory
         ? `won|${world.session.run?.depth}|${world.session.run?.boons.map(b => b.id).join('|')}|${tuning.view.width}`
         : ''
     if (nextKey === this.key) return
     this.key = nextKey
     this.clear()
-    if (offer) this.paintOffer(offer.options, offer.focus, offer.deity)
+    if (rite) this.paintRite(RITES[rite.id], rite.focus)
+    else if (offer) this.paintOffer(offer)
     else if (victory) this.paintVictory(world)
     else this.paintPause()
   }
@@ -99,23 +105,23 @@ export class RewardOverlay {
 
   private add(t: Text): void { this.texts.push(t); this.root.addChild(t) }
 
-  // The offer is a meeting, not a menu. Someone specific is standing there, they are named, and they
-  // say one line before you take their terms — so the screen leads with the speaker and only then
-  // shows what is on the table.
-  private paintOffer(options: [BoonId, BoonId, BoonId], focus: 0 | 1 | 2, deity: Deity): void {
+  /**
+   * The plate every speaker stands on: a niche, a portrait, a name, an epithet, and one line beneath.
+   * Two screens use it now — the gods' offer and the ferryman's toll — so it lives here once. It
+   * returns the y the caller's own content may start at, which is the only thing they disagree on.
+   * The line arrives already formed: quoted when someone is saying it, bare when it is narration.
+   */
+  private paintSpeaker(who: PortraitId, name: string, epithet: string, accent: number, line: string, lineTone = P.dim): number {
     const W = tuning.view.width, H = tuning.view.height
-    const god = DEITIES[deity]
-    const accent = deity === 'fury' ? P.ember : P.veil
     this.g.rect(0, 0, W, H).fill({ color: P.void, alpha: 0.92 })
     this.g.rect(0, 0, W, 3).fill({ color: accent })
 
-    // --- the speaker plate -------------------------------------------------------------------
     const plateH = 56
     const plateY = 12
     const maskScale = 2
     const maskSize = MASK_W * maskScale
-    const nameLabel = label(god.name, 16, P.bone)
-    const epithetLabel = label(god.epithet.toUpperCase(), 9, accent)
+    const nameLabel = label(name, 16, P.bone)
+    const epithetLabel = label(epithet.toUpperCase(), 9, accent)
     const textW = Math.max(nameLabel.width, epithetLabel.width)
     const plateW = Math.min(W - 24, maskSize + 16 + textW + 20)
     const plateX = Math.floor((W - plateW) / 2)
@@ -123,11 +129,11 @@ export class RewardOverlay {
     this.g.rect(plateX, plateY, plateW, plateH).fill({ color: P.face, alpha: 0.96 })
     this.g.rect(plateX, plateY, 2, plateH).fill(accent)
     this.g.rect(plateX, plateY + plateH - 1, plateW, 1).fill({ color: accent, alpha: 0.35 })
-    // A niche behind the mask, so the god is lit from her own alcove rather than floating on a panel.
+    // A niche behind the portrait, so the speaker is lit from their own alcove rather than floating.
     const maskX = plateX + 8
     const maskY = plateY + Math.floor((plateH - maskSize) / 2)
     this.g.rect(maskX - 2, maskY - 2, maskSize + 4, maskSize + 4).fill({ color: P.void, alpha: 0.9 })
-    drawDeityMask(this.g, deity, maskX, maskY, maskScale)
+    drawPortrait(this.g, who, maskX, maskY, maskScale)
 
     const textX = maskX + maskSize + 10
     nameLabel.anchor.set(0, 0.5)
@@ -135,8 +141,63 @@ export class RewardOverlay {
     epithetLabel.anchor.set(0, 0.5)
     epithetLabel.position.set(textX, plateY + 36); this.add(epithetLabel)
 
-    const greeting = label(`"${god.greeting}"`, 10, P.dim)
-    greeting.position.set(W / 2, plateY + plateH + 12); this.add(greeting)
+    const spoken = label(line, 10, lineTone)
+    spoken.position.set(W / 2, plateY + plateH + 12); this.add(spoken)
+    return plateY + plateH + 22
+  }
+
+  // A toll is not a menu of powers, so it does not look like one: two wide slabs, each stating its
+  // price in the ferryman's own gold before it says anything charming about itself.
+  private paintRite(def: RiteDef, focus: 0 | 1): void {
+    const W = tuning.view.width, H = tuning.view.height
+    const accent = P.gold
+    const y = this.paintSpeaker('charon', def.speaker, def.epithet, accent, `"${def.line}"`)
+
+    const gap = 12
+    const cardW = Math.min(190, Math.floor((W - 48 - gap) / 2))
+    const cardH = 116
+    const x0 = Math.floor((W - (cardW * 2 + gap)) / 2)
+    def.choices.forEach((choice, i) => {
+      const x = x0 + i * (cardW + gap)
+      const selected = i === focus
+      // Paying costs life and swimming costs standing, so the two sides are not the same colour:
+      // the price you pay now is red, the one you defer is his gold.
+      const tone = i === 0 ? P.red : accent
+      const edge = selected ? tone : 0x4c4658
+      this.g.roundRect(x, y, cardW, cardH, 3).fill({ color: selected ? P.faceHi : P.face, alpha: 1 })
+      this.g.roundRect(x, y, cardW, cardH, 3).stroke({ color: edge, width: selected ? 3 : 1 })
+      this.g.rect(x + 12, y + 33, cardW - 24, 2).fill({ color: edge })
+      if (selected) {
+        this.g.rect(x + 3, y + 3, cardW - 6, 2).fill({ color: edge })
+        this.g.rect(x + 3, y + cardH - 5, cardW - 6, 2).fill({ color: edge })
+      }
+      const n = label(choice.label, 16, selected ? P.bone : P.dim)
+      n.position.set(x + cardW / 2, y + 19); this.add(n)
+      const cost = label(choice.cost, 9, tone)
+      cost.position.set(x + cardW / 2, y + 48); this.add(cost)
+      const detail = label(choice.detail, 11, selected ? P.bone : P.dim)
+      detail.style.wordWrap = true; detail.style.wordWrapWidth = cardW - 28
+      detail.anchor.set(0.5, 0)
+      detail.position.set(x + cardW / 2, y + 62); this.add(detail)
+    })
+    const act = label('A / D OR ARROWS TO CHOOSE   ·   ENTER / ATTACK TO ANSWER', 10, accent)
+    act.position.set(W / 2, H - 16); this.add(act)
+  }
+
+  // The offer is a meeting, not a menu. Someone specific is standing there, they are named, and they
+  // say one line before you take their terms — so the screen leads with the speaker and only then
+  // shows what is on the table.
+  private paintOffer(offer: RewardOffer): void {
+    const { options, focus, deity } = offer
+    const W = tuning.view.width, H = tuning.view.height
+    const god = DEITIES[deity]
+    const accent = deity === 'fury' ? P.ember : P.veil
+    // The ferryman's payout arrives as a second offer in the same room, from a god the door never
+    // promised. Without a word of attribution that reads as a bug, so his line replaces her greeting
+    // — unquoted and in his gold, because he is not the one standing there.
+    const y = offer.fromRite
+      ? this.paintSpeaker(deity, god.name, god.epithet, accent, 'THE FERRYMAN PAYS OUT WHAT HE WAS PAID', P.gold)
+      : this.paintSpeaker(deity, god.name, god.epithet, accent, `"${god.greeting}"`)
 
     // --- the terms ---------------------------------------------------------------------------
     const gap = 8
@@ -144,7 +205,6 @@ export class RewardOverlay {
     const cardH = 128
     const total = cardW * 3 + gap * 2
     const x0 = Math.floor((W - total) / 2)
-    const y = plateY + plateH + 22
     options.forEach((id, i) => {
       const def = BOONS[id]
       const x = x0 + i * (cardW + gap)

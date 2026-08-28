@@ -69,6 +69,14 @@ function makeSliceBot(combat: Bot): Bot {
     if (world.session.run?.result === 'won') { inp.confirm = true; finished = true; return inp }
     if (world.roomPhase === 'transitioning') return inp
     if (world.roomPhase === 'reward') { inp.confirm = true; return inp }
+    // The toll. Half the seeds pay and half swim, so a matrix run exercises both consequences: the
+    // fourth vow and the smaller life bar, or the debt that wades into the Hall of Minos.
+    if (world.roomPhase === 'entering') {
+      const rite = world.session.run?.pendingRite
+      if (rite && (world.seed & 2) !== 0 && rite.focus === 0) inp.choiceDelta = 1
+      else inp.confirm = true
+      return inp
+    }
     if (world.roomPhase === 'town') {
       if (!world.session.preparedWeapon && world.arena.rack) routeToward(inp, world, world.arena.rack.x, world.arena.rack.y, orbit)
       else {

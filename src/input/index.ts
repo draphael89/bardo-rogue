@@ -166,7 +166,9 @@ export class InputSystem {
     f.aimX = aim.x; f.aimY = aim.y; f.aimSoft = aim.soft
     this.lastAim = { x: aim.x, y: aim.y }
     f.attack = attack; f.attackHeld = attackHeld; f.heavy = heavy; f.dodge = dodge; f.restart = restart
-    if (world.roomPhase === 'reward') {
+    // Both modal screens take the same two keys and swallow everything else, so the sword can never
+    // be swung at a menu. `entering` is the rite; `reward` is the offer.
+    if (world.roomPhase === 'reward' || world.roomPhase === 'entering') {
       const left = this.pressed.has('ArrowLeft') || this.pressed.has('KeyA')
       const right = this.pressed.has('ArrowRight') || this.pressed.has('KeyD')
       f.choiceDelta = left === right ? padChoiceDelta : left ? -1 : 1

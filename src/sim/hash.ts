@@ -2,6 +2,7 @@ import type { World, PlayerState, EnemyState, ProjectileKind } from './world'
 import type { EnemyKind } from './events'
 import type { WaveState } from './world'
 import type { RoomPhase } from './session'
+import type { RiteId } from './rites'
 import { ARM } from './weapons'
 import { BOON } from './boons'
 
@@ -15,6 +16,7 @@ const ENEMY_KIND: Record<EnemyKind, number> = { brute: 0, caster: 1, charger: 2,
 const WAVE_STATE: Record<WaveState, number> = { idle: 0, pending: 1, active: 2, done: 3 }
 const ROOM_PHASE: Record<RoomPhase, number> = { town: 0, entering: 1, fighting: 2, reward: 3, exits: 4, transitioning: 5, resolved: 6 }
 const PROJECTILE_KIND: Record<ProjectileKind, number> = { bolt: 0, arrow: 1, mirror: 2, echo: 3, verdict: 4 }
+const RITE: Record<RiteId, number> = { toll: 0 }
 
 // FNV-1a over a canonical snapshot of everything the sim's outcome depends on.
 // Deliberately NOT hashed: world.visualRng (cosmetic-only stream) and the arena's DECORATION, so
@@ -53,10 +55,16 @@ export function hashWorld(world: World): number {
       for (const visit of run.roomHistory) { for (let i = 0; i < visit.id.length; i++) byte(visit.id.charCodeAt(i)); int(visit.enteredTick) }
       flag(!!run.pendingReward)
       if (run.pendingReward) {
-        byte(run.pendingReward.family === 'blade' ? 0 : 1); byte(run.pendingReward.focus)
+        byte(run.pendingReward.family === 'blade' ? 0 : 1); byte(run.pendingReward.focus); flag(run.pendingReward.fromRite)
         for (const id of run.pendingReward.options) int(BOON[id])
       }
       if (run.killedBy !== 'none') { byte(ENEMY_KIND[run.killedBy] + 1); flag(run.killedRanged) }
+      // The toll: what is being asked, and both halves of what it left behind. A refusal has to be
+      // in here or a replay could pay it in one run and swim in the next and still agree.
+      flag(!!run.pendingRite)
+      if (run.pendingRite) { byte(RITE[run.pendingRite.id]); byte(run.pendingRite.focus) }
+      if (run.riteBoonOwed) flag(true)
+      if (run.riteDebt) flag(true)
     }
   }
 

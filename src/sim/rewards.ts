@@ -56,7 +56,7 @@ export function deityFor(family: RewardFamily): Deity {
   return family === 'blade' ? DEITIES.fury.id : DEITIES.hecate.id
 }
 
-export function offerReward(world: World, family: RewardFamily): void {
+export function offerReward(world: World, family: RewardFamily, fromRite = false): void {
   const run = world.session.run
   if (!run || run.result !== 'active') return
   const available = BOON_IDS.filter(id => !hasBoon(world, id) && usable(world, id))
@@ -76,7 +76,7 @@ export function offerReward(world: World, family: RewardFamily): void {
   // Keeping the guard explicit makes a future content edit fail loudly instead of showing a blank card.
   if (picked.length < 3) throw new Error('reward pool exhausted before three choices could be offered')
   const options = picked.slice(0, 3) as [BoonId, BoonId, BoonId]
-  run.pendingReward = { family, options, focus: 0, deity: speaker }
+  run.pendingReward = { family, options, focus: 0, deity: speaker, fromRite }
   world.roomPhase = 'reward'
   world.phaseTick = world.tick
   world.timeScale = 1
@@ -107,7 +107,16 @@ export function updateReward(world: World, input: InputFrame): void {
   if (!input.confirm) return
   const id = offer.options[offer.focus]
   grantBoon(world, id)
-  if (world.session.run) world.session.run.pendingReward = null
+  const run = world.session.run
+  if (run) run.pendingReward = null
+  // What the ferryman was paid with, handed over the moment the bank is clear. It comes from the
+  // other side of the crossroads than the room's own mark: the coin in his hand was somebody else's.
+  if (run?.riteBoonOwed && run.result === 'active') {
+    run.riteBoonOwed = false
+    world.emit({ type: 'boonChosen', boon: id, x: world.player.x, y: world.player.y })
+    offerReward(world, offer.family === 'blade' ? 'veil' : 'blade', true)
+    return
+  }
   world.roomPhase = 'exits'
   world.phaseTick = world.tick
   world.doorOpen = world.hasNextRoom()

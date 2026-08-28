@@ -108,7 +108,11 @@ export const SLICE_WARDEN: WaveDef[] = [{ groups: [{ delay: 20, spawns: [
   { kind: 'warden', x: 13, y: 5 },
 ] }] }]
 
-export function queueSpawn(world: World, s: SpawnDef): void {
+/**
+ * `ticks` overrides the telegraph length. Only the toll's debt uses it: that body is not part of a
+ * wave's phrasing and has to arrive after the room's own opening, not inside it.
+ */
+export function queueSpawn(world: World, s: SpawnDef, ticks = tuning.spawnTelegraphTicks): void {
   let x = s.x * TILE, y = s.y * TILE
   const radius = s.kind === 'dummy' ? 6 : tuning[s.kind].radius
   // Authored formations can mirror into asymmetric room masonry. Resolve the telegraph itself to
@@ -124,7 +128,7 @@ export function queueSpawn(world: World, s: SpawnDef): void {
     }
     x = bestX; y = bestY
   }
-  world.spawnQueue.push({ kind: s.kind, x, y, ticksLeft: tuning.spawnTelegraphTicks })
+  world.spawnQueue.push({ kind: s.kind, x, y, ticksLeft: ticks, total: ticks })
   world.emit({ type: 'spawnTelegraph', x, y, kind: s.kind })
 }
 

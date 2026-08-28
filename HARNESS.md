@@ -60,7 +60,7 @@ Available once the page has booted (`await page.waitForFunction(() => !!window._
 - `bot(name | null)`: swap in or remove any bot listed above.
 - `pause(p?)`: pause/unpause the loop, returns the new state.
 - `hash()`: FNV hash of the sim state. Equal hashes = identical worlds.
-- `state()`: compact JSON snapshot: tick, freeze/slow, room and phase, player/armed state, session/meta/run/reward/history, rack/offering, boons, enemies, bolts, and metrics.
+- `state()`: compact JSON snapshot: tick, freeze/slow, room and phase, player/armed state, session/meta/run/reward/rite/history, rack/offering, boons, enemies, bolts, and metrics.
 - `frameStats()`: `{ frames, p50, p95, max }` render frame time in ms over the last 240 frames.
 - `mute(m?)`, `debug(v?)`: toggle audio / overlay, return the new state.
 - `record(on?)`: start (resets to a fresh run of the current seed/scenario) or stop recording. Returns whether recording.

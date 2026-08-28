@@ -2,6 +2,7 @@ import type { ArmId } from './weapons'
 import type { BoonId, Deity } from './boons'
 import type { DeathKind } from './events'
 import type { DoorMark } from './arena'
+import type { RiteId } from './rites'
 import type { World } from './world'
 import { ARM, grantArm } from './weapons'
 import { Rng, STREAM, streamSeed } from './rng'
@@ -27,6 +28,12 @@ export interface RewardOffer {
   options: [BoonId, BoonId, BoonId]
   focus: 0 | 1 | 2
   deity: Deity            // who is speaking; the door's mark promised this
+  fromRite: boolean       // the ferryman's payout, not the room's own reward — the screen must say so
+}
+
+export interface RiteOffer {
+  id: RiteId
+  focus: 0 | 1
 }
 
 export interface RunState {
@@ -40,6 +47,11 @@ export interface RunState {
   roomId: string
   roomHistory: RoomVisit[]
   pendingReward: RewardOffer | null
+  // The toll, in its three states: being asked, paid (and owed a vow at this room's end), or
+  // refused. A refusal outlives the room it was made in — that is the whole point of it.
+  pendingRite: RiteOffer | null
+  riteBoonOwed: boolean
+  riteDebt: boolean
   result: RunResult
   startedTick: number
   primedBrand: boolean
@@ -105,6 +117,9 @@ export function startRun(world: World, firstRoomId: string): boolean {
     roomId: firstRoomId,
     roomHistory: [],
     pendingReward: null,
+    pendingRite: null,
+    riteBoonOwed: false,
+    riteDebt: false,
     result: 'active',
     startedTick: world.tick,
     primedBrand: false,

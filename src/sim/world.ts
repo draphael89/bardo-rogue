@@ -81,7 +81,9 @@ export interface Projectile extends Body {
   srcKind: EnemyKind | 'player'
 }
 
-export interface SpawnEntry { kind: EnemyKind; x: number; y: number; ticksLeft: number }
+// `total` is the telegraph's authored length, kept beside the countdown so the marker can draw its
+// own progress. It is not hashed: `ticksLeft` alone decides when the body arrives.
+export interface SpawnEntry { kind: EnemyKind; x: number; y: number; ticksLeft: number; total: number }
 
 export type WaveState = 'idle' | 'pending' | 'active' | 'done'
 

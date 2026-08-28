@@ -118,6 +118,19 @@ export const tuning = {
     transitionTicks: 8,   // 133 ms: enough for a threshold blink, never enough to break momentum
   },
 
+  // THE TOLL. The run's one non-combat beat, and the only place a permanent cost is on the table.
+  // lifeCost is a whole vessel out of five, which is the same unit the shore's offering gives back —
+  // paying is meant to be felt for the rest of the descent, not shrugged off.
+  // The refusal is not paid here: it is paid in the Hall of Minos, where the account is read out.
+  rites: {
+    toll: {
+      lifeCost: 1,
+      debtKind: 'charger' as const,   // the river sends something that swims
+      debtX: 4, debtY: 12,            // tiles: the hall's far corner, at the water — never on top of the player
+      debtDelay: 150,                 // ticks: its mark is on the floor before Minos, and it wades in a second after him
+    },
+  },
+
   // Status effects: the shared vocabulary boons compose through. Burn is deliberately modest -
   // enemies here have 2 to 8 life, so a status that out-damages the sword would replace the sword.
   status: {

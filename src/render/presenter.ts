@@ -337,7 +337,12 @@ export class Presenter {
           this.camera.addTrauma(0.22)
           this.camera.punchZoom(J.zoom.roomClear)
           this.postfx.pulse()
-          this.hud.showBanner(ev.name, ev.index + 1 < ev.total ? '' : 'the last chamber', 1.8)
+          // A room that opens with a rite introduces itself through the speaker standing in it, so
+          // the arrival banner would only be a second title bleeding through the modal. The place
+          // label still carries the name, and the answer gets the banner instead.
+          if (this.world.roomPhase !== 'entering') {
+            this.hud.showBanner(ev.name, ev.index + 1 < ev.total ? '' : 'the last chamber', 1.8)
+          }
           this.hud.place.text = ev.name
           break
         case 'returned': {
@@ -379,6 +384,18 @@ export class Presenter {
           break
         case 'rewardOffered':
         case 'rewardFocus':
+        case 'riteOffered':
+        case 'riteFocus':
+          break
+        case 'riteChosen':
+          // Paying is a thing taken out of you; refusing is a thing left behind. Same beat, opposite
+          // colour, and the flash is the only feedback either answer gets before the room starts.
+          this.flash(0.4, ev.paid ? 0x9e4658 : 0xd4b060)
+          this.particles.ring(ev.x, ev.y, ev.paid ? 0xc06070 : 0xd4b060)
+          this.hud.showBanner(ev.paid ? 'THE TOLL IS PAID' : 'YOU CROSS OWED', ev.paid ? 'he carries you' : 'the river remembers', 1.6)
+          break
+        case 'riteDebtCalled':
+          this.hud.showBanner('THE ACCOUNT IS READ', 'the river sent one after you', 1.8)
           break
         case 'boonChosen': {
           const def = BOONS[ev.boon]
@@ -789,7 +806,7 @@ export class Presenter {
     for (let i = 0; i < this.spawnMarkers.length; i++) {
       const s = w.spawnQueue[i]
       this.spawnMarkers[i].sprite.visible = !!s
-      if (s) this.spawnMarkers[i].update(s.x, s.y, s.ticksLeft, tuning.spawnTelegraphTicks)
+      if (s) this.spawnMarkers[i].update(s.x, s.y, s.ticksLeft, s.total)
     }
 
     if (w.freeze <= 0 && this.playerView.squash > 0) this.playerView.squash -= dtSec * 60

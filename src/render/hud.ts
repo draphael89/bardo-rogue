@@ -1264,7 +1264,7 @@ export class Hud {
 
     const age = now - this.hintStart
     const alpha = age < this.hintTicks - 80 ? 0.8 : Math.max(0, (this.hintTicks - age) / 80) * 0.8
-    this.hintRow.alpha = this.chromeHidden || dead || world.roomPhase === 'town' || world.roomPhase === 'reward' ? 0 : alpha
+    this.hintRow.alpha = this.chromeHidden || dead || world.roomPhase === 'town' || world.roomPhase === 'reward' || world.roomPhase === 'entering' ? 0 : alpha
     this.hintRow.visible = this.hintRow.alpha > 0.02
   }
 

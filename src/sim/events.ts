@@ -7,6 +7,7 @@ export type DeathKind = EnemyKind | 'none'
 
 import type { ArmId } from './weapons'
 import type { BoonId, Deity } from './boons'
+import type { RiteId } from './rites'
 
 export type SimEvent =
   | { type: 'swing'; x: number; y: number; angle: number; swing: number; heavy: boolean; dash: boolean }
@@ -41,6 +42,11 @@ export type SimEvent =
   | { type: 'rewardOffered'; options: [BoonId, BoonId, BoonId]; deity: Deity }
   | { type: 'rewardFocus'; focus: 0 | 1 | 2 }
   | { type: 'boonChosen'; boon: BoonId; x: number; y: number }
+  | { type: 'riteOffered'; rite: RiteId }
+  | { type: 'riteFocus'; focus: 0 | 1 }
+  | { type: 'riteChosen'; rite: RiteId; paid: boolean; x: number; y: number }
+  // the refused toll, collected where it was always going to be collected
+  | { type: 'riteDebtCalled' }
   | { type: 'brandApplied'; id: number; stacks: number; x: number; y: number }
   | { type: 'burnApplied'; id: number; stacks: number; x: number; y: number }
   | { type: 'burnTick'; id: number; stacks: number; x: number; y: number }

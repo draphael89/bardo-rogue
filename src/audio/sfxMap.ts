@@ -204,6 +204,24 @@ export function playEventSfx(a: AudioSystem, ev: SimEvent): void {
     case 'rewardFocus':
       a.play('impactGeneric_light', { gain: 0.14, pitch: 1.7 + ev.focus * 0.08, bus: 'ui' })
       break
+    // The ferryman is not a god and does not get their bell. He gets the low end of the same
+    // instrument, struck once, the way a hull knocks against a post.
+    case 'riteOffered':
+      a.bell(0.7, 110, 3.4, 'ui')
+      a.bell(0.3, 164.81, 2.6, 'music', 0.26)
+      break
+    case 'riteFocus':
+      a.play('impactGeneric_light', { gain: 0.14, pitch: 1.3 + ev.focus * 0.1, bus: 'ui' })
+      break
+    case 'riteChosen':
+      // Paying rings; swimming does not. One is a coin into a palm, the other is a door left open.
+      if (ev.paid) a.bell(0.66, 220, 2.6, 'ui')
+      else a.bell(0.5, 87.31, 3.6, 'ui')
+      a.bell(0.34, ev.paid ? 329.63 : 130.81, 2.4, 'music', 0.22)
+      break
+    case 'riteDebtCalled':
+      a.bell(0.52, 87.31, 3.2, 'music')
+      break
     case 'boonChosen':
       a.play('swordMetal', { ...at, gain: 0.55, pitch: 1.25, bus: 'ui' })
       a.bell(0.82, 392, 3.0, 'music')
@@ -283,7 +301,7 @@ export function playEventSfx(a: AudioSystem, ev: SimEvent): void {
 function listen(a: AudioSystem, ev: SimEvent): void {
   switch (ev.type) {
     case 'footstep': case 'swing': case 'dodge': case 'dodgeEnd': case 'dodged': case 'graze':
-    case 'draw': case 'arrowLoose': case 'weaponPrepared': case 'boonChosen':
+    case 'draw': case 'arrowLoose': case 'weaponPrepared': case 'boonChosen': case 'riteChosen':
     case 'playerHurt': case 'playerDeath': case 'returned': a.setListener(ev.x, ev.y)
   }
 }

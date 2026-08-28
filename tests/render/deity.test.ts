@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { DEITY_MASK, MASK_H, MASK_W } from '@/render/views/deity'
+import { PORTRAIT, MASK_H, MASK_W } from '@/render/views/deity'
 
 // A hand-authored pixel map is the one kind of art a typo can ruin silently: a row one character
 // short shifts every pixel after it and still renders something plausible.
-describe('deity masks', () => {
+describe('speaker portraits', () => {
   const TONES = new Set(['.', 'd', 'm', 'l', 'a', 'h', 'r'])
 
-  for (const [id, mask] of Object.entries(DEITY_MASK)) {
+  for (const [id, mask] of Object.entries(PORTRAIT)) {
     it(`${id} is exactly ${MASK_W}x${MASK_H} with no stray tones`, () => {
       expect(mask.rows.length).toBe(MASK_H)
       mask.rows.forEach((row, i) => {

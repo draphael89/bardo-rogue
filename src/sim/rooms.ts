@@ -2,13 +2,14 @@ import { tuning } from '@/tuning'
 import { TILE, buildArena, setDoorWalkable, type DoorDir, type DoorMark, type RoomKind } from './arena'
 import { Rng, STREAM, streamSeed } from './rng'
 import {
-  startWaves, THRESHOLD_RUN_WAVES, CROSSING_RUN_WAVES,
+  THRESHOLD_RUN_WAVES, CROSSING_RUN_WAVES,
   SLICE_ROOM_1, SLICE_ROOM_2_BLADE, SLICE_ROOM_2_VEIL, SLICE_ROOM_3, SLICE_WARDEN,
   type WaveDef,
 } from './waves'
 import type { World } from './world'
 import { clearBulletTime } from './combat'
 import { recordRoomEntry, restoreRunHealth, startRun, storeRunHealth, type RewardFamily } from './session'
+import { beginRoomFight, offerRite, type RiteId } from './rites'
 
 export interface RoomExit {
   dir: DoorDir
@@ -25,6 +26,8 @@ export interface RoomDef {
   exits?: RoomExit[]
   reward?: RewardFamily
   boss?: boolean
+  /** Asked on arrival, before the room's own waves. See rites.ts. */
+  rite?: RiteId
 }
 
 export const HUB_ID = 'bardo'
@@ -92,6 +95,7 @@ function sliceGraph(): RoomDef[] {
       id: 'black-step',
       name: "CHARON'S LANDING",
       kind: 'crossing',
+      rite: 'toll',
       waves: SLICE_ROOM_3,
       reward: 'veil',
       exits: [{ dir: 'north', to: 'warden', mark: 'boss' }],
@@ -157,8 +161,11 @@ export function enterRoom(world: World, index: number, via: 'door' | 'return' = 
   p.stateTick = 0
   restoreRunHealth(world)
   p.armed = room.kind !== 'bardo'
-  if (room.waves?.length) startWaves(world, room.waves)
-  world.roomPhase = room.kind === 'bardo' ? 'town' : room.waves?.length ? 'fighting' : roomHasExits(room) ? 'exits' : 'resolved'
+  // The room's opening: the hub is a hub, a room with a rite asks it first, everything else fights.
+  // beginRoomFight owns the phase in the last two cases and is the only path into a room's waves.
+  if (room.kind === 'bardo') world.roomPhase = 'town'
+  else if (room.rite && world.scenario === 'loop') offerRite(world, room.rite)
+  else beginRoomFight(world)
   if (room.kind === 'bardo') {
     world.arena.rackTaken = false
     world.doorOpen = false

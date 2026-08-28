@@ -11,8 +11,8 @@
 ## STATUS — what has since been built
 
 The sections below are the plan as written. This block records what was executed against it, so the
-document does not become the next stale audit. Tests: **232 passing**; `pnpm matrix` 100/100 seeds
-resolve on both loop bots; `pnpm smoke` drives both endings through a real browser.
+document does not become the next stale audit. Tests: **256 passing**; `pnpm matrix` 100/100 seeds
+resolve on both loop bots (kite 90%, naive 0%); `pnpm smoke` drives both endings through a real browser.
 
 | Plan item | State |
 |---|---|
@@ -22,6 +22,7 @@ resolve on both loop bots; `pnpm smoke` drives both endings through a real brows
 | Task 7 — statuses, boons, gods | **Done.** Burn joins Brand in `src/sim/status.ts`; twelve vows across two powers with one duo; the offer screen is a meeting with a named, drawn deity. |
 | Boss | **Done, ahead of schedule.** Minos has three attacks that recombine in phase two, a `verdict` floor-hazard primitive on the projectile pool, and per-attack telegraphs — the old tell drew a slam plate under every attack, which was a lie. |
 | Realm identity (part of Task 8) | **Partly done.** The five spaces and the dead are named; palette and layout work is not started. |
+| Pacing — THE TOLL (not in the plan as written) | **Done.** The run was four fights and three offers with no breath. Charon's Landing now asks before it fights: pay a permanent vessel of life and he hands you a fourth vow from across the crossroads, or cross owed and one more shade wades into the Hall of Minos. It reuses the `entering` room phase the audit had flagged as doing no work, and it is one authored rite rather than an event framework with one entry. `src/sim/rites.ts`, ten tests, and the ferryman is the third portrait on the speaker plate. |
 | Task 10 — shell | **Partly done.** A title screen held over the living hub, and the HUD's missing single chrome toggle. Settings, credits and abandon-run are not built. |
 | Tasks 3–6, 9 | **Not started.** Rooms-as-data, the generated route and map, node-boundary save, the obol/Remembrance economy, and the bow. These remain the next milestone, in the order given below. |
 

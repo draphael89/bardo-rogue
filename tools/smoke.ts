@@ -25,9 +25,10 @@ const PATHS: PathSpec[] = [
 type GameState = {
   tick: number
   room: { id: string; phase: string }
+  player: { maxHp: number }
   session: {
     meta: { attempts: number; victories: number }
-    run: { result: string; depth: number; boons: string[]; killedBy: string } | null
+    run: { result: string; depth: number; boons: string[]; killedBy: string; rite: { id: string } | null } | null
   }
 }
 
@@ -58,6 +59,7 @@ async function play(page: Page, spec: PathSpec): Promise<void> {
     const g = (window as any).__game
     const seenRooms: string[] = []
     let sawReward = 0
+    let sawRite = 0
     let resolved: string | null = null
     let killedBy: string | null = null
     let boons: string[] = []
@@ -67,22 +69,25 @@ async function play(page: Page, spec: PathSpec): Promise<void> {
       const id = s.room.id
       if (seenRooms[seenRooms.length - 1] !== id) seenRooms.push(id)
       if (s.room.phase === 'reward') sawReward++
+      if (s.session.run?.rite) sawRite++
       const run = s.session.run
       if (run) {
         if (run.boons.length > boons.length) boons = run.boons
         if (run.result !== 'active' && !resolved) { resolved = run.result; killedBy = run.killedBy }
       } else if (resolved && s.room.id === 'bardo' && s.room.phase === 'town') {
-        return { seenRooms, sawReward, resolved, killedBy, boons, ticks: s.tick, meta: s.session.meta, done: true }
+        return { seenRooms, sawReward, sawRite, resolved, killedBy, boons, ticks: s.tick, meta: s.session.meta, done: true }
       }
     }
     const s = g.state() as GameState
-    return { seenRooms, sawReward, resolved, killedBy, boons, ticks: s.tick, meta: s.session.meta, done: false }
+    return { seenRooms, sawReward, sawRite, resolved, killedBy, boons, ticks: s.tick, meta: s.session.meta, done: false }
   }, MAX_TICKS)
 
   check(outcome.done, `returns to the Bardo (${outcome.ticks} ticks)`)
   check(outcome.resolved === spec.expect, `run resolves as ${spec.expect} (got ${String(outcome.resolved)})`)
   check(outcome.seenRooms.length >= 3, `descends through rooms: ${outcome.seenRooms.join(' > ')}`)
   check(outcome.sawReward > 0, 'reaches at least one reward offer')
+  // The toll is only asked if the run gets as far as the Landing, so this is checked where it applies.
+  if (outcome.seenRooms.includes('black-step')) check(outcome.sawRite > 0, 'the ferryman asks for his toll')
   check(outcome.boons.length > 0, `builds a run: ${outcome.boons.join(', ') || 'none'}`)
   if (spec.expect === 'lost') check(outcome.killedBy !== 'none' && !!outcome.killedBy, `death names its killer (${String(outcome.killedBy)})`)
   check(outcome.meta.attempts >= 1, `attempt is recorded (attempts=${outcome.meta.attempts})`)

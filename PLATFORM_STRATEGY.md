@@ -472,6 +472,32 @@ Two findings from building it that the plan did not anticipate, both now fixed i
    desktop CSP allows exactly that one token and locks down everything else; dropping it later means
    importing `pixi.js/unsafe-eval`.
 
+An adversarial review of the finished diff (six lenses: correctness, Electron security, save
+integrity, determinism, macOS portability, test quality) raised fifteen findings; each was checked
+against the code and thirteen were fixed. The ones worth remembering, because they were all invisible
+to a green test suite:
+
+- **An empty file imported as a save wiped progress.** `parseSave('')` returns a *default* document,
+  and the import path refused only `corrupt` and `future` -- so a truncated download applied zeroed
+  counters and announced SAVE IMPORTED. It now accepts only `ok` and `migrated`.
+- **Two browser tabs silently overwrote each other**, each holding a whole document in memory. The web
+  adapter now reports foreign writes through the `storage` event and the losing session stops writing
+  and says so.
+- **Development hooks shipped in the packaged app.** `BARDO_DESKTOP_MODE=dev` would have pointed a
+  signed build -- carrying its save-file bridge -- at an http origin, and the navigation fence, the
+  IPC sender check and the CSP all key off that same decision. Gated on `app.isPackaged`.
+- **`?reduced=1` was written into the player's stored settings** at the next autosave.
+- **A failing save store was invisible** outside the console; the first failure now banners in-game.
+- **The corrupt-save smoke check raced the app's own boot recovery** and would have failed
+  intermittently on a faster machine. It now asserts the outcome of that recovery instead, which
+  proves more.
+- **The smoke asserted an absolute `reducedEffects` value**, so it would have failed on any Mac with
+  Accessibility > Reduce motion enabled. It asserts the flip now.
+- **`tests/sim/boundary.test.ts` had gaps of its own**, found by deliberately breaking the tree and
+  watching it stay green: it never looked at `src/tuning.ts` (which most of the sim imports), its
+  import matcher recognised only single quotes, and its comment stripper would have tripped on the
+  repo's own inline "never Math.random" note. All four negative cases fail correctly now.
+
 Deferred deliberately, with reasons: `RunCheckpoint` stays a reserved `null` slot until run structure
 settles (the envelope is ready for it); IndexedDB stays unbuilt while saves are kilobytes; and
 electron-builder is configured (`electron-builder.yml`, `build/entitlements.mac.plist`) but not

@@ -1,3 +1,13 @@
+# GitHub Actions pipeline for this repository — NOT ACTIVE WHERE IT SITS.
+#
+# This file belongs at .github/workflows/ci.yml. It lives here because the GitHub App that pushes
+# this branch has no `workflows` permission and cannot create or update anything under
+# .github/workflows/ over git or over the REST API, so a branch containing it cannot be pushed
+# at all. Rather than lose the pipeline, it is parked here verbatim.
+#
+# To turn it on:  git mv ci/github-actions.yml .github/workflows/ci.yml && git commit && git push
+# Or grant the Claude GitHub App the `workflows` scope and move it back in one commit.
+#
 name: ci
 
 on:

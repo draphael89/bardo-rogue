@@ -3,6 +3,7 @@ import { TILE, buildArena, setDoorWalkable, type DoorDir, type DoorMark, type Ro
 import { Rng, STREAM, streamSeed } from './rng'
 import { startWaves, THRESHOLD_RUN_WAVES, CROSSING_RUN_WAVES, type WaveDef } from './waves'
 import type { World } from './world'
+import { clearBulletTime } from './combat'
 
 export interface RoomExit {
   dir: DoorDir
@@ -76,6 +77,7 @@ export function enterRoom(world: World, index: number, via: 'door' | 'return' = 
   world.roomClearTick = -1
   world.timeScale = 1
   world.slowmoTicks = 0
+  clearBulletTime(world)
   world.wave = { index: -1, state: 'idle', groupIndex: 0, timer: 0, total: 0 }
   world.waveDefs = null
   world.spawnQueue.length = 0

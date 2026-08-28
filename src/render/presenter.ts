@@ -1,7 +1,9 @@
 import { Container, Graphics, Sprite, Texture } from 'pixi.js'
 import type { RenderApp } from './app'
 import type { Atlas } from './atlas'
-import type { World, Enemy } from '@/sim/world'
+import { slowAlphaFor } from './slowAlpha'
+import { SLOW_FULL } from '@/sim/world'
+import type { World, Enemy, Projectile } from '@/sim/world'
 import type { SimEvent } from '@/sim/events'
 import { tuning } from '@/tuning'
 import { EntityView, createPlayerView, createEnemyView, updatePlayerView, updateEnemyView, makePropSprite, SpawnMarkerView, BoltView, ArrowView, drawAimLine, drawSwingArc, drawSwingTip, drawBowAim } from './views'
@@ -16,7 +18,7 @@ import { Lighting } from './light'
 import { PostFx } from './postfx'
 import { DamageNumbers } from './damageNumbers'
 import { Atmosphere } from './atmosphere'
-import { fxRng, seedFx } from './fxRng'
+import { seedFx } from './fxRng'
 import { hasBoon } from '@/sim/boons'
 
 // Reads sim state + events every frame and drives everything visible. Never mutates the sim.
@@ -167,7 +169,7 @@ export class Presenter {
           if (v) { this.particles.shatter(v.body, ev.x, ev.y, ev.angle); v.destroy(); this.enemyViews.delete(ev.id) }
           this.particles.blood(ev.x, ev.y, ev.angle, ev.kind === 'charger' ? 0x6a3aa0 : 0x8a1a22)
           this.particles.puff(ev.x, ev.y, 6, 0x3a2a2a)
-          this.flash(0.35, 0xffffff)
+          this.flash(J.killFlash, 0xffffff)
           this.camera.punchZoom(J.zoom.kill) // juice hook
           break
         }
@@ -481,11 +483,32 @@ export class Presenter {
   }
 
   private flashAlpha = 0
-  flash(alpha: number, color: number) { this.flashOverlay.tint = color; this.flashAlpha = Math.max(this.flashAlpha, alpha) }
+  // The loudest flash this frame owns the colour too. Taking the max alpha but the last tint meant a
+  // kill repainted the warm contact flash white, so every death read the same regardless of how it landed.
+  flash(alpha: number, color: number) {
+    if (alpha <= this.flashAlpha) return
+    this.flashAlpha = alpha
+    this.flashOverlay.tint = color
+  }
+
+  // A trail belongs to the distance the bolt covered, not to the number of frames the display drew.
+  // The step is derived from velocity rather than a remembered position, so it stays exact when
+  // slow-motion drags the bolt: the trail thins with the bolt instead of piling up under it.
+  private stampTrail(v: { trailAcc: number }, b: Projectile, dtSec: number, spacing: number, emit: (x: number, y: number) => void): void {
+    v.trailAcc += Math.hypot(b.vx, b.vy) * dtSec * (this.world.slowRate / SLOW_FULL)
+    let n = 0
+    while (v.trailAcc >= spacing && n++ < 8) { v.trailAcc -= spacing; emit(b.x, b.y) }
+    if (n >= 8) v.trailAcc = 0   // a long hitch must not dump a frame's worth of pool in one go
+  }
 
   render(alpha: number, dtSec: number) {
     const w = this.world
     this.time += dtSec
+    // Everything on the far side of the slow-motion gate advances on a stretched clock, so it needs a
+    // stretched alpha or it holds still for three frames and jumps on the fourth. slowAcc is where the
+    // gate's accumulator stands after this tick, so this sweeps 0..1 across the whole stretched
+    // interval. At full speed slowAcc is always 0 and slowRate is SLOW_FULL, so this IS alpha.
+    const slowAlpha = slowAlphaFor(w.slowAcc, w.slowRate, alpha)
     const p = w.player
     const L = this.ra.layers
 
@@ -502,7 +525,7 @@ export class Presenter {
         if (v.squash > 0) v.squash -= dtSec * 60
         if (v.redFlash > 0) v.redFlash -= dtSec * 60
       }
-      updateEnemyView(v, e, w, alpha, this.time)
+      updateEnemyView(v, e, w, slowAlpha, this.time)
       const hf = (this.hitFlash.get(id) ?? 0) - dtSec
       if (hf > 0) this.hitFlash.set(id, hf); else this.hitFlash.delete(id)
       v.setFlash(hf > 0)
@@ -517,14 +540,14 @@ export class Presenter {
     for (const [id, v] of this.boltViews) {
       const b = w.projectiles.find(x => x.id === id && x.active)
       if (!b) { v.destroy(); this.boltViews.delete(id); continue }
-      v.update(lerp(b.px, b.x, alpha), lerp(b.py, b.y, alpha), this.time)
-      if (fxRng.ui.next() < 0.5) this.particles.boltTrail(b.x, b.y)
+      v.update(lerp(b.px, b.x, slowAlpha), lerp(b.py, b.y, slowAlpha), this.time)
+      this.stampTrail(v, b, dtSec, tuning.juice.trail.boltPx, (x, y) => this.particles.boltTrail(x, y))
     }
     for (const [id, v] of this.arrowViews) {
       const b = w.projectiles.find(x => x.id === id && x.active)
       if (!b) { v.destroy(); this.arrowViews.delete(id); continue }
-      v.update(lerp(b.px, b.x, alpha), lerp(b.py, b.y, alpha), b.angle)
-      if (fxRng.ui.next() < 0.4) this.particles.arrowTrail(b.x, b.y)
+      v.update(lerp(b.px, b.x, slowAlpha), lerp(b.py, b.y, slowAlpha), b.angle)
+      this.stampTrail(v, b, dtSec, tuning.juice.trail.arrowPx, (x, y) => this.particles.arrowTrail(x, y))
     }
     while (this.spawnMarkers.length < w.spawnQueue.length) this.spawnMarkers.push(new SpawnMarkerView(this.atlas, L.fx))
     for (let i = 0; i < this.spawnMarkers.length; i++) {
@@ -543,7 +566,7 @@ export class Presenter {
     // per-frame vector fx
     this.fxGraphics.clear()
     this.groundFx.clear()
-    for (const e of w.enemies) if (e.active && e.kind === 'caster' && e.state === 'aim') drawAimLine(this.fxGraphics, e, alpha)
+    for (const e of w.enemies) if (e.active && e.kind === 'caster' && e.state === 'aim') drawAimLine(this.fxGraphics, e, slowAlpha)
     if (armOf(w) === ARM.bow) drawBowAim(this.fxGraphics, p, alpha)
     else {
       // smear under the fighters so body and blade occupy the frame; the hot tip stays in air

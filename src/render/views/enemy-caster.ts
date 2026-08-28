@@ -224,6 +224,7 @@ let stampGen = 0
 
 export class BoltView {
   g: Graphics
+  trailAcc = 0          // px travelled since the last trail stamp
   glowG: Graphics
   private hx: number[] = []; private hy: number[] = []
   private px = 0; private py = 0; private started = false; private angle = 0

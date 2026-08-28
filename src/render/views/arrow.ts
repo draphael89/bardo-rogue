@@ -14,6 +14,7 @@ const TRAIL = 0x6a4830
 
 export class ArrowView {
   g: Graphics
+  trailAcc = 0          // px travelled since the last trail stamp
   private started = false
   private ox = 0
   private oy = 0

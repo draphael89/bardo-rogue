@@ -32,7 +32,9 @@ export function overlapsSolid(a: Arena, x: number, y: number, r: number): boolea
 }
 
 // Soft circle separation. Pushes b away from a by weight wb and a by wa.
-export function separate(a: { x: number; y: number }, ra: number, b: { x: number; y: number }, rb: number, wa: number, wb: number): void {
+// The push goes through the wall solver, not straight into x/y: a crowd pinning someone against a
+// wall must shove them along it, never into it. Nothing runs after separation to undo a penetration.
+export function separate(arena: Arena, a: { x: number; y: number }, ra: number, b: { x: number; y: number }, rb: number, wa: number, wb: number): void {
   const dx = b.x - a.x, dy = b.y - a.y
   const d2 = dx * dx + dy * dy
   const min = ra + rb
@@ -40,6 +42,6 @@ export function separate(a: { x: number; y: number }, ra: number, b: { x: number
   const d = Math.sqrt(d2)
   const push = (min - d) * 0.5
   const nx = dx / d, ny = dy / d
-  a.x -= nx * push * wa; a.y -= ny * push * wa
-  b.x += nx * push * wb; b.y += ny * push * wb
+  if (wa) moveWithWalls(arena, a, -nx * push * wa, -ny * push * wa, ra)
+  if (wb) moveWithWalls(arena, b, nx * push * wb, ny * push * wb, rb)
 }

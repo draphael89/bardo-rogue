@@ -1,5 +1,5 @@
 // Record a bot's input frames as a replay fixture.
-//   pnpm record-bot -- --bot kite --scenario full --seed 1 --out replays/kite-full-s1.json [--ticks 10800]
+//   pnpm record-bot -- --bot kite --scenario full --seed 2 --out replays/kite-full-s2.json [--ticks 10800]
 //   pnpm record-bots            (regenerates the fixture set used by tests/sim/replay.test.ts; then update its hashes)
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { createWorld } from '../src/sim/scenarios'
@@ -10,7 +10,7 @@ import { quantizeFrame, replayToJson, type Replay } from '../src/sim/replay'
 import type { InputFrame } from '../src/sim/input'
 
 const FIXTURES: Array<{ bot: BotName; scenario: string; seed: number; out: string }> = [
-  { bot: 'kite', scenario: 'full', seed: 1, out: 'replays/kite-full-s1.json' },
+  { bot: 'kite', scenario: 'full', seed: 2, out: 'replays/kite-full-s2.json' },
   { bot: 'naive-melee', scenario: 'wave1', seed: 3, out: 'replays/naive-wave1-s3.json' },
   { bot: 'idle', scenario: 'wave1', seed: 5, out: 'replays/idle-wave1-s5.json' },
 ]

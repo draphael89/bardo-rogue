@@ -36,7 +36,9 @@ deaths, wavesCleared, clearSeconds, deathSeconds, avgTickUs, maxTickUs. A run st
 - `debug=1`: F1 overlay on. `mute=1`: no audio. `god=1`: player cannot take damage.
 - `bot=idle|naive-melee|kite`: a scripted player drives the sim instead of the keyboard.
 
-Keys in the game: WASD/arrows move, mouse aim, click/J attack, Space/Shift/K dodge, R restart.
+Combat slow-motion: `__game.state().slow` is `{ rate, ticks }` — rate is per-mille, 1000 is full speed. Force it with `__game.world.slowRate = 250; __game.world.slowTicks = 120`.
+
+Keys in the game: WASD move, arrows aim (8-way, and holding one pins the facing so you strafe), mouse aim, click/J attack, Space/Shift/K dodge, R restart. With no arrow and an untouched mouse, aim follows movement.
 F1 toggles the debug overlay, F2 toggles recording, F3 downloads the last recording.
 
 ## `window.__game` (src/debug/api.ts)
@@ -80,9 +82,9 @@ what was played and what is stored are identical.
 
 - Browser: F2 starts a fresh run and records; F2 again stops; F3 downloads `<scenario>-<seed>-<ticks>.json`. Move the
   file into `replays/`. A restart (R) ends the recording. "REC" blinks top-centre while recording, "REPLAY" while replaying.
-- Scripted: `pnpm record-bot -- --bot kite --scenario full --seed 1 --out replays/kite-full-s1.json`.
-- Headless: `pnpm sim -- --replay replays/kite-full-s1.json [--ticks 300]` prints hash, player, metrics. `--ticks` stops early.
-- Browser: `pnpm shot -- --replay replays/kite-full-s1.json --ticks 300 --stepwise 1` (the replay sets seed/scenario).
+- Scripted: `pnpm record-bot -- --bot kite --scenario full --seed 2 --out replays/kite-full-s2.json`.
+- Headless: `pnpm sim -- --replay replays/kite-full-s2.json [--ticks 300]` prints hash, player, metrics. `--ticks` stops early.
+- Browser: `pnpm shot -- --replay replays/kite-full-s2.json --ticks 300 --stepwise 1` (the replay sets seed/scenario).
 - Node API: `runReplay(replay, onTick?)` returns `{ world, hash, metrics }`; `encodeReplay`/`decodeReplay`, `replayToJson`/`replayFromJson`.
 
 The same replay must give the same hash headless and in the browser at the same tick. `tests/sim/replay.test.ts`

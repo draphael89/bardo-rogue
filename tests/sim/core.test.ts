@@ -34,6 +34,62 @@ describe('determinism', () => {
   })
 })
 
+describe('movement authority', () => {
+  const P = tuning.player
+  const ms = (ticks: number) => Math.round(ticks * 1000 / 60)
+
+  // ticks until |vx| first reaches `frac` of max speed, driving moveX every tick
+  function ticksTo(from: number, moveX: number, done: (vx: number) => boolean): number {
+    const w = createWorld(1, 'empty')
+    w.player.vx = from
+    for (let t = 1; t <= 60; t++) {
+      stepWorld(w, { ...emptyInput(), moveX })
+      w.events.length = 0
+      if (done(w.player.vx)) return t
+    }
+    return Infinity
+  }
+
+  it('reaches full authority from rest within 67 ms', () => {
+    const t = ticksTo(0, 1, vx => vx >= P.maxSpeed * 0.9)
+    expect(t, `${ms(t)} ms to 90% speed`).toBeLessThanOrEqual(4)
+  })
+
+  it('stops within 50 ms', () => {
+    const t = ticksTo(P.maxSpeed, 0, vx => vx === 0)
+    expect(t, `${ms(t)} ms to stop`).toBeLessThanOrEqual(3)
+  })
+
+  it('reverses within 100 ms', () => {
+    // the one that decides whether a direction change reads as a turn or a skid
+    const t = ticksTo(P.maxSpeed, -1, vx => vx <= -P.maxSpeed * 0.9)
+    expect(t, `${ms(t)} ms to reverse`).toBeLessThanOrEqual(6)
+  })
+
+  it('does not let a cardinal press leave sideways drift hanging', () => {
+    // holding right while moving up-right: the y axis is being released, so it should brake, not coast
+    const w = createWorld(1, 'empty')
+    w.player.vx = P.maxSpeed; w.player.vy = -P.maxSpeed
+    let t = 0
+    for (; t < 60; t++) {
+      stepWorld(w, { ...emptyInput(), moveX: 1 })
+      w.events.length = 0
+      if (w.player.vy === 0) break
+    }
+    expect(t + 1, 'ticks to shed the sideways component').toBeLessThanOrEqual(3)
+  })
+
+  it('treats cardinals and diagonals identically', () => {
+    const diag = 1 / Math.SQRT2
+    const a = createWorld(1, 'empty'), b = createWorld(1, 'empty')
+    for (let t = 0; t < 10; t++) {
+      stepWorld(a, { ...emptyInput(), moveX: 1 }); a.events.length = 0
+      stepWorld(b, { ...emptyInput(), moveX: diag, moveY: diag }); b.events.length = 0
+    }
+    expect(Math.hypot(b.player.vx, b.player.vy)).toBeCloseTo(Math.hypot(a.player.vx, a.player.vy), 6)
+  })
+})
+
 describe('dodge', () => {
   it('has i-frames exactly in the tuned window and a cooldown', () => {
     const w = createWorld(1, 'empty')
@@ -83,6 +139,95 @@ describe('dodge', () => {
     expect(p.hp).toBe(tuning.player.hp)
     expect(bolt!.active).toBe(true)
   })
+  it('is never body-blocked for the whole travel phase', () => {
+    const d = tuning.player.dodge
+    const roll = { ...emptyInput(), moveX: 1, dodge: true }
+    const hold = { ...emptyInput(), moveX: 1 }
+    // stateTicks 0 .. travel-1 are the flight; the landing tick that follows is legitimately blockable
+    const trace = (withBody: boolean): number[] => {
+      const w = createWorld(1, 'empty')
+      // one body the roll launches into (catches stateTick 0), one it lands on (catches the brake tail)
+      if (withBody) { w.spawnEnemy('dummy', w.player.x + 10, w.player.y); w.spawnEnemy('dummy', w.player.x + 41, w.player.y) }
+      const xs: number[] = []
+      stepWorld(w, roll); w.events.length = 0; xs.push(w.player.x)
+      for (let t = 1; t < d.travel; t++) { stepWorld(w, hold); w.events.length = 0; xs.push(w.player.x) }
+      return xs
+    }
+    const clear = trace(false), blocked = trace(true)
+    for (let t = 0; t < d.travel; t++) {
+      expect(blocked[t], `roll displaced by a body at dodge stateTick ${t}`).toBeCloseTo(clear[t], 6)
+    }
+  })
+})
+
+describe('hit-stop', () => {
+  it('holds every body exactly still while the sim is frozen', () => {
+    const w = createWorld(1, 'dummy')
+    const dummy = w.enemies.find(e => e.active)!
+    const p = w.player
+    p.x = dummy.x - 14; p.y = dummy.y
+    let froze = false
+    for (let t = 0; t < 30 && !froze; t++) {
+      stepWorld(w, { ...emptyInput(), attack: t === 0, aimX: 1, aimY: 0 })
+      w.events.length = 0
+      froze = w.freeze > 0
+    }
+    expect(froze, 'no hit-stop happened').toBe(true)
+
+    // px/py are the renderer's interpolation source. If they drift from x/y on a frozen tick, the
+    // loop's alpha resets every tick and the body re-runs its last motion instead of holding the pose.
+    let checked = 0
+    while (w.freeze > 0) {
+      stepWorld(w, emptyInput())
+      w.events.length = 0
+      for (const e of w.enemies) {
+        if (!e.active) continue
+        expect(e.px, `enemy ${e.id} px drifts during hit-stop`).toBeCloseTo(e.x, 9)
+        expect(e.py, `enemy ${e.id} py drifts during hit-stop`).toBeCloseTo(e.y, 9)
+      }
+      checked++
+    }
+    expect(checked).toBeGreaterThan(0)
+  })
+})
+
+describe('attack responsiveness', () => {
+  const ms = (ticks: number) => Math.round(ticks * 1000 / 60)
+
+  it('answers on the very tick the button is read', () => {
+    const w = createWorld(1, 'empty')
+    stepWorld(w, { ...emptyInput(), attack: true, aimX: 1, aimY: 0 })
+    // the swing event is what the renderer builds anticipation from: it must not wait a frame
+    expect(w.events.some(e => e.type === 'swing')).toBe(true)
+    expect(w.player.state).toBe('attack')
+  })
+
+  it('lands a light hit within 83 ms of the press', () => {
+    const w = createWorld(1, 'dummy')
+    const dummy = w.enemies.find(e => e.active)!
+    const p = w.player
+    p.x = dummy.x - 14; p.y = dummy.y
+    for (let t = 1; t <= 30; t++) {
+      stepWorld(w, { ...emptyInput(), attack: t === 1, aimX: 1, aimY: 0 })
+      const hit = w.events.some(e => e.type === 'hit')
+      w.events.length = 0
+      // 4 ticks to the first active frame; this dummy sits far enough round the arc to be caught on the next
+      if (hit) { expect(t - 1, `${ms(t - 1)} ms to contact`).toBeLessThanOrEqual(5); return }
+    }
+    throw new Error('the swing never connected')
+  })
+
+  it('can be redirected by at least 35 degrees during a light wind-up', () => {
+    const w = createWorld(1, 'empty')
+    stepWorld(w, { ...emptyInput(), attack: true, aimX: 1, aimY: 0 })
+    const start = w.player.swingAngle
+    const s = tuning.player.attack.swings[0]
+    // hold a new aim through the whole startup and see how far the blade follows
+    for (let t = 1; t < s.startup; t++) { stepWorld(w, { ...emptyInput(), aimX: 0, aimY: 1 }); w.events.length = 0 }
+    const turned = Math.abs(w.player.swingAngle - start) * 180 / Math.PI
+    // enough to re-target something that moved, not enough to swing at what is behind you
+    expect(turned, `only ${turned.toFixed(0)} degrees of correction`).toBeGreaterThanOrEqual(35)
+  })
 })
 
 describe('attack', () => {
@@ -96,6 +241,18 @@ describe('attack', () => {
     }
     expect(swings.slice(0, 3)).toEqual([0, 1, 2])
     expect(swings[3]).toBe(0)
+  })
+  it('flows the chain at its own pace while the button is held', () => {
+    const w = createWorld(1, 'empty')
+    const swings: number[] = []
+    for (let i = 0; i < 300; i++) {
+      stepWorld(w, { ...emptyInput(), attack: true })   // held, not mashed
+      for (const e of w.events) if (e.type === 'swing') swings.push(e.swing)
+      w.events.length = 0
+    }
+    expect(swings.length).toBeGreaterThan(6)
+    // the buffer is re-armed every tick, so the gates alone must keep the loop honest
+    for (let i = 0; i < swings.length; i++) expect(swings[i], `swing ${i}`).toBe(i % 3)
   })
   it('hits a dummy in front once per swing and applies hit-stop', () => {
     const w = createWorld(1, 'dummy')
@@ -196,6 +353,21 @@ function forceRoomClear(w: ReturnType<typeof createWorld>): void {
   w.wave.groupIndex = defs[w.wave.index].groups.length
   stepWorld(w, emptyInput())
 }
+
+describe('room clear', () => {
+  it('a live hostile bolt cannot damage the player after roomClear', () => {
+    const w = createWorld(1, 'wave1')
+    const p = w.player
+    // a bolt already in flight, aimed straight at the player, when the last enemy dies
+    expect(w.fireProjectile(p.x - 60, p.y, 0, 110, 3, 180, 0, 1)).not.toBeNull()
+    forceRoomClear(w)
+    expect(w.events.some(e => e.type === 'roomClear')).toBe(true)
+    w.events.length = 0
+    const hp = p.hp
+    run(w, 200)
+    expect(p.hp, 'the player was hit after the room was already clear').toBe(hp)
+  })
+})
 
 describe('run rooms', () => {
   it('starts the first fight with the door sealed', () => {

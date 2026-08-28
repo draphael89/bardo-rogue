@@ -26,7 +26,10 @@ export const tuning = {
 
   player: {
     radius: 5,
-    maxSpeed: 95, accelTicks: 5, decelTicks: 4,
+    // Ticks from rest to full speed, from full speed to rest, and to cross zero when reversing.
+    // A direction change gets its own rate: braking into a reversal at the acceleration rate is
+    // what makes a turn read as a skid rather than a turn.
+    maxSpeed: 95, accelTicks: 4, decelTicks: 3, turnTicks: 2,
     hp: 5,
     hurtIFrames: 40, hurtKnockback: 12, hurtHitstop: 4,
     // Launch, invulnerable traversal, landing — three readable phases in one state, and a price.
@@ -47,11 +50,13 @@ export const tuning = {
     },
     attack: {
       buffer: 8,
-      steerRateDeg: 9,      // max deg/tick the swing angle may still be steered, during steerTicks only
+      steerRateDeg: 12,     // max deg/tick the swing angle may still be steered, during steerTicks only
+                            // note the press tick cannot steer (the state is entered after the steer block),
+                            // so a light's usable correction is (steerTicks - 1) * steerRateDeg
       heavyChargeTicks: 2,  // startup ticks before the heavy's blade-glow telegraph lights up (presentation)
       swings: [
-        { startup: 5, active: 4, recovery: 13, damage: 2, radius: 25, arcDeg: 130, lunge: 13, windup: 2, hitstop: 3, knockback: 90, chainFrom: 2, dodgeCancelFrom: 1, whiffPenalty: 7, moveCommit: 0.45, moveRecover: 0.7, steerTicks: 3, sweep: 1, heavy: false },
-        { startup: 5, active: 4, recovery: 13, damage: 2, radius: 25, arcDeg: 150, lunge: 15, windup: 2, hitstop: 3, knockback: 95, chainFrom: 2, dodgeCancelFrom: 1, whiffPenalty: 7, moveCommit: 0.45, moveRecover: 0.7, steerTicks: 3, sweep: -1, heavy: false },
+        { startup: 4, active: 4, recovery: 13, damage: 2, radius: 25, arcDeg: 130, lunge: 13, windup: 2, hitstop: 3, knockback: 90, chainFrom: 2, dodgeCancelFrom: 1, whiffPenalty: 7, moveCommit: 0.45, moveRecover: 0.7, steerTicks: 4, sweep: 1, heavy: false },
+        { startup: 4, active: 4, recovery: 13, damage: 2, radius: 25, arcDeg: 150, lunge: 15, windup: 2, hitstop: 3, knockback: 95, chainFrom: 2, dodgeCancelFrom: 1, whiffPenalty: 7, moveCommit: 0.45, moveRecover: 0.7, steerTicks: 4, sweep: -1, heavy: false },
         { startup: 12, active: 7, recovery: 24, damage: 4, radius: 31, arcDeg: 215, lunge: 30, windup: 8, hitstop: 8, knockback: 260, chainFrom: 999, dodgeCancelFrom: 9, whiffPenalty: 14, moveCommit: 0, moveRecover: 0.1, steerTicks: 4, sweep: 1, heavy: true },
       ] as SwingDef[],
     },
@@ -78,9 +83,16 @@ export const tuning = {
 
   hitstop: { killBonus: 2, max: 12, boltCut: 3 },
   knockbackDecayTicks: 8,
+
+  // Combat slow-motion. The player and the input poll stay welded to 60 Hz; only enemies and
+  // projectiles run on the stretched clock, so your own swing is full speed while the world crawls.
+  // `rate` is per-mille of normal speed and should divide 1000, or the stretched clock is not exact.
+  // Short on purpose: at rate 250 the player gets four times the real time to act AND four times the
+  // real-time damage, so the window is the lever, not the depth.
+  bullet: { rate: 250, ticks: 24, maxTicks: 24 },
   spawnTelegraphTicks: 40,
   waveGapTicks: 60,
-  roomClearSlowmoTicks: 12,
+  roomClearSlowmo: 0.2, roomClearSlowmoTicks: 12,
   run: {
     doorHalfW: 22,        // px: the open door is three tiles wide
     doorEnterMaxY: 32,    // px: north wall-face row; overlapping it while the door is open enters
@@ -128,6 +140,13 @@ export const tuning = {
     lookahead: 4, lookaheadLerp: 0.08,
     aberrationTicks: 3,
     aberrationStrength: 2,  // screen px of red/blue split at the pulse peak
+    // Screen flash on an ordinary kill. It has to sit UNDER heavy contact (0.20) and under getting
+    // hurt (0.25), or the most routine event in the fight is also the loudest and the next telegraph
+    // is washed out by the last thing you killed. The shatter and the punch-zoom carry the release.
+    killFlash: 0.12,
+    // Projectile trails are stamped every N px the bolt travels, not every N frames: per-frame
+    // emission put 2.4x the trail on a 144 Hz display, and bunched it up under slow-motion.
+    trail: { boltPx: 7, arrowPx: 11 },
     zoom: { roomClear: 1.06, kill: 1.015, heavyHit: 1.035, decay: 6 }, // decay = per-second ease rate back to 1
     // Contact. The light hit is ~90% of all contact, so it gets the whole chain, only smaller: the
     // camera is shoved along the blade, the body is shoved back off it, the screen blinks once.

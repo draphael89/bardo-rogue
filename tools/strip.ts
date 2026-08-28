@@ -4,7 +4,7 @@
 // usage: pnpm strip -- --scenario dummy --eval "near(first(), -18, 0)" --hold '{"attack":true,"aimX":1}' \
 //                      --frames 20 --every 3 --crop player --out /tmp/swing-chain.png
 //        pnpm strip -- --scenario wave1 --bot kite --from 300 --frames 12 --every 2
-//        pnpm strip -- --replay replays/kite-full-s1.json --from 600 --frames 12
+//        pnpm strip -- --replay replays/kite-full-s2.json --from 600 --frames 12
 //
 // Determinism: rAF is swallowed before boot and every tick is stepped by hand, one render per tick at a fixed dt.
 // That is the whole mechanism — presentation is a wall-clock dt accumulator (presenter.time, camera.t, lighting.t,

@@ -5,6 +5,8 @@ import { tuning } from '@/tuning'
 import type { WaveDef } from './waves'
 import { roomsFor, type RoomDef } from './rooms'
 
+export const SLOW_FULL = 1000   // scale unit for slowRate, not a tunable
+
 export type PlayerState = 'free' | 'dodge' | 'attack' | 'dead'
 export type EnemyState =
   | 'idle' | 'chase' | 'windup' | 'attack' | 'recover' | 'stagger' | 'dead'
@@ -76,6 +78,11 @@ export class World {
   freeze = 0
   timeScale = 1
   slowmoTicks = 0
+  // Combat slow-motion, per-mille. slowRate is how much of a world tick each 60 Hz tick is worth,
+  // so SLOW_FULL means enemies and projectiles run every tick exactly as they always have.
+  slowRate = SLOW_FULL
+  slowAcc = 0
+  slowTicks = 0
   swingCounter = 0
   nextEnemyId = 1
   nextProjectileId = 1

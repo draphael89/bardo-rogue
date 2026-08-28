@@ -1,6 +1,7 @@
 import { tuning } from '@/tuning'
 import { enterRoomById, HUB_ID } from './rooms'
 import type { World } from './world'
+import { clearBulletTime } from './combat'
 
 export function canReturn(world: World): boolean {
   return world.player.state === 'dead' && world.rooms.some(r => r.id === HUB_ID)
@@ -26,6 +27,7 @@ export function returnToHub(world: World): void {
   p.swingIndex = 0
   world.timeScale = 1
   world.slowmoTicks = 0
+  clearBulletTime(world)
   world.freeze = 0
   world.boonBits = 0
   world.nextEnemyId = 1

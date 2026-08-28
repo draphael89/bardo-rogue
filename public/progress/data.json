@@ -1,8 +1,8 @@
 {
   "title": "Bardo Rogue",
-  "subtitle": "Gauntlet against Enter the Gungeon & Hades \u2014 two marked doors, then the rest",
-  "updated": "2026-08-28T03:55:00-04:00",
-  "now": "audio-bed",
+  "subtitle": "Gauntlet against Enter the Gungeon & Hades — two marked doors, then the rest",
+  "updated": "2026-08-28T09:56:56-04:00",
+  "now": "combat-feel",
   "round": 2,
   "timeline": [
     {
@@ -15,7 +15,7 @@
     },
     {
       "t": "16:59",
-      "text": "Round 1 build in \u2014 lighting, grade, ritual floor, living air."
+      "text": "Round 1 build in — lighting, grade, ritual floor, living air."
     },
     {
       "t": "17:04",
@@ -27,19 +27,19 @@
     },
     {
       "t": "17:09",
-      "text": "Round 2 in \u2014 seal plate, nave, side aisles, wall furniture, side braziers."
+      "text": "Round 2 in — seal plate, nave, side aisles, wall furniture, side braziers."
     },
     {
       "t": "17:10",
-      "text": "R2 still lost: tan dirt + HUD-reticle seal. Approach change \u2014 opaque plate, floor wash, no ticks."
+      "text": "R2 still lost: tan dirt + HUD-reticle seal. Approach change — opaque plate, floor wash, no ticks."
     },
     {
       "t": "17:13",
-      "text": "Round 3 in \u2014 slate floor, gold seal + chevron, purple diamond rugs, graves/chest/table, wall windows."
+      "text": "Round 3 in — slate floor, gold seal + chevron, purple diamond rugs, graves/chest/table, wall windows."
     },
     {
       "t": "17:19",
-      "text": "Round 4 build \u2014 original bardo_room tileset. Kenney leaves the floor."
+      "text": "Round 4 build — original bardo_room tileset. Kenney leaves the floor."
     },
     {
       "t": "17:26",
@@ -51,11 +51,11 @@
     },
     {
       "t": "17:32",
-      "text": "Round 5 in \u2014 still pool in the steel plate, ash-leaf planters, velvet armchairs. Banner kit stripped."
+      "text": "Round 5 in — still pool in the steel plate, ash-leaf planters, velvet armchairs. Banner kit stripped."
     },
     {
       "t": "17:34",
-      "text": "Round 6 in \u2014 aisles packed with plants, well-lip on the pool, hotter window lights. Critic on the still."
+      "text": "Round 6 in — aisles packed with plants, well-lip on the pool, hotter window lights. Critic on the still."
     },
     {
       "t": "17:36",
@@ -63,7 +63,7 @@
     },
     {
       "t": "17:37",
-      "text": "Round 7 in \u2014 star well + broken ring, three plant kinds, richer runners."
+      "text": "Round 7 in — star well + broken ring, three plant kinds, richer runners."
     },
     {
       "t": "17:38",
@@ -71,7 +71,7 @@
     },
     {
       "t": "17:39",
-      "text": "Round 8 in \u2014 raised well lip, contact shadows under every prop. Still building."
+      "text": "Round 8 in — raised well lip, contact shadows under every prop. Still building."
     },
     {
       "t": "17:40",
@@ -79,7 +79,7 @@
     },
     {
       "t": "17:44",
-      "text": "Round 9 in \u2014 32px plants and chairs, wine runners, brass threshold inlay, north counters. Critic on the still."
+      "text": "Round 9 in — 32px plants and chairs, wine runners, brass threshold inlay, north counters. Critic on the still."
     },
     {
       "t": "17:45",
@@ -87,7 +87,7 @@
     },
     {
       "t": "17:47",
-      "text": "Round 10 in \u2014 Keep-light walls, bigger steel plate, quieter door. Furniture can actually be named in the wide shot."
+      "text": "Round 10 in — Keep-light walls, bigger steel plate, quieter door. Furniture can actually be named in the wide shot."
     },
     {
       "t": "17:48",
@@ -95,7 +95,7 @@
     },
     {
       "t": "17:49",
-      "text": "Round 11 in \u2014 carved dais with relief threshold, restored vignette, slight furniture asymmetry."
+      "text": "Round 11 in — carved dais with relief threshold, restored vignette, slight furniture asymmetry."
     },
     {
       "t": "17:50",
@@ -488,13 +488,33 @@
     {
       "t": "03:55",
       "text": "Audio-bed PARK. Two losses on the same family. Buses, bed, announcer-off, crowd, lead stay. Re-enter behind authored combat stems."
+    },
+    {
+      "t": "09:56",
+      "text": "Combat-feel pass off the audit (68/100). Verified every claim against HEAD first; two were worse in the code than in the write-up."
+    },
+    {
+      "t": "09:56",
+      "text": "Trust fixes: keyboard aimed at the browser window corner (-142 deg for every direction, measured). Rolls were body-blocked mid-flight. Crowds squeezed bodies through walls on ordinary ticks."
+    },
+    {
+      "t": "09:56",
+      "text": "Authority: reversal 167ms -> 100ms via a turn rate, not a shorter accel. Light contact 100ms -> 83ms. Steer correction 18 -> 36 deg. Hold-to-attack."
+    },
+    {
+      "t": "09:56",
+      "text": "Bullet time on a perfect dodge: enemies gated inside stepWorld, player stays on 60Hz. Proven neutral - fixtures reproduce old hashes with only the trigger off."
+    },
+    {
+      "t": "09:56",
+      "text": "Kill flash 0.35 -> 0.12; it was louder than getting hurt and washed out the next telegraph. 68 -> 107 tests. Enemy tuning is the open follow-up: kite clears in 28-33s vs a 60-120s target."
     }
   ],
   "pieces": [
     {
       "id": "phase-0-input",
       "status": "done",
-      "title": "Attack edge-trigger + camera-aware aim",
+      "title": "Camera-aware aim + input latching (attack edge-trigger since reversed: see combat-feel)",
       "rounds": 0
     },
     {
@@ -773,6 +793,12 @@
       "before": "shots/return-r1-death.png",
       "after": "shots/return-r2-hub.png",
       "ref": "ref/return-0.jpg"
+    },
+    {
+      "id": "combat-feel",
+      "status": "done",
+      "title": "Controls & game feel: keyboard aim, hold-to-attack, dodge ghosting, wall-safe crowds, turn rate, sword latency, perfect-dodge bullet time, flash hierarchy",
+      "rounds": 0
     }
   ]
 }

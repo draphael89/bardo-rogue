@@ -80,7 +80,12 @@ async function launch(): Promise<{ app: ElectronApplication; page: Page }> {
   const a = await withTimeout(electron.launch({
     executablePath: ELECTRON,
     args: [MAIN, '--no-sandbox', '--disable-dev-shm-usage'],
-    env: { ...baseEnv, BARDO_USER_DATA_DIR: userData, BARDO_SAVE_VERIFY: '1', BARDO_DESKTOP_MODE: 'packaged', BARDO_SOFTWARE_GL: '1' },
+    env: {
+      ...baseEnv, BARDO_USER_DATA_DIR: userData, BARDO_SAVE_VERIFY: '1', BARDO_DESKTOP_MODE: 'packaged',
+      // Software GL only where there is no GPU. Forcing it on macOS would mean the smoke never
+      // exercises the Metal-backed ANGLE path the product actually ships on.
+      ...(process.platform === 'linux' ? { BARDO_SOFTWARE_GL: '1' } : {}),
+    },
     timeout: 60_000,
   }), 60_000, 'electron.launch')
   app = a
@@ -140,6 +145,11 @@ try {
       return { canvas: !!c, version: ctx ? String(ctx.getParameter(ctx.VERSION)) : null }
     })
     assert(gl.canvas && !!gl.version, `no WebGL context on the canvas (${JSON.stringify(gl)})`)
+    // On the shipping target this must be the real GPU path, not a software fallback that would hide
+    // exactly the driver-level regressions this tier exists to catch.
+    if (process.platform === 'darwin') {
+      assert(!/swiftshader/i.test(gl.version ?? ''), `macOS ran on software GL: ${gl.version}`)
+    }
     return gl.version ?? ''
   })
 

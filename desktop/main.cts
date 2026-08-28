@@ -149,6 +149,14 @@ function loadWindowState(): WindowState {
       })
       if (onScreen) { s.x = x; s.y = y }
     }
+    // ...and never restore a size the display cannot hold: sized on a docked 4K monitor, then
+    // launched on the built-in panel, the window would otherwise open larger than the screen with
+    // its controls off the edge.
+    const target = s.x !== undefined
+      ? screen.getDisplayMatching({ x: s.x, y: s.y as number, width: s.width, height: s.height })
+      : screen.getPrimaryDisplay()
+    s.width = Math.max(MIN_W, Math.min(s.width, target.workArea.width))
+    s.height = Math.max(MIN_H, Math.min(s.height, target.workArea.height))
     return s
   } catch { return { ...DEFAULT_STATE } }
 }
@@ -288,6 +296,13 @@ async function confirmQuit(w: BrowserWindow): Promise<boolean> {
   if (promptOpen) return false                     // a second Cmd+Q must not stack dialogs
   promptOpen = true
   try {
+    // On macOS a parented message box is a SHEET attached to that window. Cmd+Q from a minimised or
+    // hidden app would otherwise attach it to a window nobody can see: the quit is cancelled, no
+    // dialog appears, and the app looks like it is refusing to close. Bring the window back first.
+    if (w.isMinimized()) w.restore()
+    if (!w.isVisible()) w.show()
+    app.focus({ steal: true })
+    w.focus()
     const { response } = await dialog.showMessageBox(w, {
       type: 'warning', buttons: ['Quit', 'Keep Playing'], defaultId: 1, cancelId: 1, noLink: true,
       message: 'Quit Bardo Rogue?', detail: 'A run is in progress. It will be lost.',

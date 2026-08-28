@@ -56,8 +56,8 @@ async function probe(p: string): Promise<Probe> {
   return { state: 'ok', data: raw }
 }
 
-// Makes the rename itself durable. Not fatal if it fails -- the rename is still atomic; Windows
-// simply cannot fsync a directory handle.
+// Orders the rename with the same best-effort caveat as above. Not fatal if it fails -- the rename is
+// still atomic; Windows simply cannot fsync a directory handle at all.
 async function syncDir(d: string): Promise<void> {
   let dh: FileHandle | undefined
   try { dh = await open(d, 'r'); await dh.sync() } catch { /* best effort */ }
@@ -107,7 +107,11 @@ export function createSaveStore(dir: string, opts: SaveStoreOptions = {}) {
     try {
       fh = await open(tmp, 'wx')          // never adopt a temp file another process owns
       await fh.writeFile(data, 'utf8')
-      await fh.sync()                     // the bytes are on disk BEFORE anything points at them
+      // Best effort, and worth being precise about: on macOS fsync(2) pushes the write to the drive
+      // but does NOT flush the drive's own cache -- that needs F_FULLFSYNC, which Node cannot issue.
+      // So this orders the write before the rename rather than guaranteeing it survives a power cut.
+      // The rotation is what actually protects a player: the previous generation is still in ~bak.
+      await fh.sync()
     } finally { await fh?.close() }
     try { await rename(p.current, p.backup) }                    // rotate; ENOENT = the first write ever
     catch (e) { if (code(e) !== 'ENOENT') { await unlink(tmp).catch(() => undefined); throw e } }

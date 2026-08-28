@@ -23,7 +23,9 @@ mac:
       arch: [arm64]
     - target: zip
       arch: [arm64]      # zip is the Steam- and updater-friendly artifact; dmg is what a tester double-clicks
-  icon: build/icon.icns  # not authored yet: without it electron-builder warns and uses the default icon
+  # No `icon:` key on purpose. An explicitly configured resource must exist or electron-builder
+  # aborts; with buildResources: build it auto-discovers build/icon.icns once that is authored, and
+  # falls back to the stock Electron icon until then.
   hardenedRuntime: true
   gatekeeperAssess: false
   entitlements: build/entitlements.mac.plist

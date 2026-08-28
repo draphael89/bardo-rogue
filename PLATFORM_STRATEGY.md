@@ -473,8 +473,8 @@ Two findings from building it that the plan did not anticipate, both now fixed i
    importing `pixi.js/unsafe-eval`.
 
 An adversarial review of the finished diff (six lenses: correctness, Electron security, save
-integrity, determinism, macOS portability, test quality) raised fifteen findings; each was checked
-against the code and thirteen were fixed. The ones worth remembering, because they were all invisible
+integrity, determinism, macOS portability, test quality) raised twenty findings; each was checked
+against the code and eighteen were fixed. The ones worth remembering, because they were all invisible
 to a green test suite:
 
 - **An empty file imported as a save wiped progress.** `parseSave('')` returns a *default* document,
@@ -493,6 +493,20 @@ to a green test suite:
   proves more.
 - **The smoke asserted an absolute `reducedEffects` value**, so it would have failed on any Mac with
   Accessibility > Reduce motion enabled. It asserts the flip now.
+- **The quit confirmation would have been invisible on macOS.** A parented `showMessageBox` is a
+  sheet; from a minimised or hidden app it attaches to a window nobody can see, the quit is cancelled
+  and the guard's re-entrancy flag never clears -- the app simply appears to refuse to close. It now
+  restores, shows and focuses the window first.
+- **The smoke forced software GL everywhere**, so a Mac run would have reported success without ever
+  touching the Metal-backed ANGLE path the product ships on. SwiftShader is now Linux-only, and on
+  darwin the smoke asserts the renderer is *not* software.
+- **A window sized on a docked 4K display reopened larger than the built-in panel.** Position was
+  validated against the attached displays; size was not.
+- **`electron-builder.yml` named an icon that does not exist**, which aborts the build rather than
+  warning -- on the one machine where the `.app` can be produced at all.
+- **`fsync` is not the durability guarantee on macOS that it is on ext4** (it needs `F_FULLFSYNC`,
+  which Node cannot issue). The comment claiming otherwise was corrected rather than the code: the
+  rotation, not the fsync, is what actually protects a player's previous generation.
 - **`tests/sim/boundary.test.ts` had gaps of its own**, found by deliberately breaking the tree and
   watching it stay green: it never looked at `src/tuning.ts` (which most of the sim imports), its
   import matcher recognised only single quotes, and its comment stripper would have tripped on the

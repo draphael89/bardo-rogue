@@ -4,7 +4,7 @@
   "arena": "game",
   "mix": "efficient",
   "stopRule": "until the user stops it",
-  "wave": 2,
+  "wave": 3,
   "status": "running",
   "evidenceLimit": "Reference exhibits are 1920x1080 gameplay stills. Motion timing is judged against the rubric's feel-chain acceptance criteria using our own tick-labelled strips, not against the bar. Every motion verdict must say so.",
   "phase0": "Repair batch run before wave 1: attack edge-trigger, camera-aware pointer, live metrics getter, widened state hash, visual/gameplay RNG stream split, pool-overflow telemetry, restart replay parity, tools/strip.ts motion exporter, ART_DIRECTION.md, per-entity views split, recalibrated balance gates.",
@@ -78,13 +78,6 @@
       "stalls": 2,
       "memo": [
         {
-          "wave": 1,
-          "round": 1,
-          "element": "wave-1 verdicts lost",
-          "stronger_does": "n/a - infrastructure, not a gap",
-          "fix": "Re-enter at wave 2 round 1. The critic verdicts lived only in the Workflow return and died with the process, and repair R1 then changed the global colour grade (p99 178 -> 229), so every wave-1 capture is non-comparable to anything captured from now on. Wave 2 round 1 is the new baseline for this piece."
-        },
-        {
           "wave": 2,
           "round": 1,
           "element": "blade and slash heat",
@@ -123,13 +116,6 @@
       "stalls": 2,
       "memo": [
         {
-          "wave": 1,
-          "round": 2,
-          "element": "wave-1 verdicts lost",
-          "stronger_does": "n/a - infrastructure, not a gap",
-          "fix": "Re-enter at wave 2 round 1. The critic verdicts lived only in the Workflow return and died with the process, and repair R1 then changed the global colour grade (p99 178 -> 229), so every wave-1 capture is non-comparable to anything captured from now on. Wave 2 round 1 is the new baseline for this piece."
-        },
-        {
           "wave": 2,
           "round": 2,
           "element": "wound and body crumple",
@@ -159,13 +145,6 @@
       "rounds": 6,
       "stalls": 2,
       "memo": [
-        {
-          "wave": 1,
-          "round": 0,
-          "element": "wave-1 verdicts lost",
-          "stronger_does": "n/a - infrastructure, not a gap",
-          "fix": "Re-enter at wave 2 round 1. The critic verdicts lived only in the Workflow return and died with the process, and repair R1 then changed the global colour grade (p99 178 -> 229), so every wave-1 capture is non-comparable to anything captured from now on. Wave 2 round 1 is the new baseline for this piece."
-        },
         {
           "wave": 2,
           "round": 2,
@@ -216,13 +195,6 @@
       "stalls": 2,
       "memo": [
         {
-          "wave": 1,
-          "round": 2,
-          "element": "wave-1 verdicts lost",
-          "stronger_does": "n/a - infrastructure, not a gap",
-          "fix": "Re-enter at wave 2 round 1. The critic verdicts lived only in the Workflow return and died with the process, and repair R1 then changed the global colour grade (p99 178 -> 229), so every wave-1 capture is non-comparable to anything captured from now on. Wave 2 round 1 is the new baseline for this piece."
-        },
-        {
           "wave": 2,
           "round": 1,
           "element": "pie as stamp",
@@ -265,13 +237,6 @@
       "stalls": 2,
       "memo": [
         {
-          "wave": 1,
-          "round": 3,
-          "element": "wave-1 verdicts lost",
-          "stronger_does": "n/a - infrastructure, not a gap",
-          "fix": "Re-enter at wave 2 round 1. The critic verdicts lived only in the Workflow return and died with the process, and repair R1 then changed the global colour grade (p99 178 -> 229), so every wave-1 capture is non-comparable to anything captured from now on. Wave 2 round 1 is the new baseline for this piece."
-        },
-        {
           "wave": 2,
           "round": 1,
           "element": "body on the lock line",
@@ -311,13 +276,6 @@
       "rounds": 7,
       "stalls": 2,
       "memo": [
-        {
-          "wave": 1,
-          "round": 3,
-          "element": "wave-1 verdicts lost",
-          "stronger_does": "n/a - infrastructure, not a gap",
-          "fix": "Re-enter at wave 2 round 1. The critic verdicts lived only in the Workflow return and died with the process, and repair R1 then changed the global colour grade (p99 178 -> 229), so every wave-1 capture is non-comparable to anything captured from now on. Wave 2 round 1 is the new baseline for this piece."
-        },
         {
           "wave": 2,
           "round": 0,
@@ -359,13 +317,6 @@
       "stalls": 2,
       "memo": [
         {
-          "wave": 1,
-          "round": 3,
-          "element": "wave-1 verdicts lost",
-          "stronger_does": "n/a - infrastructure, not a gap",
-          "fix": "Re-enter at wave 2 round 1. The critic verdicts lived only in the Workflow return and died with the process, and repair R1 then changed the global colour grade (p99 178 -> 229), so every wave-1 capture is non-comparable to anything captured from now on. Wave 2 round 1 is the new baseline for this piece."
-        },
-        {
           "wave": 2,
           "round": 2,
           "element": "weapon-and-ammo chrome",
@@ -390,13 +341,6 @@
       "rounds": 5,
       "stalls": 2,
       "memo": [
-        {
-          "wave": 1,
-          "round": 0,
-          "element": "wave-1 verdicts lost",
-          "stronger_does": "n/a - infrastructure, not a gap",
-          "fix": "Re-enter at wave 2 round 1. The critic verdicts lived only in the Workflow return and died with the process, and repair R1 then changed the global colour grade (p99 178 -> 229), so every wave-1 capture is non-comparable to anything captured from now on. Wave 2 round 1 is the new baseline for this piece."
-        },
         {
           "wave": 2,
           "round": 0,
@@ -439,13 +383,6 @@
       "rounds": 5,
       "stalls": 2,
       "memo": [
-        {
-          "wave": 1,
-          "round": 2,
-          "element": "wave-1 verdicts lost",
-          "stronger_does": "n/a - infrastructure, not a gap",
-          "fix": "Re-enter at wave 2 round 1. The critic verdicts lived only in the Workflow return and died with the process, and repair R1 then changed the global colour grade (p99 178 -> 229), so every wave-1 capture is non-comparable to anything captured from now on. Wave 2 round 1 is the new baseline for this piece."
-        },
         {
           "wave": 2,
           "round": 2,
@@ -510,6 +447,22 @@
       "note": "Ran ~1h. caster, charger and combat-hud completed all 3 rounds; brute 2; sword-swing and hit-impact partial; dodge-roll and death-card never started (third and second in their lanes). 27 agents were killed by a session rate limit, and the workflow itself died with the parent process, so no verdict survived. Two real incidents: a capture agent stashed the shared worktree at 21:07 and reverted every lane for two minutes, and two writers overlapped on hud.ts. Both are now prevented in the preamble. Boundary repair R1 landed after the wave: the colour grade was crushing the whole range by ~30%, so no lane could answer the critics' \"top of the range\" gap. p99 178 -> 229 against the reference's 232.",
       "wins": [],
       "parked": []
+    },
+    {
+      "wave": 2,
+      "note": "62 agents, zero rate-limit failures. 27 critic verdicts recovered from the workflow journal after the wave was paused. NINE of ten pieces parked, and every one of them independently asked for the same thing: authored art. sword-swing wants authored swing poses, hit-impact an authored hit pose, dodge-roll authored roll-through frames, brute authored windup frames, caster a painted staff, charger authored floor-wound art, combat-hud authored HUD stamps, death-card authored death art, audio-bed recorded stems. Nine blind critics in seven separate lanes, none aware of the others, converged on one conclusion: the code-drawn art has hit its ceiling. That is bardo-critic section 7's change-the-tool case, not a stall to grind through. Wave 3 is therefore an asset-kit wave, not another critique wave. Two repairs also landed: R3 removed R1's clamp after two critics measured that impact had nowhere to go, and the arena lane's darker room closed R2 (static pixels above 72%% luminance 8.7%% -> 0.3%%).",
+      "wins": [],
+      "parked": [
+        "sword-swing",
+        "hit-impact",
+        "dodge-roll",
+        "brute",
+        "caster",
+        "charger",
+        "combat-hud",
+        "death-card",
+        "audio-bed"
+      ]
     }
   ],
   "phase0Findings": [

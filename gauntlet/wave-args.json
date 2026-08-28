@@ -3,27 +3,27 @@
   "projectDir": "/Users/davidraphael/Desktop/bardo-rogue-web",
   "evidenceDir": "gauntlet/evidence",
   "bar": "Enter the Gungeon and Hades",
-  "wave": 2,
+  "wave": 3,
   "waveRounds": 3,
   "mix": "efficient",
   "budgetFloor": 120000,
-  "rubric": "Score all seven axes 0-5 EVERY round so round 11 stays comparable to round 1. If no axis moves for two rounds the piece is stuck by arithmetic, not by feel.\n1 Readability - one frame tells you what is happening and what will hurt you.\n2 Material and light - surfaces have weight; light has a hierarchy and a focal point.\n3 Feel chain - anticipation, contact, impact, recovery all present and proportionate.\n4 Composition - a focal point, asymmetry with intent, nothing grid-snapped by accident.\n5 Pixel integrity - grid-aligned, integer scale, no shimmer, one consistent sprite scale.\n6 Density - how much is happening per second compared with the exhibits.\n7 Originality - a fan of the stronger exhibit would not call ours a copy. Copying the other exhibit's composition is itself a gap here, never progress.\n\nEVIDENCE LIMIT, state it in your verdict: the reference exhibits are stills. Timing therefore cannot be compared against them. Judge axis 3 against the acceptance criteria below using our own tick-labelled strip and trace, and say plainly that you did.\nFeel-chain acceptance: is there an anticipation frame distinguishable from idle? Is there exactly ONE readable contact frame? Does the freeze last long enough to see and short enough not to stall? Does recovery overshoot and settle rather than snap? Does the visual peak land on the tick the trace says damage becomes possible?\n\nThings critics in this domain miss without prompting:\n- Sub-pixel effects. At 480x270 a 0.19px camera shake is not a subtle shake, it is NO shake. Compute it, do not eyeball it.\n- Silence as a bug. If an input produces no visual and no sound, that is a defect, not restraint. Diff the action strip against the idle strip.\n- Grading the still and ignoring the tick. \"The arc lives 2 ticks past contact\" is a gap; \"feels floaty\" is not.\n- Pixel-scale mismatch. Soft full-resolution gradients over hard 16px pixels read as gloss over placeholder.\n- Bilateral symmetry and grid-snapped placement. The room currently mirrors left to right down to the plant.\n- Light at the frame edges while the centre, where the eye and the fight are, is the least lit area.\n- Accepting a bot metric as evidence of fun. Bots are regression probes. They do not report delight, panic, or perceived fairness.\n\nNEW THIS WAVE, and it changes what a frame should look like: boundary repair R1 fixed the colour grade, which had been crushing the whole range by about 30%. Frame p99 luminance moved from 178 to 229 (the stronger exhibit sits at 232) and the palette now clamps to its authored ends rather than to 0-1. So every capture from this wave onward is BRIGHTER and higher-contrast than any wave-1 capture, and the two are not comparable. Judge this wave against the exhibits and the acceptance criteria, never against a remembered earlier round.\nKnown and already assigned, so do not spend your one gap on it: static lighting, not events, currently owns the top of the range -- a quiet empty room measures 8.7% of pixels above 72% luminance against a busy combat frame's 10.0%. That is the room's own lights, and it belongs to the arena lane.",
+  "rubric": "Score all seven axes 0-5 EVERY round so round 11 stays comparable to round 1. If no axis moves for two rounds the piece is stuck by arithmetic, not by feel.\n1 Readability - one frame tells you what is happening and what will hurt you.\n2 Material and light - surfaces have weight; light has a hierarchy and a focal point.\n3 Feel chain - anticipation, contact, impact, recovery all present and proportionate.\n4 Composition - a focal point, asymmetry with intent, nothing grid-snapped by accident.\n5 Pixel integrity - grid-aligned, integer scale, no shimmer, one consistent sprite scale.\n6 Density - how much is happening per second compared with the exhibits.\n7 Originality - a fan of the stronger exhibit would not call ours a copy. Copying the other exhibit's composition is itself a gap here, never progress.\n\nEVIDENCE LIMIT, state it in your verdict: the reference exhibits are stills. Timing therefore cannot be compared against them. Judge axis 3 against the acceptance criteria below using our own tick-labelled strip and trace, and say plainly that you did.\nFeel-chain acceptance: is there an anticipation frame distinguishable from idle? Is there exactly ONE readable contact frame? Does the freeze last long enough to see and short enough not to stall? Does recovery overshoot and settle rather than snap? Does the visual peak land on the tick the trace says damage becomes possible?\n\nThings critics in this domain miss without prompting:\n- Sub-pixel effects. At 480x270 a 0.19px camera shake is not a subtle shake, it is NO shake. Compute it, do not eyeball it.\n- Silence as a bug. If an input produces no visual and no sound, that is a defect, not restraint. Diff the action strip against the idle strip.\n- Grading the still and ignoring the tick. \"The arc lives 2 ticks past contact\" is a gap; \"feels floaty\" is not.\n- Pixel-scale mismatch. Soft full-resolution gradients over hard 16px pixels read as gloss over placeholder.\n- Bilateral symmetry and grid-snapped placement. The room currently mirrors left to right down to the plant.\n- Light at the frame edges while the centre, where the eye and the fight are, is the least lit area.\n- Accepting a bot metric as evidence of fun. Bots are regression probes. They do not report delight, panic, or perceived fairness.\n\nNEW THIS WAVE, and it changes what a frame should look like: the colour grade no longer clamps the composited frame to the palette's ends. Repair R1 had stopped the grade crushing the whole range by ~30%, but its clamp then left impact nowhere to go -- two of you caught that last wave without being told about the grade ('no pixel in ANY of our rendered frames exceeds (236,240,246)'). The clamp is gone. Alongside it the room got much darker: static pixels above 72% luminance fell from 8.7% to 0.3%, and a busy combat frame now peaks at 255 on a hit spark instead of on a wall. So the top of the range is now genuinely reserved for events, and captures from this wave are darker and higher-contrast than wave 2's. Judge against the exhibits and the acceptance criteria, never a remembered round.",
   "smooth": true,
   "dryRun": false,
   "lanes": [
     {
       "id": "arena",
-      "why": "the user's live complaint, and the only lane touching the room's own files; disjoint from every combat lane.",
+      "why": "the room's own files; disjoint from every combat lane.",
       "pieces": [
         "arena"
       ]
     },
     {
       "id": "feel",
-      "why": "dodge, hit-impact and the sword chain all write player.ts, combat.ts and tuning.ts. One owner, in sequence. dodge-roll goes FIRST this wave: it has had zero rounds across two waves because it sat third in the lane.",
+      "why": "one owner for player.ts, combat.ts and tuning.ts, in sequence. hit-impact goes FIRST: it is the only piece still at zero rounds after two waves.",
       "pieces": [
-        "dodge-roll",
         "hit-impact",
+        "dodge-roll",
         "sword-swing"
       ]
     },
@@ -50,10 +50,10 @@
     },
     {
       "id": "ui",
-      "why": "hud.ts and damageNumbers.ts are touched by nothing else. death-card goes FIRST this wave: it has had zero rounds because combat-hud used all three.",
+      "why": "hud.ts and damageNumbers.ts. combat-hud goes FIRST: death-card took six rounds last wave to combat-hud's two.",
       "pieces": [
-        "death-card",
-        "combat-hud"
+        "combat-hud",
+        "death-card"
       ]
     },
     {
@@ -81,7 +81,7 @@
         "gauntlet/evidence/reference/ref-density-01.jpg"
       ],
       "status": "open",
-      "rounds": 0,
+      "rounds": 1,
       "stalls": 0,
       "memo": [
         {
@@ -90,36 +90,14 @@
           "element": "un-parked",
           "stronger_does": "n/a",
           "fix": "Parked after 11 rounds because no art direction existed and every round guessed. ART_DIRECTION.md now exists (533 lines, sections 0-11, with an acceptance table), so per bardo-critic section 7 the piece re-enters. It also has a measured brief and measurable gates, which the 11 rounds never had."
-        }
-      ],
-      "latest": [],
-      "history": []
-    },
-    "dodge-roll": {
-      "spec": "The dodge as the other half of the combat language: launch, invulnerable traversal, landing. Verified leads: 18 ticks, 44 px, i-frames on ticks 2-12. The economics are broken \u2014 44px/18t = 146.7 px/s against a 95 px/s run speed, so rolling is strictly better travel, and a never-attacking dodge-spam bot stalls wave 1 indefinitely (brutes landed 2 attacks in 120 seconds because they can never catch a rolling player). The i-frame window itself is honest and pinned by an exact test; the surrounding economics are the defect. Consider a cost (cooldown or stamina), earlier i-frame onset so a correct read is rewarded rather than punished, direction latched at the exact input edge, and a landing with readable recovery instead of one generic easing curve. Preserve attack buffering through the roll. A generic 360-degree sprite spin reads as a programmer's roll.",
-      "owns": [
-        "src/sim/player.ts",
-        "src/tuning.ts",
-        "src/render/views/player.ts",
-        "src/render/presenter.ts",
-        "src/render/camera.ts"
-      ],
-      "protocol": "Motion. Dev server must already be on :5173; never start a second. 1) `pnpm strip -- --scenario wave1 --seed 1 --from the dodge press --frames 12 --every 2 --crop 176,88,128,96 --out <E>/strip.png` \u2014 tick-labelled, --stepwise discipline, NEAREST upscale only. 2) the sidecar `<E>/strip.png.json` state+event trace. 3) `pnpm poses -- --only dodge --out <E>/poses.png`. 4) the single most load-bearing frame, 4x NEAREST crop, as `<E>/exhibit.png` \u2014 this is the blind-comparison exhibit and it must be the same medium as the reference. 5) startup/active/recovery tick counts read from the trace, written to `<E>/timing.json`. Same seed, same crop box, every round. DRIVE THE INPUT WITH DISCRETE PRESSES, never `--hold '{\"attack\":true}'`: the hold flag re-applies the input partial before every single step, which is mashing at 60 Hz and hides what a player's own timing produces. Attack is now a true edge (one press = one intention), so use the `--eval` hook to press once per swing at the earliest legal chain tick. A chain captured by per-tick re-pressing is a fiction.",
-      "reference": [
-        "gauntlet/evidence/reference/ref-melee-01.jpg",
-        "gauntlet/evidence/reference/ref-melee-02.jpg",
-        "gauntlet/evidence/reference/ref-melee-03.jpg"
-      ],
-      "status": "open",
-      "rounds": 0,
-      "stalls": 0,
-      "memo": [
+        },
         {
-          "wave": 1,
+          "wave": 2,
           "round": 0,
-          "element": "wave-1 verdicts lost",
-          "stronger_does": "n/a - infrastructure, not a gap",
-          "fix": "Re-enter at wave 2 round 1. The critic verdicts lived only in the Workflow return and died with the process, and repair R1 then changed the global colour grade (p99 178 -> 229), so every wave-1 capture is non-comparable to anything captured from now on. Wave 2 round 1 is the new baseline for this piece."
+          "element": "Enemy sprite lighting in busy.png: every enemy is DARKER than the floor it stands on. Measured Weber contrast against a 3x-radius local background ring: caster1 -0.34 (L 0.052 vs floor 0.079), charger5 -0.34 (0.156 vs 0.236), brute -0.55 (0.060 vs 0.133), caster2 -0.04. Body saturation 0.42-0.48. The brute is winding up (state 'windup', stateTick 8) directly on top of the player and is the least visible object in the frame.",
+          "stronger_does": "In ref-density-01 every ordinary threat is brighter than its floor by a Weber contrast of +1.43 to +2.17 (2.4x-3.2x local floor luminance) at body saturation 0.63-0.67, each with a hard dark keyline and a cast contact shadow. Where A does go darker than the floor, it is the boss at -0.17, and it pays for that with saturation 0.96 and a silhouette filling ~12% of the frame. A never asks you to find a low-saturation sub-floor-value sprite.",
+          "fix": "Light the actors above the room instead of under it. Give every enemy body an authored value floor tied to the local floor value (target body mid-tone >= 2x local floor L, i.e. >= 0.30 against our 0.15 floor) and lift body saturation into the 0.60-0.70 band A uses. Add a 1px warm rim on the key side plus a hard dark elliptical contact shadow at the feet so the silhouette survives even when the body value dips. Then split silhouette hue per archetype (brute / charger / caster) so the type reads from value and hue, not from a pink hat. Re-measure the same four Weber numbers and require all >= +1.0.",
+          "repro": null
         }
       ],
       "latest": [],
@@ -146,11 +124,63 @@
       "stalls": 0,
       "memo": [
         {
-          "wave": 1,
+          "wave": 2,
           "round": 2,
-          "element": "wave-1 verdicts lost",
-          "stronger_does": "n/a - infrastructure, not a gap",
-          "fix": "Re-enter at wave 2 round 1. The critic verdicts lived only in the Workflow return and died with the process, and repair R1 then changed the global colour grade (p99 178 -> 229), so every wave-1 capture is non-comparable to anything captured from now on. Wave 2 round 1 is the new baseline for this piece."
+          "element": "wound and body crumple",
+          "stronger_does": "holds a recoiling silhouette with a wound burst on flesh",
+          "fix": "PARK. Two stalls on the same gap. Re-enter behind an authored hit pose. Freeze-hold, flinch, and the pixel cut stay."
+        }
+      ],
+      "latest": [],
+      "history": []
+    },
+    "dodge-roll": {
+      "spec": "The dodge as the other half of the combat language: launch, invulnerable traversal, landing. Verified leads: 18 ticks, 44 px, i-frames on ticks 2-12. The economics are broken \u2014 44px/18t = 146.7 px/s against a 95 px/s run speed, so rolling is strictly better travel, and a never-attacking dodge-spam bot stalls wave 1 indefinitely (brutes landed 2 attacks in 120 seconds because they can never catch a rolling player). The i-frame window itself is honest and pinned by an exact test; the surrounding economics are the defect. Consider a cost (cooldown or stamina), earlier i-frame onset so a correct read is rewarded rather than punished, direction latched at the exact input edge, and a landing with readable recovery instead of one generic easing curve. Preserve attack buffering through the roll. A generic 360-degree sprite spin reads as a programmer's roll.",
+      "owns": [
+        "src/sim/player.ts",
+        "src/tuning.ts",
+        "src/render/views/player.ts",
+        "src/render/presenter.ts",
+        "src/render/camera.ts"
+      ],
+      "protocol": "Motion. Dev server must already be on :5173; never start a second. 1) `pnpm strip -- --scenario wave1 --seed 1 --from the dodge press --frames 12 --every 2 --crop 176,88,128,96 --out <E>/strip.png` \u2014 tick-labelled, --stepwise discipline, NEAREST upscale only. 2) the sidecar `<E>/strip.png.json` state+event trace. 3) `pnpm poses -- --only dodge --out <E>/poses.png`. 4) the single most load-bearing frame, 4x NEAREST crop, as `<E>/exhibit.png` \u2014 this is the blind-comparison exhibit and it must be the same medium as the reference. 5) startup/active/recovery tick counts read from the trace, written to `<E>/timing.json`. Same seed, same crop box, every round. DRIVE THE INPUT WITH DISCRETE PRESSES, never `--hold '{\"attack\":true}'`: the hold flag re-applies the input partial before every single step, which is mashing at 60 Hz and hides what a player's own timing produces. Attack is now a true edge (one press = one intention), so use the `--eval` hook to press once per swing at the earliest legal chain tick. A chain captured by per-tick re-pressing is a fiction.",
+      "reference": [
+        "gauntlet/evidence/reference/ref-melee-01.jpg",
+        "gauntlet/evidence/reference/ref-melee-02.jpg",
+        "gauntlet/evidence/reference/ref-melee-03.jpg"
+      ],
+      "status": "open",
+      "rounds": 6,
+      "stalls": 0,
+      "memo": [
+        {
+          "wave": 2,
+          "round": 2,
+          "element": "contact flash at overlap",
+          "stronger_does": "keeps an opaque body occupying a standing beam, no hurt color",
+          "fix": "Changed the threat to a bolt column. Stall 1. Do not grind another brute-slam through."
+        },
+        {
+          "wave": 2,
+          "round": 3,
+          "element": "beam-occupied silhouette",
+          "stronger_does": "holds a flat dive inside the column so the glow eats the body",
+          "fix": "Split with wow both ways. Held dive through occupy; kept the cyan floor ring."
+        },
+        {
+          "wave": 2,
+          "round": 4,
+          "element": "column-occupied silhouette",
+          "stronger_does": "a tumbling painted body the beam bloom swallows, head then torso then legs, plus plant dust",
+          "fix": "PARK. Two looks at occupancy after the slam-as-hit exhibit was retired. Re-enter behind authored roll-through frames. Dive-through-occupy, one-shot dodged announce, and no screen pulse stay."
+        },
+        {
+          "wave": 2,
+          "round": 4,
+          "element": "The successful-dodge burst in strip-through.png, roll ticks 1-2 (t=48, t=49). Measured on the native 128x96 crop: a filled ~40x28 px starburst with an opaque near-white core (L=240) sits exactly on the player. At t=48 and t=49 neither the player nor the brute has a single visible pixel of silhouette \u2014 the two frames are also near-identical (frac>90% luminance 0.041 then 0.042), so it is one still image held for 2 ticks with no actor in it. It also lifts the WHOLE frame: native median luminance goes 36 -> 53 (+47%) at t=48 and is still 39 at t=49. Add the tick before it (t=47, the press) where the brute's attack telegraph is an opaque orange ellipse painted OVER both bodies, and three consecutive ticks (50 ms) at the decisive moment of the game's core defensive move contain no readable character.",
+          "stronger_does": "In ref-melee-01 the white slash is a hollow crescent: the bright pixels form a thin directional arc with an empty interior, drawn UNDER the actors. Zagreus's fully-shaded sprite and Megaera's whole body stay 100% readable through the brightest VFX in the frame, and the screen's median luminance never lifts \u2014 the burst is local and the room stays dark around it. The brightest pixels point at the target instead of covering it. Same in ref-melee-03: a huge fire bloom, and Zagreus is still drawn on top of it, silhouette intact.",
+          "fix": "Draw the dodge reward behind the actors and never over them: replace the filled disk with an open ring/crescent (1-2 px stroke) plus a directional smear along the roll axis, and re-composite the player and the enemy sprites on top with a 1 px white rim so the brightest pixel in the frame lands ON the actor. Cap the core at ONE tick of full brightness and decay it over 2-3 ticks instead of holding an identical frame twice. Delete the frame-wide additive lift entirely (target: median luminance moves less than 5, not 17). Same treatment for the brute's telegraph \u2014 make it a floor decal drawn under both bodies, not an opaque fill on top of them.",
+          "repro": null
         }
       ],
       "latest": [],
@@ -174,15 +204,22 @@
         "gauntlet/evidence/reference/ref-melee-03.jpg"
       ],
       "status": "open",
-      "rounds": 1,
+      "rounds": 2,
       "stalls": 0,
       "memo": [
         {
-          "wave": 1,
+          "wave": 2,
           "round": 1,
-          "element": "wave-1 verdicts lost",
-          "stronger_does": "n/a - infrastructure, not a gap",
-          "fix": "Re-enter at wave 2 round 1. The critic verdicts lived only in the Workflow return and died with the process, and repair R1 then changed the global colour grade (p99 178 -> 229), so every wave-1 capture is non-comparable to anything captured from now on. Wave 2 round 1 is the new baseline for this piece."
+          "element": "blade and slash heat",
+          "stronger_does": "puts a lunging body, a glowing sword, and a white-hot torn arc on the same diagonal",
+          "fix": "Keep the crescent. Leave the fighter and the hilt clear of the ribbon, heat the leading edge, and let the blade sit on the tip. Do not replace the crescent."
+        },
+        {
+          "wave": 2,
+          "round": 2,
+          "element": "authored follow-through",
+          "stronger_does": "drops a readable body into a deep lunge with a physical blade the crescent is the wake of",
+          "fix": "PARK. Two stalls on the same family. Re-enter behind authored swing poses. The under-fighter smear, hole, hot tip, and warm heavy blade stay."
         }
       ],
       "latest": [],
@@ -201,15 +238,30 @@
         "gauntlet/evidence/reference/ref-density-03.jpg"
       ],
       "status": "open",
-      "rounds": 2,
+      "rounds": 6,
       "stalls": 0,
       "memo": [
         {
-          "wave": 1,
-          "round": 2,
-          "element": "wave-1 verdicts lost",
-          "stronger_does": "n/a - infrastructure, not a gap",
-          "fix": "Re-enter at wave 2 round 1. The critic verdicts lived only in the Workflow return and died with the process, and repair R1 then changed the global colour grade (p99 178 -> 229), so every wave-1 capture is non-comparable to anything captured from now on. Wave 2 round 1 is the new baseline for this piece."
+          "wave": 2,
+          "round": 1,
+          "element": "pie as stamp",
+          "stronger_does": "fills a rimmed hatch disk under the fighter so the lethal floor is one closed shape",
+          "fix": "Won the pick both orders, missed wow. Idle bot stood inside the brute. Put the witness on the rim; ask the hammer to author the mark."
+        },
+        {
+          "wave": 2,
+          "round": 4,
+          "element": "windup mass",
+          "stronger_does": "fills the frame with a leaning, wound-up body and a saturated floor cone that already owns the tiles",
+          "fix": "PARK. Three splits after the pick-win: one order wants a painted giant, the other wants our keep-out. Same family as the warden hood. The pie, falling charge, landing bead, weight shadow, and tile cracks stay. Re-enter behind authored brute windup frames."
+        },
+        {
+          "wave": 2,
+          "round": 4,
+          "element": "The contact frame itself \u2014 exhibit-impact.png at t=156, the exact tick the trace fires playerHurt. The hit is one opaque, flat, cream-orange ellipse centred on the actors. Measured on the 128x80 game frame: 809 game px above L 0.55, 604 above L 0.70, and ZERO pixels above L 0.85. Brightest pixel in the whole frame is RGB 236,204,203 (L=0.826) \u2014 nothing reaches white. The blob erases the brute down to the crown row and swallows the player entirely; at the one moment the player must read who hit whom and which way they are being thrown, the frame contains no silhouette, no outline, no direction vector.",
+          "stronger_does": "All three reference frames build the same event as a value pyramid with a hard apex and an intact silhouette. Measured identically: ref-01 0.28% of frame at L>0.95 / 0.79% >0.85 / 1.53% >0.70; ref-02 1.50 / 2.98 / 4.29; ref-03 0.69 / 2.37 / 5.90. Every one touches 255,255,255, and 7-18% of the bright mass sits in the top apex band. The core is tiny (ref-01's is roughly 12x14 game px), and it is layered \u2014 white core, yellow ring, saturated orange, red rim, grey smoke plumes on independent arcs \u2014 sitting ON TOP of the boss while the boss's face, eyes, mouth and dark outline stay fully legible underneath. The flash adds light; it never subtracts the character.",
+          "fix": "Invert the area/intensity trade: shrink the flash footprint by roughly 4-6x (target under 150 game px above L 0.55) and give it a real apex \u2014 a 6-10 game px core clamped to the palette's authored white so the frame finally has pixels above L 0.95, then two banded falloff steps (hot core, mid, rim) rather than one fill. Draw it additively over the actors and re-stamp the brute's and player's outline pixels on top afterwards so neither silhouette can ever be erased, and offset the whole thing along the attack angle (1.5708, straight south) instead of centring it, so contact carries direction.",
+          "repro": null
         }
       ],
       "latest": [],
@@ -228,15 +280,30 @@
         "gauntlet/evidence/reference/ref-density-03.jpg"
       ],
       "status": "open",
-      "rounds": 3,
+      "rounds": 6,
       "stalls": 0,
       "memo": [
         {
-          "wave": 1,
-          "round": 3,
-          "element": "wave-1 verdicts lost",
-          "stronger_does": "n/a - infrastructure, not a gap",
-          "fix": "Re-enter at wave 2 round 1. The critic verdicts lived only in the Workflow return and died with the process, and repair R1 then changed the global colour grade (p99 178 -> 229), so every wave-1 capture is non-comparable to anything captured from now on. Wave 2 round 1 is the new baseline for this piece."
+          "wave": 2,
+          "round": 1,
+          "element": "body on the lock line",
+          "stronger_does": "runs the beam through the figure you have to move",
+          "fix": "Won the pick both orders, missed wow. Fair bar is a Sniper Shell lock, not a density room."
+        },
+        {
+          "wave": 2,
+          "round": 4,
+          "element": "death line from an aimed weapon",
+          "stronger_does": "a scoped muzzle throws a fat red laser that owns the floor",
+          "fix": "PARK. Occupied sight vs authored rifle. Thick beam reads as a hit; thin beam reads as overlay. Re-enter behind a painted staff and sight. Solid lock, stop-on-body, COL_SIGHT, staff scale, and the detached bolt stay."
+        },
+        {
+          "wave": 2,
+          "round": 4,
+          "element": "The caster's bolt at ticks 74-80 (strip.png cells #08-#10, exhibit.png). Measured at native scale off strip.png: the bolt renders as a wedge that is THICKEST at the caster and tapers outward - column pixel-heights at t=74 run 16,18,15,16,15,13,13,11,11,11,10,10,9,8,7,7,7 from x=70 to x=84. It never detaches: scanning right from the caster's 16px sprite box (crop x 53-69), the first empty column is x=85 at t=74, x=82 at t=77, x=93 at t=80 - a continuous bridge of effect pixels from the shooter's body to the bolt front in every single frame. And it does not travel: the mass strictly right of the caster has centroid x = 76.0 / 74.7 / 76.2 at t=74/77/80, net +0.2 px over six ticks, while the trace moves the bolt 11 px (world 172 -> 184.8 by t=81). Its area is flat too: 205 / 218 / 206 magenta px - no decay over 9+ ticks. At t=74 the discharge also completely covers the caster: you cannot see who fired. So the threat has no head, no gap, no travel and no decay. It reads as a beam the caster is holding, not an object crossing the room - which also means there is no single readable contact frame for the shot, just a 9-tick plateau.",
+          "stronger_does": "In ref-density-02 downsampled to native 480x270, every enemy bullet is a compact ~7px round white head with a hard 1px rim, sitting at a clearly separated point on a thin 1-2px trail; consecutive heads sit ~11px apart, so displacement is unmissable frame to frame. In ref-density-01 the rocket is a ~5x8 head with a 1-2px white smoke trail, and the blue orb is a 5px round - nothing is welded to its shooter, and the shooter stays fully readable. The reference rule is consistent: the HEAD is the brightest, most compact, most detached element and the trail is thinner and dimmer behind it. Our wedge inverts that - brightest and fattest at the origin, tapering toward the target.",
+          "fix": "Split the one effect into three. (a) Muzzle flash: its own burst at the caster's hand that decays to zero over 2-3 ticks and is clipped so it never covers the caster's 16px silhouette. (b) Bolt head: a compact shape no wider than ~6 native px, the brightest thing in the effect. (c) Trail: capped in length and at most 1/3 the head's luminance, with the hard requirement that an empty column opens between the caster sprite box and the bolt within 3 ticks of firing - re-run the column scan above as the gate. Then make motion visible: at 110 px/s the head advances 1.83 px/tick, less than one 2x-scaled pixel, and the 34px trail is 19x that displacement, so the travel is buried. Either raise bolt speed until the head centroid advances >=3 px/tick, or increase the caster's stand-off so the flight is long enough to read, and verify by re-measuring the head centroid per tick - the pass condition is monotonic, not the +0.2 px it measures now.",
+          "repro": null
         }
       ],
       "latest": [],
@@ -248,59 +315,35 @@
         "src/sim/enemies/charger.ts",
         "src/render/views/enemy-charger.ts"
       ],
-      "protocol": "Motion. Dev server must already be on :5173; never start a second. 1) `pnpm strip -- --scenario charger-swarm --seed 1 --from freeze start --frames 12 --every 2 --crop 160,104,160,80 --out <E>/strip.png` \u2014 tick-labelled, --stepwise discipline, NEAREST upscale only. 2) the sidecar `<E>/strip.png.json` state+event trace. 3) `pnpm poses -- --only charger --out <E>/poses.png`. 4) the single most load-bearing frame, 4x NEAREST crop, as `<E>/exhibit.png` \u2014 this is the blind-comparison exhibit and it must be the same medium as the reference. 5) startup/active/recovery tick counts read from the trace, written to `<E>/timing.json`. Same seed, same crop box, every round. Also capture a 4-charger frame from scenario wave3 as `<E>/exhibit-crowd.png`: if four tells are indistinguishable, that is the gap.",
+      "protocol": "Motion. Dev server must already be on :5173; never start a second. 1) `pnpm strip -- --scenario charger --seed 1 --from freeze start --frames 12 --every 2 --crop 144,72,192,128 --out <E>/strip.png` \u2014 tick-labelled, --stepwise discipline, NEAREST upscale only. 2) the sidecar `<E>/strip.png.json` state+event trace. 3) `pnpm poses -- --only charger --out <E>/poses.png`. 4) the single most load-bearing frame, 4x NEAREST crop, as `<E>/exhibit.png` \u2014 this is the blind-comparison exhibit and it must be the same medium as the reference. 5) startup/active/recovery tick counts read from the trace, written to `<E>/timing.json`. Same seed, same crop box, every round. Also capture a 4-charger frame from scenario wave3 as `<E>/exhibit-crowd.png`: if four tells are indistinguishable, that is the gap.",
       "reference": [
         "gauntlet/evidence/reference/ref-dash-01.jpg"
       ],
       "status": "open",
-      "rounds": 3,
+      "rounds": 7,
       "stalls": 0,
       "memo": [
         {
-          "wave": 1,
-          "round": 3,
-          "element": "wave-1 verdicts lost",
-          "stronger_does": "n/a - infrastructure, not a gap",
-          "fix": "Re-enter at wave 2 round 1. The critic verdicts lived only in the Workflow return and died with the process, and repair R1 then changed the global colour grade (p99 178 -> 229), so every wave-1 capture is non-comparable to anything captured from now on. Wave 2 round 1 is the new baseline for this piece."
-        }
-      ],
-      "latest": [],
-      "history": []
-    },
-    "death-card": {
-      "spec": "The death moment and its card. The staging already works \u2014 30 ticks of 0.25 slow-motion, the player's own sprite shatters, a red vignette closes in \u2014 and several audits called it the most art-directed moment in the game. What is wrong is the words. The card says 'YOU DIED' and 'press R', which is developer UX wearing a game's clothes, and the loudest authored voice in the entire build is a stock fighter-game announcer shouting FLAWLESS VICTORY over an indigo death-realm. Read VISION.md: you are already dead, losing a run is being pulled back to the bardo, not a game over. This is the cheapest place in the whole project to put the fiction into the game instead of the filename, and there is a latent motif nobody wrote down \u2014 a room floating in a starfield void, doors and windows opening onto star-sky, THE THRESHOLD. Also add the run summary that is missing. `ART_DIRECTION.md` at the repo root is the aim; cite it.",
-      "owns": [
-        "src/render/hud.ts",
-        "src/render/atmosphere.ts"
-      ],
-      "protocol": "Still plus short motion. `pnpm strip -- --scenario wave1 --seed 5 --from <the killing blow> --frames 10 --every 3 --out <E>/strip.png` for the death sequence, plus the settled card as `<E>/exhibit.png` at 2x NEAREST. Same seed and start tick every round.",
-      "reference": [
-        "gauntlet/evidence/reference/ref-death-01.jpg"
-      ],
-      "status": "parked",
-      "rounds": 3,
-      "stalls": 2,
-      "memo": [
-        {
-          "wave": 1,
-          "round": 0,
-          "element": "wave-1 verdicts lost",
-          "stronger_does": "n/a - infrastructure, not a gap",
-          "fix": "Re-enter at wave 2 round 1. The critic verdicts lived only in the Workflow return and died with the process, and repair R1 then changed the global colour grade (p99 178 -> 229), so every wave-1 capture is non-comparable to anything captured from now on. Wave 2 round 1 is the new baseline for this piece."
-        },
-        {
           "wave": 2,
           "round": 0,
-          "element": "bar locked",
-          "stronger_does": "a run-end death page (taped kill still + named killer), not a hub room or a combat HUD",
-          "fix": "Judge the settled card against ref-death-01. Fight chrome leaves when the stele owns the frame."
+          "element": "bar",
+          "stronger_does": "a floor-projected charge lane you can step off",
+          "fix": "Fair bar is a dash-lane telegraph still (Asterius charge lane), not a Beholster density room. Density refs stay unused."
         },
         {
           "wave": 2,
           "round": 3,
-          "element": "authored fallen pose",
-          "stronger_does": "a body that has fallen and a stele that is carved stone, not a Graphics plaque over a standing heap",
-          "fix": "PARK. Two no-wow wins after a split. Re-enter behind authored death art. Fight chrome off, left stele, TAKEN BY, wine well, star-sky arch stay."
+          "element": "charge-lane overlay",
+          "stronger_does": "a painted floor wound that grows out of the body",
+          "fix": "PARK. Three fair-bar losses on overlay vs world-wound. Rails, stain-quad, and tile fills all read as a pasted rectangle. Re-enter behind authored floor-wound art. Tile stain, grout cuts, lock burst, and the dash wake stay."
+        },
+        {
+          "wave": 2,
+          "round": 6,
+          "element": "The contact/impact beat \u2014 strip.png frame #09, t=310, event playerHurt, hitstop FREEZE 4. Our ONLY impact language is a full-viewport red overlay. Measured against the neighbouring frames: 96.3% of pixels change between t=308 and t=310; the untouched wall two-thirds of the screen away from the hit goes (62,73,91) blue-grey to (121,83,97) pink; the black floor lifts from luminance 8 to 15; peak luminance FALLS from 240 to 211; pixels above luminance 230 go from 0.529% at t=308 to 0.000% at t=310. The frame in which the player takes damage is the only frame in the entire 22-tick sentence with nothing at all in the top luminance band. At the contact point itself there is no spark, no debris, no directional streak \u2014 the player sprite at t=310 is pixel-identical to t=308 apart from the global tint. The impact is rendered by subtracting contrast from the whole room.",
+          "stronger_does": "In ref-density-01 the impact is the brightest thing in the room and the room keeps its own colour. The explosion is a local additive core at pure 255 white with a spark fan and a rotating debris plume: 23,407 pixels at >=254 in a single frame, 0.500% of the frame above luminance 230 \u2014 and that frame is DARKER overall than ours (mean luminance 29.6 vs our 44.6). The dark blue floor tiles four tiles away from the blast are unchanged. Impact adds light locally; it never desaturates the room globally. ref-density-02 does the same at higher intensity: 174,944 pixels at >=254, 2.53% above 230, and the brick floor under the lasers keeps its red.",
+          "fix": "Two moves. (1) Give impact somewhere to go: no pixel in ANY of our rendered frames exceeds (236,240,246) \u2014 exhibit.png, exhibit-crowd.png and every strip panel share that exact ceiling, and the charger lane's own white rim already sits on it. Raise the ceiling to a true 255 white reserved for hit sparks and muzzle-class events only, so a hit can out-shine the telegraph that preceded it. (2) Replace the full-frame multiply with a local additive burst on the damage tick: a 3-5 px 255-white core at the contact point, 4-8 radial spark pixels thrown along the dash vector, 2-3 ticks of life. Keep a screen tint only as a vignette that darkens the frame EDGES; it must not lift p1. Acceptance test, computable from the next strip: on the hurt tick, percentage of pixels above luminance 230 must go UP relative to t=308, not to zero, and p1 luminance must stay at 8.",
+          "repro": null
         }
       ],
       "latest": [],
@@ -316,23 +359,56 @@
       "reference": [
         "gauntlet/evidence/reference/ref-hud-01.jpg"
       ],
-      "status": "parked",
+      "status": "open",
       "rounds": 2,
-      "stalls": 2,
+      "stalls": 0,
       "memo": [
-        {
-          "wave": 1,
-          "round": 3,
-          "element": "wave-1 verdicts lost",
-          "stronger_does": "n/a - infrastructure, not a gap",
-          "fix": "Re-enter at wave 2 round 1."
-        },
         {
           "wave": 2,
           "round": 2,
           "element": "weapon-and-ammo chrome",
-          "stronger_does": "frames a live pistol and a 42/330 count",
-          "fix": "PARK. Two losses on the same family. We will not invent a gun. Re-enter behind authored HUD stamps. Empty outlines, LEFT N, mercy groove stay."
+          "stronger_does": "frames a live pistol and a 42/330 count so hold and remaining fight are glanceable",
+          "fix": "PARK. Two losses on the same family. We will not invent a gun. Split: life sockets vs loadout. Re-enter behind authored HUD stamps (hearts + a blade that is ours). Empty outlines, LEFT N, mercy groove stay."
+        }
+      ],
+      "latest": [],
+      "history": []
+    },
+    "death-card": {
+      "spec": "The death moment and its card. The staging already works \u2014 30 ticks of 0.25 slow-motion, the player's own sprite shatters, a red vignette closes in \u2014 and several audits called it the most art-directed moment in the game. What is wrong is the words. The card says 'YOU DIED' and 'press R', which is developer UX wearing a game's clothes, and the loudest authored voice in the entire build is a stock fighter-game announcer shouting FLAWLESS VICTORY over an indigo death-realm. Read VISION.md: you are already dead, losing a run is being pulled back to the bardo, not a game over. This is the cheapest place in the whole project to put the fiction into the game instead of the filename, and there is a latent motif nobody wrote down \u2014 a room floating in a starfield void, doors and windows opening onto star-sky, THE THRESHOLD. Also add the run summary that is missing. `ART_DIRECTION.md` at the repo root is the aim; cite it.",
+      "owns": [
+        "src/render/hud.ts",
+        "src/render/atmosphere.ts"
+      ],
+      "protocol": "Still plus short motion. `pnpm strip -- --scenario wave1 --seed 5 --from <the killing blow> --frames 10 --every 3 --out <E>/strip.png` for the death sequence, plus the settled card as `<E>/exhibit.png` at 2x NEAREST. Same seed and start tick every round.",
+      "reference": [
+        "gauntlet/evidence/reference/ref-death-01.jpg"
+      ],
+      "status": "open",
+      "rounds": 5,
+      "stalls": 0,
+      "memo": [
+        {
+          "wave": 2,
+          "round": 0,
+          "element": "bar locked",
+          "stronger_does": "a run-end death page (taped kill still + named killer), not a hub room or a combat HUD",
+          "fix": "Judge the settled card against ref-death-01. Fight chrome leaves when the stele owns the frame."
+        },
+        {
+          "wave": 2,
+          "round": 3,
+          "element": "authored fallen pose",
+          "stronger_does": "a body that has fallen and a stele that is carved stone, not a Graphics plaque over a standing heap",
+          "fix": "PARK. Two no-wow wins after a split. Material/composition/pixel stuck at 3. Re-enter behind authored death art. Fight chrome off, left stele, TAKEN BY, wine well, star-sky arch stay."
+        },
+        {
+          "wave": 2,
+          "round": 3,
+          "element": "The death card's plate itself \u2014 the panel rect at native (128,42)-(351,231), 224x190. Measured off exhibit.png downsampled to native 480x270: the panel fill has a median luminance of 13/255; the scrimmed world just outside it has a median of 7.7/255. The card is separated from the room by 5 luminance units \u2014 2.1% of the range \u2014 plus a single 1px hairline (top edge 114, bottom edge 86). There is no cast shadow: the 7 rows below the bottom border read 7.7, 9.0, 10.3, 11.8, 10.0, 7.7, 7.7 (that is room content, not a shadow) and the 7 columns left of the left border read a flat 7.72 all the way out. And the fill is translucent, not a plate: at normal exposure the room's shelf edges and a wall crack read straight through the card, crossing under the gold divider and behind the SENT ONWARD row. Whole-frame tone: p50=8, p90=18, p99=130, max=225, and only 0.12% of pixels above 72% luminance.",
+          "stronger_does": "ref-ui-02 is the quietest, darkest frame in the reference pair \u2014 a solemn hall, no combat \u2014 and it still measures p50=25, p90=87, p99=225, with 2.00% of pixels above 72% luminance. Ours is 3x darker at the median, 5x darker at p90, and carries 1/17th the count of lit pixels; our single brightest pixel in the entire frame (225) only just reaches the reference's p99. Every framed object in both references \u2014 the boon doorway, the Mask of Nyx panel, the shrine plinths \u2014 is an opaque painted surface stacked in at least three layers: a dark cast shadow separating it from the ground, a heavy mid-value metal frame, and an inner bevel with a lit top edge and a dark bottom edge. The object reads as a physical thing sitting in front of the room, and it owns the top of the frame's value range. Ours reads as a hairline drawn on the room.",
+          "fix": "Make the card an object, not an overlay. 1) Kill the translucency \u2014 fill opaque so no room geometry crosses the card; nothing behind it should be recoverable at any exposure. 2) Lift the plate off the scrim: fill median from 13 to roughly 34-45 while pushing the scrim's side-region median from 7.7 down to ~4, so figure/ground is carried by value (a 30+ unit step) and not by a 1px line. 3) Layer the frame instead of one hairline: a 2px dark ring at luminance ~3 offset 2px down-right as a cast shadow, then the 1-2px gold rail, then a 1px inner bevel \u2014 highlight ~150 on the top and left, ~70 on the bottom and right (the existing 114-top/86-bottom split is the right instinct, it just has nothing stacked on either side of it). 4) Give the plate a material: a low-amplitude texture or a top-to-bottom ramp inside the fill so the surface is not one flat swatch. Target: frame p90 clears 60 and 1%+ of pixels above 72% luminance, with the card \u2014 not the room's leftover torches \u2014 supplying it.",
+          "repro": null
         }
       ],
       "latest": [],
@@ -350,23 +426,24 @@
         "gauntlet/evidence/reference/ref-density-02.jpg",
         "gauntlet/evidence/reference/ref-density-03.jpg"
       ],
-      "status": "parked",
-      "rounds": 2,
-      "stalls": 2,
+      "status": "open",
+      "rounds": 5,
+      "stalls": 0,
       "memo": [
-        {
-          "wave": 1,
-          "round": 2,
-          "element": "wave-1 verdicts lost",
-          "stronger_does": "n/a - infrastructure, not a gap",
-          "fix": "Re-enter at wave 2 round 1."
-        },
         {
           "wave": 2,
           "round": 2,
           "element": "player-commit lift",
           "stronger_does": "keeps swing and dodge clearly above the combat bed under full voice load",
-          "fix": "PARK. Two losses on the same family. Re-enter behind authored combat stems. Buses, bed, announcer-off, crowd, lead stay."
+          "fix": "PARK. Two losses on the same family. Gain, delayed commit duck, and an SFX crowd carve did not hold ~6 dB broadband on swing and dodge in both renders. Re-enter behind authored combat stems and recorded swing takes. Buses, bed, announcer-off, crowd, lead stay."
+        },
+        {
+          "wave": 2,
+          "round": 2,
+          "element": "The danger channel has one timbre. Per event-sound-map.png, six of the game's danger cues \u2014 enemyWindup brute (3000 Hz), caster (2100 Hz), charger (2200 Hz), enemyAttack brute (2600 Hz), charger (3200 Hz) and spawnTelegraph (2350 Hz) \u2014 are all the same 'synth struck bowl', and the whole vocabulary fits inside 2100-3200 Hz, a span of 7.3 semitones. solo-levels.json confirms the ear cannot separate them: all six peak in the same 2400-4800 Hz band, and the six-band lift profiles are near-identical after removing loudness \u2014 enemyAttack/brute vs enemyAttack/charger 0.6 dB rms apart, enemyWindup/charger vs spawnTelegraph 1.8 dB, enemyWindup/brute vs enemyWindup/charger 2.0 dB. Only the caster wind-up separates at all (5.7 dB). Worse, the layer that actually says WHICH enemy is the quiet one: bell 1.20 vs swordMetal 0.30 (-12.0 dB) for the brute, 0.72 vs laserRetro 0.22 (-10.3 dB) for the caster, 1.07 vs creature 0.28 (-11.6 dB) for the charger. The identifying cue sits 10-12 dB under the generic cue, on all three. Result: with your back turned you hear 'something is about to hurt me' but never which of three enemies, and the three demand different responses.",
+          "stronger_does": "In ref-density-01 and -02 the threat channel is separated by carrier, not by an offset on one shared carrier. The yellow tracer line, the red laser sight, the orange fireball cluster, the pink hearts and the grey smoke each own a different hue AND a different shape AND a different motion, at full contrast. The identifying property is the loud property \u2014 you never have to look past a generic 'danger' element to find out which danger it is. Nothing in that frame is another thing shifted one semitone.",
+          "fix": "Give each enemy class its own timbre family and separate them by more than an octave, then invert the layer ratio. Concretely: keep the struck bowl for exactly one class, move the brute to a low struck/wood body around 300-500 Hz, and give the charger a rising pitch sweep (not a struck decay) so it is separated by envelope shape as well as by frequency; leave the caster's bright bell where it is. Then raise the identifying layer (swordMetal / laserRetro / creature) to within 3 dB of the shared layer, or above it, and drop the shared bell to a 'something' bed underneath. Re-run solo-levels.json and require the six-band shape distance between any two danger cues to be >= 8 dB rms before calling it done \u2014 that number is the gate, not the ear.",
+          "repro": null
         }
       ],
       "latest": [],

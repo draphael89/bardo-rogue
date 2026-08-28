@@ -215,6 +215,23 @@ export function playEventSfx(a: AudioSystem, ev: SimEvent): void {
       a.play('impactPunch_heavy', { ...at, gain: 0.42 + ev.stacks * 0.08, pitch: 0.9 })
       a.thump(0.35 + ev.stacks * 0.1, 135, 62, 0.18)
       break
+    // Fire announces itself once, on ignition, and then keeps quiet. A cue on every bite would put
+    // a metronome under any fight where two bodies are alight.
+    case 'burnApplied':
+      a.play('impactGeneric_light', { ...at, gain: 0.2, pitch: 1.5 })
+      break
+    case 'burnTick':
+    case 'burnEnded':
+      break
+    case 'brandPassed':
+      a.play('impactGeneric_light', { x: ev.toX, y: ev.toY, gain: 0.22, pitch: 1.35 })
+      break
+    // The interrupt is the rarest good thing a heavy can do, so it gets the loudest single sound the
+    // blade has and a struck bowl over it.
+    case 'interrupt':
+      a.play('impactPunch_heavy', { ...at, gain: 0.5, pitch: 1.08 })
+      a.bell(0.26, 1046.5, 0.9, 'ui')
+      break
     case 'runWon':
       a.bell(1, 196, 4.2)
       a.bell(0.7, 293.66, 3.7, 'music', 0.18)

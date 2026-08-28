@@ -1300,12 +1300,16 @@ export class Hud {
     g.clear()
 
     // Same legend either way: a glyph for the device you are actually holding, then what it does.
-    type Item = { kind: 'word' | 'crosshair' | 'lmb' | 'stickL' | 'stickR' | 'btnX' | 'btnA'; word?: string; label: string }
+    type Item = { kind: 'word' | 'crosshair' | 'lmb' | 'stickL' | 'stickR' | 'btnX' | 'btnA' | 'btnY'; word?: string; label: string }
+    // The heavy earns a slot here the day it becomes its own button: a verb nobody is told about is
+    // a verb nobody uses. Lock loses its place on the keyboard row instead — it is the one entry a
+    // player can discover without being shown, and the row must not outgrow its plate.
     const items: Item[] = this.padMode
-      ? [{ kind: 'stickL', label: 'MOVE' }, { kind: 'stickR', label: 'AIM' }, { kind: 'btnX', label: 'STRIKE' }, { kind: 'btnA', label: 'DODGE' }]
+      ? [{ kind: 'stickL', label: 'MOVE' }, { kind: 'stickR', label: 'AIM' }, { kind: 'btnX', label: 'STRIKE' },
+         { kind: 'btnY', label: 'HEAVY' }, { kind: 'btnA', label: 'DODGE' }]
       : [{ kind: 'word', word: 'WASD', label: 'MOVE' }, { kind: 'word', word: 'ARROWS', label: 'AIM' },
-         { kind: 'word', word: 'J', label: 'STRIKE' }, { kind: 'word', word: 'SPACE', label: 'DODGE' },
-         { kind: 'word', word: 'Q', label: 'LOCK' }]
+         { kind: 'word', word: 'J', label: 'STRIKE' }, { kind: 'word', word: 'L', label: 'HEAVY' },
+         { kind: 'word', word: 'SPACE', label: 'DODGE' }]
 
     const GAP = 4, SEP = 12
     const widths = items.map(it => it.kind === 'word' ? this.measure(it.word!) + 9 : it.kind === 'lmb' ? 9 : it.kind === 'crosshair' ? 11 : 10)
@@ -1378,7 +1382,7 @@ export class Hud {
       default: {            // pad: sticks and face buttons share one octagon shell
         const cx = x + 5, top = y + 1
         const stick = it.kind === 'stickL' || it.kind === 'stickR'
-        const col = it.kind === 'btnX' ? C.gold : it.kind === 'btnA' ? C.bone : edge
+        const col = it.kind === 'btnX' ? C.gold : it.kind === 'btnY' ? C.ember : it.kind === 'btnA' ? C.bone : edge
         g.rect(x + 3, top + 9, 5, 1).fill({ color: C.void, alpha: 0.9 })
         g.rect(x + 2, top + 1, 7, 7).fill(face)
         g.rect(x + 1, top + 2, 9, 5).fill(face)
@@ -1394,7 +1398,9 @@ export class Hud {
           g.rect(nub - 1, top + 3, 3, 3).fill(ink)
         } else {
           // 3x5 hand-set letters: the 8px webfont overflows a 10px button shell
-          const rows = it.kind === 'btnX' ? ['X.X', 'X.X', '.X.', 'X.X', 'X.X'] : ['.X.', 'X.X', 'XXX', 'X.X', 'X.X']
+          const rows = it.kind === 'btnX' ? ['X.X', 'X.X', '.X.', 'X.X', 'X.X']
+            : it.kind === 'btnY' ? ['X.X', 'X.X', '.X.', '.X.', '.X.']
+            : ['.X.', 'X.X', 'XXX', 'X.X', 'X.X']
           for (let ry = 0; ry < 5; ry++) for (let rx = 0; rx < 3; rx++) if (rows[ry][rx] === 'X') g.rect(cx - 1 + rx, top + 2 + ry, 1, 1).fill(col)
         }
         break

@@ -379,6 +379,34 @@ export class Presenter {
         case 'brandApplied':
           this.particles.ring(ev.x, ev.y, ev.stacks >= 3 ? 0xff9a30 : 0xb03010)
           break
+        case 'burnApplied':
+          this.particles.flame(ev.x, ev.y - 4)
+          this.particles.puff(ev.x, ev.y, 3, 0xff8c30)
+          break
+        case 'burnTick':
+          this.particles.flame(ev.x, ev.y - 3)
+          break
+        case 'brandPassed': {
+          // The debt has to be SEEN to move, or a mark reappearing on another body reads as a bug.
+          // Embers walk the whole span so the eye follows them to their new owner.
+          const steps = 6
+          for (let i = 1; i <= steps; i++) {
+            const t = i / (steps + 1)
+            this.particles.ember(ev.fromX + (ev.toX - ev.fromX) * t, ev.fromY + (ev.toY - ev.fromY) * t)
+          }
+          this.particles.ring(ev.toX, ev.toY, 0xff9a30)
+          break
+        }
+        case 'interrupt':
+          // Catching someone mid-word is the hardest read the heavy can buy. It gets its own
+          // punctuation: a hard white ring and a shove, over and above the hit that carried it.
+          this.particles.ring(ev.x, ev.y, 0xfff4d8)
+          this.particles.puff(ev.x, ev.y, 7, 0xffd070)
+          this.camera.addTrauma(0.22)
+          this.postfx.pulse()
+          break
+        case 'burnEnded':
+          break
         case 'brandConsumed':
           this.particles.ring(ev.x, ev.y, 0xffe090)
           this.particles.puff(ev.x, ev.y, 4 + ev.stacks * 2, 0xff7a18)
@@ -745,6 +773,7 @@ export class Presenter {
       if (!e.active) continue
       if (e.kind === 'caster' && e.state === 'aim') drawAimLine(this.fxGraphics, e, slowAlpha)
       if (e.brand > 0) drawBrandPips(this.fxGraphics, e, slowAlpha)
+      if (e.burn > 0) drawBurn(this.fxGraphics, this.groundFx, e, slowAlpha, this.time)
     }
     if (w.session.run?.primedBrand) drawPrimedEdge(this.fxGraphics, p, alpha)
     if (armOf(w) === ARM.bow) drawBowAim(this.fxGraphics, p, alpha)
@@ -794,6 +823,34 @@ function drawBrandPips(g: Graphics, e: Enemy, alpha: number): void {
     g.rect(px - 1, y - 1, 5, 5).fill(0x08070e)
     g.rect(px, y, 3, 3).fill(i < e.brand ? (e.brand === 3 ? 0xffcc56 : 0xff7a18) : 0x3a2018)
     if (i < e.brand) g.rect(px + 1, y, 1, 2).fill(0xfff0c0)
+  }
+}
+
+// Brand counts, so it is drawn as pips you can read at a glance: you need the number to know what a
+// heavy will cash. Burn does not count - the exact stack never changes a decision - so it is drawn
+// as fire ON the body instead of a second row of counters competing with the first.
+function drawBurn(g: Graphics, ground: Graphics, e: Enemy, alpha: number, time: number): void {
+  const x = Math.round(lerp(e.px, e.x, alpha))
+  const y = Math.round(lerp(e.py, e.y, alpha))
+  // The pool first, under the body: a burning shape is lit from below, and this is what makes the
+  // status legible across a room at speed. The licks are the detail, not the signal.
+  const pulse = 0.5 + 0.5 * Math.sin(time * 7)
+  const pr = e.radius + 3 + e.burn
+  ground.ellipse(x, y + 3, pr, Math.round(pr * 0.5)).fill({ color: 0xff7a18, alpha: 0.10 + 0.05 * e.burn + 0.04 * pulse })
+  const licks = 3 + e.burn
+  for (let i = 0; i < licks; i++) {
+    // A cheap deterministic flicker: each lick has its own phase, so they never pulse in unison.
+    const phase = time * 9 + i * 2.1
+    const sway = Math.sin(phase) * 3
+    const rise = ((phase * 0.5) % 1)
+    const lx = Math.round(x + sway + (i - licks / 2) * 3)
+    // Rooted at the body and climbing only to just above it, so the Brand pips keep the airspace
+    // over the head to themselves and the two statuses never read as one stacked readout.
+    const ly = Math.round(y + 2 - rise * (e.radius + 7))
+    const h = 1 + Math.round((1 - rise) * 2)
+    // The ramp stays hot most of the way up: the dark tail of a fire is invisible on a dark floor,
+    // which is where the first pass lost most of its pixels.
+    g.rect(lx, ly, 1, h).fill(rise < 0.55 ? 0xffe08a : rise < 0.85 ? 0xffa03a : 0xd4551c)
   }
 }
 

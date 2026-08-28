@@ -50,11 +50,16 @@ function desktopSaveStore(bridge: DesktopBridge): SaveStore {
   return {
     read: id => readVia(bridge.saves.read.bind(bridge.saves), id),
     readBackup: id => readVia(bridge.saves.readBackup.bind(bridge.saves), id),
+    // Reject, never resolve: a swallowed refusal is a player losing a session's progress while the
+    // game says nothing. main.ts's write chain turns a rejection into the PROGRESS NOT SAVING banner.
     write: async (id, data) => {
       const r = await bridge.saves.write(id, data)
-      if (!r.ok) console.log(`[save] write refused: ${r.error}`)
+      if (!r.ok) throw new Error(`save write refused: ${r.error}`)
     },
-    delete: async id => { await bridge.saves.delete(id) },
+    delete: async id => {
+      const r = await bridge.saves.delete(id)
+      if (!r.ok) throw new Error(`save delete refused: ${r.error}`)
+    },
   }
 }
 
@@ -70,7 +75,7 @@ export function createDesktopPlatform(bridge: DesktopBridge): Platform {
     // inverting it here would swallow a second press during macOS's fullscreen animation.
     fullscreen: async on => { await bridge.setFullscreen(on ?? 'toggle') },
     setRunActive: active => bridge.setRunActive(active),
-    exportFile: async (text, filename) => { await bridge.exportFile(text, filename) },
+    exportFile: (text, filename) => bridge.exportFile(text, filename),
     importFile: () => bridge.importFile(),
   }
 }

@@ -221,11 +221,14 @@ async function boot() {
   // fullscreen call itself lives in src/platform (it is the host's job); this is the renderer's.
   document.addEventListener('fullscreenchange', () => ra.resize())
 
-  const exportSave = () => {
+  const exportSave = async () => {
     // For a save from a newer build, export the bytes as they were READ: re-serialising would emit a
     // schemaVersion-2 document with the newer build's fields quietly dropped, which is indistinguishable
     // from a real one.
-    void platform.exportFile(loaded.raw ?? serializeSave(savedSave), saveFilename(new Date()))
+    // The call has to happen inside the keydown the browser is still processing (the download click
+    // needs that gesture), so it is started before anything is awaited.
+    const written = await platform.exportFile(loaded.raw ?? serializeSave(savedSave), saveFilename(new Date()))
+    if (!written) { presenter.hud.showBanner('SAVE NOT EXPORTED', 'nothing was written', 2.0); return }
     presenter.hud.showBanner('SAVE EXPORTED', savable ? 'CHECK YOUR DOWNLOADS' : 'EXPORTED AS FOUND', 2.0)
   }
   const importSave = async () => {
@@ -268,7 +271,7 @@ async function boot() {
     if (e.code === 'F3') { e.preventDefault(); if (recorder.recording) stopRecord(); recorder.download() }
     if (e.code === 'KeyF' && !e.repeat) { e.preventDefault(); void platform.fullscreen() }
     // Save management is reachable only from the pause screen, so it can never fire mid-fight.
-    if (userPaused && e.code === 'KeyE' && !e.repeat) { e.preventDefault(); exportSave() }
+    if (userPaused && e.code === 'KeyE' && !e.repeat) { e.preventDefault(); void exportSave() }
     if (userPaused && e.code === 'KeyI' && !e.repeat) { e.preventDefault(); void importSave() }
   })
   if (!noSave) {

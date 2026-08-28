@@ -29,11 +29,14 @@ export function createStorageSaveStore(storage: StorageLike | undefined): SaveSt
 // the web adapter's business and nobody else's, so it happens here rather than in the boot path.
 // The legacy keys are never written again and never deleted -- a rollback to an older build still
 // finds a player's attempts and victories exactly where it left them.
-export function migrateLegacyKeys(storage: StorageLike | undefined, profileId: string): void {
+export function migrateLegacyKeys(storage: StorageLike | undefined, profileId: string, preferredReducedEffects = false): void {
   if (!storage) return
   try {
     if (storage.getItem(saveKey(profileId)) !== null) return           // already on the envelope
-    const save = migrateLegacySave(storage.getItem(META_KEY), storage.getItem(SETTINGS_KEY), { profileId })
+    // The OS preference has to come along: a returning player with meta progress but no settings key
+    // would otherwise have `reducedEffects: false` written down as an explicit choice they never made,
+    // and an explicit value shadows the system preference from then on.
+    const save = migrateLegacySave(storage.getItem(META_KEY), storage.getItem(SETTINGS_KEY), { profileId, preferredReducedEffects })
     if (save) storage.setItem(saveKey(profileId), serializeSave(save))
   } catch { /* nothing to recover; boot proceeds on defaults */ }
 }
@@ -47,7 +50,7 @@ function safeLocalStorage(): StorageLike | undefined {
 
 export function createWebPlatform(opts: DetectOptions = {}): Platform {
   const storage = safeLocalStorage()
-  if (opts.migrateLegacy !== false) migrateLegacyKeys(storage, PROFILE_ID)
+  if (opts.migrateLegacy !== false) migrateLegacyKeys(storage, PROFILE_ID, prefersReducedMotion())
   let picker: HTMLInputElement | null = null
   return {
     kind: 'web',

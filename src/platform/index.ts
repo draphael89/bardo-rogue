@@ -32,7 +32,7 @@ export interface Platform {
   // Fires when something outside this session wrote the save. Only the browser needs it -- two tabs
   // of the same origin -- and the desktop host prevents the equivalent with a single-instance lock.
   watchForeignWrites?(cb: () => void): void
-  exportFile(text: string, filename: string): Promise<void>
+  exportFile(text: string, filename: string): Promise<boolean>   // false = cancelled or not written
   importFile(): Promise<string | null>                // null = the player cancelled
 }
 

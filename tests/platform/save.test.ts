@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { META_KEY, SETTINGS_KEY, type StorageLike } from '@/sim/storage'
 import { defaultSave, serializeSave, type BardoSave } from '@/sim/save'
 import { backupKey, createStorageSaveStore, migrateLegacyKeys, saveKey } from '@/platform/web'
+import { createDesktopPlatform, type DesktopBridge } from '@/platform/desktop'
 import { loadSave, saveFilename } from '@/platform/saveFile'
 
 // The same shape tests/sim/slice.test.ts uses. Nothing here needs a DOM: the web adapter's storage
@@ -190,6 +191,23 @@ describe('legacy key migration', () => {
     expect(storage.getItem(saveKey(ID))).toBe(existing)
   })
 
+  it('carries the system reduced-motion preference through the upgrade', () => {
+    // A returning player with meta progress but no settings key never chose a value. Writing an
+    // explicit `false` would shadow the OS preference from then on, because an explicit value wins.
+    const storage = new MemoryStorage()
+    storage.setItem(META_KEY, JSON.stringify({ version: 1, attempts: 7, victories: 2, unlockedWeapons: ['blade'] }))
+    migrateLegacyKeys(storage, ID, true)
+    expect(JSON.parse(storage.getItem(saveKey(ID))!).settings.reducedEffects).toBe(true)
+  })
+
+  it('keeps an explicit legacy setting over the system preference', () => {
+    const storage = new MemoryStorage()
+    storage.setItem(META_KEY, JSON.stringify({ version: 1, attempts: 1, victories: 0, unlockedWeapons: ['blade'] }))
+    storage.setItem(SETTINGS_KEY, JSON.stringify({ version: 1, reducedEffects: false }))
+    migrateLegacyKeys(storage, ID, true)
+    expect(JSON.parse(storage.getItem(saveKey(ID))!).settings.reducedEffects).toBe(false)
+  })
+
   it('does nothing for a fresh player', () => {
     const storage = new MemoryStorage()
     migrateLegacyKeys(storage, ID)
@@ -204,6 +222,43 @@ describe('legacy key migration', () => {
     hostile.data.set(META_KEY, JSON.stringify({ version: 1, attempts: 7, victories: 2, unlockedWeapons: ['blade'] }))
     expect(() => migrateLegacyKeys(hostile, ID)).not.toThrow()
     expect(hostile.getItem(saveKey(ID))).toBeNull()
+  })
+})
+
+describe('desktop adapter', () => {
+  // Only the save methods matter here; the rest of the bridge is never called by these tests.
+  const bridge = (overrides: Partial<DesktopBridge['saves']>): DesktopBridge => ({
+    platform: 'desktop',
+    versions: { electron: 'test', chrome: 'test' },
+    saves: {
+      read: async () => ({ ok: true, data: null }),
+      readBackup: async () => ({ ok: true, data: null }),
+      write: async () => ({ ok: true, bytes: 0 }),
+      delete: async () => ({ ok: true }),
+      ...overrides,
+    },
+    setRunActive: () => {},
+    exportFile: async () => true,
+    importFile: async () => null,
+    setFullscreen: async () => false,
+    isFullscreen: async () => false,
+  })
+
+  it('rejects a refused write instead of reporting success', async () => {
+    // A swallowed refusal is a player losing a session's progress in silence: main.ts turns this
+    // rejection into the PROGRESS NOT SAVING banner.
+    const store = createDesktopPlatform(bridge({ write: async () => ({ ok: false, error: 'ENOSPC' }) })).saves
+    await expect(store.write(ID, 'anything')).rejects.toThrow(/ENOSPC/)
+  })
+
+  it('rejects a refused read rather than reporting an absent save', async () => {
+    const store = createDesktopPlatform(bridge({ read: async () => ({ ok: false, error: 'EACCES' }) })).saves
+    await expect(store.read(ID)).rejects.toThrow(/EACCES/)
+  })
+
+  it('still reports a genuinely absent save as null', async () => {
+    const store = createDesktopPlatform(bridge({})).saves
+    await expect(store.read(ID)).resolves.toBeNull()
   })
 })
 

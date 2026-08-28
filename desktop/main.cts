@@ -320,10 +320,15 @@ function buildMenu(): void {
     ...(mac ? [{ role: 'appMenu' as const }] : []),
     { role: 'fileMenu' },
     { role: 'editMenu' },
+    // Reload and DevTools are DEVELOPMENT ONLY. A run has no checkpoint, so Cmd+R would throw one
+    // away without ever reaching the quit guard -- and a player has no use for either item. In dev,
+    // where reloading against Vite is the whole point, they stay.
     { label: 'View', submenu: [
       { role: 'togglefullscreen' },                // native window fullscreen, so Escape stays pause
-      { type: 'separator' },
-      { role: 'reload' }, { role: 'forceReload' }, { role: 'toggleDevTools' },
+      ...(isDev ? [
+        { type: 'separator' } as const,
+        { role: 'reload' } as const, { role: 'forceReload' } as const, { role: 'toggleDevTools' } as const,
+      ] : []),
     ] },
     { role: 'windowMenu' },
   ]

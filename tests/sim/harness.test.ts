@@ -108,7 +108,7 @@ describe('pool overflow is observable', () => {
 // Mirrors the tick loop in src/main.ts with presentation stripped out. That loop is the
 // definition of browser semantics; if it changes, this must change with it.
 function runReplayBrowserSemantics(replay: Replay): { world: ReturnType<typeof createWorld>; hash: number } {
-  let world = createWorld(replay.seed, replay.scenario, { god: replay.god })
+  let world = createWorld(replay.seed, replay.scenario, { god: replay.god, ...(replay.meta ? { meta: replay.meta } : {}) })
   let metrics = new Metrics()
   let frames: InputFrame[] | null = replay.frames.length ? replay.frames : null
   let idx = 0
@@ -120,7 +120,8 @@ function runReplayBrowserSemantics(replay: Replay): { world: ReturnType<typeof c
     world.events.length = 0
     if (world.wantsRestart) {
       const keep = frames, keepIdx = idx
-      world = createWorld(replay.seed, replay.scenario, { god: replay.god })
+      const meta = replay.scenario === 'loop' ? world.session.meta : replay.meta
+      world = createWorld(replay.seed, replay.scenario, { god: replay.god, ...(meta ? { meta } : {}) })
       metrics = new Metrics()
       frames = keep; idx = keepIdx
     }

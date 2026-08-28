@@ -10,6 +10,7 @@ export function updateEnemies(world: World): void {
     if (!e.active) continue
     e.stateTick++
     if (e.flash > 0) e.flash--
+    if (e.brandTicks > 0 && --e.brandTicks === 0) e.brand = 0
     switch (e.kind) {
       case 'brute': updateBrute(world, e); break
       case 'caster': updateCaster(world, e); break

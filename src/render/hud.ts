@@ -573,6 +573,12 @@ export class Hud {
 
   private updateLife(world: World, now: number, hurtAge: number) {
     const p = world.player
+    if (world.roomPhase === 'town') {
+      this.plateG.visible = false
+      this.rig.visible = false
+      return
+    }
+    this.plateG.visible = true
     const shake = hurtAge >= 0 && hurtAge < HURT_SHAKE.length ? HURT_SHAKE[hurtAge] : 0
     const n = p.maxHp
     const low = p.hp === 1 && p.state !== 'dead'
@@ -918,7 +924,7 @@ export class Hud {
     if (this.cardAct.text !== act) this.cardAct.text = act
     const rows: [string, string][] = [
       ['TAKEN BY', takenBy(this.deathKiller ?? 'none')],
-      ['SENT ONWARD', `${felled}`],
+      world.session.run ? ['REACHED', `${world.session.run.depth} CHAMBERS`] : ['SENT ONWARD', `${felled}`],
       ['HELD', `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`],
     ]
     for (let i = 0; i < rows.length; i++) {
@@ -1241,7 +1247,7 @@ export class Hud {
 
     const age = now - this.hintStart
     const alpha = age < this.hintTicks - 80 ? 0.8 : Math.max(0, (this.hintTicks - age) / 80) * 0.8
-    this.hintRow.alpha = dead ? 0 : alpha
+    this.hintRow.alpha = dead || world.roomPhase === 'town' || world.roomPhase === 'reward' ? 0 : alpha
     this.hintRow.visible = this.hintRow.alpha > 0.02
   }
 

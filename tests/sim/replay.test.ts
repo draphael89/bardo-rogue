@@ -3,6 +3,11 @@ import { readFileSync } from 'node:fs'
 import { emptyInput, type InputFrame } from '@/sim/input'
 import { Rng } from '@/sim/rng'
 import { decodeReplay, encodeReplay, quantizeFrame, replayFromJson, replayToJson, runReplay, type Replay } from '@/sim/replay'
+import { createWorld } from '@/sim/scenarios'
+import { makeBot } from '@/sim/bots'
+import { stepWorld } from '@/sim/step'
+import { hashWorld } from '@/sim/hash'
+import { Recorder } from '@/input/recorder'
 
 // Expected hashes for the fixtures under replays/. A changed hash means the sim changed (tuning, rules, rng use).
 // If that change is intended: run `pnpm record-bots`, paste the printed hashes here, and re-check the sanity asserts.
@@ -45,6 +50,23 @@ describe('replay format', () => {
     expect(e.runs).toEqual([[0, 0, 10000, 0, 0, 100]])
     expect('god' in e).toBe(false)
   })
+  it('round-trips the initial persistent meta snapshot', () => {
+    const r: Replay = {
+      v: 1, seed: 17, scenario: 'loop',
+      meta: { version: 1, attempts: 7, victories: 3, unlockedWeapons: ['blade'] },
+      frames: randomFrames(20),
+    }
+    expect(decodeReplay(encodeReplay(r))).toEqual(r)
+    expect(replayFromJson(replayToJson(r))).toEqual(r)
+  })
+  it('snapshots recorder meta instead of retaining a live counter reference', () => {
+    const meta = { version: 1 as const, attempts: 7, victories: 3, unlockedWeapons: ['blade' as const] }
+    const recorder = new Recorder()
+    recorder.start(17, 'loop', false, meta)
+    meta.attempts++
+    recorder.capture(emptyInput())
+    expect(recorder.stop().meta).toEqual({ version: 1, attempts: 7, victories: 3, unlockedWeapons: ['blade'] })
+  })
   it('rejects unknown versions', () => {
     expect(() => decodeReplay({ v: 2 as 1, seed: 1, scenario: 'empty', runs: [] })).toThrow()
   })
@@ -67,5 +89,22 @@ describe('replay fixtures', () => {
     runReplay(r, w => seen.push(w.tick))
     expect(seen.length).toBe(r.frames.length)
     expect(seen[0]).toBe(1); expect(seen[seen.length - 1]).toBe(r.frames.length)
+  })
+
+  it('reproduces a loop recording from its captured meta baseline', () => {
+    const initialMeta = { version: 1 as const, attempts: 7, victories: 3, unlockedWeapons: ['blade' as const] }
+    const source = createWorld(17, 'loop', { meta: initialMeta })
+    const bot = makeBot('slice-kite')
+    const frames: InputFrame[] = []
+    for (let i = 0; i < 600; i++) {
+      const frame = quantizeFrame(bot(source))
+      frames.push(frame)
+      stepWorld(source, frame)
+      source.events.length = 0
+    }
+    expect(source.session.meta.attempts).toBe(8)
+    const replay: Replay = { v: 1, seed: 17, scenario: 'loop', meta: initialMeta, frames }
+    expect(runReplay(replay).hash).toBe(hashWorld(source))
+    expect(runReplay({ ...replay, meta: undefined }).hash).not.toBe(hashWorld(source))
   })
 })

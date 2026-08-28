@@ -177,6 +177,9 @@ export function playEventSfx(a: AudioSystem, ev: SimEvent): void {
       a.play('doorOpen_1', { gain: 0.45, bus: 'ui' })
       a.bell(0.6, 196, 1.8)
       break
+    case 'roomTransition':
+      a.play('doorOpen_1', { gain: 0.28, pitch: 0.82, bus: 'ui' })
+      break
     case 'returned':
       a.play('doorOpen_1', { gain: 0.45, bus: 'ui' })
       a.bell(0.7, 196, 2.2)
@@ -185,6 +188,40 @@ export function playEventSfx(a: AudioSystem, ev: SimEvent): void {
     case 'offeringTaken':
       a.bell(0.55, 392, 2.4)
       a.bell(0.28, 523.25, 1.8, 'music', 0.2)
+      break
+    case 'weaponPrepared':
+      a.play('swordMetal', { ...at, gain: 0.72, pitch: 1.05, bus: 'ui' })
+      a.bell(0.48, 329.63, 1.7, 'music', 0.08)
+      break
+    case 'runStarted':
+      a.bell(0.55, 146.83, 2.2)
+      break
+    case 'rewardOffered':
+      a.bell(0.72, 293.66, 2.8, 'ui')
+      a.bell(0.38, 440, 2.1, 'music', 0.18)
+      break
+    case 'rewardFocus':
+      a.play('impactGeneric_light', { gain: 0.14, pitch: 1.7 + ev.focus * 0.08, bus: 'ui' })
+      break
+    case 'boonChosen':
+      a.play('swordMetal', { ...at, gain: 0.55, pitch: 1.25, bus: 'ui' })
+      a.bell(0.82, 392, 3.0, 'music')
+      a.bell(0.42, 587.33, 2.2, 'music', 0.2)
+      break
+    case 'brandApplied':
+      a.play('impactGeneric_light', { ...at, gain: 0.12 + ev.stacks * 0.03, pitch: 1.1 + ev.stacks * 0.12 })
+      break
+    case 'brandConsumed':
+      a.play('impactPunch_heavy', { ...at, gain: 0.42 + ev.stacks * 0.08, pitch: 0.9 })
+      a.thump(0.35 + ev.stacks * 0.1, 135, 62, 0.18)
+      break
+    case 'runWon':
+      a.bell(1, 196, 4.2)
+      a.bell(0.7, 293.66, 3.7, 'music', 0.18)
+      a.bell(0.5, 392, 3.2, 'music', 0.36)
+      a.stopBed(1.2)
+      break
+    case 'runLost':
       break
     case 'draw':
       a.play('cloth3', { ...at, gain: 0.55, pitch: 0.85, pitchVar: 0.04 })
@@ -198,6 +235,12 @@ export function playEventSfx(a: AudioSystem, ev: SimEvent): void {
     case 'arrowHitWall':
       a.play('impactGeneric_light', { ...at, gain: 0.35, pitch: 1.15 })
       break
+    case 'friendlyProjectileEnded':
+      if (ev.kind === 'mirror') {
+        a.play('laserRetro', { ...at, gain: 0.35, pitch: 1.55 })
+        a.play('impactGeneric_light', { ...at, gain: 0.25, pitch: 1.4 })
+      } else a.play('woosh2', { ...at, gain: 0.28, pitch: 1.8 })
+      break
   }
   census(a, ev)
 }
@@ -210,7 +253,7 @@ export function playEventSfx(a: AudioSystem, ev: SimEvent): void {
 function listen(a: AudioSystem, ev: SimEvent): void {
   switch (ev.type) {
     case 'footstep': case 'swing': case 'dodge': case 'dodgeEnd': case 'dodged': case 'graze':
-    case 'draw': case 'arrowLoose':
+    case 'draw': case 'arrowLoose': case 'weaponPrepared': case 'boonChosen':
     case 'playerHurt': case 'playerDeath': case 'returned': a.setListener(ev.x, ev.y)
   }
 }

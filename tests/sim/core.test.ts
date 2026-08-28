@@ -790,13 +790,27 @@ describe('return', () => {
     expect(w.player.state).toBe('free')
   })
 
-  it('the loop starts in the bardo; empty death then R still asks for a full restart', () => {
+  it('the production loop starts unarmed in the bardo and the rack wakes the threshold', () => {
     const loop = createWorld(1, 'loop')
     expect(loop.rooms[0]?.id).toBe(HUB_ID)
     expect(loop.roomName).toBe('THE BARDO')
-    expect(loop.doorOpen).toBe(true)
+    expect(loop.arena.kind).toBe('bardo')
+    expect(loop.doorOpen).toBe(false)
+    expect(loop.player.armed).toBe(false)
     expect(loop.aliveEnemies()).toBe(0)
     expect(loop.player.state).toBe('free')
+    stepWorld(loop, { ...emptyInput(), attack: true, dodge: true })
+    expect(loop.player.state).toBe('free')
+    expect(loop.swingCounter).toBe(0)
+    expect(loop.events.some(e => e.type === 'dodge' || e.type === 'swing')).toBe(false)
+    const rack = loop.arena.rack!
+    loop.player.x = rack.x; loop.player.y = rack.y
+    stepWorld(loop, emptyInput())
+    expect(loop.arena.rackTaken).toBe(true)
+    expect(loop.player.armed).toBe(true)
+    expect(loop.session.preparedWeapon).toBe('blade')
+    expect(loop.doorOpen).toBe(true)
+    expect(loop.events.some(e => e.type === 'weaponPrepared')).toBe(true)
 
     const empty = createWorld(1, 'empty')
     killPlayer(empty)

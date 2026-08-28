@@ -4,6 +4,8 @@ import type { EnemyKind } from './events'
 import { TILE, setDoorWalkable } from './arena'
 import { clearBulletTime } from './combat'
 import { overlapsSolid } from './collision'
+import { offerReward } from './rewards'
+import { finishRun } from './session'
 
 export interface SpawnDef { kind: EnemyKind; x: number; y: number } // in tiles
 export interface WaveGroup { delay: number; spawns: SpawnDef[]; whenRemainingAtMost?: number; mirrorX?: boolean }
@@ -62,6 +64,44 @@ export const CROSSING_RUN_WAVES: WaveDef[] = [
     { kind: 'charger', x: 3, y: 11 },
   ] }] },
 ]
+
+// The production slice is authored as four distinct questions, not four escalating piles.
+// Room 1 teaches commitment; the branches test movement or priority; Room 3 asks the player to
+// combine those lessons before the Warden. Delays are short enough to preserve momentum but long
+// enough for each arrival tell to register.
+export const SLICE_ROOM_1: WaveDef[] = [{ groups: [{ delay: 0, spawns: [
+  { kind: 'brute', x: 8, y: 5 },
+  { kind: 'brute', x: 19, y: 6 },
+] }] }]
+
+export const SLICE_ROOM_2_VEIL: WaveDef[] = [{ groups: [
+  { delay: 0, spawns: [{ kind: 'caster', x: 13, y: 4 }] },
+  { delay: 55, spawns: [{ kind: 'charger', x: 4, y: 9 }] },
+  { delay: 32, spawns: [{ kind: 'charger', x: 22, y: 10 }] },
+] }]
+
+export const SLICE_ROOM_2_BLADE: WaveDef[] = [{ groups: [
+  { delay: 0, spawns: [
+    { kind: 'brute', x: 13, y: 5 },
+    { kind: 'caster', x: 4, y: 4 },
+    { kind: 'caster', x: 22, y: 4 },
+  ] },
+] }]
+
+export const SLICE_ROOM_3: WaveDef[] = [{ groups: [
+  { delay: 0, spawns: [
+    { kind: 'brute', x: 8, y: 5 },
+    { kind: 'caster', x: 21, y: 4 },
+  ] },
+  { delay: 55, whenRemainingAtMost: 1, spawns: [
+    { kind: 'charger', x: 4, y: 10 },
+    { kind: 'charger', x: 22, y: 10 },
+  ] },
+] }]
+
+export const SLICE_WARDEN: WaveDef[] = [{ groups: [{ delay: 20, spawns: [
+  { kind: 'warden', x: 13, y: 5 },
+] }] }]
 
 export function queueSpawn(world: World, s: SpawnDef): void {
   let x = s.x * TILE, y = s.y * TILE
@@ -128,7 +168,11 @@ export function updateWaves(world: World): void {
     world.emit({ type: 'waveClear', wave: w.index + 1 })
     if (w.index + 1 >= w.total) {
       w.state = 'done'
-      world.doorOpen = true
+      const room = world.rooms[world.roomIndex]
+      const production = world.scenario === 'loop'
+      const reward = production ? room.reward : undefined
+      const victory = production && !!room.boss
+      world.doorOpen = !reward && !victory
       world.roomClearTick = world.tick
       world.timeScale = tuning.roomClearSlowmo
       world.slowmoTicks = tuning.roomClearSlowmoTicks
@@ -140,8 +184,14 @@ export function updateWaves(world: World): void {
         b.active = false
         world.emit({ type: 'boltHitWall', x: b.x, y: b.y })
       }
-      if (world.hasNextRoom()) setDoorWalkable(world.arena, true)
-      world.emit({ type: 'roomClear', hasNext: world.hasNextRoom() })
+      if (world.doorOpen && world.hasNextRoom()) setDoorWalkable(world.arena, true)
+      world.emit({ type: 'roomClear', hasNext: world.hasNextRoom(), reward: !!reward, victory })
+      if (victory) finishRun(world, 'won')
+      else if (reward) offerReward(world, reward)
+      else {
+        world.roomPhase = world.hasNextRoom() ? 'exits' : 'resolved'
+        world.phaseTick = world.tick
+      }
     } else {
       w.state = 'pending'
       w.timer = tuning.waveGapTicks

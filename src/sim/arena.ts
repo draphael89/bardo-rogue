@@ -32,15 +32,21 @@ export const PROP = {
   brazier: 4, ossuary: 5, shard: 6, pew: 7,
 } as const
 
-export type RoomKind = 'threshold' | 'crossing' | 'shore'
+export type RoomKind = 'bardo' | 'threshold' | 'crossing' | 'shore'
 export type DoorDir = 'north' | 'east'
-export type DoorMark = 'combat' | 'gift'
+export type DoorMark = 'combat' | 'gift' | 'blade' | 'veil' | 'hard' | 'boss'
 export type OfferingKind = 'life'
 
 export interface ArenaOffering {
   x: number
   y: number
   kind: OfferingKind
+}
+
+export interface ArenaRack {
+  x: number
+  y: number
+  arm: 'blade'
 }
 
 export interface ArenaDoor {
@@ -73,6 +79,8 @@ export interface Arena {
   inner: { x0: number; y0: number; x1: number; y1: number } // walkable rect in px
   offering?: ArenaOffering         // a walk-in gift; presentation reads offeringTaken
   offeringTaken?: boolean
+  rack?: ArenaRack                 // Bardo preparation; walk into the weapon to ready the threshold
+  rackTaken?: boolean
 }
 
 export const ARENA_COLS = 26
@@ -103,6 +111,7 @@ export function setDoorWalkable(a: Arena, open: boolean): void {
 // rng here is World.visualRng (or a derived visual stream): cosmetic only, never mixed into the world hash.
 export function buildArena(rng: Rng, kind: RoomKind = 'threshold'): Arena {
   switch (kind) {
+    case 'bardo': return buildBardo(rng)
     case 'crossing': return buildCrossing(rng)
     case 'threshold': return buildThreshold(rng)
     case 'shore': return buildShore(rng)
@@ -379,6 +388,66 @@ function buildCrossing(rng: Rng): Arena {
     ],
     windows: [{ x: 8.5 * TILE, y: 1.5 * TILE, radius: 44, strength: 0.55 }],
     furrow, focal,
+    inner: { x0: TILE, y0: 2 * TILE, x1: (cols - 1) * TILE, y1: (rows - 1) * TILE },
+  }
+}
+
+// Home is intentionally quieter and more directional than a combat chamber. The dark reliquary on
+// the west, the sword rack on the east, and the sealed threshold in the north form a single readable
+// sentence: remember, prepare, depart. Empty floor around the rack gives the pickup room to breathe.
+function buildBardo(rng: Rng): Arena {
+  void rng
+  const cols = ARENA_COLS, rows = ARENA_ROWS
+  const s = shell(cols, rows)
+  const { base, overlay, solid, idx } = s
+  const focal = { x: 5.5 * TILE, y: 7.5 * TILE }
+  const rack = { x: 19.5 * TILE, y: 8.3 * TILE, arm: 'blade' as const }
+  const furrow = { x0: focal.x + 18, y0: focal.y + 20, x1: 13 * TILE, y1: 2.4 * TILE }
+
+  pave(s, makeLevelAt({
+    cols, rows, focal, furrow, bandW: 8, emberR: 32, seed: 31,
+    fight: { x: rack.x, y: rack.y, rx: 1.45, r: 58 },
+  }))
+
+  // A worn runner points to the threshold without outlining a UI arrow.
+  for (let r = 3; r <= 11; r++) for (let c = 12; c <= 14; c++) {
+    if (solid[idx(c, r)]) continue
+    base[idx(c, r)] = r === 3 ? T.matNorth : r === 11 ? T.matSouth : T.matBody
+  }
+
+  const door: ArenaDoor = { dir: 'north', col: 13, row: 1, mark: 'combat' }
+  const doors = [door]
+  base[idx(door.col, door.row)] = T.wallFace
+  base[idx(4, 1)] = T.windowL
+  base[idx(5, 1)] = T.windowR
+  base[idx(21, 1)] = T.relief
+  for (const c of [8, 17, 24] as const) base[idx(c, 1)] = T.wallFaceB
+
+  for (const [c, r, t] of [[9, 10, T.crackA], [16, 5, T.crackB], [22, 12, T.pit]] as const) overlay[idx(c, r)] = t
+
+  const props: Prop[] = []
+  // West reliquary: one compact Bardo-specific landmark, built from the existing bell language but
+  // upright and intact rather than sunken into a battle floor.
+  for (const [dx, dy, tile] of [
+    [0, 0, PROP.bellNW], [32, 0, PROP.bellNE], [0, 32, PROP.bellSW], [32, 32, PROP.bellSE],
+  ] as const) props.push({ x: 3.5 * TILE + dx, y: 4.5 * TILE + dy, tile, sortY: 9 * TILE, sheet: 'prop' })
+  for (let r = 7; r <= 8; r++) for (let c = 4; c <= 6; c++) solid[idx(c, r)] = 1
+
+  // Two small edge clusters only; the open centre belongs to the route from rack to door.
+  for (const [c, r, tile] of [[2, 11, PROP.ossuary], [23, 4, PROP.pew]] as const) {
+    solid[idx(c, r)] = 1
+    props.push({ x: c * TILE - 8, y: r * TILE - 20, tile, sortY: (r + 1) * TILE, sheet: 'prop' })
+  }
+
+  return {
+    kind: 'bardo', cols, rows, base, overlay, solid, props, door, doors,
+    playerStart: { x: 10 * TILE, y: 11.5 * TILE },
+    braziers: [
+      { x: focal.x, y: focal.y, radius: 92, strength: 0.8 },
+      { x: rack.x, y: rack.y, radius: 74, strength: 0.72 },
+    ],
+    windows: [{ x: 4.5 * TILE, y: 1.5 * TILE, radius: 48, strength: 0.62 }],
+    furrow, focal, rack, rackTaken: false,
     inner: { x0: TILE, y0: 2 * TILE, x1: (cols - 1) * TILE, y1: (rows - 1) * TILE },
   }
 }

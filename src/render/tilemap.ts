@@ -1,5 +1,5 @@
 import { Container, Sprite, RenderTexture, Graphics, type DestroyOptions, type Renderer } from 'pixi.js'
-import { TILE, T, type Arena, type ArenaDoor, type DoorMark, type ArenaOffering } from '@/sim/arena'
+import { TILE, T, type Arena, type ArenaDoor, type DoorMark, type ArenaOffering, type ArenaRack } from '@/sim/arena'
 import type { Atlas } from './atlas'
 import { tuning } from '@/tuning'
 
@@ -11,6 +11,10 @@ export interface TilemapView { sprite: Sprite; door: Container; setDoorOpen(open
 const MARK = {
   combat: 0xff6a18, combatCore: 0xffcc56, combatEdge: 0x3a1008,
   gift: 0xe8c060, giftCore: 0xfff0c0, giftEdge: 0x4a3810,
+  blade: 0xff7a30, bladeCore: 0xffd060, bladeEdge: 0x4a1808,
+  veil: 0xa878ff, veilCore: 0xe0c8ff, veilEdge: 0x241044,
+  hard: 0xe04438, hardCore: 0xffb050, hardEdge: 0x3c0808,
+  boss: 0xffc448, bossCore: 0xfff0a0, bossEdge: 0x4a2600,
   plate: 0x08070e,
 } as const
 
@@ -56,6 +60,35 @@ function paintMark(g: Graphics, mark: DoorMark): void {
       markPx(g, -4, -1, 8, 2, c)
       break
     }
+    case 'blade': {
+      const e = MARK.bladeEdge, f = MARK.blade, c = MARK.bladeCore
+      markPx(g, -10, 8, 20, 3, e); markPx(g, -8, 6, 16, 3, f)
+      markPx(g, -6, -12, 4, 18, e); markPx(g, -5, -11, 2, 16, c)
+      markPx(g, 3, -9, 4, 15, e); markPx(g, 4, -8, 2, 13, c)
+      markPx(g, -8, -12, 8, 3, f); markPx(g, 1, -9, 8, 3, f)
+      break
+    }
+    case 'veil': {
+      const e = MARK.veilEdge, f = MARK.veil, c = MARK.veilCore
+      markPx(g, -3, -12, 6, 3, e); markPx(g, -7, -9, 14, 3, e)
+      markPx(g, -10, -6, 20, 12, e); markPx(g, -7, 6, 14, 3, e); markPx(g, -3, 9, 6, 3, e)
+      markPx(g, -6, -6, 12, 12, f); markPx(g, -2, -5, 4, 10, c)
+      break
+    }
+    case 'hard': {
+      const e = MARK.hardEdge, f = MARK.hard, c = MARK.hardCore
+      markPx(g, -11, -9, 4, 18, e); markPx(g, 7, -9, 4, 18, e)
+      markPx(g, -8, -6, 16, 12, f); markPx(g, -4, -3, 3, 3, c); markPx(g, 2, -3, 3, 3, c)
+      markPx(g, -5, 3, 10, 3, e); markPx(g, -2, 6, 4, 5, e)
+      break
+    }
+    case 'boss': {
+      const e = MARK.bossEdge, f = MARK.boss, c = MARK.bossCore
+      markPx(g, -11, 5, 22, 5, e); markPx(g, -9, 3, 18, 4, f)
+      markPx(g, -10, -8, 5, 11, f); markPx(g, -2, -12, 4, 15, c); markPx(g, 5, -8, 5, 11, f)
+      markPx(g, -8, -3, 16, 4, f)
+      break
+    }
     default: { const _e: never = mark; return _e }
   }
 }
@@ -70,7 +103,7 @@ function makeDoorCluster(atlas: Atlas, d: ArenaDoor): { root: Container; setOpen
   const glow = new Sprite(atlas.light('circle'))
   glow.anchor.set(0.5)
   glow.blendMode = 'add'
-  glow.tint = d.mark === 'gift' ? 0xffe090 : 0xff6a28
+  glow.tint = d.mark === 'veil' ? 0xb888ff : d.mark === 'blade' ? 0xff7a30 : d.mark === 'hard' ? 0xe04438 : d.mark === 'boss' ? 0xffc448 : d.mark === 'gift' ? 0xffe090 : 0xff6a28
   glow.scale.set(0.28)
   glow.alpha = 0.06
 
@@ -167,6 +200,33 @@ function inHeart(x: number, y: number): boolean {
 function inStamp(x: number, y: number): boolean {
   const sx = x - STAMP_OX, sy = y - STAMP_OY
   return sy >= 0 && sy < STAMP_H && sx >= 0 && sx < STAMP_W && LIFE_STAMP[sy][sx] === 'X'
+}
+
+function makeRackCluster(rack: ArenaRack): { root: Container; sync(taken: boolean): void } {
+  const root = new Container()
+  root.position.set(rack.x, rack.y)
+  const glow = new Graphics()
+  const rackG = new Graphics()
+  root.addChild(glow, rackG)
+  const paint = (taken: boolean) => {
+    glow.clear()
+    glow.circle(0, 0, taken ? 14 : 22).fill({ color: taken ? 0x58402c : 0xff9a38, alpha: taken ? 0.06 : 0.16 })
+    rackG.clear()
+    // Three stone rests establish future weapon slots; only the centre carries steel.
+    markPx(rackG, -25, 10, 50, 4, 0x09080d)
+    for (const x of [-18, 0, 18]) {
+      markPx(rackG, x - 5, 3, 10, 10, 0x1c2230)
+      markPx(rackG, x - 3, 4, 6, 7, 0x4b4650)
+    }
+    if (!taken) {
+      markPx(rackG, -2, -19, 4, 23, 0xd8e0e8)
+      markPx(rackG, -1, -18, 2, 21, 0xfff0c8)
+      markPx(rackG, -8, 0, 16, 3, 0x8c5028)
+      markPx(rackG, -3, 3, 6, 7, 0x3a2018)
+    }
+  }
+  paint(false)
+  return { root, sync: paint }
 }
 
 function paintOffering(g: Graphics, spent: boolean): void {
@@ -393,6 +453,8 @@ export function buildTilemap(renderer: Renderer, atlas: Atlas, arena: Arena, are
   for (const c of clusters) door.addChild(c.root)
   const gift = arena.offering ? makeOfferingCluster(atlas, arena.offering) : null
   if (gift) door.addChild(gift.root)
+  const rack = arena.rack ? makeRackCluster(arena.rack) : null
+  if (rack) door.addChild(rack.root)
   const nativeDestroy = door.destroy.bind(door)
   door.destroy = (options?: boolean | DestroyOptions) => {
     nativeDestroy(typeof options === 'boolean' ? { children: true } : { children: true, ...options })
@@ -411,6 +473,7 @@ export function buildTilemap(renderer: Renderer, atlas: Atlas, arena: Arena, are
     setDoorOpen(open) {
       for (const c of clusters) c.setOpen(open)
       gift?.sync(!!arena.offeringTaken)
+      rack?.sync(!!arena.rackTaken)
     },
   }
 }

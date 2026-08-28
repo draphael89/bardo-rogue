@@ -7,6 +7,8 @@ export interface InputFrame {
   attackHeld: boolean               // physically held; sustains combo flow but is never queued after release
   dodge: boolean                    // pressed this tick (edge)
   restart: boolean
+  choiceDelta?: -1 | 0 | 1        // reward focus, edge-triggered
+  confirm?: boolean               // common modal/summary confirmation edge
 }
 
 export function emptyInput(): InputFrame {

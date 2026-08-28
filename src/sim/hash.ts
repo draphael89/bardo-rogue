@@ -1,6 +1,9 @@
-import type { World, PlayerState, EnemyState } from './world'
+import type { World, PlayerState, EnemyState, ProjectileKind } from './world'
 import type { EnemyKind } from './events'
 import type { WaveState } from './world'
+import type { RoomPhase } from './session'
+import { ARM } from './weapons'
+import { BOON } from './boons'
 
 // Stable integer codes. Enum order is part of the hash contract: append, never reorder.
 const PLAYER_STATE: Record<PlayerState, number> = { free: 0, dodge: 1, attack: 2, dead: 3 }
@@ -10,6 +13,8 @@ const ENEMY_STATE: Record<EnemyState, number> = {
 }
 const ENEMY_KIND: Record<EnemyKind, number> = { brute: 0, caster: 1, charger: 2, dummy: 3, warden: 4 }
 const WAVE_STATE: Record<WaveState, number> = { idle: 0, pending: 1, active: 2, done: 3 }
+const ROOM_PHASE: Record<RoomPhase, number> = { town: 0, entering: 1, fighting: 2, reward: 3, exits: 4, transitioning: 5, resolved: 6 }
+const PROJECTILE_KIND: Record<ProjectileKind, number> = { bolt: 0, arrow: 1, mirror: 2, echo: 3 }
 
 // FNV-1a over a canonical snapshot of everything the sim's outcome depends on.
 // Deliberately NOT hashed: world.visualRng (cosmetic-only stream) and the arena it builds,
@@ -28,7 +33,29 @@ export function hashWorld(world: World): number {
   if (world.boonBits) int(world.boonBits)
   if (world.returns) int(world.returns)
   if (world.roomIndex) int(world.roomIndex)
+  if (world.scenario === 'loop') {
+    byte(ROOM_PHASE[world.roomPhase]); int(world.phaseTick); int(world.transitionTicks)
+    if (world.transitionTarget) for (let i = 0; i < world.transitionTarget.length; i++) byte(world.transitionTarget.charCodeAt(i))
+  }
   int(world.rng.state)
+
+  if (world.scenario === 'loop') {
+    const session = world.session
+    int(session.meta.attempts); int(session.meta.victories)
+    byte(session.preparedWeapon ? ARM[session.preparedWeapon] + 1 : 0)
+    const run = session.run
+    flag(!!run)
+    if (run) {
+      int(run.seed); int(run.hp); int(run.maxHp); int(run.depth); int(run.startedTick); byte(run.result === 'active' ? 0 : run.result === 'won' ? 1 : 2)
+      flag(run.primedBrand); int(run.boonBits); int(run.roomHistory.length)
+      for (const visit of run.roomHistory) { for (let i = 0; i < visit.id.length; i++) byte(visit.id.charCodeAt(i)); int(visit.enteredTick) }
+      flag(!!run.pendingReward)
+      if (run.pendingReward) {
+        byte(run.pendingReward.family === 'blade' ? 0 : 1); byte(run.pendingReward.focus)
+        for (const id of run.pendingReward.options) int(BOON[id])
+      }
+    }
+  }
 
   const p = world.player
   byte(PLAYER_STATE[p.state]); int(p.stateTick)
@@ -40,6 +67,7 @@ export function hashWorld(world: World): number {
   int(p.iframes); num(p.flash); int(p.dodgeRead)
   num(p.moveX); num(p.moveY); int(p.footTick); int(p.deathTick); flag(p.god)
   if (p.arm) byte(p.arm)
+  if (!p.armed) flag(false)
 
   let active = 0
   for (const e of world.enemies) if (e.active) active++
@@ -53,6 +81,7 @@ export function hashWorld(world: World): number {
     int(e.lastHitSwingId); num(e.flash); flag(e.hitDone)
     num(e.orbitAngle); int(e.orbitDir); int(e.hoverTicks); int(e.cooldown); int(e.dashTicks); int(e.spawnTick)
     if (e.phase) byte(e.phase)
+    if (e.brand) { byte(e.brand); int(e.brandTicks) }
   }
 
   let bolts = 0
@@ -63,6 +92,7 @@ export function hashWorld(world: World): number {
     int(b.id); num(b.x); num(b.y); num(b.px); num(b.py); num(b.vx); num(b.vy)
     num(b.radius); int(b.life); num(b.angle)
     if (b.team) { byte(b.team); int(b.damage); int(b.actionId) }
+    if (b.kind === 'mirror' || b.kind === 'echo') byte(PROJECTILE_KIND[b.kind])
   }
 
   const w = world.wave

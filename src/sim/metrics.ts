@@ -8,6 +8,7 @@ export class Metrics {
   boltsFired = 0; boltsCut = 0
   enemyAttacks = 0; damageTaken = 0; deaths = 0
   wavesCleared = 0; clearTick = -1; deathTick = -1; returns = 0
+  roomsEntered = 0; boonsChosen = 0; runEndTick = -1; runDurationTicks = -1; runResult: 'won' | 'lost' | null = null
   private swingHit = new Map<number, boolean>()
   private lastSwingId = 0
 
@@ -29,6 +30,10 @@ export class Metrics {
         case 'playerDeath': this.deaths++; this.deathTick = world.tick; break
         case 'waveClear': this.wavesCleared++; break
         case 'roomClear': this.clearTick = world.tick; break
+        case 'roomEnter': this.roomsEntered++; break
+        case 'boonChosen': this.boonsChosen++; break
+        case 'runWon': this.runEndTick = world.tick; this.runDurationTicks = ev.ticks; this.runResult = 'won'; break
+        case 'runLost': this.runEndTick = world.tick; this.runDurationTicks = ev.ticks; this.runResult = 'lost'; break
         case 'returned': this.returns++; break
       }
     }
@@ -44,6 +49,8 @@ export class Metrics {
       boltsFired: this.boltsFired, boltsCut: this.boltsCut,
       enemyAttacks: this.enemyAttacks, damageTaken: this.damageTaken, deaths: this.deaths,
       wavesCleared: this.wavesCleared, returns: this.returns,
+      roomsEntered: this.roomsEntered, boonsChosen: this.boonsChosen, runResult: this.runResult,
+      runSeconds: this.runDurationTicks >= 0 ? +(this.runDurationTicks / 60).toFixed(1) : null,
       clearSeconds: this.clearTick >= 0 ? +(this.clearTick / 60).toFixed(1) : null,
       deathSeconds: this.deathTick >= 0 ? +(this.deathTick / 60).toFixed(1) : null,
     }

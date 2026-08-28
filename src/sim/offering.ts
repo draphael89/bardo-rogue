@@ -14,5 +14,7 @@ export function tryCollectOffering(world: World): void {
   const gain = tuning.run.offeringHp
   world.player.maxHp += gain
   world.player.hp = Math.min(world.player.maxHp, world.player.hp + gain)
+  const run = world.session.run
+  if (run) { run.hp = world.player.hp; run.maxHp = world.player.maxHp }
   world.emit({ type: 'offeringTaken', kind: o.kind, x: o.x, y: o.y })
 }

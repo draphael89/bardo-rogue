@@ -29,6 +29,7 @@ function record(bot: BotName, scenario: string, seed: number, out: string, god =
     frames.push(f)
     stepWorld(world, f)
     world.events.length = 0
+    if (scenario === 'loop' && world.returns > 0) break
     if (world.wave.state === 'done' && world.tick - world.roomClearTick > 120) break
     if (world.player.state === 'dead' && world.tick - world.player.deathTick > 120) break
   }

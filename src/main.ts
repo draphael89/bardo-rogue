@@ -18,11 +18,13 @@ import { decodeReplay, isEncodedReplay, quantizeFrame, replayToJson, type Replay
 import { Recorder } from '@/input/recorder'
 import { tuning } from '@/tuning'
 import { Text } from 'pixi.js'
+import { loadMeta, loadSettings, saveMeta, saveSettings } from '@/sim/storage'
+import { defaultMetaState, type MetaStateV1 } from '@/sim/session'
 
 async function boot() {
   const q = new URLSearchParams(location.search)
   const seed = +(q.get('seed') ?? 1)
-  const scenario = q.get('scenario') ?? 'full'
+  const scenario = q.get('scenario') ?? 'loop'
   const god = q.get('god') === '1'
   const debug = q.get('debug') === '1'
   const mute = q.get('mute') === '1'
@@ -46,13 +48,19 @@ async function boot() {
   audio.muted = mute
   audio.load(manifest.audio) // not awaited: the game starts silent-then-sound rather than waiting
 
-  let world: World = createWorld(seed, scenario, { god })
+  const browserStorage = typeof localStorage === 'undefined' ? undefined : localStorage
+  const preferredReducedEffects = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches
+  const storedSettings = loadSettings(browserStorage, preferredReducedEffects)
+  let reducedEffects = q.has('reduced') ? q.get('reduced') !== '0' : storedSettings.reducedEffects
+  let world: World = createWorld(seed, scenario, { god, ...(scenario === 'loop' ? { meta: loadMeta(browserStorage) } : {}) })
+  let userPaused = false
   let metrics = new Metrics()
   const presenter = new Presenter(ra, atlas, world)
+  presenter.setReducedEffects(reducedEffects)
   presenter.particles.attachRenderer(ra.app.renderer)
   presenter.onEvent = ev => playEventSfx(audio, ev)
   ra.viewOverride = viewOverride
-  ra.onViewResize = () => { presenter.rebuildRoom(); presenter.hud.relayout() }
+  ra.onViewResize = () => { presenter.rebuildRoom(); presenter.hud.relayout(); presenter.reward.relayout() }
   const input = new InputSystem(ra)
   const overlay = new DebugOverlay(ra.layers.debug, ra.layers.hud)
   overlay.setVisible(debug)
@@ -63,9 +71,11 @@ async function boot() {
   // R restarts whatever is currently running (not the URL scenario), so replays and __game.reset() restart correctly
   let cur = { seed, scenario, god }
 
-  const reset = (s = cur.seed, sc = cur.scenario, opts: { god?: boolean } = { god: cur.god }) => {
+  const reset = (s = cur.seed, sc = cur.scenario, opts: { god?: boolean; meta?: MetaStateV1 } = { god: cur.god }) => {
     cur = { seed: s, scenario: sc, god: !!opts.god }
-    world = createWorld(s, sc, opts)
+    const suppliedMeta = Object.prototype.hasOwnProperty.call(opts, 'meta')
+    const meta = sc === 'loop' ? (suppliedMeta ? opts.meta : world.scenario === 'loop' ? world.session.meta : undefined) : undefined
+    world = createWorld(s, sc, { ...opts, ...(meta ? { meta } : {}) })
     metrics = new Metrics()
     replayFrames = null
     if (recorder.recording) { recorder.stop(); console.log('[replay] recording stopped by restart') }
@@ -85,6 +95,9 @@ async function boot() {
     stepWorld(world, frame)
     metrics.consume(world, world.events)
     presenter.handleEvents(world.events)
+    if (world.scenario === 'loop' && world.events.some(ev => ev.type === 'runStarted' || ev.type === 'runWon' || ev.type === 'returned')) {
+      saveMeta(world.session.meta, browserStorage)
+    }
     world.events.length = 0
     if (world.wantsRestart) {
       // reset() clears replayFrames; a restart *inside* a replay keeps playing, matching runReplay()
@@ -95,7 +108,11 @@ async function boot() {
   }
 
   const record = (on = !recorder.recording) => {
-    if (on && !recorder.recording) { reset(); recorder.start(cur.seed, cur.scenario, cur.god); console.log('[replay] recording (fresh run)') }
+    if (on && !recorder.recording) {
+      reset()
+      recorder.start(cur.seed, cur.scenario, cur.god, cur.scenario === 'loop' ? world.session.meta : undefined)
+      console.log('[replay] recording (fresh run)')
+    }
     else if (!on && recorder.recording) stopRecord()
     return recorder.recording
   }
@@ -107,7 +124,10 @@ async function boot() {
   }
   const replay = (r: Replay | EncodedReplay) => {
     const rep = isEncodedReplay(r) ? decodeReplay(r) : r
-    reset(rep.seed, rep.scenario, { god: rep.god })
+    reset(rep.seed, rep.scenario, {
+      god: rep.god,
+      ...(rep.scenario === 'loop' ? { meta: rep.meta ?? defaultMetaState() } : {}),
+    })
     replayFrames = rep.frames.length ? rep.frames : null
     replayIdx = 0
   }
@@ -122,7 +142,7 @@ async function boot() {
 
   const loop = new Loop({
     tick,
-    render: (alpha, dt) => { presenter.render(alpha, dt); overlay.update(world, loop); updateRecText(); ra.renderFrame() },
+    render: (alpha, dt) => { presenter.reward.setPaused(userPaused); presenter.render(alpha, dt); overlay.update(world, loop); updateRecText(); ra.renderFrame() },
     timeScale: () => world.timeScale,
   })
 
@@ -154,6 +174,12 @@ async function boot() {
   document.addEventListener('fullscreenchange', () => ra.resize())
 
   window.addEventListener('keydown', e => {
+    if ((e.code === 'Escape' || e.code === 'KeyP') && !e.repeat) { e.preventDefault(); userPaused = !userPaused; loop.paused = userPaused }
+    if (e.code === 'KeyV' && !e.repeat) {
+      reducedEffects = !reducedEffects
+      presenter.setReducedEffects(reducedEffects)
+      saveSettings({ version: 1, reducedEffects }, browserStorage)
+    }
     if (e.code === 'F1') { e.preventDefault(); overlay.toggle() }
     if (e.code === 'F2') { e.preventDefault(); record() }
     if (e.code === 'F3') { e.preventDefault(); if (recorder.recording) stopRecord(); recorder.download() }
@@ -161,7 +187,7 @@ async function boot() {
   })
   loop.start()
   if (scenario === 'run') presenter.hud.showBanner(world.roomName, 'clear the room', 1.8)
-  else if (scenario === 'loop') presenter.hud.showBanner(world.roomName, 'the door starts the next attempt', 1.8)
+  else if (scenario === 'loop') presenter.hud.showBanner(world.roomName, '', 1.5)
   else if (scenario === 'full' || scenario === 'empty') presenter.hud.showBanner('THE THRESHOLD', '', 1.5)
   else if (scenario === 'shore') presenter.hud.showBanner('THE FAR SHORE', 'a life waits', 1.8)
   else if (scenario === 'blessed') presenter.hud.showBanner('THE THRESHOLD', 'the blade reaches farther', 1.8)

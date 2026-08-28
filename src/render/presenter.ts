@@ -24,6 +24,7 @@ import { ActionFeedbackGate, crowdScreenMultiplier } from './feedback'
 import { guardUp } from '@/sim/enemies/oathbound'
 import { RewardOverlay } from './reward'
 import { TitleOverlay } from './title'
+import { ATTACK as WARDEN_ATTACK } from '@/sim/enemies/warden'
 
 interface ImpactStamp {
   t: number; r: number; a: number; snap: number; sweep: number
@@ -229,6 +230,7 @@ export class Presenter {
           this.postfx.pulse(); this.lastHurtAngle = ev.angle // juice hook
           break
         case 'playerDeath': {
+          this.hud.setKiller(ev.by)
           this.camera.addTrauma(0.8)
           // juice hook: the player shatters like an enemy and stays hidden until restart
           const v = this.playerView
@@ -303,11 +305,20 @@ export class Presenter {
           else if (ev.kind === 'charger') this.particles.dust(ev.x, ev.y + 6, ev.angle + Math.PI, 3)
           else if (ev.kind === 'warden') {
             const Wj = J.warden
-            this.particles.dust(ev.x, ev.y + 8, 0, Wj.slamDust)
-            this.camera.addTrauma(Wj.slamTrauma)
-            this.camera.punchZoom(Wj.slamZoom)
-            this.flash(Wj.slamFlash, 0xfff0c0)
-            this.postfx.pulse()
+            if (ev.attack === WARDEN_ATTACK.gavel) {
+              // The hammer, and only the hammer, lands. The whole package is an IMPACT: dust off the
+              // floor, trauma, a punch of zoom and a bright flash.
+              this.particles.dust(ev.x, ev.y + 8, 0, Wj.slamDust)
+              this.camera.addTrauma(Wj.slamTrauma)
+              this.camera.punchZoom(Wj.slamZoom)
+              this.flash(Wj.slamFlash, 0xfff0c0)
+              this.postfx.pulse()
+            } else {
+              // He is pronouncing, not striking. The verdict's bolts and the scales' marks announce
+              // themselves; all this beat owes is the weight of him committing.
+              this.camera.addTrauma(Wj.slamTrauma * 0.3)
+              this.particles.puff(ev.x, ev.y - 2, 4, 0xd4b060)
+            }
           }
           break
         case 'enemyPhase': {

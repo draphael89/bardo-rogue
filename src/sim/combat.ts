@@ -116,7 +116,11 @@ export function damageEnemy(world: World, e: Enemy, damage: number, angle: numbe
     e.state = 'dead'
     e.stateTick = 0
     if (!silent) addFreeze(world, hitstop + tuning.hitstop.killBonus)
-    world.emit({ type: 'hit', x: e.x, y: e.y, angle, damage, heavy, targetId: e.id, kind, killed: true, actionId })
+    // A killing burn tick is still silent. Emitting `hit` here gave directionless status damage the
+    // whole weapon-contact package — stamp, impact sound, damage number, flash, camera kick — on the
+    // one tick a body happened to burn out, while every non-lethal tick before it correctly had
+    // none. The kill still reads; only the blow that never happened is withheld.
+    if (!silent) world.emit({ type: 'hit', x: e.x, y: e.y, angle, damage, heavy, targetId: e.id, kind, killed: true, actionId })
     world.emit({ type: 'kill', x: e.x, y: e.y, angle, kind, id: e.id, actionId })
     // Anything the body still owed is settled here, while its marks are readable and before the
     // slot is recycled.

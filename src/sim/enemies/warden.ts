@@ -145,7 +145,7 @@ export function updateWarden(world: World, e: Enemy): void {
         e.state = 'attack'; e.stateTick = 0; e.hitDone = false; e.dashTicks = 0
         // The scales are written the instant he commits, so their whole delay is the player's to use.
         if (e.attackId === ATTACK.scales) callScales(world, e)
-        world.emit({ type: 'enemyAttack', id: e.id, kind: 'warden', x: e.x, y: e.y, angle: e.aimAngle })
+        world.emit({ type: 'enemyAttack', id: e.id, kind: 'warden', x: e.x, y: e.y, angle: e.aimAngle, attack: e.attackId })
       }
       break
     case 'attack': {

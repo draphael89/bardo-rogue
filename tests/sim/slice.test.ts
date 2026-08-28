@@ -466,6 +466,30 @@ describe('statuses', () => {
     expect(staggers).toBe(0)
   })
 
+  // Silent damage is defined as having no blow behind it, and every non-lethal burn tick honoured
+  // that. The tick that finished a body did not: it emitted `hit` on the way to `kill`, so the one
+  // frame a shade burned out got the whole weapon-contact package — stamp, impact, damage number,
+  // camera kick — for damage with no direction and no weapon.
+  it('a body that burns out is killed, not struck', () => {
+    const w = armed()
+    const e = w.spawnEnemy('brute', 200, 120)!
+    e.state = 'chase'
+    e.hp = 1
+    applyBurn(w, e, 1)
+    let hits = 0, kills = 0
+    for (let i = 0; i < tuning.status.burn.interval + 2; i++) {
+      stepWorld(w, emptyInput())
+      for (const ev of w.events) {
+        if (ev.type === 'hit') hits++
+        if (ev.type === 'kill') kills++
+      }
+      w.events.length = 0
+    }
+    expect(kills).toBe(1)
+    expect(hits).toBe(0)
+    expect(w.freeze).toBe(0)
+  })
+
   it('expires on its own schedule and stops biting', () => {
     const w = armed()
     // A dummy, deliberately: a live brute would close, land a hit, and its hit-stop would pause the

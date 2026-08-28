@@ -113,24 +113,7 @@ function takenBy(kind: EnemyKind | 'none'): string {
   }
 }
 
-// Presentation-only: nearest living body (or hostile bolt) on the killing frame. The sim does not
-// store a killer id; this lane does not own combat.ts. Latch the result — do not re-pick as they walk off.
-function inferKiller(world: World): EnemyKind | 'none' {
-  const p = world.player
-  let best: EnemyKind | 'none' = 'none'
-  let bestD = 40 * 40
-  for (const e of world.enemies) {
-    if (!e.active) continue
-    const d = (e.x - p.x) * (e.x - p.x) + (e.y - p.y) * (e.y - p.y)
-    if (d < bestD) { bestD = d; best = e.kind }
-  }
-  for (const b of world.projectiles) {
-    if (!b.active || b.team !== 0) continue
-    const d = (b.x - p.x) * (b.x - p.x) + (b.y - p.y) * (b.y - p.y)
-    if (d < bestD) { bestD = d; best = 'caster' }
-  }
-  return best
-}
+
 // The veil: five nested ellipses centred on the corpse, each contributing one hard step. Composited they reach
 // ~0.33 at the frame corner and exactly 0 on the body, so the world stays the card's ground (§3.2.3 — light
 // pools, it does not wash) instead of a blackout. Radii are in view px, x and y, at the settled step.
@@ -243,7 +226,11 @@ export class Hud {
   private cardKeyStr = 'boot'         // last drawn card geometry; the card is redrawn only when its pose changes
   private veilKey = ''                // last drawn veil step; ~540 whole-pixel rects, so it redraws 8 times, not 60/s
   private deathAt: { x: number; y: number } | null = null   // the corpse's screen pixel, latched on the killing frame
-  private deathKiller: EnemyKind | 'none' | null = null     // latched with deathAt; who stood over you
+  // Who killed you is a FACT the sim names on the blow, carried by the playerDeath event and pushed
+  // in by the presenter. This used to be guessed from the nearest living body on the killing frame,
+  // which was wrong exactly where it mattered most: a bolt is deactivated the instant it lands and a
+  // charger has usually dashed past, so a ranged or drive-by death named a bystander — or 'A BLOW'.
+  private deathKiller: EnemyKind | 'none' | null = null
   waveText: Text
   banner: Text
   sub: Text
@@ -354,6 +341,9 @@ export class Hud {
   }
 
   clearBanner() { this.bannerTicks = 0; this.hideBanner() }
+
+  /** The sim named the killer; the card states it. Called from the playerDeath event. */
+  setKiller(kind: EnemyKind | 'none'): void { this.deathKiller = kind }
 
   update(world: World, _dtSec: number) {
     const p = world.player
@@ -883,7 +873,7 @@ export class Hud {
     //    The corpse's screen pixel is latched on the killing frame and every later beat is anchored to it, so the
     //    veil never slides when the camera's death trauma shakes the world under it.
     if (!this.deathAt || age <= 1) this.deathAt = this.playerPx() ?? this.deathAt
-    if (this.deathKiller === null || age <= 1) this.deathKiller = inferKiller(world)
+
     const at = this.deathAt
     // The veil: an aperture closing on the corpse in eight whole steps, not a scrim dropped over the frame. It is
     // 0 on the body and ~0.33 at the far corner, so the room keeps its texture and its hierarchy and becomes the

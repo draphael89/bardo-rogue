@@ -22,7 +22,10 @@ export type SimEvent =
   | { type: 'dodgeEnd'; x: number; y: number }
   | { type: 'footstep'; x: number; y: number }
   | { type: 'enemyWindup'; id: number; kind: EnemyKind; x: number; y: number }
-  | { type: 'enemyAttack'; id: number; kind: EnemyKind; x: number; y: number; angle: number }
+  // `attack` is the attacker's own attackId for the bodies that have more than one. Presentation
+  // must not guess it: every Minos commit used to draw the gavel's impact, so the verdict and the
+  // scales opened with a slam that was not happening.
+  | { type: 'enemyAttack'; id: number; kind: EnemyKind; x: number; y: number; angle: number; attack?: number }
   | { type: 'enemyStagger'; id: number; x: number; y: number }
   | { type: 'enemyPhase'; id: number; kind: EnemyKind; x: number; y: number; phase: number }
   | { type: 'boltFired'; x: number; y: number; angle: number }

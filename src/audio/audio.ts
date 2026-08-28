@@ -284,6 +284,23 @@ export class AudioSystem {
    * mid-waveform clicks on the way down and finishes a chopped hit on the way up — so the master
    * ramps to silence first and the clock stops a beat later, under cover.
    */
+  /**
+   * Ask the browser to let the clock run, if it is not running and we did not stop it ourselves.
+   *
+   * The two listeners installed by `load` cover mouse and keyboard. A controller-only player fires
+   * neither — and a gamepad button is not a user activation in any browser — so without a path that
+   * asks again they were the one input device that got a silent game. This cannot force a refused
+   * resume; it makes sure the game keeps asking, so audio starts the moment the browser allows it.
+   * Cheap enough to call every frame: it returns before touching a promise unless there is
+   * something to fix.
+   */
+  tryUnlock(): void {
+    if (this._suspended) return
+    const c = this.liveCtx
+    if (!c || c.state === 'running') return
+    void c.resume().catch(() => { /* refused without a gesture; we will ask again */ })
+  }
+
   setSuspended(s: boolean): void {
     if (s === this._suspended) return
     this._suspended = s
@@ -356,8 +373,8 @@ export class AudioSystem {
       // clicking would otherwise get the bed back by dismissing the dialog. It also stays installed
       // as the recovery path for a suspend the browser initiated on its own (mobile audio focus, a
       // backgrounded tab) - without it, an interrupted context stays silent with nothing to revive it.
-      const unlock = () => { if (!this._suspended) void c.resume().catch(() => {}) }
-      window.addEventListener('pointerdown', unlock); window.addEventListener('keydown', unlock)
+      window.addEventListener('pointerdown', () => this.tryUnlock())
+      window.addEventListener('keydown', () => this.tryUnlock())
     }
   }
 

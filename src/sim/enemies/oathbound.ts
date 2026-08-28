@@ -40,6 +40,12 @@ export function updateOathbound(world: World, e: Enemy): void {
   const p = world.player
   switch (e.state) {
     case 'idle':
+      // It holds the shield from the moment it arrives, so it has to be holding it TOWARD you from
+      // the moment it arrives. Leaving aimAngle at the pooled default pointed the guard due east for
+      // the whole 20-tick grace period, and a player camping the spawn marker could walk around and
+      // light-attack straight through the one rule the elite exists for.
+      e.aimAngle = angleToPlayer(world, e)
+      facePlayer(world, e)
       if (e.stateTick >= O.idleTicks) { e.state = 'chase'; e.stateTick = 0 }
       break
     case 'chase': {

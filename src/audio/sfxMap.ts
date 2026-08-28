@@ -1,3 +1,4 @@
+import { ATTACK as WARDEN_ATTACK } from '@/sim/enemies/warden'
 import type { SimEvent } from '@/sim/events'
 import { MIX, type AudioSystem } from './audio'
 import { tuning } from '@/tuning'
@@ -150,9 +151,16 @@ export function playEventSfx(a: AudioSystem, ev: SimEvent): void {
         a.play('woosh', { ...at, gain: 0.7, pitch: 0.95 })
         a.swish(0.5, 170, 0.8, ev)
       } else if (ev.kind === 'warden') {
-        a.play('woosh', { ...at, gain: 1.4, pitch: 0.55 })
-        a.thump(1.05, 150, 46, 0.26, { click: 0.85 })
-        a.bell(1.05, 180, 0.28, 'sfx', 0, { ...at, partials: 'plate', glideTo: 80, cap: 'strike' })
+        if (ev.attack === WARDEN_ATTACK.gavel) {
+          a.play('woosh', { ...at, gain: 1.4, pitch: 0.55 })
+          a.thump(1.05, 150, 46, 0.26, { click: 0.85 })
+          a.bell(1.05, 180, 0.28, 'sfx', 0, { ...at, partials: 'plate', glideTo: 80, cap: 'strike' })
+        } else {
+          // A sentence spoken, not a hammer dropped. It rises where the gavel falls, and it leaves
+          // the floor alone — the marks and the bolts make their own noise.
+          a.bell(0.95, 165, 1.1, 'sfx', 0, { ...at, partials: 'bowl', glideTo: 247, strike: 0.25, cap: 'strike' })
+          a.play('creature', { ...at, gain: 0.34, pitch: 0.44 })
+        }
       }
       break
     case 'enemyPhase':

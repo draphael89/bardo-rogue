@@ -1010,6 +1010,40 @@ describe('the Oath-Bound Hoplite', () => {
     expect(ticks).toBeGreaterThan(light.startup + light.active + light.recovery)
   })
 
+  it('names which case Minos is delivering, so only the gavel draws an impact', () => {
+    const w = createWorld(5, 'boss')
+    w.player.god = true
+    const seen = new Set<number>()
+    for (let t = 0; t < 4000 && seen.size < 2; t++) {
+      const m = w.enemies.find(e => e.active && e.kind === 'warden')
+      if (m && !m.phase) m.hp = Math.min(m.hp, Math.floor(m.maxHp / 2))
+      stepWorld(w, emptyInput())
+      for (const ev of w.events) {
+        if (ev.type !== 'enemyAttack' || ev.kind !== 'warden') continue
+        // An optional field that is never populated fails silently the other way: every attack
+        // would take the non-gavel branch and the gavel would lose its impact entirely.
+        expect(ev.attack).toBeDefined()
+        seen.add(ev.attack!)
+      }
+      w.events.length = 0
+    }
+    expect(seen.size).toBeGreaterThan(1)
+  })
+
+  it('holds its shield toward you from the tick it arrives, not from the tick it chases', () => {
+    const w = armed()
+    // Standing WEST of it, which is where the pooled default aimAngle of zero points away from.
+    const e = w.spawnEnemy('oathbound', w.player.x + 40, w.player.y)!
+    e.hp = 99
+    expect(e.state).toBe('idle')
+    stepWorld(w, emptyInput())
+    const hp0 = e.hp
+    const toward = Math.atan2(e.y - w.player.y, e.x - w.player.x)
+    damageEnemy(w, e, 2, toward, 90, false, 3)
+    expect(e.hp).toBe(hp0)
+    expect(w.events.some(ev => ev.type === 'guardBlocked')).toBe(true)
+  })
+
   it('opens to the committed swing', () => {
     const w = armed()
     const e = facing(w, w.player.x + 40, w.player.y)

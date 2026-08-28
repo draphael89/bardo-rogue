@@ -145,6 +145,10 @@ async function boot() {
     render: (alpha, dt) => {
       // The pad is polled here rather than in the input system because the simulation is stopped
       // while the title is up, and a controller player must not be the one person who cannot start.
+      // The same poll keeps asking for the audio clock: a gamepad button is not a user activation,
+      // and the unlock listeners inside AudioSystem only hear mouse and keyboard, so a controller-
+      // only player was also the one person who got a silent game.
+      if (padAnyButton()) audio.tryUnlock()
       if (presenter.title.visible && padWantsStart()) dismissTitle()
       presenter.reward.setPaused(userPaused)
       presenter.render(alpha, dt)
@@ -157,11 +161,17 @@ async function boot() {
 
   // Start, A, X, or either shoulder — the same buttons that confirm everywhere else in the game.
   const PAD_START = [0, 2, 3, 5, 7, 9]
-  const padWantsStart = (): boolean => {
+  const firstPad = (): Gamepad | null => {
     const pads = typeof navigator !== 'undefined' && navigator.getGamepads ? navigator.getGamepads() : []
-    const pad = pads && pads[0]
-    if (!pad) return false
-    return PAD_START.some(i => !!pad.buttons[i]?.pressed)
+    return (pads && pads[0]) || null
+  }
+  const padWantsStart = (): boolean => {
+    const pad = firstPad()
+    return !!pad && PAD_START.some(i => !!pad.buttons[i]?.pressed)
+  }
+  const padAnyButton = (): boolean => {
+    const pad = firstPad()
+    return !!pad && pad.buttons.some(b => b?.pressed)
   }
 
   installApi({

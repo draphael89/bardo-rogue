@@ -59,12 +59,15 @@ export function hashWorld(world: World): number {
         for (const id of run.pendingReward.options) int(BOON[id])
       }
       if (run.killedBy !== 'none') { byte(ENEMY_KIND[run.killedBy] + 1); flag(run.killedRanged) }
-      // The toll: what is being asked, and both halves of what it left behind. A refusal has to be
-      // in here or a replay could pay it in one run and swim in the next and still agree.
+      // The toll: what is being asked, how it was answered, and both halves of what it left behind.
+      // Every one of these is written UNCONDITIONALLY. Guarding them the way the fields above are
+      // guarded aliases them: two `if (x) flag(true)` lines both emit the byte 1, so a run that paid
+      // and a run that refused feed the digest identical bytes and a replay of one validates against
+      // the other until the divergence surfaces rooms later.
       flag(!!run.pendingRite)
       if (run.pendingRite) { byte(RITE[run.pendingRite.id]); byte(run.pendingRite.focus) }
-      if (run.riteBoonOwed) flag(true)
-      if (run.riteDebt) flag(true)
+      byte(run.riteAnswer === 'paid' ? 1 : run.riteAnswer === 'refused' ? 2 : 0)
+      flag(run.riteBoonOwed); flag(run.riteDebt)
     }
   }
 

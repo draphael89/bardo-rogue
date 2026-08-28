@@ -36,6 +36,9 @@ export interface RiteOffer {
   focus: 0 | 1
 }
 
+/** How the run answered the realm's one rite. `null` until it has been asked and answered. */
+export type RiteAnswer = null | 'paid' | 'refused'
+
 export interface RunState {
   seed: number
   weapon: ArmId
@@ -50,6 +53,9 @@ export interface RunState {
   // The toll, in its three states: being asked, paid (and owed a vow at this room's end), or
   // refused. A refusal outlives the room it was made in — that is the whole point of it.
   pendingRite: RiteOffer | null
+  // Answered once per run and never again: `enterRoom` is the general room API, and without this a
+  // back-edge or a return-to-room path would turn a permanent cost into a repeatable drain.
+  riteAnswer: RiteAnswer
   riteBoonOwed: boolean
   riteDebt: boolean
   result: RunResult
@@ -118,6 +124,7 @@ export function startRun(world: World, firstRoomId: string): boolean {
     roomHistory: [],
     pendingReward: null,
     pendingRite: null,
+    riteAnswer: null,
     riteBoonOwed: false,
     riteDebt: false,
     result: 'active',
@@ -175,6 +182,27 @@ export function finishRun(world: World, result: Exclude<RunResult, 'active'>): v
     by: run.killedBy,
     ranged: run.killedRanged,
   })
+}
+
+/**
+ * Park the body for a full-screen modal. Both of the game's modals — the gods' offer and the
+ * ferryman's toll — freeze the room behind them, so they must leave the player in the same state or
+ * the first tick after one of them behaves differently from the first tick after the other.
+ */
+export function parkForModal(world: World): void {
+  world.timeScale = 1
+  world.slowmoTicks = 0
+  world.freeze = 0
+  const p = world.player
+  p.state = 'free'
+  p.stateTick = 0
+  p.attackQueuedAt = -1
+  p.heavyQueuedAt = -1
+  p.dodgeQueuedAt = -1
+  p.dodgeTick = -1
+  p.dodgeRead = 0
+  p.dodgeProcTick = -1
+  p.vx = p.vy = 0
 }
 
 export function clearRunForTown(world: World): void {

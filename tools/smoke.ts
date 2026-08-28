@@ -16,10 +16,13 @@ const only = args.path ?? ''
 const seed = +(args.seed ?? 1)
 const MAX_TICKS = 20000
 
-interface PathSpec { name: string; bot: string; expect: 'won' | 'lost' }
+// The two paths deliberately run different seeds. The slice bot answers the toll off the seed's
+// second bit, so one seed only ever exercises one side of a permanent choice; splitting them means
+// the browser drives PAY and SWIM, and both consequences, on every smoke run.
+interface PathSpec { name: string; bot: string; expect: 'won' | 'lost'; seed: number; toll: 'paid' | 'refused' }
 const PATHS: PathSpec[] = [
-  { name: 'victory', bot: 'slice-kite', expect: 'won' },
-  { name: 'death', bot: 'slice-naive', expect: 'lost' },
+  { name: 'victory', bot: 'slice-kite', expect: 'won', seed, toll: 'paid' },
+  { name: 'death', bot: 'slice-naive', expect: 'lost', seed: seed + 2, toll: 'refused' },
 ]
 
 type GameState = {
@@ -28,7 +31,11 @@ type GameState = {
   player: { maxHp: number }
   session: {
     meta: { attempts: number; victories: number }
-    run: { result: string; depth: number; boons: string[]; killedBy: string; rite: { id: string } | null } | null
+    run: {
+      result: string; depth: number; boons: string[]; killedBy: string
+      rite: { id: string } | null
+      riteAnswer: null | 'paid' | 'refused'
+    } | null
   }
 }
 
@@ -39,14 +46,14 @@ function check(ok: boolean, what: string): void {
 }
 
 async function play(page: Page, spec: PathSpec): Promise<void> {
-  console.log(`\n[${spec.name}] ${spec.bot}, seed ${seed}`)
+  console.log(`\n[${spec.name}] ${spec.bot}, seed ${spec.seed}`)
   const errors: string[] = []
   const onConsole = (m: { type(): string; text(): string }) => { if (m.type() === 'error') errors.push(m.text()) }
   const onError = (e: Error) => errors.push('pageerror: ' + e.message)
   page.on('console', onConsole)
   page.on('pageerror', onError)
 
-  await page.goto(`${url}/?scenario=loop&seed=${seed}&mute=1&bot=${spec.bot}`)
+  await page.goto(`${url}/?scenario=loop&seed=${spec.seed}&mute=1&bot=${spec.bot}`)
   await page.waitForFunction(() => !!(window as unknown as { __game?: unknown }).__game, null, { timeout: 30000 })
 
   // Step the sim by hand so the smoke does not depend on wall-clock frame pacing in CI.
@@ -60,6 +67,8 @@ async function play(page: Page, spec: PathSpec): Promise<void> {
     const seenRooms: string[] = []
     let sawReward = 0
     let sawRite = 0
+    let tollAnswer: string | null = null
+    let maxHpAfterToll = 0
     let resolved: string | null = null
     let killedBy: string | null = null
     let boons: string[] = []
@@ -70,16 +79,20 @@ async function play(page: Page, spec: PathSpec): Promise<void> {
       if (seenRooms[seenRooms.length - 1] !== id) seenRooms.push(id)
       if (s.room.phase === 'reward') sawReward++
       if (s.session.run?.rite) sawRite++
+      if (s.session.run?.riteAnswer && !tollAnswer) {
+        tollAnswer = s.session.run.riteAnswer
+        maxHpAfterToll = s.player.maxHp
+      }
       const run = s.session.run
       if (run) {
         if (run.boons.length > boons.length) boons = run.boons
         if (run.result !== 'active' && !resolved) { resolved = run.result; killedBy = run.killedBy }
       } else if (resolved && s.room.id === 'bardo' && s.room.phase === 'town') {
-        return { seenRooms, sawReward, sawRite, resolved, killedBy, boons, ticks: s.tick, meta: s.session.meta, done: true }
+        return { seenRooms, sawReward, sawRite, tollAnswer, maxHpAfterToll, resolved, killedBy, boons, ticks: s.tick, meta: s.session.meta, done: true }
       }
     }
     const s = g.state() as GameState
-    return { seenRooms, sawReward, sawRite, resolved, killedBy, boons, ticks: s.tick, meta: s.session.meta, done: false }
+    return { seenRooms, sawReward, sawRite, tollAnswer, maxHpAfterToll, resolved, killedBy, boons, ticks: s.tick, meta: s.session.meta, done: false }
   }, MAX_TICKS)
 
   check(outcome.done, `returns to the Bardo (${outcome.ticks} ticks)`)
@@ -87,7 +100,15 @@ async function play(page: Page, spec: PathSpec): Promise<void> {
   check(outcome.seenRooms.length >= 3, `descends through rooms: ${outcome.seenRooms.join(' > ')}`)
   check(outcome.sawReward > 0, 'reaches at least one reward offer')
   // The toll is only asked if the run gets as far as the Landing, so this is checked where it applies.
-  if (outcome.seenRooms.includes('black-step')) check(outcome.sawRite > 0, 'the ferryman asks for his toll')
+  if (outcome.seenRooms.includes('black-step')) {
+    check(outcome.sawRite > 0, 'the ferryman asks for his toll')
+    check(outcome.tollAnswer === spec.toll, `the toll is ${spec.toll} (got ${String(outcome.tollAnswer)})`)
+    // A permanent cost has to be visible on the bar, and a refusal has to cost nothing up front.
+    const paid = spec.toll === 'paid'
+    check(paid ? outcome.maxHpAfterToll < 5 : outcome.maxHpAfterToll === 5,
+      `paying costs a vessel and refusing does not (maxHp ${outcome.maxHpAfterToll})`)
+    if (paid && spec.expect === 'won') check(outcome.boons.length >= 4, `the ferryman pays out a fourth vow (${outcome.boons.length} vows)`)
+  }
   check(outcome.boons.length > 0, `builds a run: ${outcome.boons.join(', ') || 'none'}`)
   if (spec.expect === 'lost') check(outcome.killedBy !== 'none' && !!outcome.killedBy, `death names its killer (${String(outcome.killedBy)})`)
   check(outcome.meta.attempts >= 1, `attempt is recorded (attempts=${outcome.meta.attempts})`)

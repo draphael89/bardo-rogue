@@ -109,10 +109,12 @@ export const SLICE_WARDEN: WaveDef[] = [{ groups: [{ delay: 20, spawns: [
 ] }] }]
 
 /**
- * `ticks` overrides the telegraph length. Only the toll's debt uses it: that body is not part of a
- * wave's phrasing and has to arrive after the room's own opening, not inside it.
+ * `opts.ticks` overrides the telegraph length and `opts.debt` marks the arrival as the refused
+ * toll's. Only the toll uses either: that body is not part of a wave's phrasing, it has to arrive
+ * after the room's own opening rather than inside it, and it announces itself when it lands.
  */
-export function queueSpawn(world: World, s: SpawnDef, ticks = tuning.spawnTelegraphTicks): void {
+export function queueSpawn(world: World, s: SpawnDef, opts: { ticks?: number; debt?: boolean } = {}): void {
+  const ticks = opts.ticks ?? tuning.spawnTelegraphTicks
   let x = s.x * TILE, y = s.y * TILE
   const radius = s.kind === 'dummy' ? 6 : tuning[s.kind].radius
   // Authored formations can mirror into asymmetric room masonry. Resolve the telegraph itself to
@@ -128,7 +130,7 @@ export function queueSpawn(world: World, s: SpawnDef, ticks = tuning.spawnTelegr
     }
     x = bestX; y = bestY
   }
-  world.spawnQueue.push({ kind: s.kind, x, y, ticksLeft: ticks, total: ticks })
+  world.spawnQueue.push({ kind: s.kind, x, y, ticksLeft: ticks, total: ticks, ...(opts.debt ? { debt: true } : {}) })
   world.emit({ type: 'spawnTelegraph', x, y, kind: s.kind })
 }
 
@@ -137,7 +139,12 @@ export function updateSpawnQueue(world: World): void {
     const s = world.spawnQueue[i]
     s.ticksLeft--
     // a full pool emits poolOverflow and returns null; keep the entry and retry next tick
-    if (s.ticksLeft <= 0 && world.spawnEnemy(s.kind, s.x, s.y)) world.spawnQueue.splice(i, 1)
+    if (s.ticksLeft <= 0 && world.spawnEnemy(s.kind, s.x, s.y)) {
+      // The account is read out when the body is standing in the room, not when its mark went down
+      // two and a half seconds earlier under a room-name banner nobody could see past.
+      if (s.debt) world.emit({ type: 'riteDebtCalled' })
+      world.spawnQueue.splice(i, 1)
+    }
   }
 }
 

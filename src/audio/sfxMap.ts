@@ -205,22 +205,26 @@ export function playEventSfx(a: AudioSystem, ev: SimEvent): void {
       a.play('impactGeneric_light', { gain: 0.14, pitch: 1.7 + ev.focus * 0.08, bus: 'ui' })
       break
     // The ferryman is not a god and does not get their bell. He gets the low end of the same
-    // instrument, struck once, the way a hull knocks against a post.
+    // instrument with the struck wood left in, the way a hull knocks against a post.
     case 'riteOffered':
-      a.bell(0.7, 110, 3.4, 'ui')
+      a.bell(0.7, 110, 3.4, 'ui', 0, { partials: 'plate', strike: 1 })
       a.bell(0.3, 164.81, 2.6, 'music', 0.26)
       break
     case 'riteFocus':
       a.play('impactGeneric_light', { gain: 0.14, pitch: 1.3 + ev.focus * 0.1, bus: 'ui' })
       break
     case 'riteChosen':
-      // Paying rings; swimming does not. One is a coin into a palm, the other is a door left open.
-      if (ev.paid) a.bell(0.66, 220, 2.6, 'ui')
-      else a.bell(0.5, 87.31, 3.6, 'ui')
-      a.bell(0.34, ev.paid ? 329.63 : 130.81, 2.4, 'music', 0.22)
+      // Paying rings clean and holds its pitch: a coin dropped into a palm, and the transaction is
+      // closed. Refusing does not ring — it slides a fifth downward and keeps going, which is the
+      // sound of something being carried off rather than settled.
+      if (ev.paid) a.bell(0.66, 220, 2.6, 'ui', 0, { partials: 'tone', strike: 0.8 })
+      else a.bell(0.6, 130.81, 4.2, 'ui', 0, { partials: 'plate', glideTo: 87.31, strike: 0.35 })
+      a.bell(0.34, ev.paid ? 329.63 : 98, 2.4, 'music', 0.22)
       break
     case 'riteDebtCalled':
-      a.bell(0.52, 87.31, 3.2, 'music')
+      // The same falling figure, an octave down and much later. It is the only cue in the game that
+      // quotes an earlier one, because it is the only consequence that crosses a room boundary.
+      a.bell(0.5, 87.31, 4.4, 'music', 0, { partials: 'plate', glideTo: 65.41, strike: 0.2 })
       break
     case 'boonChosen':
       a.play('swordMetal', { ...at, gain: 0.55, pitch: 1.25, bus: 'ui' })

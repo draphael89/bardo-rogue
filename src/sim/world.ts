@@ -82,8 +82,10 @@ export interface Projectile extends Body {
 }
 
 // `total` is the telegraph's authored length, kept beside the countdown so the marker can draw its
-// own progress. It is not hashed: `ticksLeft` alone decides when the body arrives.
-export interface SpawnEntry { kind: EnemyKind; x: number; y: number; ticksLeft: number; total: number }
+// own progress. `debt` marks the one body the refused toll sends, so its arrival can announce
+// itself. Neither is hashed: `ticksLeft` alone decides when the body arrives, and an announcement
+// is presentation.
+export interface SpawnEntry { kind: EnemyKind; x: number; y: number; ticksLeft: number; total: number; debt?: boolean }
 
 export type WaveState = 'idle' | 'pending' | 'active' | 'done'
 

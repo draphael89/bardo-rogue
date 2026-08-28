@@ -103,6 +103,7 @@ export function installApi(host: {
             killedRanged: w.session.run.killedRanged,
             reward: w.session.run.pendingReward ? { ...w.session.run.pendingReward } : null,
             rite: w.session.run.pendingRite ? { ...w.session.run.pendingRite } : null,
+            riteAnswer: w.session.run.riteAnswer,
             riteBoonOwed: w.session.run.riteBoonOwed,
             riteDebt: w.session.run.riteDebt,
           } : null,

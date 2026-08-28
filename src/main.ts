@@ -134,7 +134,7 @@ async function boot() {
     if (e.code === 'F3') { e.preventDefault(); if (recorder.recording) stopRecord(); recorder.download() }
   })
   loop.start()
-  if (scenario === 'run') presenter.hud.showBanner(world.roomName, 'the door is open', 1.8)
+  if (scenario === 'run') presenter.hud.showBanner(world.roomName, 'clear the room', 1.8)
   else if (scenario === 'full' || scenario === 'empty') presenter.hud.showBanner('THE THRESHOLD', '', 1.5)
   else presenter.hud.showBanner(scenario.toUpperCase(), '', 1.2)
 }

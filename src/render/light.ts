@@ -114,9 +114,10 @@ export class Lighting {
 
     const doorN = noise(this.t * 7 + 11) * 0.55 + noise(this.t * 19 + 4) * 0.45
     const doorF = 1 + doorN * L.doorFlicker
-    this.door.scale.set((L.doorRadius * 2 * doorF) / 128)
-    this.door.alpha = L.doorAlpha * (world.doorOpen ? 1.85 : 1) * (1 - d * 0.85)
-    this.door.tint = L.doorTint
+    const open = world.doorOpen ? 1 : 0
+    this.door.scale.set((L.doorRadius * 2 * doorF * (1 + open * 1.15)) / 128)
+    this.door.alpha = L.doorAlpha * (1 + open * 2.4) * (1 - d * 0.85)
+    this.door.tint = open ? 0xfff0c8 : L.doorTint
 
     const px = lerp(p.px, p.x, alpha), py = lerp(p.py, p.y, alpha)
     this.player.position.set(Math.round(px) + this.pad + this.ra.arenaOffset.x, Math.round(py) + this.pad + this.ra.arenaOffset.y)

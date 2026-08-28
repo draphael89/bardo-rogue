@@ -1,0 +1,547 @@
+{
+  "cmd": "pnpm strip -- --scenario run --seed 1 --from 85 --frames 10 --every 3 --hold '{\"moveY\":-1,\"aimY\":-1,\"aimX\":0}' --out public/progress/shots/run-strip.png --cols 5",
+  "out": "public/progress/shots/run-strip.png",
+  "scenario": "run",
+  "seed": 1,
+  "from": 85,
+  "frames": 10,
+  "every": 3,
+  "zoom": 1,
+  "crop": {
+    "x": 0,
+    "y": 0,
+    "w": 480,
+    "h": 270
+  },
+  "bot": "",
+  "hold": {
+    "moveY": -1,
+    "aimY": -1,
+    "aimX": 0
+  },
+  "eval": "",
+  "shots": [
+    {
+      "i": 0,
+      "tick": 85,
+      "freeze": 0,
+      "state": {
+        "tick": 85,
+        "freeze": 0,
+        "wave": {
+          "index": -1,
+          "state": "idle",
+          "groupIndex": 0,
+          "timer": 0,
+          "total": 0
+        },
+        "room": {
+          "index": 0,
+          "name": "THE THRESHOLD",
+          "doorOpen": true,
+          "kind": "threshold"
+        },
+        "player": {
+          "x": 208,
+          "y": 52.6,
+          "hp": 5,
+          "state": "free",
+          "stateTick": 85,
+          "iframes": 0
+        },
+        "enemies": [],
+        "bolts": 0,
+        "metrics": {
+          "ticks": 85,
+          "seconds": 1.4,
+          "swings": 0,
+          "hitsLanded": 0,
+          "whiffSwings": 0,
+          "kills": 0,
+          "dodges": 0,
+          "successfulDodges": 0,
+          "boltsFired": 0,
+          "boltsCut": 0,
+          "enemyAttacks": 0,
+          "damageTaken": 0,
+          "deaths": 0,
+          "wavesCleared": 0,
+          "clearSeconds": null,
+          "deathSeconds": null
+        }
+      }
+    },
+    {
+      "i": 1,
+      "tick": 88,
+      "freeze": 0,
+      "state": {
+        "tick": 88,
+        "freeze": 0,
+        "wave": {
+          "index": -1,
+          "state": "idle",
+          "groupIndex": 0,
+          "timer": 0,
+          "total": 0
+        },
+        "room": {
+          "index": 0,
+          "name": "THE THRESHOLD",
+          "doorOpen": true,
+          "kind": "threshold"
+        },
+        "player": {
+          "x": 208,
+          "y": 47.8,
+          "hp": 5,
+          "state": "free",
+          "stateTick": 88,
+          "iframes": 0
+        },
+        "enemies": [],
+        "bolts": 0,
+        "metrics": {
+          "ticks": 88,
+          "seconds": 1.5,
+          "swings": 0,
+          "hitsLanded": 0,
+          "whiffSwings": 0,
+          "kills": 0,
+          "dodges": 0,
+          "successfulDodges": 0,
+          "boltsFired": 0,
+          "boltsCut": 0,
+          "enemyAttacks": 0,
+          "damageTaken": 0,
+          "deaths": 0,
+          "wavesCleared": 0,
+          "clearSeconds": null,
+          "deathSeconds": null
+        }
+      }
+    },
+    {
+      "i": 2,
+      "tick": 91,
+      "freeze": 0,
+      "state": {
+        "tick": 91,
+        "freeze": 0,
+        "wave": {
+          "index": -1,
+          "state": "idle",
+          "groupIndex": 0,
+          "timer": 0,
+          "total": 0
+        },
+        "room": {
+          "index": 0,
+          "name": "THE THRESHOLD",
+          "doorOpen": true,
+          "kind": "threshold"
+        },
+        "player": {
+          "x": 208,
+          "y": 43.1,
+          "hp": 5,
+          "state": "free",
+          "stateTick": 91,
+          "iframes": 0
+        },
+        "enemies": [],
+        "bolts": 0,
+        "metrics": {
+          "ticks": 91,
+          "seconds": 1.5,
+          "swings": 0,
+          "hitsLanded": 0,
+          "whiffSwings": 0,
+          "kills": 0,
+          "dodges": 0,
+          "successfulDodges": 0,
+          "boltsFired": 0,
+          "boltsCut": 0,
+          "enemyAttacks": 0,
+          "damageTaken": 0,
+          "deaths": 0,
+          "wavesCleared": 0,
+          "clearSeconds": null,
+          "deathSeconds": null
+        }
+      }
+    },
+    {
+      "i": 3,
+      "tick": 94,
+      "freeze": 0,
+      "state": {
+        "tick": 94,
+        "freeze": 0,
+        "wave": {
+          "index": -1,
+          "state": "idle",
+          "groupIndex": 0,
+          "timer": 0,
+          "total": 0
+        },
+        "room": {
+          "index": 0,
+          "name": "THE THRESHOLD",
+          "doorOpen": true,
+          "kind": "threshold"
+        },
+        "player": {
+          "x": 208,
+          "y": 38.3,
+          "hp": 5,
+          "state": "free",
+          "stateTick": 94,
+          "iframes": 0
+        },
+        "enemies": [],
+        "bolts": 0,
+        "metrics": {
+          "ticks": 94,
+          "seconds": 1.6,
+          "swings": 0,
+          "hitsLanded": 0,
+          "whiffSwings": 0,
+          "kills": 0,
+          "dodges": 0,
+          "successfulDodges": 0,
+          "boltsFired": 0,
+          "boltsCut": 0,
+          "enemyAttacks": 0,
+          "damageTaken": 0,
+          "deaths": 0,
+          "wavesCleared": 0,
+          "clearSeconds": null,
+          "deathSeconds": null
+        }
+      }
+    },
+    {
+      "i": 4,
+      "tick": 97,
+      "freeze": 0,
+      "state": {
+        "tick": 97,
+        "freeze": 0,
+        "wave": {
+          "index": -1,
+          "state": "idle",
+          "groupIndex": 0,
+          "timer": 0,
+          "total": 0
+        },
+        "room": {
+          "index": 0,
+          "name": "THE THRESHOLD",
+          "doorOpen": true,
+          "kind": "threshold"
+        },
+        "player": {
+          "x": 208,
+          "y": 33.6,
+          "hp": 5,
+          "state": "free",
+          "stateTick": 97,
+          "iframes": 0
+        },
+        "enemies": [],
+        "bolts": 0,
+        "metrics": {
+          "ticks": 97,
+          "seconds": 1.6,
+          "swings": 0,
+          "hitsLanded": 0,
+          "whiffSwings": 0,
+          "kills": 0,
+          "dodges": 0,
+          "successfulDodges": 0,
+          "boltsFired": 0,
+          "boltsCut": 0,
+          "enemyAttacks": 0,
+          "damageTaken": 0,
+          "deaths": 0,
+          "wavesCleared": 0,
+          "clearSeconds": null,
+          "deathSeconds": null
+        }
+      }
+    },
+    {
+      "i": 5,
+      "tick": 100,
+      "freeze": 0,
+      "state": {
+        "tick": 100,
+        "freeze": 0,
+        "wave": {
+          "index": -1,
+          "state": "idle",
+          "groupIndex": 0,
+          "timer": 0,
+          "total": 0
+        },
+        "room": {
+          "index": 1,
+          "name": "THE CROSSING",
+          "doorOpen": false,
+          "kind": "crossing"
+        },
+        "player": {
+          "x": 208,
+          "y": 191.1,
+          "hp": 5,
+          "state": "free",
+          "stateTick": 100,
+          "iframes": 0
+        },
+        "enemies": [],
+        "bolts": 0,
+        "metrics": {
+          "ticks": 100,
+          "seconds": 1.7,
+          "swings": 0,
+          "hitsLanded": 0,
+          "whiffSwings": 0,
+          "kills": 0,
+          "dodges": 0,
+          "successfulDodges": 0,
+          "boltsFired": 0,
+          "boltsCut": 0,
+          "enemyAttacks": 0,
+          "damageTaken": 0,
+          "deaths": 0,
+          "wavesCleared": 0,
+          "clearSeconds": null,
+          "deathSeconds": null
+        }
+      }
+    },
+    {
+      "i": 6,
+      "tick": 103,
+      "freeze": 0,
+      "state": {
+        "tick": 103,
+        "freeze": 0,
+        "wave": {
+          "index": -1,
+          "state": "idle",
+          "groupIndex": 0,
+          "timer": 0,
+          "total": 0
+        },
+        "room": {
+          "index": 1,
+          "name": "THE CROSSING",
+          "doorOpen": false,
+          "kind": "crossing"
+        },
+        "player": {
+          "x": 208,
+          "y": 187.3,
+          "hp": 5,
+          "state": "free",
+          "stateTick": 103,
+          "iframes": 0
+        },
+        "enemies": [],
+        "bolts": 0,
+        "metrics": {
+          "ticks": 103,
+          "seconds": 1.7,
+          "swings": 0,
+          "hitsLanded": 0,
+          "whiffSwings": 0,
+          "kills": 0,
+          "dodges": 0,
+          "successfulDodges": 0,
+          "boltsFired": 0,
+          "boltsCut": 0,
+          "enemyAttacks": 0,
+          "damageTaken": 0,
+          "deaths": 0,
+          "wavesCleared": 0,
+          "clearSeconds": null,
+          "deathSeconds": null
+        }
+      }
+    },
+    {
+      "i": 7,
+      "tick": 106,
+      "freeze": 0,
+      "state": {
+        "tick": 106,
+        "freeze": 0,
+        "wave": {
+          "index": -1,
+          "state": "idle",
+          "groupIndex": 0,
+          "timer": 0,
+          "total": 0
+        },
+        "room": {
+          "index": 1,
+          "name": "THE CROSSING",
+          "doorOpen": false,
+          "kind": "crossing"
+        },
+        "player": {
+          "x": 208,
+          "y": 182.5,
+          "hp": 5,
+          "state": "free",
+          "stateTick": 106,
+          "iframes": 0
+        },
+        "enemies": [],
+        "bolts": 0,
+        "metrics": {
+          "ticks": 106,
+          "seconds": 1.8,
+          "swings": 0,
+          "hitsLanded": 0,
+          "whiffSwings": 0,
+          "kills": 0,
+          "dodges": 0,
+          "successfulDodges": 0,
+          "boltsFired": 0,
+          "boltsCut": 0,
+          "enemyAttacks": 0,
+          "damageTaken": 0,
+          "deaths": 0,
+          "wavesCleared": 0,
+          "clearSeconds": null,
+          "deathSeconds": null
+        }
+      }
+    },
+    {
+      "i": 8,
+      "tick": 109,
+      "freeze": 0,
+      "state": {
+        "tick": 109,
+        "freeze": 0,
+        "wave": {
+          "index": -1,
+          "state": "idle",
+          "groupIndex": 0,
+          "timer": 0,
+          "total": 0
+        },
+        "room": {
+          "index": 1,
+          "name": "THE CROSSING",
+          "doorOpen": false,
+          "kind": "crossing"
+        },
+        "player": {
+          "x": 208,
+          "y": 177.7,
+          "hp": 5,
+          "state": "free",
+          "stateTick": 109,
+          "iframes": 0
+        },
+        "enemies": [],
+        "bolts": 0,
+        "metrics": {
+          "ticks": 109,
+          "seconds": 1.8,
+          "swings": 0,
+          "hitsLanded": 0,
+          "whiffSwings": 0,
+          "kills": 0,
+          "dodges": 0,
+          "successfulDodges": 0,
+          "boltsFired": 0,
+          "boltsCut": 0,
+          "enemyAttacks": 0,
+          "damageTaken": 0,
+          "deaths": 0,
+          "wavesCleared": 0,
+          "clearSeconds": null,
+          "deathSeconds": null
+        }
+      }
+    },
+    {
+      "i": 9,
+      "tick": 112,
+      "freeze": 0,
+      "state": {
+        "tick": 112,
+        "freeze": 0,
+        "wave": {
+          "index": -1,
+          "state": "idle",
+          "groupIndex": 0,
+          "timer": 0,
+          "total": 0
+        },
+        "room": {
+          "index": 1,
+          "name": "THE CROSSING",
+          "doorOpen": false,
+          "kind": "crossing"
+        },
+        "player": {
+          "x": 208,
+          "y": 173,
+          "hp": 5,
+          "state": "free",
+          "stateTick": 112,
+          "iframes": 0
+        },
+        "enemies": [],
+        "bolts": 0,
+        "metrics": {
+          "ticks": 112,
+          "seconds": 1.9,
+          "swings": 0,
+          "hitsLanded": 0,
+          "whiffSwings": 0,
+          "kills": 0,
+          "dodges": 0,
+          "successfulDodges": 0,
+          "boltsFired": 0,
+          "boltsCut": 0,
+          "enemyAttacks": 0,
+          "damageTaken": 0,
+          "deaths": 0,
+          "wavesCleared": 0,
+          "clearSeconds": null,
+          "deathSeconds": null
+        }
+      }
+    }
+  ],
+  "events": [
+    {
+      "tick": 98,
+      "type": "footstep",
+      "x": 208,
+      "y": 33.58333333333317
+    },
+    {
+      "tick": 98,
+      "type": "roomEnter",
+      "name": "THE CROSSING",
+      "index": 1,
+      "total": 2
+    },
+    {
+      "tick": 112,
+      "type": "footstep",
+      "x": 208,
+      "y": 174.58333333333326
+    }
+  ],
+  "errors": []
+}

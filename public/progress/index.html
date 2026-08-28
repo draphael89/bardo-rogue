@@ -169,10 +169,13 @@
       const t = new Date(d.updated)
       $('clock').textContent = `last slate  ${t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
       const p = d.pieces.find(x => x.id === d.now) || d.pieces[0]
+      const name = p.name || p.title || p.id
+      const take = p.take || '—'
+      const bar = p.bar || 'the bar'
       $('take').innerHTML = `
-        <div class="kicker"><span>TAKE ${p.take}</span><span>vs ${p.bar}</span></div>
-        <h2>${p.name.toUpperCase()}</h2>
-        <p>${p.blurb}</p>
+        <div class="kicker"><span>TAKE ${take}</span><span>vs ${bar}</span></div>
+        <h2>${String(name).toUpperCase()}</h2>
+        <p>${p.blurb || p.title || ''}</p>
         <div class="frames">
           ${frame(p.before, 'before')}
           ${frame(p.after, 'after  ·  r' + p.rounds)}
@@ -183,8 +186,8 @@
       `
       $('board').innerHTML = d.pieces.map(x => `
         <div class="row ${x.id === d.now ? 'live' : ''} ${x.verdict === 'ours' ? 'wow' : x.verdict === 'theirs' ? 'loss' : x.status}">
-          <span class="n">${x.take}</span>
-          <span class="name">${x.name}</span>
+          <span class="n">${x.take || '—'}</span>
+          <span class="name">${x.name || x.title || x.id}</span>
           <span class="st">${statusWord(x)}</span>
         </div>
       `).join('')

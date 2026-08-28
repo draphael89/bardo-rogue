@@ -154,6 +154,23 @@ export function buildTilemap(renderer: Renderer, atlas: Atlas, arena: Arena, are
 
   const door = new Sprite(atlas.room(T.doorClosed))
   door.position.set(arena.door.col * TILE, arena.door.row * TILE)
+  const wingL = new Sprite(atlas.room(T.doorOpen))
+  const wingR = new Sprite(atlas.room(T.doorOpen))
+  wingL.position.set(-TILE, 0)
+  wingR.position.set(TILE, 0)
+  wingL.visible = wingR.visible = false
+  const spill = new Graphics()
+  spill.rect(-TILE - 2, TILE, TILE * 3 + 4, 10)
+  spill.fill({ color: 0xffe2a0, alpha: 0.72 })
+  spill.rect(-8, TILE + 8, TILE + 16, 6)
+  spill.fill({ color: 0xfff0c8, alpha: 0.45 })
+  spill.visible = false
+  door.addChild(wingL, wingR, spill)
+  const rawDestroy = door.destroy.bind(door)
+  door.destroy = ((opts?: boolean | { children?: boolean }) => {
+    const o = typeof opts === 'object' && opts ? opts : {}
+    rawDestroy({ children: true, ...o })
+  }) as typeof door.destroy
 
   const { width, height } = tuning.view
   const voidScene = bakeVoid(atlas, arena, arenaOffset)
@@ -165,6 +182,9 @@ export function buildTilemap(renderer: Renderer, atlas: Atlas, arena: Arena, are
 
   return {
     sprite, door, voidLayer,
-    setDoorOpen(open) { door.texture = atlas.room(open ? T.doorOpen : T.doorClosed) },
+    setDoorOpen(open) {
+      door.texture = atlas.room(open ? T.doorOpen : T.doorClosed)
+      wingL.visible = wingR.visible = spill.visible = open
+    },
   }
 }

@@ -22,6 +22,8 @@ export function createWorld(seed: number, scenarioName = 'full', opts: { god?: b
   const world = new World(seed, scenarioName)
   world.player.god = !!(opts.god ?? sc.god)
   if (sc.spawns) for (const s of sc.spawns) world.spawnEnemy(s.kind, s.x * TILE, s.y * TILE)
-  if (sc.waves) startWaves(world, sc.waves)
+  const roomWaves = world.rooms[world.roomIndex]?.waves
+  if (roomWaves?.length) startWaves(world, roomWaves)
+  else if (sc.waves) startWaves(world, sc.waves)
   return world
 }

@@ -1,7 +1,7 @@
 import { tuning } from '@/tuning'
 import { TILE, buildArena, setDoorWalkable, type RoomKind } from './arena'
 import { Rng, STREAM, streamSeed } from './rng'
-import { startWaves, type WaveDef } from './waves'
+import { startWaves, THRESHOLD_RUN_WAVES, CROSSING_RUN_WAVES, type WaveDef } from './waves'
 import type { World } from './world'
 
 export interface RoomDef {
@@ -15,8 +15,8 @@ export interface RoomDef {
 export function roomsFor(scenario: string): RoomDef[] {
   if (scenario === 'run') {
     return [
-      { id: 'threshold', name: 'THE THRESHOLD', kind: 'threshold', startDoorOpen: true },
-      { id: 'crossing', name: 'THE CROSSING', kind: 'crossing' },
+      { id: 'threshold', name: 'THE THRESHOLD', kind: 'threshold', waves: THRESHOLD_RUN_WAVES },
+      { id: 'crossing', name: 'THE CROSSING', kind: 'crossing', waves: CROSSING_RUN_WAVES },
     ]
   }
   return [{ id: 'threshold', name: 'THE THRESHOLD', kind: 'threshold' }]

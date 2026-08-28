@@ -1,9 +1,9 @@
 {
   "title": "Bardo Rogue",
-  "subtitle": "Gauntlet against Enter the Gungeon & Hades \u2014 Phase 0 repair, then wave 1",
-  "updated": "2026-08-27T19:25:48-04:00",
-  "now": "phase-0: repairing the instruments",
-  "round": 0,
+  "subtitle": "Gauntlet against Enter the Gungeon & Hades \u2014 the door, then the rest",
+  "updated": "2026-08-27T22:16:00-04:00",
+  "now": "run",
+  "round": 2,
   "timeline": [
     {
       "t": "16:54",
@@ -140,6 +140,38 @@
     {
       "t": "19:34",
       "text": "Found 29 Math.random calls in the render layer: the same strip captured twice differs. Giving presentation its own seeded generator, or every round-over-round diff is noise."
+    },
+    {
+      "t": "21:50",
+      "text": "The Threshold stays PARKED (blocked on authored art). Next piece: the door. Walk north, wake in The Crossing."
+    },
+    {
+      "t": "21:50",
+      "text": "The door works. Scenario run: open door, walk north, The Crossing loads. 38 tests green."
+    },
+    {
+      "t": "21:52",
+      "text": "Blind critics (both orders) picked the bar. Gap: kit-on-a-grid vs a chamber with a floor thesis and light that carves volume. Same art block as The Threshold. Room graph stays; look is not a pass."
+    },
+    {
+      "t": "21:52",
+      "text": "Run is now a real combat: Threshold wave sealed, door opens on clear, Crossing starts a different fight. Tests 39 green."
+    },
+    {
+      "t": "21:58",
+      "text": "Strip t=435..675: ROOM CLEARED / WALK NORTH, walk through, Crossing WAVE 1, caster + two chargers spawn."
+    },
+    {
+      "t": "22:04",
+      "text": "R2 critics split. One picked the sequence. The other named the gap: the north door still looks like the fight-state door; WALK NORTH is signage over a threshold that never opens."
+    },
+    {
+      "t": "22:10",
+      "text": "Aperture pass: open door is a dark well with a gold sill, three tiles wide, light flood. Clear banner moved off the north wall so the door can be seen."
+    },
+    {
+      "t": "22:16",
+      "text": "R2 critics (both orders) picked the sequence. Lit north hole, player in it, Crossing already in a fight. Not a room-beauty contest."
     }
   ],
   "pieces": [
@@ -237,7 +269,23 @@
       "id": "arena-first-look",
       "status": "parked",
       "title": "PARKED after 11 losses. Re-enters only behind the art bible and an authored asset kit.",
+      "name": "The Threshold",
       "rounds": 11
+    },
+    {
+      "id": "run",
+      "take": "16",
+      "name": "The door",
+      "title": "Clear the room, walk the open door, fight in the next chamber",
+      "blurb": "A run is a lie until the last kill opens a door you walk through into a new fight.",
+      "bar": "Gungeon room exit",
+      "status": "done",
+      "rounds": 2,
+      "verdict": "ours",
+      "gap": "",
+      "before": "shots/run-r2-fight.png",
+      "after": "shots/run-r2-approach.png",
+      "ref": "ref/gungeon-2.jpg"
     }
   ]
 }

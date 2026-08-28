@@ -19,6 +19,16 @@ export const ROOM_WAVES: WaveDef[] = [
   },
 ]
 
+// Two-room run: Threshold teaches the brute, Crossing answers with range + dash. Positions stay off furniture.
+export const THRESHOLD_RUN_WAVES: WaveDef[] = [ROOM_WAVES[0]]
+export const CROSSING_RUN_WAVES: WaveDef[] = [
+  { groups: [{ delay: 20, spawns: [
+    { kind: 'caster', x: 4, y: 3.5 },
+    { kind: 'charger', x: 22, y: 4 },
+    { kind: 'charger', x: 3, y: 11 },
+  ] }] },
+]
+
 export function queueSpawn(world: World, s: SpawnDef): void {
   const x = s.x * TILE, y = s.y * TILE
   world.spawnQueue.push({ kind: s.kind, x, y, ticksLeft: tuning.spawnTelegraphTicks })

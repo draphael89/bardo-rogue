@@ -101,8 +101,10 @@ export class Atmosphere {
     const spanY = inner.y1 - inner.y0
 
     const glowPulse = 1 + Math.sin(this.t * 2.1) * 0.08
-    this.doorGlow.scale.set((A.doorGlowRadius * 2 * glowPulse) / 128)
-    this.doorGlow.alpha = A.doorGlowAlpha * (world.doorOpen ? 2.4 : 1) * fade * (0.85 + Math.sin(this.t * 3.2) * 0.15)
+    const open = world.doorOpen ? 1 : 0
+    this.doorGlow.scale.set((A.doorGlowRadius * 2 * glowPulse * (1 + open * 1.6)) / 128)
+    this.doorGlow.alpha = A.doorGlowAlpha * (1 + open * 5.5) * fade * (0.85 + Math.sin(this.t * 3.2) * 0.15)
+    this.doorGlow.tint = open ? 0xfff4d0 : A.doorGlowTint
 
     for (let i = 0; i < this.rays.length; i++) {
       const r = this.rays[i]

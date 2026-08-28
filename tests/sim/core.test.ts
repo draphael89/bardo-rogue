@@ -138,13 +138,32 @@ describe('enemies', () => {
   })
 })
 
+function forceRoomClear(w: ReturnType<typeof createWorld>): void {
+  for (const e of w.enemies) e.active = false
+  w.spawnQueue.length = 0
+  const defs = w.waveDefs
+  if (!defs?.length) return
+  w.wave.state = 'active'
+  w.wave.index = defs.length - 1
+  w.wave.groupIndex = defs[w.wave.index].groups.length
+  stepWorld(w, emptyInput())
+}
+
 describe('run rooms', () => {
-  it('walking north through an open door enters the next room', () => {
+  it('starts the first fight with the door sealed', () => {
     const w = createWorld(1, 'run')
     expect(w.roomIndex).toBe(0)
-    expect(w.doorOpen).toBe(true)
-    expect(w.arena.kind).toBe('threshold')
+    expect(w.doorOpen).toBe(false)
+    expect(w.wave.state).toBe('pending')
     expect(w.hasNextRoom()).toBe(true)
+  })
+  it('clearing the room opens the door; walking north enters the next fight', () => {
+    const w = createWorld(1, 'run')
+    expect(w.arena.kind).toBe('threshold')
+    forceRoomClear(w)
+    expect(w.doorOpen).toBe(true)
+    expect(w.events.some(e => e.type === 'roomClear' && e.hasNext)).toBe(true)
+    w.events.length = 0
     let entered = false
     for (let i = 0; i < 400 && w.roomIndex === 0; i++) {
       stepWorld(w, { ...emptyInput(), moveY: -1, aimY: -1 })
@@ -155,6 +174,8 @@ describe('run rooms', () => {
     expect(w.roomIndex).toBe(1)
     expect(w.arena.kind).toBe('crossing')
     expect(w.roomName).toBe('THE CROSSING')
+    expect(w.doorOpen).toBe(false)
+    expect(w.wave.state).toBe('pending')
     expect(w.player.y).toBeGreaterThan(10 * 16)
   })
   it('one-room scenarios never leave even if the door flag is forced', () => {
@@ -165,12 +186,13 @@ describe('run rooms', () => {
     expect(w.arena.kind).toBe('threshold')
     expect(w.player.y).toBeGreaterThan(2 * 16)
   })
-  it('same seed + walk-through is deterministic', () => {
-    const walk = (w: ReturnType<typeof createWorld>) => {
+  it('same seed + clear + walk-through is deterministic', () => {
+    const play = (w: ReturnType<typeof createWorld>) => {
+      forceRoomClear(w)
       for (let i = 0; i < 400; i++) stepWorld(w, { ...emptyInput(), moveY: -1, aimY: -1 })
     }
     const a = createWorld(3, 'run'), b = createWorld(3, 'run')
-    walk(a); walk(b)
+    play(a); play(b)
     expect(a.roomIndex).toBe(1)
     expect(hashWorld(a)).toBe(hashWorld(b))
   })

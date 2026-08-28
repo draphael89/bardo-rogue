@@ -1,6 +1,6 @@
 // Copies and processes the Kenney subset we actually use into public/assets.
 // Never ship the raw library. Run: pnpm assets
-import { mkdirSync, copyFileSync, writeFileSync, existsSync } from 'node:fs'
+import { mkdirSync, copyFileSync, writeFileSync, existsSync, readFileSync } from 'node:fs'
 import { execSync } from 'node:child_process'
 import { join } from 'node:path'
 import sharp from 'sharp'
@@ -11,12 +11,16 @@ if (!existsSync(K)) { console.error('Kenney dir not found:', K); process.exit(1)
 const out = (p: string) => join(OUT, p)
 for (const d of ['sprites', 'particles', 'decals', 'light', 'audio', 'fonts']) mkdirSync(out(d), { recursive: true })
 
-const manifest: Record<string, string[]> = { sprites: [], particles: [], decals: [], light: [], audio: [], fonts: [] }
+// This tool owns only the keys it writes. It used to rewrite the whole manifest, so running `assets`
+// after `tiles` or `fx` silently dropped their sheets — the standing footgun called out in CLAUDE.md.
+const existing: Record<string, string[]> = existsSync(out('manifest.json'))
+  ? JSON.parse(readFileSync(out('manifest.json'), 'utf8'))
+  : {}
+const manifest: Record<string, string[]> = { ...existing, sprites: [], light: [], audio: [], fonts: [] }
 
 // --- sprites (copied verbatim, nearest-neighbor art) ---
 copyFileSync(join(K, '2D assets/Tiny Dungeon/Tilemap/tilemap_packed.png'), out('sprites/tiny_dungeon.png'))
-copyFileSync(join(K, '2D assets/Micro Roguelike/Tilemap/colored_tilemap_packed.png'), out('sprites/micro.png'))
-manifest.sprites.push('tiny_dungeon.png', 'micro.png')
+manifest.sprites.push('tiny_dungeon.png')
 
 // --- particles: 512px soft shapes -> 64px (they get pixelated by the low-res render target anyway) ---
 const P = join(K, '2D assets/Particle Pack/PNG (Transparent)')
@@ -25,18 +29,12 @@ const particleNames = [
   ...range2('circle', 1, 5), ...range2('trace', 1, 7), ...range2('slash', 1, 4), ...range2('scorch', 1, 3),
   ...range2('flame', 1, 6), 'muzzle_01', 'magic_01', 'light_01', 'twirl_01',
 ]
-for (const n of particleNames) {
-  await sharp(join(P, `${n}.png`)).resize(64, 64).png().toFile(out(`particles/${n}.png`))
-  manifest.particles.push(`${n}.png`)
-}
+// Particles and ground decals are authored by `pnpm fx` now (tools/make-bardo-fx.ts). Kenney's soft
+// radial shapes violated ART_DIRECTION §6 in four clauses; this tool no longer writes either family.
 
 // --- decals: splats -> 32px, tinted at runtime ---
 const S = join(K, '2D assets/Splat Pack/PNG/Default (256px)')
-for (let i = 0; i < 12; i++) {
-  const n = `splat${String(i).padStart(2, '0')}`
-  await sharp(join(S, `${n}.png`)).resize(32, 32).png().toFile(out(`decals/${n}.png`))
-  manifest.decals.push(`${n}.png`)
-}
+
 
 // --- light masks ---
 await sharp(join(K, '2D assets/Light Masks/Transparent/circle_a.png')).resize(128, 128).png().toFile(out('light/circle.png'))

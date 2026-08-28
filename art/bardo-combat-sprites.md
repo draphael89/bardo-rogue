@@ -7,18 +7,21 @@ alpha-matted sources, not shipped browser assets:
 - `source/bardo_hero_alpha_v1.png` — 4x4, 16 semantic hero poses.
 - `source/bardo_brute_alpha_v1.png` — 4x2, 8 semantic Brute poses.
 
-The tiny indexed production sheets are deterministic derivatives:
+The production sheets are deterministic derivatives, compiled from these sources by specs:
 
 ```sh
-node tools/process-sprite-sheet.mjs art/source/bardo_hero_alpha_v1.png public/assets/sprites/bardo_hero.png --cols 4 --rows 4 --cell 32 --colors 16 --report art/source/bardo_hero.metrics.json
-node tools/process-sprite-sheet.mjs art/source/bardo_brute_alpha_v1.png public/assets/sprites/bardo_brute.png --cols 4 --rows 2 --cell 48 --colors 16 --fit pose --margin 2 --midtone-floor 90 --report art/source/bardo_brute.metrics.json
+pnpm art compile art/specs/hero.json
+pnpm art compile art/specs/brute.json
 ```
 
-The Brute uses pose fitting because its square generated sheet has tall 4x2 grid cells; cropping each
-silhouette before fitting preserves its aspect ratio. The processor otherwise downsamples every cell
-with nearest-neighbor sampling, removes residual
-green spill, forces binary alpha, and quantizes the entire atlas to a shared palette. The retained JSON
-reports are inspection metadata and are outside the shipped `public/` tree.
+Each spec records its own grid, palette ramp, pivots, sockets, clips and provenance; the compiler
+(`tools/art/compile.ts`) reduces the source by voting in canon-palette space, and the gates
+(`tools/art/gates.ts`) reject the result if it drifts. The Brute uses `fit: "pose"` because its square
+generated sheet has tall 4x2 cells, so each silhouette is cropped before fitting to preserve aspect.
+
+The original normalizer (`tools/process-sprite-sheet.mjs`) is gone. It sampled one source point per
+output pixel, which at ~39 source pixels per output pixel is a coin flip at every edge — that is why
+the first sheets shipped with dissolved blades. Its metrics sidecar reported `pass: true` for both.
 
 ## Hero generation prompt
 

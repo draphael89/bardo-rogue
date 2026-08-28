@@ -6,6 +6,25 @@
 
 **Revision 2 — synthesis.** This plan was cross-reviewed against an independent vertical-slice plan authored against revision `1ef5b18` (three commits behind HEAD). That plan's current-state audit is stale — it describes a build without the loop, boons, boss, or persistence that exist at HEAD — but several of its design calls beat v1 of this document and are adopted here: the independent-heavy and dash-attack combat questions (Phase 1), node-boundary save/resume instead of replay fast-forward, the Remembrances + Smith-reroll meta proof with the bow deferred, leaner enemy counts built around one guard-break elite, Minos and the named Greek spaces, the recombining-phases boss principle, and a cultural-review gate for mythological material.
 
+---
+
+## STATUS — what has since been built
+
+The sections below are the plan as written. This block records what was executed against it, so the
+document does not become the next stale audit. Tests: **232 passing**; `pnpm matrix` 100/100 seeds
+resolve on both loop bots; `pnpm smoke` drives both endings through a real browser.
+
+| Plan item | State |
+|---|---|
+| Task 1 — truth pass | **Done.** Attempt-keyed run seeds (a reload no longer replays yesterday's opening); sim-authoritative death cause carried by the blow and by the projectile; the tile router extracted to `src/sim/nav.ts` and used by the loop bots, taking seeded traversal from 95/100 to 100/100; the arena's `solid` mask hashed; pause given ownership of the audio clock and of visibility loss. |
+| Task 1 — CI and instruments | **Done.** `.github/workflows/ci.yml` runs typecheck, tests, build and a 100-seed acceptance matrix, plus a browser job that drives both endings. `tools/smoke.ts` and `tools/matrix.ts` are new; the matrix separates the hard soft-lock gate from a reported balance band. `tests/docs.test.ts` pins `HARNESS.md` against the encoder so the agent contract cannot rot again. |
+| Task 2 — the heavy as its own verb | **Done** (the prototype half; the human A/B remains). Right mouse / L / C / pad Y, its own queue, priority stated once as roll > heavy > light, a chain-cutting cancel, a roll launch, inert on the bow. Ten contract tests. The dash attack is named in the swing event and given the roll's cold colour and a tighter swish. |
+| Task 7 — statuses, boons, gods | **Done.** Burn joins Brand in `src/sim/status.ts`; twelve vows across two powers with one duo; the offer screen is a meeting with a named, drawn deity. |
+| Boss | **Done, ahead of schedule.** Minos has three attacks that recombine in phase two, a `verdict` floor-hazard primitive on the projectile pool, and per-attack telegraphs — the old tell drew a slam plate under every attack, which was a lie. |
+| Realm identity (part of Task 8) | **Partly done.** The five spaces and the dead are named; palette and layout work is not started. |
+| Task 10 — shell | **Partly done.** A title screen held over the living hub, and the HUD's missing single chrome toggle. Settings, credits and abandon-run are not built. |
+| Tasks 3–6, 9 | **Not started.** Rooms-as-data, the generated route and map, node-boundary save, the obol/Remembrance economy, and the bow. These remain the next milestone, in the order given below. |
+
 This document is the unified plan requested by the game-loop audit (Appendix B) and the vertical-slice addendum: one verdict, one gap analysis, one rank-ordered list of what to do next. All claims were re-verified against the current tree, not carried forward from earlier audits.
 
 **Evidence base for this audit:** full read of `src/sim/` (all 30 files), the entry point, input, tuning, and the render/audio surfaces; `pnpm typecheck` green; `pnpm test` green (**184 tests, 14 files**); fresh headless runs of the production loop (`slice-kite` seeds 1–60, `slice-naive` seeds 1–20); five Playwright screenshots along the golden path (Bardo, Threshold fight, Veiled Crossing fight, reward offer, Warden fight), reproducible via:

@@ -189,15 +189,22 @@ function kite(world: World): InputFrame {
     return inp
   }
   const punishable = e.state === 'recover' || e.state === 'stagger' || e.state === 'aim' || e.state === 'idle' || e.kind === 'caster'
+  // The committed swing is what a punish window is FOR. A body that has just spent its attack is
+  // open long enough to eat the plant, and against a brute the heavy is the only thing that breaks
+  // poise — so the probe spends it there and nowhere else, which is the read a player has to make.
+  const heavy = tuning.player.attack.swings[tuning.player.attack.swings.length - 1]
+  const openWide = (e.state === 'recover' || e.state === 'stagger') && e.stateTick < 14
   if (punishable || e.kind === 'charger') {
     if (d > 20) { inp.moveX = inp.aimX; inp.moveY = inp.aimY }
-    if (d <= 42) inp.attack = world.tick % 3 === 0
+    if (d <= heavy.radius && openWide) inp.heavy = true
+    else if (d <= 42) inp.attack = world.tick % 3 === 0
   } else {
     // Close to a real punish distance. The old 34–44 px dead band could stare at a brute across a
     // pillar forever; a human routes around it, so the control probe must keep expressing intent too.
     if (d < 23) { inp.moveX = -inp.aimX; inp.moveY = -inp.aimY }
     else if (d > 25) { inp.moveX = inp.aimX; inp.moveY = inp.aimY }
-    if (d <= 27 && e.state === 'chase') inp.attack = world.tick % 3 === 0
+    if (d <= heavy.radius && openWide) inp.heavy = true
+    else if (d <= 27 && e.state === 'chase') inp.attack = world.tick % 3 === 0
   }
   return inp
 }

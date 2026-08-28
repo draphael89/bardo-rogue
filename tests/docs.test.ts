@@ -10,7 +10,7 @@ describe('harness documentation', () => {
   it('documents the replay flag bits exactly as the encoder defines them', () => {
     const label: Record<keyof typeof FLAG, string> = {
       aimSoft: 'aimSoft', attack: 'attack', dodge: 'dodge', restart: 'restart',
-      attackHeld: 'attackHeld', confirm: 'confirm', choiceLeft: 'choice-left', choiceRight: 'choice-right',
+      attackHeld: 'attackHeld', confirm: 'confirm', choiceLeft: 'choice-left', choiceRight: 'choice-right', heavy: 'heavy',
     }
     for (const [key, bit] of Object.entries(FLAG)) {
       const expected = `${bit} ${label[key as keyof typeof FLAG]}`

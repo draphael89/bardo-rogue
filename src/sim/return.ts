@@ -28,6 +28,7 @@ export function returnToHub(world: World): void {
   p.kbx = p.kby = 0
   p.controlTick = 0
   p.attackQueuedAt = -1
+  p.heavyQueuedAt = -1
   p.dodgeQueuedAt = -1
   p.dodgeTick = -1
   p.swingIndex = 0

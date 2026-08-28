@@ -149,7 +149,7 @@ export function enterRoom(world: World, index: number, via: 'door' | 'return' = 
   p.y = p.py = start.y
   p.vx = p.vy = 0
   p.kbx = p.kby = 0
-  p.attackQueuedAt = p.dodgeQueuedAt = -1
+  p.attackQueuedAt = p.heavyQueuedAt = p.dodgeQueuedAt = -1
   p.dodgeTick = -1
   p.dodgeRead = 0
   p.dodgeProcTick = -1

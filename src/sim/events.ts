@@ -9,7 +9,7 @@ import type { ArmId } from './weapons'
 import type { BoonId } from './boons'
 
 export type SimEvent =
-  | { type: 'swing'; x: number; y: number; angle: number; swing: number; heavy: boolean }
+  | { type: 'swing'; x: number; y: number; angle: number; swing: number; heavy: boolean; dash: boolean }
   | { type: 'hit'; x: number; y: number; angle: number; damage: number; heavy: boolean; targetId: number; kind: EnemyKind; killed: boolean; actionId: number }
   | { type: 'kill'; x: number; y: number; angle: number; kind: EnemyKind; id: number; actionId: number }
   | { type: 'playerHurt'; x: number; y: number; angle: number; hp: number }

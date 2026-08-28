@@ -27,6 +27,7 @@ export interface Player extends Body {
   assistTargetId: number          // soft-aim hysteresis; 0 means no retained target
   controlTick: number             // advances only when the player can act; hit-stop never ages intent
   attackQueuedAt: number          // controlTick of a discrete request; -1 means none
+  heavyQueuedAt: number           // the committed swing has its own queue, so a light never eats it
   dodgeQueuedAt: number
   dodgeTick: number               // roll clock; survives a late-roll attack overlay, -1 after its full authored timeline
   iframes: number
@@ -195,7 +196,7 @@ export function makePlayer(x: number, y: number): Player {
     hp: tuning.player.hp, maxHp: tuning.player.hp,
     state: 'free', stateTick: 0, facing: 1, aimAngle: 0, moveAngle: 0,
     dodgeDirX: 1, dodgeDirY: 0, swingIndex: 0, swingAngle: 0, swingId: 0, assistTargetId: 0,
-    controlTick: 0, attackQueuedAt: -1, dodgeQueuedAt: -1, dodgeTick: -1,
+    controlTick: 0, attackQueuedAt: -1, heavyQueuedAt: -1, dodgeQueuedAt: -1, dodgeTick: -1,
     iframes: 0, flash: 0, moveX: 0, moveY: 0, footTick: 0, deathTick: -1, god: false,
     arm: 0, armed: true, dodgeRead: 0, dodgeProcTick: -1,
   }

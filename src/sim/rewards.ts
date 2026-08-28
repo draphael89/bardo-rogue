@@ -53,6 +53,7 @@ export function offerReward(world: World, family: RewardFamily): void {
   world.player.state = 'free'
   world.player.stateTick = 0
   world.player.attackQueuedAt = -1
+  world.player.heavyQueuedAt = -1
   world.player.dodgeQueuedAt = -1
   world.player.dodgeTick = -1
   world.player.dodgeRead = 0

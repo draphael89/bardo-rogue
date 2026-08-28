@@ -9,11 +9,12 @@ import type { RenderApp } from '@/render/app'
 // Gamepad buttons read as edges. Every index here must be sampled through edge() every tick or its padPrev
 // goes stale and it fires twice.
 const PAD_ATTACK = [2, 5, 7]      // X / RB / RT
+const PAD_HEAVY = [3, 6]          // Y / LT — the weight sits under a different finger than the light
 const PAD_DODGE = [0, 1, 4]       // A / B / LB
 const PAD_RESTART = [9]           // start
 const PAD_CHOICE_LEFT = 14
 const PAD_CHOICE_RIGHT = 15
-const PAD_EDGE = new Set([...PAD_ATTACK, ...PAD_DODGE, ...PAD_RESTART, PAD_CHOICE_LEFT, PAD_CHOICE_RIGHT])
+const PAD_EDGE = new Set([...PAD_ATTACK, ...PAD_HEAVY, ...PAD_DODGE, ...PAD_RESTART, PAD_CHOICE_LEFT, PAD_CHOICE_RIGHT])
 
 // Keyboard + mouse + gamepad -> one InputFrame per sim tick. Presses between ticks are latched so nothing is dropped.
 export class InputSystem {
@@ -25,6 +26,7 @@ export class InputSystem {
   private explicitAimOwns = false    // released arrows/stick hold last aim instead of falling through to WASD
   private mousePressed = false
   private mouseHeld = false
+  private mouseHeavyPressed = false
   private padPrev: boolean[] = []
   private cursorScreen = new Point()
   private cursorWorld = new Point()
@@ -43,17 +45,24 @@ export class InputSystem {
     // and a button still down when the tab goes away must not keep swinging forever
     window.addEventListener('blur', () => {
       this.down.clear(); this.pressed.clear()
-      this.mousePressed = false; this.mouseHeld = false
+      this.mousePressed = false; this.mouseHeld = false; this.mouseHeavyPressed = false
     })
     const c = ra.app.canvas
     c.addEventListener('mousemove', e => { this.mouseX = e.clientX; this.mouseY = e.clientY; this.mouseSeen = true; this.mouseOwnsAim = true; this.explicitAimOwns = false })
-    c.addEventListener('mousedown', e => { if (e.button === 0) { this.mousePressed = true; this.mouseHeld = true; this.mouseOwnsAim = true; this.explicitAimOwns = false } })
+    // Left is the light, right is the weight: the convention every action game shares, so the hand
+    // already knows it. Right-click never holds — the heavy is an edge, by design.
+    c.addEventListener('mousedown', e => {
+      if (e.button === 0) { this.mousePressed = true; this.mouseHeld = true }
+      else if (e.button === 2) this.mouseHeavyPressed = true
+      else return
+      this.mouseOwnsAim = true; this.explicitAimOwns = false
+    })
     window.addEventListener('mouseup', e => { if (e.button === 0) this.mouseHeld = false })
     c.addEventListener('contextmenu', e => e.preventDefault())
   }
 
   sample(world: World): InputFrame {
-    if (this.override) { const f = { ...this.override }; this.override = { ...this.override, attack: false, dodge: false, restart: false, choiceDelta: 0, confirm: false }; this.pressed.clear(); this.mousePressed = false; return f }
+    if (this.override) { const f = { ...this.override }; this.override = { ...this.override, attack: false, heavy: false, dodge: false, restart: false, choiceDelta: 0, confirm: false }; this.pressed.clear(); this.mousePressed = false; this.mouseHeavyPressed = false; return f }
     const f = emptyInput()
     const d = this.down
     // A complete keydown/keyup pair can occur between two 60 Hz samples. `pressed` latches that
@@ -86,6 +95,8 @@ export class InputSystem {
     // sustains combo flow while the button is still down, so releasing can never cause a surprise swing.
     let attack = this.mousePressed || this.pressed.has('KeyJ') || this.pressed.has('KeyZ')
     let attackHeld = this.mouseHeld || d.has('KeyJ') || d.has('KeyZ')
+    // Two clean rows for the two hands that reach here: J/K/L and Z/X/C, light/dodge/heavy.
+    let heavy = this.mouseHeavyPressed || this.pressed.has('KeyL') || this.pressed.has('KeyC')
     // dodge stays an edge: holding it would just be free travel
     let dodge = this.pressed.has('Space') || this.pressed.has('ShiftLeft') || this.pressed.has('KeyK') || this.pressed.has('KeyX')
     let restart = this.pressed.has('KeyR')
@@ -116,6 +127,7 @@ export class InputSystem {
       for (const i of PAD_ATTACK) if (b(i)) attackHeld = true
       padAttackEdge = anyEdge(PAD_ATTACK)                   // a modal must never inherit a combat hold
       if (padAttackEdge) attack = true
+      if (anyEdge(PAD_HEAVY)) heavy = true
       if (anyEdge(PAD_DODGE)) dodge = true
       if (anyEdge(PAD_RESTART)) restart = true
       const choiceLeft = edge(PAD_CHOICE_LEFT), choiceRight = edge(PAD_CHOICE_RIGHT)
@@ -153,17 +165,17 @@ export class InputSystem {
     })
     f.aimX = aim.x; f.aimY = aim.y; f.aimSoft = aim.soft
     this.lastAim = { x: aim.x, y: aim.y }
-    f.attack = attack; f.attackHeld = attackHeld; f.dodge = dodge; f.restart = restart
+    f.attack = attack; f.attackHeld = attackHeld; f.heavy = heavy; f.dodge = dodge; f.restart = restart
     if (world.roomPhase === 'reward') {
       const left = this.pressed.has('ArrowLeft') || this.pressed.has('KeyA')
       const right = this.pressed.has('ArrowRight') || this.pressed.has('KeyD')
       f.choiceDelta = left === right ? padChoiceDelta : left ? -1 : 1
-      f.confirm = this.pressed.has('Enter') || this.pressed.has('Space') || this.pressed.has('KeyJ') || this.pressed.has('KeyZ') || this.mousePressed || padAttackEdge || dodge
-      f.moveX = 0; f.moveY = 0; f.attack = false; f.attackHeld = false; f.dodge = false
+      f.confirm = this.pressed.has('Enter') || this.pressed.has('Space') || this.pressed.has('KeyJ') || this.pressed.has('KeyZ') || this.mousePressed || padAttackEdge || dodge || heavy
+      f.moveX = 0; f.moveY = 0; f.attack = false; f.attackHeld = false; f.heavy = false; f.dodge = false
     } else if (world.player.state === 'dead' || (world.roomPhase === 'resolved' && world.session.run?.result !== 'active')) {
-      f.confirm = this.pressed.has('Enter') || this.pressed.has('Space') || this.pressed.has('KeyJ') || this.pressed.has('KeyZ') || this.mousePressed || padAttackEdge || dodge
+      f.confirm = this.pressed.has('Enter') || this.pressed.has('Space') || this.pressed.has('KeyJ') || this.pressed.has('KeyZ') || this.mousePressed || padAttackEdge || dodge || heavy
     }
-    this.pressed.clear(); this.mousePressed = false
+    this.pressed.clear(); this.mousePressed = false; this.mouseHeavyPressed = false
     return f
   }
 

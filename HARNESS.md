@@ -43,7 +43,7 @@ A stock combat scenario stops 2 s after clear or death; the production `loop` st
 
 Combat slow-motion: `__game.state().slow` is `{ rate, ticks }` — rate is per-mille, 1000 is full speed. Force it with `__game.world.slowRate = 250; __game.world.slowTicks = 120`.
 
-Keys in the game: WASD move, arrows aim (8-way, and holding one pins the facing so you strafe), mouse aim, click/J/Z attack, Space/Shift/K/X dodge, P/Escape pause, V reduced effects, F fullscreen. With no arrow and an untouched mouse, aim follows movement. Rewards use A/D or left/right, then Enter/Space/attack to claim. The same confirm returns after death or victory.
+Keys in the game: WASD move, arrows aim (8-way, and holding one pins the facing so you strafe), mouse aim, left-click/J/Z light attack, right-click/L/C heavy attack, Space/Shift/K/X dodge, P/Escape pause, V reduced effects, F fullscreen. With no arrow and an untouched mouse, aim follows movement. Rewards use A/D or left/right, then Enter/Space/attack to claim. The same confirm returns after death or victory.
 F1 toggles the debug overlay, F2 toggles recording, F3 downloads the last recording.
 
 ## `window.__game` (src/debug/api.ts)
@@ -56,7 +56,7 @@ Available once the page has booted (`await page.waitForFunction(() => !!window._
 - `loop`: the fixed-step loop; `loop.paused`, `loop.frameTimes`.
 - `reset(seed?, scenario?, { god? })`: fresh world. Omitted args keep the current run's seed/scenario.
 - `step(n = 1)`: advance the sim n ticks by hand (pause first, or the loop keeps ticking too).
-- `setInput(partial | null)`: force an `InputFrame` (`moveX moveY aimX aimY aimSoft attack attackHeld dodge restart choiceDelta confirm`). Forced action/modal fields fire once, then clear. `null` returns control to the keyboard.
+- `setInput(partial | null)`: force an `InputFrame` (`moveX moveY aimX aimY aimSoft attack attackHeld heavy dodge restart choiceDelta confirm`). Forced action/modal fields fire once, then clear. `null` returns control to the keyboard.
 - `bot(name | null)`: swap in or remove any bot listed above.
 - `pause(p?)`: pause/unpause the loop, returns the new state.
 - `hash()`: FNV hash of the sim state. Equal hashes = identical worlds.
@@ -82,7 +82,7 @@ Available once the page has booted (`await page.waitForFunction(() => !!window._
 
 A replay is `{ v: 1, seed, scenario, god?, frames: InputFrame[] }` (`src/sim/replay.ts`). On disk it is run-length
 encoded: `runs: [moveX, moveY, aimX, aimY, flags, count]` with axes as ints x10000 and flags bits
-`1 aimSoft, 2 attack, 4 dodge, 8 restart, 16 attackHeld, 32 confirm, 64 choice-left, 128 choice-right`
+`1 aimSoft, 2 attack, 4 dodge, 8 restart, 16 attackHeld, 32 confirm, 64 choice-left, 128 choice-right, 256 heavy`
 (the table in `src/sim/replay.ts` is the source of truth; CI fails if this line drifts from it). The browser quantizes every frame to 1/10000 before the sim sees it, so
 what was played and what is stored are identical.
 

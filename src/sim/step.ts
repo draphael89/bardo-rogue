@@ -50,12 +50,12 @@ function resolveOverlaps(world: World): void {
   for (let i = 0; i < es.length; i++) {
     const a = es[i]
     if (!a.active || a.state === 'dead') continue
-    if (!playerGhost && p.state !== 'dead' && a.state !== 'dash') separate(p, p.radius, a, a.radius, 0.3, 0.7)
+    if (!playerGhost && p.state !== 'dead' && a.state !== 'dash') separate(world.arena, p, p.radius, a, a.radius, 0.3, 0.7)
     for (let j = i + 1; j < es.length; j++) {
       const b = es[j]
       if (!b.active || b.state === 'dead') continue
       if (a.state === 'dash' || b.state === 'dash') continue
-      separate(a, a.radius, b, b.radius, 0.5, 0.5)
+      separate(world.arena, a, a.radius, b, b.radius, 0.5, 0.5)
     }
   }
 }

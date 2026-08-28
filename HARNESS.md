@@ -80,9 +80,9 @@ what was played and what is stored are identical.
 
 - Browser: F2 starts a fresh run and records; F2 again stops; F3 downloads `<scenario>-<seed>-<ticks>.json`. Move the
   file into `replays/`. A restart (R) ends the recording. "REC" blinks top-centre while recording, "REPLAY" while replaying.
-- Scripted: `pnpm record-bot -- --bot kite --scenario full --seed 1 --out replays/kite-full-s1.json`.
-- Headless: `pnpm sim -- --replay replays/kite-full-s1.json [--ticks 300]` prints hash, player, metrics. `--ticks` stops early.
-- Browser: `pnpm shot -- --replay replays/kite-full-s1.json --ticks 300 --stepwise 1` (the replay sets seed/scenario).
+- Scripted: `pnpm record-bot -- --bot kite --scenario full --seed 2 --out replays/kite-full-s2.json`.
+- Headless: `pnpm sim -- --replay replays/kite-full-s2.json [--ticks 300]` prints hash, player, metrics. `--ticks` stops early.
+- Browser: `pnpm shot -- --replay replays/kite-full-s2.json --ticks 300 --stepwise 1` (the replay sets seed/scenario).
 - Node API: `runReplay(replay, onTick?)` returns `{ world, hash, metrics }`; `encodeReplay`/`decodeReplay`, `replayToJson`/`replayFromJson`.
 
 The same replay must give the same hash headless and in the browser at the same tick. `tests/sim/replay.test.ts`

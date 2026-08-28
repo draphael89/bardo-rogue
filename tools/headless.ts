@@ -1,5 +1,5 @@
 // Headless scenario runner. Example: pnpm sim -- --scenario full --bot kite --seeds 1-10 --ticks 10800
-// Replay mode:                       pnpm sim -- --replay replays/kite-full-s1.json [--ticks 300]
+// Replay mode:                       pnpm sim -- --replay replays/kite-full-s2.json [--ticks 300]
 import { readFileSync } from 'node:fs'
 import { createWorld } from '../src/sim/scenarios'
 import { stepWorld } from '../src/sim/step'

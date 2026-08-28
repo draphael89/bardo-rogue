@@ -6,6 +6,7 @@ import { arcHits, damageEnemy, addFreeze, sweepEase, swingStep } from './combat'
 import { swingReach } from './boons'
 import { ARM, armOf } from './weapons'
 import { bowMoveScale, bowSteer, looseArrow, startDraw } from './bow'
+import { backlash } from './enemies/caster'
 import { angleDiff, deg, len } from './math'
 
 export function capturePlayerInput(world: World, input: InputFrame): void {
@@ -177,14 +178,26 @@ export function updatePlayer(world: World, input: InputFrame): void {
         if (!b.active) continue
         if (arcHits(p.x, p.y, mid, reach.radius, spanDeg, b.x, b.y, b.radius)) {
           b.active = false
-          // latch it: the caster that owns this bolt may not get a tick for a while under slow-motion,
-          // and world.events is cleared by the host every tick
-          world.cutBoltId = b.id; world.cutBoltX = b.x; world.cutBoltY = b.y
+          // Punish the caster that owns this bolt here and now. Deferring it until the caster next
+          // runs needs the news to survive as world state, which cannot represent two bolts cut on
+          // one tick and goes stale when a hub return recycles projectile ids.
+          punishBoltOwner(world, b.id, b.x, b.y)
           addFreeze(world, tuning.hitstop.boltCut)
           world.emit({ type: 'boltCut', x: b.x, y: b.y })
         }
       }
     }
+  }
+}
+
+// A cut bolt costs its caster: it is dragged toward the cut and opened up. Only the owner pays, and
+// only while it still believes the bolt is in flight.
+function punishBoltOwner(world: World, boltId: number, cx: number, cy: number): void {
+  for (const e of world.enemies) {
+    if (!e.active || e.state === 'dead' || e.targetX !== boltId) continue
+    e.targetX = 0
+    backlash(world, e, cx, cy)
+    return
   }
 }
 

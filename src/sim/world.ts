@@ -83,11 +83,6 @@ export class World {
   slowRate = SLOW_FULL
   slowAcc = 0
   slowTicks = 0
-  // Last bolt the player's blade cut, latched rather than read off world.events: under slow-motion
-  // the caster no longer runs on the tick the cut happened, so the event is long gone by then.
-  cutBoltId = 0
-  cutBoltX = 0
-  cutBoltY = 0
   swingCounter = 0
   nextEnemyId = 1
   nextProjectileId = 1

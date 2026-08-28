@@ -102,8 +102,9 @@ describe('combat slow-motion', () => {
   })
 
   it('still backlashes the caster when the cut lands on a tick it does not run', () => {
-    // The caster used to learn its bolt was cut by scanning world.events on the same tick. Under
-    // slow-motion it is not awake on that tick, so the news has to survive as state, not an event.
+    // The caster used to learn its bolt was cut by scanning world.events on the same tick, which
+    // only worked because the player runs first. Behind the gate it is not awake on that tick, so
+    // the blade now applies the punish itself at the moment of the cut.
     const w = createWorld(1, 'caster-only')
     const p = w.player
     const caster = w.enemies.find(e => e.active && e.kind === 'caster')!
@@ -126,10 +127,67 @@ describe('combat slow-motion', () => {
       w.events.length = 0
     }
     expect(cut, 'the blade never cut the bolt').toBe(true)
-    expect(w.cutBoltId).toBe(bolt.id)
     expect(staggered, 'the caster never paid for its cut bolt').toBe(true)
     expect(caster.hp, 'the backlash did no damage').toBeLessThan(hpBefore)
     expect(caster.targetX, 'the caster still thinks its bolt is in flight').toBe(0)
+  })
+
+  it('punishes every caster whose bolt one swing cuts, not just the last', () => {
+    // One swing can catch two bolts on the same tick. A single "last cut" slot on the world could
+    // only ever name one of their owners, and the other silently got away with it.
+    const w = createWorld(1, 'caster-only')
+    const p = w.player
+    const casters = w.enemies.filter(e => e.active && e.kind === 'caster')
+    expect(casters.length).toBeGreaterThanOrEqual(2)
+
+    // two bolts, side by side, both inside one swing arc
+    const bolts = [-6, 6].map(dx => w.fireProjectile(p.x + dx, p.y - 20, 0, 40, 3, 600, 0, 1)!)
+    casters[0].targetX = bolts[0].id
+    casters[1].targetX = bolts[1].id
+    const hp = casters.map(c => c.hp)
+    for (const c of casters) {
+      expect(Math.hypot(c.x - p.x, c.y - p.y), 'the sword can reach a caster; the test would prove nothing')
+        .toBeGreaterThan(40)
+    }
+
+    let cuts = 0
+    for (let t = 0; t < 40; t++) {
+      stepWorld(w, { ...emptyInput(), attack: t === 0, aimX: 0, aimY: -1 })
+      cuts += w.events.filter(e => e.type === 'boltCut').length
+      w.events.length = 0
+    }
+    expect(cuts, 'the swing did not catch both bolts').toBe(2)
+    casters.forEach((c, i) => {
+      expect(c.hp, `caster ${i} was not punished for its cut bolt`).toBeLessThan(hp[i])
+      expect(c.targetX, `caster ${i} still thinks its bolt is in flight`).toBe(0)
+    })
+  })
+
+  it('does not punish a caster for a recycled projectile id', () => {
+    // returnToHub resets nextProjectileId to 1, so a later attempt reuses ids from an earlier one.
+    // A world-level "last cut id" outlived that reset and framed an innocent bolt.
+    const w = createWorld(1, 'caster-only')
+    const p = w.player
+    const caster = w.enemies.find(e => e.active && e.kind === 'caster')!
+    const cut = w.fireProjectile(p.x, p.y - 20, 0, 40, 3, 600, 0, 1)!
+    const cutId = cut.id
+    caster.targetX = cut.id
+    for (let t = 0; t < 40 && cut.active; t++) {
+      stepWorld(w, { ...emptyInput(), attack: t === 0, aimX: 0, aimY: -1 })
+      w.events.length = 0
+    }
+    expect(cut.active, 'setup failed: the bolt was never cut').toBe(false)
+
+    // a fresh bolt that happens to carry the same id, belonging to a caster that was never cut
+    const innocent = w.fireProjectile(p.x + 120, p.y, 0, 40, 3, 4, 0, 1)!
+    innocent.id = cutId
+    const other = w.enemies.find(e => e.active && e.kind === 'caster' && e !== caster)!
+    other.targetX = cutId
+    const hpBefore = other.hp
+    run(w, 30)                                  // let it expire on its own
+    expect(innocent.active).toBe(false)
+    expect(other.hp, 'a caster was punished for a bolt nobody cut').toBe(hpBefore)
+    expect(other.targetX, 'the lane should still be released').toBe(0)
   })
 
   it('clears on room transition', () => {

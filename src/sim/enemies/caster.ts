@@ -47,7 +47,10 @@ function boltClosing(world: World, b: Projectile): boolean {
   return (world.player.x - b.x) * b.vx + (world.player.y - b.y) * b.vy > 0
 }
 
-function backlash(world: World, e: Enemy, cx: number, cy: number): void {
+// The blade calls this the instant it cuts a bolt, so the punish lands with the cut rather than
+// whenever the owning caster next happens to run. That matters under slow-motion, where the caster
+// may be several ticks behind the sword.
+export function backlash(world: World, e: Enemy, cx: number, cy: number): void {
   const toCut = Math.atan2(cy - e.y, cx - e.x)
   damageEnemy(world, e, CUT.damage, toCut, CUT.pull, false, CUT.hitstop)
   if (!e.active || e.state === 'dead') return
@@ -61,15 +64,9 @@ export function updateCaster(world: World, e: Enemy): void {
   const p = world.player
   if (e.cooldown > 0) e.cooldown--
 
-  // did my bolt end this tick, and was it cut?
-  if (e.targetX > 0 && !myBolt(world, e)) {
-    // Was MY bolt the one the blade cut? Reading world.cutBoltId rather than scanning world.events
-    // for any boltCut: ids are never reused, so this cannot mistake another caster's cut for its own,
-    // and it survives the ticks slow-motion skips. Events are cleared by the host every tick.
-    const cut = world.cutBoltId === e.targetX
-    e.targetX = 0
-    if (cut) { backlash(world, e, world.cutBoltX, world.cutBoltY); return }
-  }
+  // my bolt ended: it expired, hit a wall, or hit the player. A cut is not handled here — the blade
+  // already applied the backlash at the moment it landed, and cleared the lane.
+  if (e.targetX > 0 && !myBolt(world, e)) e.targetX = 0
 
   switch (e.state) {
     case 'idle':

@@ -268,8 +268,14 @@ function updateBruteTell(v: EntityView, e: Enemy, x: number, y: number, tk: numb
   // the cycle belong to the contact flash below. That is what puts the loudest frame ON the damage
   // tick instead of two ticks before it.
   const qb = q * q                                   // brightness lags the geometry, then arrives
-  const wash = scorching ? 0x2a1208 : mixCol(0x07030c, 0x3a1206, q)
-  const washA = (scorching ? 0.42 * fade : lerp(0.62, 0.42, q)) * bloom
+  // The plate used to start BLACKER than the floor to make headroom for the hit. That is the same
+  // move the charger critic measured and rejected -- "impact adds light locally; it never
+  // desaturates the room" -- and at 0.62 alpha over the pie AND the run-up lane it read as a hole
+  // punched in the stone rather than heat gathering on it. The mark now starts as a warm scorch and
+  // only ever adds: the headroom for the hit comes from the flash being white, not from the floor
+  // being black.
+  const wash = scorching ? 0x2a1208 : mixCol(0x35180e, 0x5c2a12, q)
+  const washA = (scorching ? 0.42 * fade : lerp(0.26, 0.34, q)) * bloom
   const hotCol = scorching ? 0x50200f : mixCol(0x8a3010, 0xd9762c, qb)
   const hotA = (scorching ? 0.5 * fade : lerp(0.68, 1, q)) * bloom
   const rimCol = scorching ? 0x8a3a18 : mixCol(0xd4763c, 0xff9c4a, qb)
@@ -279,7 +285,7 @@ function updateBruteTell(v: EntityView, e: Enemy, x: number, y: number, tk: numb
   emit(g, G_LANE, wash, washA * 0.5)
   emit(g, G_PLATE, wash, washA)
   emit(g, G_HOT, hotCol, hotA)
-  emit(g, G_UNDER, 0x0b0409, 0.85 * rimA)
+  emit(g, G_UNDER, 0x140a10, 0.40 * rimA)   // was 0x0b0409 at 0.85: a second near-black plate under the rim
   emit(g, G_RUNGD, mixCol(0x4e2413, 0x7d4019, qb), (0.55 + 0.25 * q) * bloom)
   emit(g, G_RUNG2, rung2, (0.5 + 0.4 * q) * bloom)
   emit(g, G_RUNG1, rung1, (0.6 + 0.4 * q) * bloom)
@@ -336,7 +342,7 @@ function updateBruteTell(v: EntityView, e: Enemy, x: number, y: number, tk: numb
   if (!scorching) {
     const lean = 2 + 6 * q
     blob(g, fx + Math.round(cos * lean), fy + 1, 5 + 3 * q, 2.4 + q)
-    g.fill({ color: 0x050208, alpha: (0.38 + 0.22 * q) * bloom })
+    g.fill({ color: 0x0d0710, alpha: (0.26 + 0.14 * q) * bloom })
     // World-space break: jagged dark strokes from the landing, so the axe is glued to broken
     // tiles and the pie is a burn on stone, not a hatch sticker.
     for (let i = 0; i < CRACKS.length; i++) {
@@ -353,7 +359,7 @@ function updateBruteTell(v: EntityView, e: Enemy, x: number, y: number, tk: numb
     if (q >= 0.35) {
       for (let i = 0; i < SPLOTS.length; i++) g.rect(cx + SPLOTS[i][0], cy + Math.round(SPLOTS[i][1] * 0.7), 1, 1)
     }
-    g.fill({ color: 0x080308, alpha: (0.58 + 0.28 * q) * bloom })
+    g.fill({ color: 0x120a14, alpha: (0.34 + 0.18 * q) * bloom })
   }
   // Footprint: the spot the lunge puts him on, so the mark reads as "he arrives here and swings across
   // that", not as a glow leaking out of whoever happens to be standing in it.

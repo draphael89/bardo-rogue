@@ -8,7 +8,7 @@ import { tryEnterDoor } from './rooms'
 import { tryCollectOffering } from './offering'
 import { canReturn, returnToHub } from './return'
 import { separate } from './collision'
-import { isPlayerInvulnerable } from './combat'
+import { tuning } from '@/tuning'
 
 // One deterministic tick. Presentation must never call anything else on the sim.
 export function stepWorld(world: World, input: InputFrame): void {
@@ -44,7 +44,9 @@ export function stepWorld(world: World, input: InputFrame): void {
 function resolveOverlaps(world: World): void {
   const p = world.player
   const es = world.enemies
-  const playerGhost = p.state === 'dodge' && isPlayerInvulnerable(world)
+  // A roll ghosts for its whole travel phase, not just its i-frame window. Being hittable on the
+  // brake tail is the price of the roll; being body-blocked mid-flight is a broken promise.
+  const playerGhost = p.state === 'dodge' && p.stateTick < tuning.player.dodge.travel
   for (let i = 0; i < es.length; i++) {
     const a = es[i]
     if (!a.active || a.state === 'dead') continue

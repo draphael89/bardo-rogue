@@ -83,6 +83,25 @@ describe('dodge', () => {
     expect(p.hp).toBe(tuning.player.hp)
     expect(bolt!.active).toBe(true)
   })
+  it('is never body-blocked for the whole travel phase', () => {
+    const d = tuning.player.dodge
+    const roll = { ...emptyInput(), moveX: 1, dodge: true }
+    const hold = { ...emptyInput(), moveX: 1 }
+    // stateTicks 0 .. travel-1 are the flight; the landing tick that follows is legitimately blockable
+    const trace = (withBody: boolean): number[] => {
+      const w = createWorld(1, 'empty')
+      // one body the roll launches into (catches stateTick 0), one it lands on (catches the brake tail)
+      if (withBody) { w.spawnEnemy('dummy', w.player.x + 10, w.player.y); w.spawnEnemy('dummy', w.player.x + 41, w.player.y) }
+      const xs: number[] = []
+      stepWorld(w, roll); w.events.length = 0; xs.push(w.player.x)
+      for (let t = 1; t < d.travel; t++) { stepWorld(w, hold); w.events.length = 0; xs.push(w.player.x) }
+      return xs
+    }
+    const clear = trace(false), blocked = trace(true)
+    for (let t = 0; t < d.travel; t++) {
+      expect(blocked[t], `roll displaced by a body at dodge stateTick ${t}`).toBeCloseTo(clear[t], 6)
+    }
+  })
 })
 
 describe('attack', () => {

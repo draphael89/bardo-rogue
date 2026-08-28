@@ -22,7 +22,7 @@ function census(a: AudioSystem, ev: SimEvent): void {
   switch (ev.type) {
     case 'spawn': alive++; break
     case 'kill': alive = Math.max(0, alive - 1); break
-    case 'playerHurt': hp01 = Math.max(0, ev.hp / tuning.player.hp); break
+    case 'playerHurt': case 'offeringTaken': hp01 = Math.max(0, Math.min(1, ev.hp / Math.max(1, ev.maxHp))); break
     case 'roomClear': case 'playerDeath': alive = 0; break
     case 'restart': case 'returned': alive = 0; hp01 = 1; a.resumeBed(); break
     default: return
@@ -30,8 +30,11 @@ function census(a: AudioSystem, ev: SimEvent): void {
   a.setCombat(alive, hp01)
 }
 
-export function playEventSfx(a: AudioSystem, ev: SimEvent): void {
-  listen(a, ev)
+export function playEventSfx(a: AudioSystem, ev: SimEvent, listener?: Readonly<{ x: number; y: number }>): void {
+  // The live game supplies the authoritative player position for every event. Callers that only
+  // have an event (tests/offline tools) retain the legacy player-origin fallback below.
+  if (listener) a.setListener(listener.x, listener.y)
+  else listen(a, ev)
   // Every sound that happens somewhere is placed there. Non-positional punctuation (waves, the
   // room clear, the door) has no `at` and stays centred.
   const at = 'x' in ev ? { x: ev.x, y: ev.y } : {}
@@ -46,9 +49,16 @@ export function playEventSfx(a: AudioSystem, ev: SimEvent): void {
     case 'hit':
       // the consequence, deliberately under the cause: a landed hit is confirmation, not news.
       // It still owns 200-600 Hz, where nothing else in the mix is competing for the top.
-      a.play('impactPunch_medium', { ...at, gain: 0.5, pitch: ev.heavy ? 0.85 : 1 })
-      if (ev.kind === 'brute' || ev.kind === 'warden') a.play('impactPlate_medium', { ...at, gain: ev.kind === 'warden' ? 0.32 : 0.24, pitch: ev.kind === 'warden' ? 0.85 : 1.1 })
-      if (ev.kind === 'charger') a.play('impactGeneric_light', { ...at, gain: 0.32, pitch: 1.3 })
+      if (ev.guarded) {
+        // The veil answers with a short, high steel refusal. It confirms contact without borrowing
+        // the body-heavy punch that says the player found an opening.
+        a.play('swordStone2', { ...at, gain: 0.22, pitch: 1.5 })
+        a.play('impactPlate_medium', { ...at, gain: 0.16, pitch: 1.4 })
+      } else {
+        a.play('impactPunch_medium', { ...at, gain: 0.5, pitch: ev.heavy ? 0.85 : 1 })
+        if (ev.kind === 'brute' || ev.kind === 'warden') a.play('impactPlate_medium', { ...at, gain: ev.kind === 'warden' ? 0.32 : 0.24, pitch: ev.kind === 'warden' ? 0.85 : 1.1 })
+        if (ev.kind === 'charger') a.play('impactGeneric_light', { ...at, gain: 0.32, pitch: 1.3 })
+      }
       if (ev.killed) { a.play('impactPunch_heavy', { ...at, gain: 0.5, pitch: 0.9 }); a.play('creature', { ...at, gain: 0.28, pitch: 0.9 }) }
       break
     case 'playerHurt':
@@ -81,9 +91,20 @@ export function playEventSfx(a: AudioSystem, ev: SimEvent): void {
       a.play('cloth1', { gain: 1.4, pitch: 1.2, pitchVar: 0.04, lead: true })
       a.swish(1.45, 90, 1.7, ev, true)
       break
+    case 'dodgeWall':
+      // A short stone/steel answer, below damage and attack contact. dodgeEnd still supplies the
+      // quiet cloth settle on the same tick, making this read as interrupted travel rather than HP loss.
+      a.play('swordStone2', { ...at, gain: 0.42, pitch: 0.72, pitchVar: 0.04 })
+      a.play('impactGeneric_light', { ...at, gain: 0.26, pitch: 0.68, pitchVar: 0.03 })
+      break
     case 'dodged':
       // an attack passed through the i-frames: the near miss is the reward, never varied
       a.play('woosh4', { gain: 1.2, pitch: 0.55, pitchVar: 0, lead: true }); a.swish(1.2, 220, 0.6, undefined, true)
+      break
+    case 'reversal':
+      // A narrow cold-to-warm seam: audible recognition without stacking another attack whoosh.
+      a.bell(0.34, 1320, 0.16, 'sfx', 0, { ...at, partials: 'tone', glideTo: 660, strike: 0.18, cap: 'strike' })
+      a.play('swordMetal', { ...at, gain: 0.18, pitch: ev.weapon === 'blade' ? 1.45 : 1.75 })
       break
     case 'graze':
       // A small high breath, intentionally below the low, long perfect-dodge confirmation.
@@ -136,9 +157,19 @@ export function playEventSfx(a: AudioSystem, ev: SimEvent): void {
         a.bell(0.82, 3200, 0.16, 'sfx', 0, { ...at, partials: 'plate', glideTo: 2000, cap: 'strike' })
         a.swish(0.5, 120, 1.5, ev)
       } else if (ev.kind === 'warden') {
-        a.play('woosh', { ...at, gain: 1.4, pitch: 0.55 })
-        a.thump(1.05, 150, 46, 0.26, { click: 0.85 })
-        a.bell(1.05, 180, 0.28, 'sfx', 0, { ...at, partials: 'plate', glideTo: 80, cap: 'strike' })
+        if (ev.pattern === 'slam') {
+          a.play('woosh', { ...at, gain: 1.4, pitch: 0.55 })
+          a.thump(1.05, 150, 46, 0.26, { click: 0.85 })
+          a.bell(1.05, 180, 0.28, 'sfx', 0, { ...at, partials: 'plate', glideTo: 80, cap: 'strike' })
+        } else if (ev.pattern === 'ring') {
+          // Outward geometry: a small rising metal bloom, no floor-impact thump.
+          a.play('laserRetro', { ...at, gain: 0.28, pitch: 1.15 })
+          a.bell(0.34, 880, 0.2, 'sfx', 0, { ...at, partials: 'tone', glideTo: 1320, cap: 'strike' })
+        } else {
+          // Aimed projectile fan: directional air, lighter than the radial body slam.
+          a.play('woosh2', { ...at, gain: 0.48, pitch: 1.3 })
+          a.swish(0.32, 105, 1.5, ev)
+        }
       }
       break
     case 'enemyPhase':
@@ -149,6 +180,10 @@ export function playEventSfx(a: AudioSystem, ev: SimEvent): void {
       break
     case 'enemyStagger':
       a.play('impactPlate_medium', { ...at, gain: 0.4, pitch: 1.35 })
+      break
+    case 'enemyWallSlam':
+      a.play('swordStone1', { ...at, gain: 0.44, pitch: ev.kind === 'brute' ? 0.72 : 0.9 })
+      a.play('impactGeneric_light', { ...at, gain: 0.28, pitch: 0.68 })
       break
     case 'spawnTelegraph':
       // something is arriving where you are standing: a tell, and priced like one
@@ -245,14 +280,11 @@ export function playEventSfx(a: AudioSystem, ev: SimEvent): void {
   census(a, ev)
 }
 
-/**
- * The player is the ears. These events are the only ones whose (x, y) IS the player, and one of
- * them fires whenever the player moves or acts — so the listener is never stale while anything
- * is happening, and the player's own sounds always land dead centre at full level.
- */
+/** Event-only fallback for tests and offline renderers. The live path supplies the current player
+ * position directly to playEventSfx, because enemy cues must not wait for a footstep to move ears. */
 function listen(a: AudioSystem, ev: SimEvent): void {
   switch (ev.type) {
-    case 'footstep': case 'swing': case 'dodge': case 'dodgeEnd': case 'dodged': case 'graze':
+    case 'footstep': case 'swing': case 'dodge': case 'dodgeWall': case 'dodgeEnd': case 'dodged': case 'reversal': case 'graze':
     case 'draw': case 'arrowLoose': case 'weaponPrepared': case 'boonChosen':
     case 'playerHurt': case 'playerDeath': case 'returned': a.setListener(ev.x, ev.y)
   }

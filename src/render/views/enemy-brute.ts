@@ -2,9 +2,11 @@ import { Graphics, type Container } from 'pixi.js'
 import type { Texture } from 'pixi.js'
 import type { Atlas } from '../atlas'
 import type { Enemy } from '@/sim/world'
+import type { Arena } from '@/sim/arena'
 import { tuning } from '@/tuning'
-import { TILE, ARENA_COLS, ARENA_ROWS } from '@/sim/arena'
+import { hasLineOfSight, overlapsSolid, raycastSolidDistance } from '@/sim/collision'
 import { lerp, clamp01, easeOutCubic, lerpAngle } from '../anim'
+import { isDangerPointVisible } from '../terrain'
 import { BRUTE_COMMIT_LEAD as COMMIT_LEAD } from '@/sim/enemies/brute'
 import { EntityView, HALF_PI, type EnemyFrame, type Pose } from './shared'
 import type { Sheet } from '../sheet'
@@ -59,7 +61,15 @@ function tellProgress(e: Enemy, tk: number): number {
   return 1
 }
 
-export function updateBruteView(v: EntityView, e: Enemy, f: EnemyFrame, out: Pose): void {
+// stateTick 1 is the first movement update, but its render interval starts at the pre-move pose.
+// Offset the interpolated clock by that one held release tick so current position + remaining reach
+// always names the same eventual landing point.
+export function bruteTellLungeTravel(tk: number): number {
+  const B = tuning.brute
+  return clamp01((tk - 1) / B.lungeTicks) * B.lungeDist
+}
+
+export function updateBruteView(v: EntityView, e: Enemy, f: EnemyFrame, out: Pose, arena: Arena): void {
   const { time, tk, speed } = f
   let sx = 1, sy = 1, rot = 0, hop = 0
   const B = tuning.brute
@@ -111,7 +121,7 @@ export function updateBruteView(v: EntityView, e: Enemy, f: EnemyFrame, out: Pos
     // complete drawing back into a puppet and move the contact pose away from the real hit tick.
     sx = 1; sy = 1; rot = 0; hop = 0
   }
-  updateBruteTell(v, e, f.x, f.y, tk)
+  updateBruteTell(v, e, f.x, f.y, tk, arena)
   updateBruteImpact(v, e, f)
   // no tint channel at all: the brute never announces himself with a colour.
   out.sx = sx; out.sy = sy; out.rot = rot; out.hop = hop; out.tint = 0xffffff
@@ -183,7 +193,7 @@ const G_LANE = 1, G_PLATE = 2, G_HOT = 3, G_RUNGD = 4, G_RUNG2 = 5, G_RUNG1 = 6,
 const NG = 10
 const runs: number[][] = Array.from({ length: NG }, () => [])   // x, y, w triples per group
 
-function updateBruteTell(v: EntityView, e: Enemy, x: number, y: number, tk: number): void {
+function updateBruteTell(v: EntityView, e: Enemy, x: number, y: number, tk: number, arena: Arena): void {
   const g = tellFor(v)
   if (!g) return
   const hi = tellHiFor(v)
@@ -201,12 +211,16 @@ function updateBruteTell(v: EntityView, e: Enemy, x: number, y: number, tk: numb
   const past = s === 'attack' ? tk - (B.lungeTicks + CONTACT_LEAD) : 0
   const bloom = s === 'windup' ? clamp01((tk + 1) / 2.5) : past > 0 ? clamp01(1 - past / 4) : 1
   const fade = scorching ? 1 - tk / SCORCH_TICKS : 1
-  const travelled = s === 'attack' ? Math.min(1, tk / B.lungeTicks) * B.lungeDist : 0
-  const ahead = scorching ? 0 : B.lungeDist - travelled          // how far the committed lunge still has to run
+  const travelled = s === 'attack' ? bruteTellLungeTravel(tk) : 0
+  const plannedAhead = scorching ? 0 : B.lungeDist - travelled
+  // Predict from the interpolated body using the same circle/solid contract as movement. A pillar
+  // shortens both the run-up and the eventual strike origin; the mark can never continue behind it.
+  const ahead = raycastSolidDistance(arena, x, y, e.aimAngle, plannedAhead, e.radius)
   const foot = tuning.player.radius + 1                          // paint on the player's own foot plane
   const aim = e.aimAngle, cos = Math.cos(aim), sin = Math.sin(aim)
   const fx = Math.round(x), fy = Math.round(y + foot)            // his feet, now
-  const cx = Math.round(x + cos * ahead), cy = Math.round(y + foot + sin * ahead)   // where the lunge lands him
+  const landX = x + cos * ahead, landY = y + sin * ahead
+  const cx = Math.round(landX), cy = Math.round(landY + foot)   // where the lunge lands him
   const R = B.hitRadius, tr = tuning.player.radius, half = (B.hitArcDeg * Math.PI) / 360
   const cosHalf = Math.cos(half), reach = R + tr
   const ex0 = Math.cos(aim - half), ey0 = Math.sin(aim - half)
@@ -227,21 +241,23 @@ function updateBruteTell(v: EntityView, e: Enemy, x: number, y: number, tk: numb
   const laneLen = Math.max(0, ahead)
   for (let iy = 0; iy < h; iy++) {
     const py = y0 + iy
-    if (py < INNER.y0 || py > INNER.y1) continue
     for (let ix = 0; ix < w; ix++) {
       const px = x0 + ix
-      if (px < INNER.x0 || px > INNER.x1) continue
+      const centerY = py - foot
+      // Cells name legal player-centre positions. Do not paint stone itself or the clearance band a
+      // radius-five player can never occupy.
+      if (overlapsSolid(arena, px, centerY, tr)) continue
       // the true danger set: the hammer's pie slice grown by the player's own radius, which is exactly
       // what arcHits() tests. The rim is therefore the line your feet must stay outside of.
       const dx = px - cx, dy = py - cy
       const r2 = dx * dx + dy * dy
       let cell = 0
-      if (r2 <= reach * reach) {
+      if (r2 <= reach * reach && hasLineOfSight(arena, landX, landY, px, centerY)) {
         const r = Math.sqrt(r2)
         if (r <= reach && dx * cos + dy * sin >= r * cosHalf) cell = G_PLATE
         else if (segD2(dx, dy, ex0, ey0, R) <= tr * tr || segD2(dx, dy, ex1, ey1, R) <= tr * tr) cell = G_PLATE
       }
-      if (cell === 0 && laneLen > 2) {                 // the run-up lane: he passes through here first
+      if (cell === 0 && laneLen > 2 && hasLineOfSight(arena, x, y, px, centerY)) { // the run-up lane: he passes through here first
         const lx = px - fx, ly = py - fy
         const t = lx * cos + ly * sin
         if (t >= -2 && t <= laneLen) {
@@ -282,7 +298,9 @@ function updateBruteTell(v: EntityView, e: Enemy, x: number, y: number, tk: numb
         }
       } else if (l !== 0 || r !== 0 || u !== 0 || d !== 0) {
         const px = x0 + ix, py = y0 + iy
-        if (px >= INNER.x0 && px <= INNER.x1 && py >= INNER.y0 && py <= INNER.y1) cells[i] = G_UNDER
+        const centerY = py - foot
+        if (!overlapsSolid(arena, px, centerY, tr)
+          && (hasLineOfSight(arena, landX, landY, px, centerY) || hasLineOfSight(arena, x, y, px, centerY))) cells[i] = G_UNDER
       }
     }
   }
@@ -355,9 +373,9 @@ function updateBruteTell(v: EntityView, e: Enemy, x: number, y: number, tk: numb
     }
     hi.fill({ color: mixCol(0xc45a18, 0xff9c4a, qb), alpha: (0.34 + 0.46 * qb) * bloom })
     const bead = 2.2 + 3.2 * q
-    blob(hi, cx, cy, bead + 2.4, (bead + 2.4) * 0.62)
+    dangerBlob(hi, cx, cy, bead + 2.4, (bead + 2.4) * 0.62, arena, landX, landY, foot, tr)
     hi.fill({ color: mixCol(0xff6a18, 0xffa040, qb), alpha: (0.22 + 0.4 * qb) * bloom })
-    blob(hi, cx, cy, bead, bead * 0.58)
+    dangerBlob(hi, cx, cy, bead, bead * 0.58, arena, landX, landY, foot, tr)
     hi.fill({ color: mixCol(0xff9a3a, 0xffd070, qb), alpha: (0.55 + 0.4 * qb) * bloom })
     // Cracks above the lightmap or they die in the dither: the burn is on broken stone.
     for (let i = 0; i < CRACKS.length; i++) {
@@ -367,12 +385,15 @@ function updateBruteTell(v: EntityView, e: Enemy, x: number, y: number, tk: numb
         const jag = ((d + i * 3) & 2) === 0 ? 1 : -1
         const px = Math.round(cx + ca * d + ((d >> 1) & 1) * jag)
         const py = Math.round(cy + sa * d * 0.7)
-        hi.rect(px, py, 1, 1)
-        if ((d & 1) === 0) hi.rect(px + jag, py, 1, 1)
+        if (isDangerPointVisible(arena, landX, landY, px, py - foot, tr)) hi.rect(px, py, 1, 1)
+        if ((d & 1) === 0 && isDangerPointVisible(arena, landX, landY, px + jag, py - foot, tr)) hi.rect(px + jag, py, 1, 1)
       }
     }
     if (q >= 0.35) {
-      for (let i = 0; i < SPLOTS.length; i++) hi.rect(cx + SPLOTS[i][0], cy + Math.round(SPLOTS[i][1] * 0.7), 1, 1)
+      for (let i = 0; i < SPLOTS.length; i++) {
+        const px = cx + SPLOTS[i][0], py = cy + Math.round(SPLOTS[i][1] * 0.7)
+        if (isDangerPointVisible(arena, landX, landY, px, py - foot, tr)) hi.rect(px, py, 1, 1)
+      }
     }
     hi.fill({ color: 0x1a0808, alpha: (0.72 + 0.2 * q) * bloom })
   }
@@ -392,12 +413,15 @@ function updateBruteTell(v: EntityView, e: Enemy, x: number, y: number, tk: numb
         const jag = ((d + i * 3) & 2) === 0 ? 1 : -1
         const px = Math.round(cx + ca * d + ((d >> 1) & 1) * jag)
         const py = Math.round(cy + sa * d * 0.7)
-        g.rect(px, py, 1, 1)
-        if ((d & 1) === 0) g.rect(px + jag, py, 1, 1)
+        if (isDangerPointVisible(arena, landX, landY, px, py - foot, tr)) g.rect(px, py, 1, 1)
+        if ((d & 1) === 0 && isDangerPointVisible(arena, landX, landY, px + jag, py - foot, tr)) g.rect(px + jag, py, 1, 1)
       }
     }
     if (q >= 0.35) {
-      for (let i = 0; i < SPLOTS.length; i++) g.rect(cx + SPLOTS[i][0], cy + Math.round(SPLOTS[i][1] * 0.7), 1, 1)
+      for (let i = 0; i < SPLOTS.length; i++) {
+        const px = cx + SPLOTS[i][0], py = cy + Math.round(SPLOTS[i][1] * 0.7)
+        if (isDangerPointVisible(arena, landX, landY, px, py - foot, tr)) g.rect(px, py, 1, 1)
+      }
     }
     g.fill({ color: 0x120a14, alpha: (0.34 + 0.18 * q) * bloom })
   }
@@ -407,7 +431,8 @@ function updateBruteTell(v: EntityView, e: Enemy, x: number, y: number, tk: numb
     for (let i = 0; i < 16; i++) {
       if ((i & 3) === 3) continue
       const a = (i / 16) * TAU
-      g.rect(Math.round(cx + Math.cos(a) * e.radius), Math.round(cy + Math.sin(a) * e.radius * 0.7), 1, 1)
+      const px = Math.round(cx + Math.cos(a) * e.radius), py = Math.round(cy + Math.sin(a) * e.radius * 0.7)
+      if (isDangerPointVisible(arena, landX, landY, px, py - foot)) g.rect(px, py, 1, 1)
     }
     g.fill({ color: rimCol, alpha: rimA * 0.8 })
   }
@@ -434,10 +459,6 @@ function mixCol(a: number, b: number, t: number): number {
   const bb = Math.round((a & 255) + (((b & 255) - (a & 255)) * u))
   return (r << 16) | (gg << 8) | bb
 }
-
-// The walkable rect. Arena.inner is not reachable from a view (EnemyFrame carries no world), so this
-// mirrors it from the two arena constants; the mark is clipped to it pixel by pixel.
-const INNER = { x0: TILE, y0: 2 * TILE, x1: (ARENA_COLS - 1) * TILE, y1: (ARENA_ROWS - 1) * TILE }
 
 // 4x4 ordered dither, used by the impact's dark ramp below.
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5]
@@ -638,6 +659,27 @@ function blob(g: Graphics, cx: number, cy: number, rx: number, ry: number, irx =
     const y = cy + dy
     if (ihw > 0) { g.rect(cx - hw, y, hw - ihw, 1); g.rect(cx + ihw + 1, y, hw - ihw, 1) }
     else g.rect(cx - hw, y, hw * 2 + 1, 1)
+  }
+}
+
+// Ground-space ellipse whose pixels name legal, cover-visible player centres. Emitting contiguous
+// runs retains the ordinary blob's low draw-call cost without allocating scratch arrays per frame.
+function dangerBlob(g: Graphics, cx: number, cy: number, rx: number, ry: number,
+                    arena: Arena, originX: number, originY: number, foot: number, targetRadius: number): void {
+  if (rx < 1 || ry < 1) return
+  for (let dy = -Math.round(ry); dy <= Math.round(ry); dy++) {
+    const t = 1 - (dy * dy) / (ry * ry)
+    if (t <= 0) continue
+    const hw = Math.round(rx * Math.sqrt(t))
+    let start = -1
+    for (let dx = -hw; dx <= hw + 1; dx++) {
+      const visible = dx <= hw && isDangerPointVisible(arena, originX, originY, cx + dx, cy + dy - foot, targetRadius)
+      if (visible && start < 0) start = dx
+      else if (!visible && start >= 0) {
+        g.rect(cx + start, cy + dy, dx - start, 1)
+        start = -1
+      }
+    }
   }
 }
 

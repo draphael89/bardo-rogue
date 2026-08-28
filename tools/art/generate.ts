@@ -176,8 +176,8 @@ export async function requests(provider: ProviderName, spec: GenerateSpec, token
   // PixelLab: bitforge is the endpoint that takes a style image, so the approved pool selects it;
   // pixflux is the plain text-to-sprite path when there is nothing to condition on.
   const url = refs.length
-    ? 'https://api.pixellab.ai/v2/generate-image-bitforge'
-    : 'https://api.pixellab.ai/v2/generate-image-pixflux'
+    ? 'https://api.pixellab.ai/v2/create-image-bitforge'
+    : 'https://api.pixellab.ai/v2/create-image-pixflux'
   return Array.from({ length: count }, (_, i) => ({
     url,
     method: 'POST' as const,
@@ -191,7 +191,7 @@ export async function requests(provider: ProviderName, spec: GenerateSpec, token
       detail: 'medium detail',
       no_background: true,
       color_image: { type: 'base64', base64: palette },
-      ...(refs.length ? { style_image: { type: 'base64', base64: refs[0] }, style_strength: 0.5 } : {}),
+      ...(refs.length ? { style_image: { type: 'base64', base64: refs[0] }, style_strength: 50 } : {}),
       // One call per candidate, so vary the seed or every candidate comes back identical.
       ...(spec.seed !== undefined ? { seed: spec.seed + i } : {}),
     },
@@ -217,13 +217,26 @@ export async function generate(provider: ProviderName, spec: GenerateSpec, outDi
   if (!token) throw new Error(`generate: ${TOKEN_ENV[provider]} is not set — export it, or use --dry-run to review the request`)
   const reqs = await requests(provider, spec, token)
   const prompt = buildPrompt(spec)
-  const images: string[] = []
+  const hash = promptHash(prompt)
+  const requestHash = createHash('sha256')
+    .update(JSON.stringify(reqs.map(({ url, body }) => ({ url, body }))))
+    .digest('hex').slice(0, 12)
+  const runBase = `${provider}-${hash}-${requestHash}`
+  let runId = runBase
+  for (let attempt = 2; existsSync(join(outDir, `${runId}.prompt.txt`)); attempt++) runId = `${runBase}-${attempt}`
+  const files: string[] = []
   let jobId: string | undefined
   let seed: number | undefined = spec.seed
 
+  mkdirSync(outDir, { recursive: true })
+  writeFileSync(join(outDir, `${runId}.prompt.txt`), prompt + '\n')
+
   for (const req of reqs) {
     const res = await fetch(req.url, { method: req.method, headers: req.headers, body: JSON.stringify(req.body) })
-    if (!res.ok) throw new Error(`generate: ${provider} returned ${res.status} ${res.statusText}: ${(await res.text()).slice(0, 400)}`)
+    if (!res.ok) {
+      const saved = files.length ? `; saved ${files.length} candidate(s) in ${outDir} — inspect them before retrying` : ''
+      throw new Error(`generate: ${provider} returned ${res.status} ${res.statusText}: ${(await res.text()).slice(0, 400)}${saved}`)
+    }
     const json = await res.json() as Record<string, unknown>
     // Both providers return base64; the key differs and has changed across versions, so accept any of
     // the documented shapes rather than pinning one and breaking on the next release.
@@ -232,18 +245,14 @@ export async function generate(provider: ProviderName, spec: GenerateSpec, outDi
       (json.images as string[]) ??
       (json.image ? [(json.image as { base64?: string })?.base64 ?? json.image as string] : [])
     if (!batch.length) throw new Error(`generate: ${provider} returned no images: ${JSON.stringify(json).slice(0, 400)}`)
-    images.push(...batch)
+    for (const b64 of batch) {
+      const file = join(outDir, `${runId}-${files.length}.png`)
+      writeFileSync(file, Buffer.from(b64.replace(/^data:image\/\w+;base64,/, ''), 'base64'))
+      files.push(file)
+    }
     jobId ??= (json.job_id ?? json.id) as string | undefined
     seed ??= json.seed as number | undefined
   }
 
-  mkdirSync(outDir, { recursive: true })
-  const hash = promptHash(prompt)
-  const files = images.map((b64, i) => {
-    const file = join(outDir, `${provider}-${hash}-${i}.png`)
-    writeFileSync(file, Buffer.from(b64.replace(/^data:image\/\w+;base64,/, ''), 'base64'))
-    return file
-  })
-  writeFileSync(join(outDir, `${provider}-${hash}.prompt.txt`), prompt + '\n')
   return { provider, promptHash: hash, files, jobId, seed }
 }

@@ -8,11 +8,12 @@ import { makeSessionState, type GameSessionState, type MetaStateV1, type RoomPha
 
 export const SLOW_FULL = 1000   // scale unit for slowRate, not a tunable
 
-export type PlayerState = 'free' | 'dodge' | 'attack' | 'dead'
+export type PlayerState = 'free' | 'dodge' | 'attack' | 'dead' | 'hurt'
 export type EnemyState =
   | 'idle' | 'chase' | 'windup' | 'attack' | 'recover' | 'stagger' | 'dead'
   | 'position' | 'aim'                       // caster
   | 'hover' | 'freeze' | 'dash'              // charger
+  | 'phase'                                  // warden's non-damaging veil-break beat
 
 export interface Body { x: number; y: number; px: number; py: number; vx: number; vy: number; kbx: number; kby: number; radius: number }
 
@@ -24,8 +25,9 @@ export interface Player extends Body {
   moveAngle: number           // last non-zero movement direction
   dodgeDirX: number; dodgeDirY: number
   swingIndex: number; swingAngle: number; swingId: number
+  bladeActionConnected: boolean // current blade swing hit a body or cut a hostile bolt
   assistTargetId: number          // soft-aim hysteresis; 0 means no retained target
-  controlTick: number             // advances only when the player can act; hit-stop never ages intent
+  controlTick: number             // advances on unfrozen player ticks; hit-stop never ages intent
   attackQueuedAt: number          // controlTick of a discrete request; -1 means none
   dodgeQueuedAt: number
   dodgeTick: number               // roll clock; survives a late-roll attack overlay, -1 after its full authored timeline
@@ -39,6 +41,8 @@ export interface Player extends Body {
   armed: boolean              // town starts unarmed; debug scenarios keep the historical armed default
   dodgeRead: number           // 0 stock; 1 this roll already grazed; 2 this roll already announced a pass-through
   dodgeProcTick: number       // exact tick of a successful i-frame read; boon triggers consume this edge
+  reversalTicks: number       // live player-clock window earned by a true pass-through; hit-stop never ages it
+  reversalActionId: number    // action that spent the last window; presentation may bridge its authored pose
 }
 
 export interface Enemy extends Body {
@@ -56,8 +60,16 @@ export interface Enemy extends Body {
   dashTicks: number
   spawnTick: number
   phase: number                 // 0 stock; bosses write 1+ so hashes stay put
+  phasePending: boolean         // threshold crossed; applied only after the current action resolves
+  actionPhase: number           // phase latched when an enemy commits to its current action
+  pattern: number               // current authored attack pattern (warden; 0 for stock enemies)
+  patternCursor: number         // deterministic next-pattern cursor
+  patternStep: number           // one-shot/volley progress inside the current pattern
+  poseTick: number              // semantic enemy animation clock; advances only with the hostile world
   brand: number                 // 0..3 stacks from Ashen Edge
   brandTicks: number            // status expiry; refreshed whenever Brand is applied
+  knockbackHeavy: boolean       // current shove came from a committed contact and may punctuate on stone
+  knockbackActionId: number     // immutable action identity for that possible wall contact
 }
 
 export type ProjectileKind = 'bolt' | 'arrow' | 'mirror' | 'echo'
@@ -190,10 +202,10 @@ export function makePlayer(x: number, y: number): Player {
     x, y, px: x, py: y, vx: 0, vy: 0, kbx: 0, kby: 0, radius: tuning.player.radius,
     hp: tuning.player.hp, maxHp: tuning.player.hp,
     state: 'free', stateTick: 0, facing: 1, aimAngle: 0, moveAngle: 0,
-    dodgeDirX: 1, dodgeDirY: 0, swingIndex: 0, swingAngle: 0, swingId: 0, assistTargetId: 0,
+    dodgeDirX: 1, dodgeDirY: 0, swingIndex: 0, swingAngle: 0, swingId: 0, bladeActionConnected: false, assistTargetId: 0,
     controlTick: 0, attackQueuedAt: -1, dodgeQueuedAt: -1, dodgeTick: -1,
     iframes: 0, flash: 0, moveX: 0, moveY: 0, footTick: 0, deathTick: -1, god: false,
-    arm: 0, armed: true, dodgeRead: 0, dodgeProcTick: -1,
+    arm: 0, armed: true, dodgeRead: 0, dodgeProcTick: -1, reversalTicks: 0, reversalActionId: -1,
   }
 }
 
@@ -202,7 +214,9 @@ export function makeEnemy(): Enemy {
     id: 0, active: false, kind: 'brute', x: 0, y: 0, px: 0, py: 0, vx: 0, vy: 0, kbx: 0, kby: 0, radius: 6,
     hp: 1, maxHp: 1, state: 'idle', stateTick: 0, facing: 1, aimAngle: 0, targetX: 0, targetY: 0,
     lastHitSwingId: -1, flash: 0, hitDone: false, orbitAngle: 0, orbitDir: 1, hoverTicks: 0, cooldown: 0, dashTicks: 0, spawnTick: 0,
-    phase: 0, brand: 0, brandTicks: 0,
+    phase: 0, phasePending: false, actionPhase: 0, pattern: 0, patternCursor: 0, patternStep: 0, poseTick: 0,
+    brand: 0, brandTicks: 0,
+    knockbackHeavy: false, knockbackActionId: 0,
   }
 }
 

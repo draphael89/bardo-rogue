@@ -4,6 +4,7 @@ import { aimLockTarget, resolveAim, type AimSources } from '@/input/aim'
 const NONE: AimSources = {
   padAimX: 0, padAimY: 0, arrowX: 0, arrowY: 0,
   mouseX: 0, mouseY: 0, lockX: 0, lockY: 0, moveX: 0, moveY: 0, lastAimX: 1, lastAimY: 0,
+  retainedX: 0, retainedY: 0, retainedSoft: true,
 }
 const at = (s: Partial<AimSources>) => resolveAim({ ...NONE, ...s })
 const deg = (a: { x: number; y: number }) => Math.round(Math.atan2(a.y, a.x) * 180 / Math.PI)
@@ -34,11 +35,12 @@ describe('resolveAim', () => {
     expect(deg(a)).toBe(0)
   })
 
-  it('ranks sources: right stick > arrows > explicit lock > mouse > movement > last aim', () => {
-    expect(deg(at({ padAimX: 0, padAimY: -1, arrowX: 1, mouseX: -1, lockX: 0, lockY: 1, moveX: 1 }))).toBe(-90)
-    expect(deg(at({ arrowX: 0, arrowY: 1, mouseX: -1, lockX: 1, moveX: 1 }))).toBe(90)
-    expect(deg(at({ mouseX: -1, lockX: 0, lockY: 1, moveX: 1 }))).toBe(90)
-    expect(deg(at({ lockX: 0, lockY: -1, moveX: 1 }))).toBe(-90)
+  it('ranks sources: right stick > arrows > explicit lock > mouse > retained > movement > last aim', () => {
+    expect(deg(at({ padAimX: 0, padAimY: -1, arrowX: 1, mouseX: -1, lockX: 0, lockY: 1, retainedX: -1, moveX: 1 }))).toBe(-90)
+    expect(deg(at({ arrowX: 0, arrowY: 1, mouseX: -1, lockX: 1, retainedX: -1, moveX: 1 }))).toBe(90)
+    expect(deg(at({ mouseX: -1, lockX: 0, lockY: 1, retainedX: 1, moveX: 1 }))).toBe(90)
+    expect(deg(at({ lockX: 0, lockY: -1, retainedX: 1, moveX: 1 }))).toBe(-90)
+    expect(deg(at({ retainedX: -1, moveX: 1 }))).toBe(180)
     expect(deg(at({ moveX: 0, moveY: 1 }))).toBe(90)
     expect(deg(at({ lastAimX: 0, lastAimY: -1 }))).toBe(-90)
   })
@@ -47,6 +49,8 @@ describe('resolveAim', () => {
     expect(at({ padAimX: 1 }).soft).toBe(false)
     expect(at({ mouseX: 1 }).soft).toBe(false)
     expect(at({ lockX: 1 }).soft).toBe(false)       // never replace the target explicitly chosen by Q
+    expect(at({ retainedX: 1, retainedSoft: false }).soft).toBe(false)
+    expect(at({ retainedX: 1, retainedSoft: true }).soft).toBe(true)
     expect(at({ arrowX: 1 }).soft).toBe(true)     // 8-way is coarse; let the sim finish the angle
     expect(at({ moveX: 1 }).soft).toBe(true)
     expect(at({}).soft).toBe(true)

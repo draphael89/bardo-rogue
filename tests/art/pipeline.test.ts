@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeAll } from 'vitest'
-import { readFileSync, existsSync, mkdtempSync } from 'node:fs'
+import { describe, it, expect, beforeAll, afterEach, vi } from 'vitest'
+import { readFileSync, existsSync, mkdtempSync, readdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import sharp from 'sharp'
@@ -7,10 +7,20 @@ import { validateSheetDef, type SheetDef } from '../../src/render/sheet'
 import { compileSheet, validateClipRefs } from '../../tools/art/compile'
 import { makeContext, runGates, summarise } from '../../tools/art/gates'
 import { canon, rgbToHex, type RGB } from '../../tools/art/palette'
+import { generate, requests } from '../../tools/art/generate'
 
-const SHEETS = ['bardo_hero', 'bardo_brute'] as const
+const SHEETS = [
+  'bardo_hero',
+  'bardo_hero_north',
+  'bardo_hero_north_roll',
+  'bardo_hero_south',
+  'bardo_hero_south_roll',
+  'bardo_brute',
+] as const
 const sheetPath = (n: string) => `public/assets/sprites/${n}.png`
 const sidecarPath = (n: string) => `public/assets/sprites/${n}.json`
+
+afterEach(() => vi.unstubAllGlobals())
 
 describe('asset contract', () => {
   it('accepts the shipped sidecars', () => {
@@ -125,6 +135,74 @@ describe('compiler', () => {
     expect(() => validateSheetDef(out.def, 'test')).not.toThrow()
     expect(out.def.source?.compiler).toBeTruthy()
     expect(out.def.source?.sourceHash).toMatch(/^[0-9a-f]{16}$/)
+  })
+
+  it('rejects two compile frames assigned to the same cell', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'bardo-duplicate-frame-'))
+    const src = join(dir, 'src.png')
+    await sharp({ create: { width: 32, height: 32, channels: 4, background: '#66334d' } }).png().toFile(src)
+    await expect(compileSheet({
+      id: 'test.duplicate', kind: 'character', input: src, output: join(dir, 'out.png'),
+      cell: 16, cols: 2, rows: 1, palette: ['mortar', 'purple1'],
+      frames: [{ name: 'first', i: 0 }, { name: 'second', i: 0 }],
+    }, 'test')).rejects.toThrow(/both use cell 0/)
+  })
+})
+
+describe('generation boundary', () => {
+  it('uses the current PixelLab endpoints and integer style strength', async () => {
+    const plain = await requests('pixellab', { subject: 'hero', size: 32, count: 1 }, 'token')
+    expect(plain[0].url).toBe('https://api.pixellab.ai/v2/create-image-pixflux')
+
+    const styled = await requests('pixellab', {
+      subject: 'hero', size: 32, count: 1,
+      references: ['public/assets/sprites/bardo_hero.png'],
+    }, 'token')
+    expect(styled[0].url).toBe('https://api.pixellab.ai/v2/create-image-bitforge')
+    expect(styled[0].body).toMatchObject({ style_strength: 50 })
+  })
+
+  it('preserves a paid success when a later candidate request fails', async () => {
+    const out = mkdtempSync(join(tmpdir(), 'bardo-generate-partial-'))
+    const before = process.env.PIXELLAB_SECRET
+    process.env.PIXELLAB_SECRET = 'test'
+    let calls = 0
+    vi.stubGlobal('fetch', async () => ++calls === 1
+      ? new Response(JSON.stringify({ image: { type: 'base64', base64: Buffer.from('paid-image').toString('base64') } }), {
+          status: 200, headers: { 'content-type': 'application/json' },
+        })
+      : new Response('rate limited', { status: 429, statusText: 'Too Many Requests' }))
+    try {
+      await expect(generate('pixellab', { subject: 'hero', size: 32, count: 2 }, out))
+        .rejects.toThrow(/saved 1 candidate/)
+      expect(readdirSync(out).filter(f => f.endsWith('.png'))).toHaveLength(1)
+      expect(readdirSync(out).filter(f => f.endsWith('.prompt.txt'))).toHaveLength(1)
+    } finally {
+      if (before === undefined) delete process.env.PIXELLAB_SECRET
+      else process.env.PIXELLAB_SECRET = before
+    }
+  })
+
+  it('never overwrites a paid candidate from an earlier run', async () => {
+    const out = mkdtempSync(join(tmpdir(), 'bardo-generate-retention-'))
+    const before = process.env.PIXELLAB_SECRET
+    process.env.PIXELLAB_SECRET = 'test'
+    vi.stubGlobal('fetch', async (_url: string, init?: RequestInit) => {
+      const seed = (JSON.parse(String(init?.body)) as { seed: number }).seed
+      return new Response(JSON.stringify({
+        image: { type: 'base64', base64: Buffer.from(`paid-seed-${seed}`).toString('base64') }, seed,
+      }), { status: 200, headers: { 'content-type': 'application/json' } })
+    })
+    try {
+      const first = await generate('pixellab', { subject: 'hero', size: 32, count: 1, seed: 10 }, out)
+      const second = await generate('pixellab', { subject: 'hero', size: 32, count: 1, seed: 99 }, out)
+      expect(second.files[0]).not.toBe(first.files[0])
+      expect(readFileSync(first.files[0], 'utf8')).toBe('paid-seed-10')
+      expect(readFileSync(second.files[0], 'utf8')).toBe('paid-seed-99')
+    } finally {
+      if (before === undefined) delete process.env.PIXELLAB_SECRET
+      else process.env.PIXELLAB_SECRET = before
+    }
   })
 })
 

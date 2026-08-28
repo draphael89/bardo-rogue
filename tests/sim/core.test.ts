@@ -10,7 +10,7 @@ import { isPlayerInvulnerable } from '@/sim/combat'
 import { arcHits } from '@/sim/combat'
 import { grantBoon, hasBoon, swingReach } from '@/sim/boons'
 import { ARM, grantArm } from '@/sim/weapons'
-import { damageEnemy, hurtPlayer } from '@/sim/combat'
+import { damageEnemyForTest, hurtPlayer } from '@/sim/combat'
 import { HUB_ID } from '@/sim/rooms'
 
 function run(world: ReturnType<typeof createWorld>, ticks: number, bot = makeBot('idle'), metrics?: Metrics) {
@@ -697,42 +697,47 @@ describe('warden', () => {
     expect(miss.player.hp).toBe(tuning.player.hp)
   })
 
-  it('half life breaks the veil and the next slam throws a ring', () => {
+  it('half life queues a separate veil-break beat after the current attack resolves', () => {
     const w = createWorld(1, 'empty')
     const e = plantWarden(w, -80)
+    w.events.length = 0
     e.hp = Math.floor(e.maxHp / 2)
     stepWorld(w, emptyInput())
-    expect(e.phase).toBe(1)
-    expect(w.events.some(ev => ev.type === 'enemyPhase' && ev.phase === 1)).toBe(true)
+    expect(e.phase).toBe(0)
+    expect(e.phasePending).toBe(true)
+    expect(w.events.some(ev => ev.type === 'enemyPhase')).toBe(false)
     w.events.length = 0
 
-    e.state = 'attack'
-    e.stateTick = 0
-    e.hitDone = true
-    e.dashTicks = 0
-    let bolts = 0
-    for (let i = 0; i < tuning.warden.slamTicks + tuning.warden.boltDelay + 2; i++) {
+    let attacked = false, phased = false
+    for (let i = 0; i < tuning.warden.windup + tuning.warden.slamTicks + tuning.warden.recover + 8; i++) {
       stepWorld(w, emptyInput())
-      bolts += w.events.filter(ev => ev.type === 'boltFired').length
+      const sameTickAttack = w.events.some(ev => ev.type === 'enemyAttack' || ev.type === 'boltFired')
+      const sameTickPhase = w.events.some(ev => ev.type === 'enemyPhase')
+      expect(sameTickAttack && sameTickPhase, `phase and attack shared tick ${w.tick}`).toBe(false)
+      attacked ||= sameTickAttack
+      phased ||= sameTickPhase
       w.events.length = 0
+      if (phased) break
     }
-    expect(bolts).toBe(tuning.warden.boltCount)
-    expect(w.projectiles.filter(b => b.active && b.team === 0).length).toBe(tuning.warden.boltCount)
+    expect(attacked).toBe(true)
+    expect(phased).toBe(true)
+    expect(e.phase).toBe(1)
+    expect(e.state).toBe('phase')
   })
 
   it('a light hit does not stagger; a heavy in recover does; a heavy in windup does not', () => {
     const w = createWorld(1, 'empty')
     const e = plantWarden(w, -80)
     e.state = 'recover'
-    damageEnemy(w, e, 1, 0, 10, false, 0)
+    damageEnemyForTest(w, e, 1, 0, 10, false, 0)
     expect(e.state).toBe('recover')
 
-    damageEnemy(w, e, 1, 0, 10, true, 0)
+    damageEnemyForTest(w, e, 1, 0, 10, true, 0)
     expect(e.state).toBe('stagger')
 
     e.state = 'windup'
     e.stateTick = 8
-    damageEnemy(w, e, 1, 0, 10, true, 0)
+    damageEnemyForTest(w, e, 1, 0, 10, true, 0)
     expect(e.state).toBe('windup')
   })
 

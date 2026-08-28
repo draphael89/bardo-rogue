@@ -1,36 +1,119 @@
 import { DT, tuning } from '@/tuning'
 import type { World, Enemy } from '../world'
-import { angleToPlayer, distToPlayer, moveToward, facePlayer, enemyRadialAttack, tickStagger } from './common'
+import type { WardenAttackPattern } from '../events'
+import { angleToPlayer, distToPlayer, moveToward, facePlayer, enemyRadialAttack, tickStagger, hasPlayerLineOfSight } from './common'
+import { wardenProjectileAngle, wardenProjectileContract, type WardenProjectileContract } from './warden-contract'
+
+// Numeric and append-only: pattern identity is part of the deterministic enemy snapshot.
+export const WARDEN_PATTERN = { slam: 0, ring: 1, fan: 2 } as const
+export type WardenPattern = typeof WARDEN_PATTERN[keyof typeof WARDEN_PATTERN]
+
+const WARDEN_EVENT_PATTERN: readonly WardenAttackPattern[] = ['slam', 'ring', 'fan']
+
+// `actionPhase` is captured when the windup begins. Never read live phase for an in-flight timing:
+// crossing the veil threshold cannot steal warning or recovery frames from an attack already shown.
+export function wardenActionPhase(e: Enemy): number {
+  return e.state === 'windup' || e.state === 'attack' || e.state === 'recover' ? e.actionPhase : e.phase
+}
 
 export function wardenWindup(e: Enemy): number {
-  return e.phase ? tuning.warden.windup2 : tuning.warden.windup
+  const W = tuning.warden
+  const p2 = wardenActionPhase(e) > 0
+  if (e.pattern === WARDEN_PATTERN.ring) return p2 ? W.ringWindup2 : W.ringWindup
+  if (e.pattern === WARDEN_PATTERN.fan) return p2 ? W.fanWindup2 : W.fanWindup
+  return p2 ? W.windup2 : W.windup
 }
 
 export function wardenRecover(e: Enemy): number {
-  return e.phase ? tuning.warden.recover2 : tuning.warden.recover
+  const W = tuning.warden
+  const p2 = wardenActionPhase(e) > 0
+  if (e.pattern === WARDEN_PATTERN.ring) return p2 ? W.ringRecover2 : W.ringRecover
+  if (e.pattern === WARDEN_PATTERN.fan) return p2 ? W.fanRecover2 : W.fanRecover
+  return p2 ? W.recover2 : W.recover
 }
 
-function maybePhase(world: World, e: Enemy): void {
-  if (e.phase || e.hp * 2 > e.maxHp) return
+export function wardenAttackTicks(e: Enemy): number {
+  const W = tuning.warden
+  if (e.pattern === WARDEN_PATTERN.ring) return W.ringAttackTicks
+  if (e.pattern === WARDEN_PATTERN.fan) {
+    const volleys = wardenProjectileContract('fan', wardenActionPhase(e)).volleys
+    return W.fanAttackTicks + (volleys - 1) * W.fanVolleyGap
+  }
+  return W.slamTicks
+}
+
+function queuePhase(e: Enemy): void {
+  if (!e.phase && !e.phasePending && e.hp <= e.maxHp * tuning.warden.phaseThreshold) e.phasePending = true
+}
+
+// The veil break is a state, not an event pasted onto the threshold-crossing hit. Windup, release,
+// active frames, and recovery all finish under their latched phase; only idle/chase may spend the
+// pending transition. Returning true prevents any attack event from sharing this tick.
+function beginPhaseIfSafe(world: World, e: Enemy): boolean {
+  if (!e.phasePending || (e.state !== 'idle' && e.state !== 'chase')) return false
+  e.phasePending = false
   e.phase = 1
+  e.actionPhase = 1
+  e.state = 'phase'
+  e.stateTick = 0
+  e.vx = 0; e.vy = 0
   world.emit({ type: 'enemyPhase', id: e.id, kind: 'warden', x: e.x, y: e.y, phase: 1 })
+  return true
+}
+
+function selectPattern(e: Enemy): void {
+  // Teaching order, then repetition: judgment circle -> outward gaps -> aimed fan.
+  e.pattern = (e.patternCursor % 3) as WardenPattern
+  e.patternCursor++
+  e.patternStep = 0
+  e.actionPhase = e.phase
+}
+
+function fireBolt(world: World, e: Enemy, angle: number, contract: WardenProjectileContract): void {
+  const ox = e.x + Math.cos(angle) * contract.spawnOffset
+  const oy = e.y + Math.sin(angle) * contract.spawnOffset
+  const bolt = world.fireProjectile(ox, oy, angle, contract.speed, contract.boltRadius, contract.lifeTicks, 0, tuning.warden.boltDamage)
+  if (bolt) world.emit({ type: 'boltFired', x: ox, y: oy, angle })
 }
 
 function looseRing(world: World, e: Enemy): void {
-  const W = tuning.warden
-  for (let i = 0; i < W.boltCount; i++) {
-    const a = e.aimAngle + (Math.PI * 2 * i) / W.boltCount
-    const ox = e.x + Math.cos(a) * (e.radius + 4)
-    const oy = e.y + Math.sin(a) * (e.radius + 4)
-    const bolt = world.fireProjectile(ox, oy, a, W.boltSpeed, W.boltRadius, W.boltLife, 0, W.boltDamage)
-    if (bolt) world.emit({ type: 'boltFired', x: ox, y: oy, angle: a })
+  const contract = wardenProjectileContract('ring', wardenActionPhase(e))
+  for (let i = 0; i < contract.count; i++) {
+    fireBolt(world, e, wardenProjectileAngle(contract, e.aimAngle, e.patternCursor, i), contract)
   }
+}
+
+function looseFan(world: World, e: Enemy, volley: number): void {
+  const contract = wardenProjectileContract('fan', wardenActionPhase(e))
+  for (let i = 0; i < contract.count; i++) {
+    fireBolt(world, e, wardenProjectileAngle(contract, e.aimAngle, e.patternCursor, i, volley), contract)
+  }
+}
+
+function updateAttack(world: World, e: Enemy): void {
+  const W = tuning.warden
+  e.vx = 0; e.vy = 0
+  if (e.pattern === WARDEN_PATTERN.slam) {
+    if (!e.hitDone && e.stateTick > 0 && e.stateTick <= W.slamTicks) {
+      if (enemyRadialAttack(world, e, W.slamRadius, W.slamDamage)) e.hitDone = true
+    }
+  } else if (e.pattern === WARDEN_PATTERN.ring) {
+    if (e.patternStep === 0 && e.stateTick > 0) { looseRing(world, e); e.patternStep = 1 }
+  } else {
+    const volleys = wardenProjectileContract('fan', wardenActionPhase(e)).volleys
+    while (e.patternStep < volleys && e.stateTick >= 1 + e.patternStep * W.fanVolleyGap) {
+      looseFan(world, e, e.patternStep)
+      e.patternStep++
+    }
+  }
+  if (e.stateTick >= wardenAttackTicks(e)) { e.state = 'recover'; e.stateTick = 0 }
 }
 
 export function updateWarden(world: World, e: Enemy): void {
   const W = tuning.warden
   const p = world.player
-  maybePhase(world, e)
+  queuePhase(e)
+  if (beginPhaseIfSafe(world, e)) return
   if (e.cooldown > 0) e.cooldown--
 
   switch (e.state) {
@@ -43,40 +126,46 @@ export function updateWarden(world: World, e: Enemy): void {
       const r = (W.orbitMin + W.orbitMax) / 2
       moveToward(world, e, p.x + Math.cos(e.orbitAngle) * r, p.y + Math.sin(e.orbitAngle) * r, W.speed)
       facePlayer(world, e)
-      if (e.cooldown <= 0 && distToPlayer(world, e) <= W.orbitMax + 20) {
+      if (e.cooldown <= 0 && distToPlayer(world, e) <= W.orbitMax + 20 && hasPlayerLineOfSight(world, e)) {
+        selectPattern(e)
         e.state = 'windup'; e.stateTick = 0
         e.aimAngle = angleToPlayer(world, e)
+        e.targetY = distToPlayer(world, e)
         e.hitDone = false
-        e.dashTicks = 0
         world.emit({ type: 'enemyWindup', id: e.id, kind: 'warden', x: e.x, y: e.y })
       }
       break
     }
     case 'windup':
       e.vx = 0; e.vy = 0
-      if (e.stateTick <= wardenWindup(e) - W.commitLead) { e.aimAngle = angleToPlayer(world, e); facePlayer(world, e) }
+      if (e.stateTick <= wardenWindup(e) - W.commitLead) {
+        e.aimAngle = angleToPlayer(world, e)
+        e.targetY = distToPlayer(world, e)
+        facePlayer(world, e)
+      }
       if (e.stateTick >= wardenWindup(e)) {
-        e.state = 'attack'; e.stateTick = 0; e.hitDone = false; e.dashTicks = 0
-        world.emit({ type: 'enemyAttack', id: e.id, kind: 'warden', x: e.x, y: e.y, angle: e.aimAngle })
+        e.state = 'attack'; e.stateTick = 0; e.hitDone = false; e.patternStep = 0
+        world.emit({
+          type: 'enemyAttack', id: e.id, kind: 'warden', x: e.x, y: e.y, angle: e.aimAngle,
+          pattern: WARDEN_EVENT_PATTERN[e.pattern] ?? 'slam',
+        })
       }
       break
-    case 'attack': {
-      e.vx = 0; e.vy = 0
-      if (!e.hitDone && e.stateTick > 0 && e.stateTick <= W.slamTicks) {
-        if (enemyRadialAttack(world, e, W.slamRadius, W.slamDamage)) e.hitDone = true
-      }
-      if (e.phase && !e.dashTicks && e.stateTick > W.slamTicks) {
-        looseRing(world, e)
-        e.dashTicks = 1
-      }
-      if (e.stateTick >= W.slamTicks + (e.phase ? W.boltDelay : 0)) { e.state = 'recover'; e.stateTick = 0 }
+    case 'attack':
+      updateAttack(world, e)
       break
-    }
     case 'recover':
       e.vx = 0; e.vy = 0
       if (e.stateTick >= wardenRecover(e)) {
         e.state = 'chase'; e.stateTick = 0
         e.cooldown = W.cooldown
+      }
+      break
+    case 'phase':
+      e.vx = 0; e.vy = 0
+      if (e.stateTick >= W.phaseTransitionTicks) {
+        e.state = 'chase'; e.stateTick = 0
+        e.cooldown = 0
       }
       break
     case 'stagger':

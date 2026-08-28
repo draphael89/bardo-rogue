@@ -1,6 +1,7 @@
 import { Container, Sprite, Texture, RenderTexture, Rectangle } from 'pixi.js'
 import type { Atlas } from './atlas'
 import { fxRng } from './fxRng'
+import { decalAlphaForFrame } from './feedback'
 import { FX_UNIT } from './fxUnits'
 
 interface P { s: Sprite; spin: number; vx: number; vy: number; life: number; maxLife: number; drag: number; grav: number; scale0: number; scale1: number; rot: number; alpha0: number; alpha1: number; ground: number | null; tint0: number; tint1: number | null; sgn: number; unit: number }
@@ -26,6 +27,7 @@ export class Particles {
   private decalSprite: Sprite
   private stamp = new Sprite()
   private decalContainer = new Container()
+  private hostileFloorThreat = false
   readonly max = 1500
 
   constructor(private atlas: Atlas, private fx: Container, decals: Container, _floor: Container) {
@@ -37,6 +39,10 @@ export class Particles {
   }
   private renderer: import('pixi.js').Renderer | null = null
   attachRenderer(r: import('pixi.js').Renderer) { this.renderer = r }
+
+  // Persistent scars should enrich the room between decisions, never compete with live floor truth.
+  // Presenter supplies only whether a hostile commitment is active; the fade remains presentation-only.
+  setThreatPriority(active: boolean) { this.hostileFloorThreat = active }
 
   clear() {
     for (const p of this.live) { p.s.visible = false; this.pool.push(p) }
@@ -63,6 +69,7 @@ export class Particles {
   }
 
   update(dt: number) {
+    this.decalSprite.alpha = decalAlphaForFrame(this.decalSprite.alpha, this.hostileFloorThreat, dt)
     for (let i = this.live.length - 1; i >= 0; i--) {
       const p = this.live[i]
       p.life -= dt

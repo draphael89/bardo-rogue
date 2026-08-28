@@ -1,0 +1,199 @@
+{
+  "id": "actor.hero.north",
+  "version": 1,
+  "kind": "character",
+  "cell": 32,
+  "cols": 4,
+  "rows": 4,
+  "palette": "bardo.canon",
+  "maxColors": 16,
+  "facing": "north",
+  "mirror": false,
+  "frames": {
+    "idle": {
+      "i": 0,
+      "pivot": [
+        16,
+        28
+      ]
+    },
+    "runA": {
+      "i": 1,
+      "pivot": [
+        16,
+        28
+      ]
+    },
+    "runB": {
+      "i": 2,
+      "pivot": [
+        16,
+        28
+      ]
+    },
+    "hurt": {
+      "i": 3,
+      "pivot": [
+        16,
+        28
+      ]
+    },
+    "light1Start": {
+      "i": 4,
+      "pivot": [
+        16,
+        26
+      ]
+    },
+    "light1Contact": {
+      "i": 5,
+      "pivot": [
+        16,
+        26
+      ]
+    },
+    "light1Recover": {
+      "i": 6,
+      "pivot": [
+        16,
+        32
+      ]
+    },
+    "light2Start": {
+      "i": 7,
+      "pivot": [
+        16,
+        26
+      ]
+    },
+    "light2Contact": {
+      "i": 8,
+      "pivot": [
+        16,
+        25
+      ]
+    },
+    "light2Recover": {
+      "i": 9,
+      "pivot": [
+        16,
+        25
+      ]
+    },
+    "heavyStart": {
+      "i": 10,
+      "pivot": [
+        16,
+        25
+      ]
+    },
+    "heavyContact": {
+      "i": 11,
+      "pivot": [
+        16,
+        25
+      ]
+    },
+    "dodgeStart": {
+      "i": 12,
+      "pivot": [
+        16,
+        21
+      ]
+    },
+    "dodgeTravel": {
+      "i": 13,
+      "pivot": [
+        16,
+        20
+      ]
+    },
+    "dodgeLand": {
+      "i": 14,
+      "pivot": [
+        16,
+        21
+      ]
+    },
+    "dead": {
+      "i": 15,
+      "pivot": [
+        16,
+        23
+      ]
+    }
+  },
+  "aliases": {
+    "heavyRecover": "heavyStart"
+  },
+  "clips": {
+    "run": {
+      "frames": [
+        "runA",
+        "runB"
+      ],
+      "timing": "ticks",
+      "ticks": [
+        7,
+        7
+      ],
+      "loop": true
+    },
+    "light1": {
+      "frames": [
+        "light1Start",
+        "light1Contact",
+        "light1Recover"
+      ],
+      "timing": "sim",
+      "sim": {
+        "ref": "player.attack.swings.0",
+        "contact": "light1Contact"
+      }
+    },
+    "light2": {
+      "frames": [
+        "light2Start",
+        "light2Contact",
+        "light2Recover"
+      ],
+      "timing": "sim",
+      "sim": {
+        "ref": "player.attack.swings.1",
+        "contact": "light2Contact"
+      }
+    },
+    "heavy": {
+      "frames": [
+        "heavyStart",
+        "heavyContact",
+        "heavyRecover"
+      ],
+      "timing": "sim",
+      "sim": {
+        "ref": "player.attack.swings.2",
+        "contact": "heavyContact"
+      }
+    },
+    "dodge": {
+      "frames": [
+        "dodgeStart",
+        "dodgeTravel",
+        "dodgeLand"
+      ],
+      "timing": "sim",
+      "sim": {
+        "ref": "player.dodge"
+      }
+    }
+  },
+  "source": {
+    "provider": "openai",
+    "model": "gpt-image (built-in tool)",
+    "approvedReference": "art/source/bardo_hero_north_alpha_v7.png",
+    "promptHash": "see art/bardo-combat-sprites.md",
+    "compiler": "bardo-art/1",
+    "sourceFile": "art/source/bardo_hero_north_alpha_v7.png",
+    "sourceHash": "7daa50b38c56da47"
+  }
+}

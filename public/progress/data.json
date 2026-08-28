@@ -1,9 +1,9 @@
 {
   "title": "Bardo Rogue",
   "subtitle": "Gauntlet against Enter the Gungeon & Hades — two marked doors, then the rest",
-  "updated": "2026-08-28T09:56:56-04:00",
+  "updated": "2026-08-28T20:57:00Z",
   "now": "combat-feel",
-  "round": 2,
+  "round": 4,
   "timeline": [
     {
       "t": "16:54",
@@ -508,6 +508,38 @@
     {
       "t": "09:56",
       "text": "Kill flash 0.35 -> 0.12; it was louder than getting hurt and washed out the next telegraph. 68 -> 107 tests. Enemy tuning is the open follow-up: kite clears in 28-33s vs a 60-120s target."
+    },
+    {
+      "t": "18:35",
+      "text": "Combat audit reopened at current HEAD. 184 tests green. Independent controls score 87; combat transaction 84; Warden depth 58. The 90+ blockers are timing truth, boss mastery, action attribution, and directional continuity."
+    },
+    {
+      "t": "18:48",
+      "text": "Trust pass in: perfect dodge now means the roll's real iframe window, bolt cuts are confirms, and a head-on wall ends travel instead of granting a stationary invulnerable tumble. Focused mechanics 37/37."
+    },
+    {
+      "t": "19:00",
+      "text": "Directional hero pipeline passes: original north/back and south/front 16-pose sheets, 15 colors, binary alpha. Blade idle, run, hit, light/heavy, dodge, land, and death no longer drop to the 16px placeholder on vertical input."
+    },
+    {
+      "t": "19:05",
+      "text": "Aim clarity in: arrow/right-stick ownership releases cleanly; Q lock now has acquire, retained, break, and clear presentation. Enemy mastery pass and blind directional-motion critic are running."
+    },
+    {
+      "t": "19:25",
+      "text": "Enemy mastery and contact truth in: Warden slam/ring/fan rotate deliberately, phase two latches safely, and every hit carries immutable source, geometry, guard, and damage provenance."
+    },
+    {
+      "t": "19:50",
+      "text": "Cover is one truth now. Blade, projectiles, hostile arcs, Judgment, aim assist, and every enemy tell use the same exact rounded-tile ray. Guard, hurt, listener, and max-HP feedback also report authoritative state."
+    },
+    {
+      "t": "20:21",
+      "text": "Replay and balance gates close: 252 tests, deterministic fixtures, 8/8 skilled full clears, 0/8 naive clears, 8/8 Warden clears, zero pool overflow, and isolated simulation below the 2ms ceiling."
+    },
+    {
+      "t": "20:57",
+      "text": "Combat 90+ passes. Independent full audit scores 93 overall with every key dimension 91–96; the final north/south melee-and-roll gate passes 91–94 after a one-tick tuck and continuously visible blade."
     }
   ],
   "pieces": [
@@ -796,9 +828,17 @@
     },
     {
       "id": "combat-feel",
+      "take": "32",
+      "name": "Every input tells the truth",
       "status": "done",
-      "title": "Controls & game feel: keyboard aim, hold-to-attack, dodge ghosting, wall-safe crowds, turn rate, sword latency, perfect-dodge bullet time, flash hierarchy",
-      "rounds": 0
+      "title": "Combat 90+: timing truth, authored direction, deliberate boss patterns, and exact feedback attribution",
+      "blurb": "A second audit found the seams left after the first feel pass. Mechanics, aim, cover, boss cadence, contact feedback, audio authority, and full directional combat art now move as one contract. A fresh implementation audit scores the result 93/100.",
+      "bar": "Hades feel + Gungeon combat readability",
+      "rounds": 5,
+      "verdict": "ours",
+      "gap": "Human headphone/speaker, physical-controller, browser/device, and maximum-density phase-two certification remains release QA.",
+      "before": "audit/poses.png",
+      "after": "audit/directional-poses.png"
     }
   ]
 }

@@ -381,7 +381,13 @@ export async function compileSheet(spec: CompileSpec, specPath = '<inline>'): Pr
   const W = spec.cols * cell, H = spec.rows * cell
   const atlas = Buffer.alloc(W * H * 4)
   const byIndex = new Map<number, FrameSpec>()
-  for (const f of spec.frames) byIndex.set(f.i, f)
+  const frameNames = new Set<string>()
+  for (const f of spec.frames) {
+    if (frameNames.has(f.name)) throw new Error(`compile: duplicate frame name "${f.name}"`)
+    if (byIndex.has(f.i)) throw new Error(`compile: frames "${byIndex.get(f.i)!.name}" and "${f.name}" both use cell ${f.i}`)
+    frameNames.add(f.name)
+    byIndex.set(f.i, f)
+  }
   const frames: FrameReport[] = []
   const usedColors = new Set<string>()
 

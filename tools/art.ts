@@ -108,6 +108,7 @@ async function cmdCompile(): Promise<void> {
     console.error(`The candidate is at ${stage} for inspection. ${destPng} is untouched.`)
     process.exit(2)
   }
+  mkdirSync(dirname(destPng), { recursive: true })
   copyFileSync(stage, destPng)
   writeSidecar(destSidecar, def)
   console.log(`  promoted -> ${destPng} + ${destSidecar}`)

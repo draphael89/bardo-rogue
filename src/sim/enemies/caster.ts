@@ -1,7 +1,7 @@
 import { tuning, DT } from '@/tuning'
 import type { World, Enemy, Projectile } from '../world'
 import { damageEnemy } from '../combat'
-import { angleToPlayer, distToPlayer, moveToward, moveAlong, facePlayer, tickStagger } from './common'
+import { angleToPlayer, distToPlayer, moveToward, moveAlong, facePlayer, tickStagger, familyTellSlotOpen, hasPlayerLineOfSight } from './common'
 
 // The caster's sentence: cross the line, or cut the bolt and reel him in.
 // Its whole defence is spacing. Cutting its bolt severs the tether, drags it out of the band it
@@ -50,9 +50,18 @@ function boltClosing(world: World, b: Projectile): boolean {
 // The blade calls this the instant it cuts a bolt, so the punish lands with the cut rather than
 // whenever the owning caster next happens to run. That matters under slow-motion, where the caster
 // may be several ticks behind the sword.
-export function backlash(world: World, e: Enemy, cx: number, cy: number): void {
+export function backlash(world: World, e: Enemy, cx: number, cy: number, sourceActionId = world.player.swingId): void {
   const toCut = Math.atan2(cy - e.y, cx - e.x)
-  damageEnemy(world, e, CUT.damage, toCut, CUT.pull, false, CUT.hitstop)
+  damageEnemy(world, e, CUT.damage, toCut, CUT.pull, false, CUT.hitstop, sourceActionId, {
+    source: 'backlash',
+    originX: cx, originY: cy,
+    // The sever travels from the cut back to its caster even though the mechanical pull points the
+    // caster the other way. Keeping the two directions distinct makes the contact read honestly.
+    direction: toCut + Math.PI,
+    sweep: 0,
+    cleave: false,
+    contactDepth: 1,
+  })
   if (!e.active || e.state === 'dead') return
   e.hitDone = true          // marks this stagger as backlash (longer window; the view reads it too)
   e.cooldown = CUT.cooldown
@@ -94,7 +103,8 @@ export function updateCaster(world: World, e: Enemy): void {
       }
       const bolt = myBolt(world, e)
       const laneBusy = !!bolt && boltClosing(world, bolt)
-      if (e.cooldown <= 0 && !laneBusy && d >= C.retreatRange * 0.8 && d <= C.prefMax + 60) {
+      if (e.cooldown <= 0 && !laneBusy && d >= C.retreatRange * 0.8 && d <= C.prefMax + 60
+        && hasPlayerLineOfSight(world, e) && familyTellSlotOpen(world, e)) {
         e.state = 'aim'; e.stateTick = 0; e.aimAngle = a; e.targetY = d
         world.emit({ type: 'enemyWindup', id: e.id, kind: 'caster', x: e.x, y: e.y })
       }

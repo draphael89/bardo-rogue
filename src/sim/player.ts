@@ -1,18 +1,19 @@
 import { tuning, DT } from '@/tuning'
 import type { Player, World } from './world'
 import type { InputFrame } from './input'
-import { moveWithWalls } from './collision'
-import { arcHits, damageEnemy, addFreeze, addBulletTime, swingProgress, swingStep } from './combat'
+import { hasLineOfSight, moveWithWalls } from './collision'
+import { arcHits, damageEnemy, addFreeze, addBulletTime, clearBulletTime, swingProgress, swingStep } from './combat'
 import { hasBoon, resolveWeaponOnHit, swingReach } from './boons'
 import { ARM, armOf } from './weapons'
 import { bowMoveScale, bowSteer, looseArrow, startDraw } from './bow'
 import { backlash } from './enemies/caster'
 import { angleDiff, deg, len } from './math'
-import { hasLineOfSight } from './arena'
 
 export function capturePlayerInput(world: World, input: InputFrame): void {
   const p = world.player
-  if (input.attack) p.attackQueuedAt = p.controlTick
+  // Unarmed presses are not future attacks. In particular, holding attack in the Bardo must not
+  // manufacture a swing before the rack has physically armed the player.
+  if (input.attack && p.armed) p.attackQueuedAt = p.controlTick
   // A second dodge press during travel is not a future action: accepting it would make a roll
   // repeat after the player released the button. Landing presses are real requests, however, and
   // get the same short grace window as an attack cancel.
@@ -83,6 +84,14 @@ export function updatePlayer(world: World, input: InputFrame): void {
   if (p.state === 'free') {
     if (hasIntent(p, p.dodgeQueuedAt, P.dodge.buffer)) startDodge(world)
     else if (hasIntent(p, p.attackQueuedAt, P.attack.buffer) || (input.attackHeld && armOf(world) === ARM.blade)) beginAttack(world)
+  } else if (p.state === 'hurt') {
+    if (p.stateTick >= P.hurtReactionTicks) {
+      p.state = 'free'; p.stateTick = 0
+      // Input capture continues through hit-stop and the recoil. Dodge wins the tie, matching every
+      // other return-to-control gate, and both stock buffers outlast this deliberately short state.
+      if (hasIntent(p, p.dodgeQueuedAt, P.dodge.buffer)) startDodge(world)
+      else if (hasIntent(p, p.attackQueuedAt, P.attack.buffer) || (input.attackHeld && armOf(world) === ARM.blade)) beginAttack(world)
+    }
   } else if (p.state === 'dodge') {
     if (p.stateTick >= P.dodge.total) {
       p.state = 'free'; p.stateTick = 0
@@ -104,7 +113,7 @@ export function updatePlayer(world: World, input: InputFrame): void {
   } else if (p.state === 'attack') {
     const s = P.attack.swings[p.swingIndex]
     // hit-confirm: a swing that touched something recovers on its own clock; a whiff pays for the miss
-    const wp = swingConnected(world) ? 0 : s.whiffPenalty
+    const wp = p.bladeActionConnected ? 0 : s.whiffPenalty
     const total = s.startup + s.active + s.recovery + wp
     const recoveryTick = p.stateTick - s.startup - s.active
     // The first four heavy startup ticks are a feint window. Once the feet plant, the attack is a
@@ -113,6 +122,7 @@ export function updatePlayer(world: World, input: InputFrame): void {
     if (earlyHeavyCancel && hasIntent(p, p.dodgeQueuedAt, P.dodge.buffer)) startDodge(world)
     else if (p.stateTick >= total) {
       p.state = 'free'; p.stateTick = 0
+      p.bladeActionConnected = false
       if (hasIntent(p, p.dodgeQueuedAt, P.dodge.buffer)) startDodge(world)
       else if (hasIntent(p, p.attackQueuedAt, P.attack.buffer)) beginAttack(world)
     }
@@ -145,6 +155,12 @@ export function updatePlayer(world: World, input: InputFrame): void {
       p.footTick++
       if (p.footTick % 14 === 0) world.emit({ type: 'footstep', x: p.x, y: p.y })
     }
+  } else if (p.state === 'hurt') {
+    const scale = P.hurtMoveScale
+    const tx = mlen > 0.01 ? input.moveX / mlen * P.maxSpeed * scale : 0
+    const ty = mlen > 0.01 ? input.moveY / mlen * P.maxSpeed * scale : 0
+    steer(p, tx, ty)
+    dx = p.vx * DT; dy = p.vy * DT
   } else if (p.state === 'dodge') {
     const d = P.dodge
     // Landing. The roll's cooldown, not a stumble: a steer floor so the first step is a step,
@@ -166,7 +182,7 @@ export function updatePlayer(world: World, input: InputFrame): void {
     const s = P.attack.swings[p.swingIndex]
     // committed through startup + active, then control bleeds back in across recovery
     const rec = p.stateTick - s.startup - s.active
-    const recLen = s.recovery + (swingConnected(world) ? 0 : s.whiffPenalty)
+    const recLen = s.recovery + (p.bladeActionConnected ? 0 : s.whiffPenalty)
     const scale = rec < 0 ? s.moveCommit : s.moveRecover + (1 - s.moveRecover) * Math.min(1, rec / recLen)
     const tx = mlen > 0.01 ? input.moveX / mlen * P.maxSpeed * scale : 0
     const ty = mlen > 0.01 ? input.moveY / mlen * P.maxSpeed * scale : 0
@@ -175,7 +191,20 @@ export function updatePlayer(world: World, input: InputFrame): void {
     const travel = swingStep(s, p.stateTick)
     dx += Math.cos(p.swingAngle) * travel; dy += Math.sin(p.swingAngle) * travel
   }
-  moveWithWalls(world.arena, p, dx, dy, p.radius)
+  const rolling = p.dodgeTick >= 0 && p.dodgeTick < P.dodge.travel
+  const moveX0 = p.x, moveY0 = p.y
+  const wall = moveWithWalls(world.arena, p, dx, dy, p.radius)
+  if (rolling && (wall.hitX || wall.hitY)) {
+    // A wall removes only the blocked component, so a diagonal roll keeps its authored tangent
+    // slide. The velocity handed to landing must be the motion that really happened, not momentum
+    // pointing invisibly into stone.
+    const actualX = p.x - moveX0, actualY = p.y - moveY0
+    p.vx = actualX / DT; p.vy = actualY / DT
+    const intendedForward = dx * p.dodgeDirX + dy * p.dodgeDirY
+    const actualForward = actualX * p.dodgeDirX + actualY * p.dodgeDirY
+    const forwardRatio = intendedForward > 0 ? Math.max(0, actualForward / intendedForward) : 1
+    if (forwardRatio < P.dodge.wallSlideMinForwardRatio) endDodgeTravelAtWall(world)
+  }
   applyKnockback(world)
 
   // --- active hit window: only the arc the blade has actually swept through is live ---
@@ -183,23 +212,40 @@ export function updatePlayer(world: World, input: InputFrame): void {
     const s = P.attack.swings[p.swingIndex]
     const k = p.stateTick - s.startup
     if (k >= 0 && k < s.active) {
+      // The answer, not merely the button press, closes the perfect-dodge breath. Startup remains
+      // readable and unsafe; the hostile clock returns on the first live blade tick, hit or whiff.
+      if (k === 0 && p.reversalActionId === p.swingId) {
+        clearBulletTime(world)
+        p.reversalActionId = -1
+      }
       // the live sector runs from the swing's start edge to wherever the blade has reached this tick
       const reach = swingReach(world, s)
       const spanDeg = reach.arcDeg * swingProgress(s, k)
       const mid = p.swingAngle + s.sweep * (deg(spanDeg) - deg(reach.arcDeg)) / 2
       for (const e of world.enemies) {
         if (!e.active || e.state === 'dead' || e.lastHitSwingId === p.swingId) continue
-        if (arcHits(p.x, p.y, mid, reach.radius, spanDeg, e.x, e.y, e.radius)) {
+        if (arcHits(p.x, p.y, mid, reach.radius, spanDeg, e.x, e.y, e.radius)
+          && hasLineOfSight(world.arena, p.x, p.y, e.x, e.y)) {
           e.lastHitSwingId = p.swingId
+          p.bladeActionConnected = true
           const toward = Math.atan2(e.y - p.y, e.x - p.x)
           const brandBefore = e.brand
-          damageEnemy(world, e, reach.damage, toward, s.knockback, s.heavy, s.hitstop)
-          resolveWeaponOnHit(world, e, s.heavy, brandBefore, toward)
+          damageEnemy(world, e, reach.damage, toward, s.knockback, s.heavy, s.hitstop, p.swingId, {
+            source: 'blade',
+            originX: p.x, originY: p.y,
+            direction: toward,
+            sweep: s.sweep,
+            cleave: !s.heavy && hasBoon(world, 'cleave'),
+            contactDepth: Math.hypot(e.x - p.x, e.y - p.y) / Math.max(1, reach.radius),
+          })
+          resolveWeaponOnHit(world, e, s.heavy, brandBefore, toward, p.swingId)
         }
       }
       for (const b of world.projectiles) {
         if (!b.active || b.team !== 0) continue
-        if (arcHits(p.x, p.y, mid, reach.radius, spanDeg, b.x, b.y, b.radius)) {
+        if (arcHits(p.x, p.y, mid, reach.radius, spanDeg, b.x, b.y, b.radius)
+          && hasLineOfSight(world.arena, p.x, p.y, b.x, b.y)) {
+          p.bladeActionConnected = true
           // Punish the caster that owns this bolt here and now. Deferring it until the caster next
           // runs needs the news to survive as world state, which cannot represent two bolts cut on
           // one tick and goes stale when a hub return recycles projectile ids.
@@ -221,6 +267,9 @@ export function updatePlayer(world: World, input: InputFrame): void {
       }
     }
   }
+  // Age the opening after transitions so all twenty advertised player-clock ticks are actionable.
+  // Hit-stop never reaches updatePlayer and therefore never consumes one.
+  if (p.reversalTicks > 0) p.reversalTicks--
 }
 
 // A cut bolt costs its caster: it is dragged toward the cut and opened up. Only the owner pays, and
@@ -229,41 +278,67 @@ function punishBoltOwner(world: World, boltId: number, cx: number, cy: number): 
   for (const e of world.enemies) {
     if (!e.active || e.state === 'dead' || e.targetX !== boltId) continue
     e.targetX = 0
-    backlash(world, e, cx, cy)
+    backlash(world, e, cx, cy, world.player.swingId)
     return
   }
 }
 
-// Did the swing now in flight touch anything? Enemies stamp the swing id they were last hit by, and
-// swing ids are never reused, so this needs no extra player state.
-function swingConnected(world: World): boolean {
-  const id = world.player.swingId
-  for (const e of world.enemies) if (e.lastHitSwingId === id) return true
-  return false
-}
-
 function startDodge(world: World): void {
   const p = world.player
+  // Cancelling a Reversal draw is a choice too; it cannot preserve the slow world for a free escape.
+  if (p.state === 'attack' && p.reversalActionId === p.swingId) {
+    clearBulletTime(world)
+    p.reversalActionId = -1
+  }
   p.state = 'dodge'; p.stateTick = 0; p.dodgeTick = 0; p.dodgeQueuedAt = -1; p.dodgeRead = 0
+  // Choosing another escape relinquishes the opening earned by the previous read.
+  p.reversalTicks = 0
+  p.bladeActionConnected = false
   if (Math.abs(p.dodgeDirX) > 0.2) p.facing = p.dodgeDirX >= 0 ? 1 : -1   // head-first along the roll
   // the direction was latched at the press (capturePlayerInput) and is never re-read here
   world.emit({ type: 'dodge', x: p.x, y: p.y, angle: Math.atan2(p.dodgeDirY, p.dodgeDirX) })
 }
 
 function beginAttack(world: World): void {
+  const p = world.player
+  if (!p.armed) return
+  const reversal = p.reversalTicks > 0
   if (armOf(world) === ARM.bow) startDraw(world)
   else startSwing(world, 0)
+  if (reversal) {
+    p.reversalTicks = 0
+    p.reversalActionId = p.swingId
+    // The dodge created the breath; the follow-up belongs to the player. The live blade/loosed
+    // arrow closes it, so startup remains a legible setup rather than a hidden fixed combo script.
+    world.emit({
+      type: 'reversal', x: p.x, y: p.y, angle: p.swingAngle, actionId: p.swingId,
+      weapon: armOf(world) === ARM.bow ? 'bow' : 'blade',
+    })
+  }
 }
 
 function startSwing(world: World, index: number): void {
   const p = world.player
   p.state = 'attack'; p.stateTick = 0; p.attackQueuedAt = -1
   p.swingIndex = index
+  p.bladeActionConnected = false
   p.swingAngle = p.aimAngle
   p.swingId = ++world.swingCounter
   p.facing = Math.cos(p.swingAngle) >= 0 ? 1 : -1
   const s = tuning.player.attack.swings[index]
   world.emit({ type: 'swing', x: p.x, y: p.y, angle: p.swingAngle, swing: index, heavy: s.heavy })
+}
+
+function endDodgeTravelAtWall(world: World): void {
+  const p = world.player
+  const d = tuning.player.dodge
+  // Preserve an overlaid attack's independent clock. A plain roll jumps onto the same authored
+  // landing timeline it would have reached after full travel; either way its safety ends now.
+  p.dodgeTick = d.travel
+  if (p.state === 'dodge') p.stateTick = Math.max(p.stateTick, d.travel)
+  const angle = Math.atan2(p.dodgeDirY, p.dodgeDirX)
+  world.emit({ type: 'dodgeWall', x: p.x, y: p.y, angle })
+  world.emit({ type: 'dodgeEnd', x: p.x, y: p.y })
 }
 
 function aimAssist(world: World, angle: number): number {

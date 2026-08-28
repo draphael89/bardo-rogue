@@ -5,7 +5,14 @@ import { bindSheet, validateSheetDef, type Sheet, type SheetDef } from './sheet'
 TextureSource.defaultOptions.scaleMode = 'nearest'
 
 /** Authored sheets, each a PNG plus the JSON sidecar that names its frames. */
-const SHEETS = ['bardo_hero', 'bardo_brute'] as const
+const SHEETS = [
+  'bardo_hero',
+  'bardo_hero_north',
+  'bardo_hero_north_roll',
+  'bardo_hero_south',
+  'bardo_hero_south_roll',
+  'bardo_brute',
+] as const
 export type SheetName = (typeof SHEETS)[number]
 
 export interface Atlas {
@@ -60,7 +67,6 @@ export async function loadAtlas(manifest: Record<string, string[]>): Promise<Atl
     return out
   }
   const tinyWhite = whiteSheet(tiny)
-
   const sheets = new Map<string, Sheet>()
   await Promise.all(SHEETS.map(async name => {
     const [tex, def] = await Promise.all([

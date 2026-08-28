@@ -28,6 +28,21 @@ async function boot() {
   const mute = q.get('mute') === '1'
   const botName = q.get('bot') as BotName | null
 
+  // Widen the render target to the window's aspect before anything reads it, so the room is not
+  // letterboxed into the middle third of a wide monitor. HEIGHT NEVER CHANGES: sprite scale, the
+  // 16px grid and every tuned distance stay exactly as authored; only how much void you see to the
+  // left and right moves. Snapped to 16 so the tile grid still lands on whole tiles, and floored at
+  // 480 so the HUD never has less room than it was laid out for.
+  // A 16:9 window computes to exactly 480, and tools/shot.ts opens a 1920x1080 viewport, so every
+  // pinned evidence crop and every gauntlet protocol keeps its coordinates. `?view=480` forces it.
+  const viewOverride = +(q.get('view') ?? 0)
+  if (viewOverride >= 480) tuning.view.width = Math.round(viewOverride / 16) * 16
+  else {
+    const aspect = window.innerWidth / Math.max(1, window.innerHeight)
+    const want = Math.round((tuning.view.height * aspect) / 16) * 16
+    tuning.view.width = Math.max(480, Math.min(768, want))
+  }
+
   const manifest = await (await fetch('/assets/manifest.json')).json() as Record<string, string[]>
   await loadFonts()
   const ra = await createRenderApp(document.getElementById('app')!, { w: ARENA_COLS * TILE, h: ARENA_ROWS * TILE })

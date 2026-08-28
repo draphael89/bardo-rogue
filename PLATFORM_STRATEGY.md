@@ -1,556 +1,467 @@
-# Bardo Rogue — Platform Strategy: Web-First Development, Native Mac Distribution
+# Bardo Rogue — Platform Strategy (v2, synthesized)
 
-Evaluated 2026-08-28 against commit `4d44311`. Every claim below about the current repository was
-verified against the tree, the test suite, a headless sim benchmark, and a production build — not
-assumed from the stack names.
+This is the merged best-of-breed plan from two independent evaluations of this repository:
 
-**The verdict, up front:** keep the browser as the primary and only day-to-day development target,
-and add a ~2-file Electron shell as a *validation and distribution* target, introduced behind a
-platform seam the codebase has already half-built (`StorageLike` in `src/sim/storage.ts`). Electron
-wins not because it is fashionable but because it is the only desktop option whose runtime is the
-*same browser engine the entire test harness already runs on*, which means the deterministic replay
-hashes, the Playwright screenshot tooling, and `window.__game` carry into the packaged app
-unchanged. Its costs (download size, RAM) land on dimensions Bardo does not care about; every
-alternative's costs land on the dimensions Bardo cares about most (testing, agent iteration, one
-engine everywhere).
+- **Evaluation A** (this branch's first commit): ran against HEAD `4d44311` — 184 tests, measured
+  15.6 µs/tick headless, 844 KB shipped JS, found the existing `StorageLike` seam and
+  `session.ts` run/meta boundary.
+- **Evaluation B** (external): ran against the older `1ef5b18` — 110 tests, 4–59 µs/tick,
+  and contributed the deepest save-model, security, and Steam-operations thinking.
+
+Both, with different scoring weights, produced the **identical ranking**: Electron > Tauri 2 >
+installed PWA > custom Swift/WKWebView host > engine migration. That agreement across two
+independent weightings is the strongest signal in either document: the decision is robust to how
+you weight the criteria. This document keeps A's evidence (it reflects the tree that exists) and
+folds in B's superior save architecture, security posture, build-defect finding, and Steam
+operational detail. Facts the two evaluations disputed were re-verified against HEAD and, where
+needed, primary sources; the adjudications are inlined where they matter.
+
+**The verdict:** the browser remains the primary development target; Electron becomes the
+packaged player product and release-validation target, behind a small platform seam. Apple
+Silicon macOS only at first. Tauri is the named, measured fallback if Chromium overhead ever
+becomes material — not the default.
 
 ---
 
-## A. Current Platform Architecture
+## A. Current Platform Architecture (HEAD `4d44311`)
 
-What Bardo actually is today:
-
-- **Runtime:** PixiJS v8.20 on WebGL (`preference: 'webgl'`, antialias off, Pixi ticker disabled —
-  the game owns its frame). Everything renders into a 480×270 `RenderTexture`, blitted at integer
-  physical-pixel scale. One dependency in the shipping bundle: `pixi.js`.
-- **Simulation:** `src/sim/` (~3,700 LOC) is pure TypeScript — no DOM, no Pixi, no `Math.random`,
-  no `Date`. Fixed 60 Hz step (`src/loop.ts`, accumulator with a 5-step catch-up cap and render
-  interpolation). Deterministic given `(seed, scenario, InputFrame[])`; FNV state hashes are pinned
-  in `tests/sim/replay.test.ts` and must match between Node and the browser.
-- **Presentation:** `src/render/` + `src/audio/` (raw Web Audio) read sim state and `world.events`,
-  never mutate. All numbers in `src/tuning.ts`.
-- **Input:** keyboard, mouse, **and gamepad** already funnel into one quantized `InputFrame` per
-  tick (`src/input/index.ts` — Gamepad API with edge detection). Fullscreen already wired (F key,
-  Fullscreen API). Focus-loss clears latched input.
-- **Persistence:** `src/sim/storage.ts` defines a `StorageLike` interface (get/set/removeItem) with
-  versioned, defensively-parsed schemas (`MetaStateV1`, `SettingsStateV1`). `src/main.ts` injects
-  `localStorage` as the adapter. The sim never touches a browser storage API directly. **The
-  "Game Save Model → Persistence Interface → Platform Adapter" architecture the addendum asks for
-  already exists in embryo.** Replays even embed meta so loop replays are hermetic.
-- **Harness:** `window.__game` (step/reset/setInput/bot/state/hash/frameStats/record/replay), URL
-  params, five bots, RLE replay format, `pnpm sim` (headless Node), `pnpm shot`/`pnpm poses`
-  (Playwright + Chromium + SwiftShader), gauntlet loop with evidence protocol. 184 Vitest tests in
-  ~4.3 s; `tsc --noEmit` clean.
-- **Payload (measured, this commit):** production JS **844 KB** across 14 chunks (almost all Pixi),
-  game assets **1.7 MB** (1.3 MB of it audio). The whole shippable game is ~2.5 MB. The 131 MB
-  `dist/` is an artifact of `public/progress/` (the 125 MB gauntlet evidence journal) being copied
-  into the build; it is dev-only and would be excluded from any player build.
-- **No CI, no backend, no accounts, no network calls at runtime** beyond fetching its own assets.
+- **Runtime:** PixiJS v8.20 on WebGL (`preference: 'webgl'`, antialias off, Pixi ticker
+  disabled — the game owns its frame). 480×270 `RenderTexture`, integer-scaled blit. One
+  production dependency: `pixi.js`. TypeScript 5.9 strict, Vite 8, pnpm.
+- **Simulation:** `src/sim/` (~3,700 LOC) — no DOM, no Pixi, no `Math.random`, no `Date`.
+  Fixed 60 Hz step with interpolation and a 5-step catch-up cap. Deterministic given
+  `(seed, scenario, InputFrame[])`; FNV hashes pinned in `tests/sim/replay.test.ts` must match
+  Node and browser. Entity pools capped at `MAX_ENEMIES = 32`, `MAX_PROJECTILES = 64`
+  (`src/sim/world.ts:77`).
+- **Run/meta boundary (exists — B evaluated a tree that predated it):** `src/sim/session.ts`
+  defines `GameSessionState { meta, preparedWeapon, run: RunState | null }`; `RunState` carries
+  seed, weapon, boon stacks, hp/maxHp, depth, roomId, room history, pending reward, result.
+  `MetaStateV1` is a versioned schema.
+- **Persistence (exists in embryo):** `src/sim/storage.ts` — `StorageLike` interface, versioned
+  defensively-parsed `MetaStateV1`/`SettingsStateV1`, corruption falls back to defaults;
+  `main.ts` injects `localStorage` and autosaves meta on `runStarted`/`runWon`/`returned`
+  events. The sim never touches a browser storage API. What does *not* exist: a run
+  checkpoint (save-and-quit mid-run), profiles, a content-revision field, backups, or any
+  non-browser adapter.
+- **Input:** keyboard, mouse, and Gamepad API already converge into one quantized `InputFrame`
+  per tick with edge detection and focus-loss clearing. Missing (backlog, not architecture):
+  rebinding, per-device glyphs, rumble, controller-first menus, Steam Input action sets.
+- **Harness:** `window.__game` (step/reset/setInput/bot/state/hash/frameStats/record/replay),
+  URL params, five bots, RLE replays, `pnpm sim` (headless Node), `pnpm shot`/`pnpm poses`
+  (Playwright Chromium + SwiftShader), gauntlet evidence loop. 184 Vitest tests in ~4 s.
+- **Payload:** production JS 844 KB across 14 chunks (almost all Pixi); runtime assets 1.7 MB
+  (1.3 MB audio). The whole shippable game is ~2.5 MB.
+- **What does not exist:** a desktop runtime, packaging, signing/notarization, updates,
+  Steamworks, a packaged-build smoke suite, WebKit runtime proof, a release asset boundary.
 
 ## B. Current Constraints — Real vs. Hypothetical
 
-Measured on this container (no GPU, software rendering available to Playwright via SwiftShader):
+Adjudicated and re-verified at HEAD. Four real constraints; none is performance-of-the-runtime,
+and **none is fixed by going native**.
 
-| Question | Answer | Evidence |
-| --- | --- | --- |
-| CPU / sim bound? | **No, by ~3 orders of magnitude.** | `pnpm sim --scenario full --bot kite`: **avg 15.6 µs per tick** (max spike 1,051 µs incl. JIT warm-up) against a 16,667 µs budget — ~0.1% of frame. Two full runs simulate in 1.2 s wall including Node startup. |
-| GPU / draw-call bound? | No. 480×270 target, a few dozen pooled sprites, particles, a handful of filters, one RT blit. **SwiftShader (software GL) renders it** — that is the whole screenshot harness. | `tools/shot.ts` launches Chromium with `--use-angle=swiftshader`. |
-| JS-main-thread bound? | No. Sim + render share the thread with enormous headroom; the loop's own `frameStats()` p50/p95 gates in the gauntlet are the watchdog. | `src/loop.ts`, `HARNESS.md` |
-| Asset-loading bound? | No. 1.7 MB total; audio deliberately not awaited at boot. | `src/main.ts:49` |
-| Memory bound? | No. Pooled entities, no per-tick allocation in sim (project rule). | `CLAUDE.md` |
-| Physics / networking? | None exist. | — |
+1. **Save durability.** Meta progression lives in `localStorage`, which browsers may evict
+   (Safari ITP's 7-day cap for infrequently visited origins; user-cleared site data; private
+   windows). For a game whose promise is "what you earned stays," this is the top platform
+   weakness. Fix: persistence hint + export/import now; filesystem saves on desktop.
+2. **Key ownership and app identity.** Browser fullscreen surrenders Escape (the pause key);
+   Cmd+W can kill a run; there is no double-clickable artifact and no Steam path. Only a shell
+   fixes these.
+3. **Release-build asset boundary (defect, verified).** `public/progress/` — the gauntlet
+   evidence journal, including an 83 MB `reference-official.mp4` — is copied wholesale into
+   `dist/` (125 MB of a 131 MB build). Any packaged build made from `dist/` today would ship
+   internal audit evidence. Must be fixed before any desktop host exists.
+4. **Watchlist, not yet a constraint: projectile presentation.** Verified at HEAD: the presenter
+   resolves several projectile views via linear `w.projectiles.find(...)` scans per frame
+   (`src/render/presenter.ts:695–721`), and an earlier controlled audit measured ~408 GL draw
+   calls at 200 synthetic projectiles (`AUDIT_REPORT.md`) against a production cap of 64. Ample
+   headroom today; the first *real* performance work as bullet density grows toward the
+   Gungeon bar will be **batching and lookup structure in the presenter** — TypeScript work on
+   shared code, which no packaging choice affects and no native rewrite is needed for.
 
-Scaling to the full VISION.md ambition (Hades-structure × Gungeon-density: multiple realms,
-bullet patterns, hundreds of projectiles) multiplies the sim workload perhaps 50–100×. That is
-still ~1–2 ms per tick — comfortable. The resolution is fixed at 480×270 by art direction, so GPU
-load barely grows. **No credible version of this game is performance-constrained on a browser
-runtime, and any option scored below gets zero credit for "native is faster."**
+Measured headroom everywhere else: sim at **15.6 µs/tick avg** (~0.1% of the 16.67 ms budget;
+consistent with B's 4–59 µs range on the older tree); SwiftShader software GL renders the game
+(that *is* the screenshot harness); assets 1.7 MB, loaded without blocking boot. GPU-bound has
+not been established and nothing suggests it; JS-main-thread, memory, physics, network: not
+constraints. Scaling to full VISION.md ambition multiplies sim cost perhaps 50–100× — still
+~1–2 ms/tick.
 
-The constraints that are *real* today are not performance:
+## C. The Five Credible Options (reconciled scores)
 
-1. **Save durability.** Meta progression lives in `localStorage`. Browsers may evict it (Safari's
-   ITP caps script-writable storage at 7 days for infrequently-visited origins; users clear site
-   data; private windows). For a roguelike whose core promise is "what you rescued, unlocked, and
-   learned stays with you," this is the single genuine platform weakness in the current
-   architecture.
-2. **Browser chrome vs. game input.** In browser fullscreen, **Escape exits fullscreen** — but
-   Escape is the game's pause key. Cmd+W closes the tab mid-run. F-keys, pinch-zoom, and the
-   address bar all leak through. A browser tab cannot fully own its keys; a desktop window can.
-3. **No app identity or distribution artifact.** Nothing a tester double-clicks; no Steam path.
-4. **Steam overlay/cloud/achievements** obviously require a packaged build eventually.
+Same five strategies in both evaluations; variations were collapsed (NW.js→Electron;
+Neutralino/Wails→Tauri). Both evaluations ranked them in this order; scores below are the
+reconciled synthesis (A scored 88/72/62/58/24; B scored 93/91/89/83/63 — B's compression
+understated gaps its own prose asserted, A's Tauri testing penalty was partly stale; details
+inline).
 
-Everything else — latency, frame pacing, rendering ceiling, audio — is hypothetical at this
-game's workload and stays hypothetical at the full vision's workload.
+### 1. Electron desktop host — 90/100 (winner)
 
----
+The existing Vite output inside a sandboxed `BrowserWindow`; a narrow preload bridge for
+filesystem persistence and lifecycle; electron-builder (or Forge — keep it minimal either way)
+produces a signed, notarized arm64 dmg/zip. Game code byte-identical to the web build.
 
-## C. The Five Credible Options
+- **Why it wins here specifically:** it ships the *same engine the entire harness already
+  certifies* (Chromium — `tools/shot.ts`, pinned replay hashes, `frameStats` gates), and
+  Playwright drives Electron with the same page object, so the desktop smoke tier is a ~50-line
+  variant of an existing tool asserting `__game.hash()` parity against `pnpm sim`. (Playwright's
+  Electron support is formally labeled experimental; the surface Bardo needs — launch, page
+  eval — is its stable core.) All shell code is TypeScript; agents never leave the language.
+  Dev mode loads `:5173`, so the shell itself gets HMR.
+- **Packaging correction (from B, verified):** `main.ts` fetches `/assets/manifest.json` and
+  the app assumes a real origin (also for storage semantics). A packaged build must serve
+  `dist/` through a custom application protocol (e.g. `app://bardo/` via `protocol.handle`) —
+  not `file://`. This is the one non-obvious integration task.
+- **Security posture (from B):** `sandbox: true`, `contextIsolation: true`,
+  `nodeIntegration: false`; preload exposes a *named, minimal* API (`window.bardoDesktop`),
+  never generic fs/shell; the smoke tier audits the exposed surface.
+- **Costs:** ~120 MB download, ~250 MB RAM — irrelevant on an Apple Silicon MacBook Pro and on
+  Steam; Chromium update cadence (you pin and upgrade on your schedule — which *removes* the
+  risk of a user's browser update breaking the shipped game); notarization paperwork.
+- **Steam:** the proven path for web-tech games (`steamworks.js`; Vampire Survivors precedent).
+  Overlay needs the known `in-process-gpu` switch and macOS overlay is weak platform-wide —
+  treat as runtime-proof, not assumption. Same shell later ships Windows/Linux with **one**
+  engine to QA.
 
-Technologies that are variations of one strategy were collapsed: NW.js and Electron are the same
-strategy (bundled Chromium); Neutralino/Wails/Capacitor-desktop and Tauri are the same strategy
-(OS WebView shell). What remains is five genuinely distinct strategies.
+### 2. Tauri 2 host — 76/100 (named fallback)
 
-### Option 1 — Pure Web, Polished (installable PWA, no native shell)
+Same thin-shell strategy; Rust host, WKWebView on macOS, ~15 MB app, lower RAM.
 
-**What it is.** Ship the game as a website. Add a manifest + service worker so it installs as a
-dock icon with its own window; use `navigator.storage.persist()` and save export/import to shore
-up persistence. No packaging at all.
+- **Testing, adjudicated against current Tauri docs:** `tauri-driver` does **not** support
+  macOS ("macOS has no WKWebView driver tool available" — Tauri's own docs). The documented
+  macOS path is WebdriverIO with an embedded WebDriver server inside the app (or a paid
+  CrabNebula fork). So macOS automation *exists* but means adopting a second E2E toolchain and
+  embedding a driver, with none of `tools/shot.ts` reused — materially worse than "same
+  Playwright object," materially better than "impossible."
+- The structural costs stand: the packaged player runs an engine (WebKit) nothing in the repo
+  has ever tested; Rust/Cargo enters an all-TypeScript repo; debugging crosses JS/IPC/Rust;
+  cross-platform later means three engines (WKWebView/WebView2/WebKitGTK) versioned by the
+  user's OS. Its advantages (size, RAM) are worth ~nothing to this game.
+- **Kept as the measured fallback:** if packaged Chromium overhead ever becomes material on the
+  target machine (measure at Phase 7), the platform seam is the migration path and the game
+  never knows.
 
-**Fit to the repo.** Zero change. The current architecture *is* this option.
+### 3. Installed web app / PWA — 65/100 as the end-state; kept forever as the surface
 
-**Workflow.** Unchanged: edit → Vite HMR → harness. Nothing added, ever.
+Manifest + service worker + installable Dock app; `navigator.storage.persist()`; export/import.
+Perfect on every development dimension — which is why it survives *inside* the recommendation
+as the permanent primary target — but as the final architecture it cannot deliver durable
+file-backed saves, key ownership, crash reporting, controlled runtime versions, or any Steam
+path. (B scored it 89 while concluding "do not treat it as the final desktop architecture";
+the score here matches that conclusion rather than contradicting it.)
 
-**Runtime.** The user's browser (or its PWA window — same engine, slightly less chrome).
+### 4. Custom Swift/AppKit WKWebView host — 60/100
 
-**Saves.** localStorage/IndexedDB + `persist()` (a *request*, not a guarantee) + manual export
-files as the real backup. Eviction risk reduced, not eliminated.
+Maximum native polish and the only Mac App Store route; but a hand-maintained second codebase
+in a second language, the same WKWebView divergence and automation gap as Tauri with less
+ecosystem leverage, a fully bespoke Steamworks bridge, and a shell that contributes nothing
+when Windows arrives. Justified only by unusual macOS-specific needs that do not exist.
 
-**Testing.** Exactly today's three tiers minus tier 3 (there is no package to smoke-test).
+### 5. Engine migration (Godot/Unity/native) — 30/100
 
-**Performance.** Identical to today. Fine.
+Rewrites presentation, harness, and tooling to solve a performance problem that measurably does
+not exist (see B: the credible bottleneck is presenter batching — shared TypeScript). Rejected.
+Its one legitimate future use: if a console deal ever exists, the deterministic sim + pinned
+replay corpus is the port's executable specification — an option preserved by doing nothing.
 
-**Native experience.** A PWA window is better than a tab but still cannot own Escape in
-fullscreen, has no menu bar identity, no filesystem saves, no Steam. The "beautiful dedicated Mac
-app" goal is simply not reachable here.
+## D. Comparison Matrix (synthesized)
 
-**Steam.** None. Steam requires a shipped binary; adopting one later means starting Option 2/3
-from scratch anyway (cheap, but this option contributes nothing toward it).
+0–100 per dimension. Overall is judgment-weighted to Bardo's priorities (High ≈ 3×: agility,
+agent-friendliness, shared code, testing, debuggability; Medium-High ≈ 2×: performance;
+Medium ≈ 1×: the rest), sanity-checked against B's explicit numeric weighting — both weightings
+produce the same ranking.
 
-**Risks.** Save eviction stories from real players; the game permanently reads as "a web page."
-
-**Score: 62.** Perfect on every high-weight development dimension (100s across agility, agent
-fit, unification, testing, debuggability), but it forfeits the entire second layer of the
-strategy: no durable saves, no app identity, no Steam. It is not really a competitor — it is the
-baseline that the winning option must preserve. It survives in the recommendation as "the browser
-remains the primary target"; it just can't be the *whole* answer.
-
-### Option 2 — Electron Shell (bundled Chromium desktop runtime)
-
-**What it is.** A `desktop/` folder containing a main process (~60 lines: create a
-`BrowserWindow`, load the game, wire menus/fullscreen/quit-confirm) and a preload script (~40
-lines: expose a filesystem-backed `StorageLike` over `contextBridge`). electron-builder produces a
-signed, notarized `.dmg`/`.zip`. The game code is byte-identical to the web build.
-
-**Fit to the repo.** Surgical. `src/main.ts` already injects storage; the only game-side change is
-a `src/platform/` seam that picks "browser adapter" or "desktop adapter injected by preload" at
-boot. The sim is untouched, so **every pinned replay hash stays valid**. In dev, the Electron
-window can simply load `http://localhost:5173` — the shell itself gets Vite HMR for free.
-
-**What changes.** Added: `src/platform/` (~100 LOC), `desktop/` (~150 LOC + config), two pnpm
-scripts, one smoke-test tool. Removed/reorganized: nothing.
-
-**Workflow.** *Agent changes combat code → browser hot reload → `pnpm shot`/`pnpm sim` validate →
-commit.* The desktop shell is touched only when shell code changes or before a release:
-`pnpm desktop:dev` to eyeball it, `pnpm smoke:desktop` in release prep. Packaging never enters the
-inner loop.
-
-**Runtime.** Chromium (the exact engine family `tools/shot.ts` already tests against) + a Node
-main process that does nothing but window/menu/fs. All gameplay stays in the renderer, i.e., in
-the same code the browser runs.
-
-**Saves.** Preload adapter: reads the save dir into memory at boot, write-through with atomic
-temp-file-rename plus one rolling `.bak`, under `~/Library/Application Support/Bardo Rogue/`.
-Same versioned JSON documents `storage.ts` already defines. Browser keeps localStorage. Steam
-Cloud later points at the same directory — zero code.
-
-**Testing.** The decisive advantage: **Playwright drives Electron natively**
-(`_electron.launch()`), and the page object it returns is the same API `tools/shot.ts` uses. The
-tier-3 smoke test is ~50 lines: launch packaged app → `waitForFunction(!!window.__game)` →
-stepwise 300 ticks → **compare `__game.hash()` against `pnpm sim` for the same seed** → screenshot
-→ save write/read/corrupt-recovery roundtrip → fullscreen toggle. Same engine means the hash
-parity check is *expected* to pass, not hoped.
-
-**Performance.** ~120 MB download, ~250 MB RAM — the two costs, and both are irrelevant for a
-desktop game on an Apple Silicon MacBook Pro (Steam builds routinely run 1–100 GB). Frame pacing,
-WebGL path, Web Audio, Gamepad API: identical to the tested browser. Native arm64 Electron builds
-exist; ProMotion is handled by the existing interpolating loop.
-
-**Native experience.** Real app icon, Dock presence, menu bar, native fullscreen that does *not*
-surrender Escape, Cmd+W/Cmd+Q interception with "abandon run?" confirm, windowed/fullscreen
-persistence, files on disk. Chromium mediates the window, but for a game that owns its whole
-canvas, the player cannot tell.
-
-**Steam.** The most-proven path for web-tech games (Vampire Survivors shipped its early Steam
-success on exactly this stack). `steamworks.js` gives achievements/cloud/rich presence from the
-main process; achievements can be driven by the existing `world.events` stream through a thin
-adapter. Overlay on macOS needs the known `in-process-gpu` switch and is the weakest point — but
-Steam's macOS overlay is broadly weak, and overlay is cosmetic for this game. Windows/Linux later:
-same shell, same engine, add builder targets.
-
-**Risks.** Chromium/Electron version churn (mitigate: pin the version, upgrade on your schedule —
-you ship the browser, so a Safari update can never break the shipped game, which is a *reduction*
-in platform risk vs. Options 1/3/4); download-size sneers (irrelevant to Steam); signing/notarization
-friction at release time (one-time setup, Developer ID cert).
-
-**Score: 88.** Highest combined value on exactly the dimensions weighted highest: it preserves
-the browser loop untouched, keeps one TypeScript codebase agents already navigate, reuses the
-harness down to the hash check, and buys durable saves + app identity + the proven Steam route.
-Its real costs are on dimensions this project explicitly does not care about.
-
-### Option 3 — Tauri 2 (Rust host + OS WebView: WKWebView on macOS)
-
-**What it is.** Same "thin shell over the existing web build" strategy, but the shell is a small
-Rust binary and the engine is the OS's WebView. ~15 MB app, ~half the RAM of Electron.
-
-**Fit to the repo.** Game-side, identical to Option 2 (same `src/platform/` seam; the storage
-adapter calls Tauri's fs plugin over IPC). Shell-side, it adds a `src-tauri/` Rust crate, Cargo,
-and rustc to the toolchain.
-
-**Workflow.** Browser stays primary; `tauri dev` also gets Vite HMR. Day-to-day nearly as good as
-Option 2 — until something breaks at the shell boundary, and then the error is in Rust, in a
-second toolchain, in a WebView that is *not* the engine anything else in the repo tests.
-
-**Runtime.** WKWebView (Safari's engine) on macOS, WebView2 (Chromium) on Windows, WebKitGTK on
-Linux — **three engines across the eventual Steam matrix**, versioned by the *user's OS*, not by
-you. Bardo's WebGL/Web Audio/Gamepad usage is standard and would very likely work in WKWebView on
-a modern Mac — but "very likely" now needs its own QA lane, and historical WKWebView gamepad and
-fullscreen quirks are exactly the papercut class this game is trying to shed.
-
-**Saves.** Fine — fs plugin, same JSON, same directory. Equivalent to Electron here.
-
-**Testing.** The disqualifying weakness. Playwright cannot drive WKWebView, and **`tauri-driver`
-(Tauri's WebDriver bridge) does not support macOS** — the one platform this strategy targets
-first. Tier-3 smoke testing becomes bespoke: AppleScript/screenshot heuristics or a hand-rolled
-debug channel. The hash-parity check against the headless sim — the spine of the whole
-verification culture — has no off-the-shelf transport into the packaged app. For a human-driven
-project this is an annoyance; for an agent-driven project it removes the agents' eyes on the
-target that ships.
-
-**Performance.** Excellent; WKWebView WebGL rides ANGLE-on-Metal. Startup and RAM beat Electron.
-None of that headroom is needed (see B).
-
-**Native experience.** Slightly better than Electron (real native menus for free, smaller
-footprint). Marginal for a fullscreen game.
-
-**Steam.** Possible (`steamworks-rs`), thinner precedent, overlay effectively unavailable in
-WKWebView, and the three-engine matrix arrives exactly when Steam adds Windows/Linux.
-
-**Risks.** Rust enters an all-TypeScript repo agents currently navigate end-to-end; Safari-engine
-divergence from every existing test artifact; macOS test-automation gap.
-
-**Score: 72.** A genuinely good technology whose advantages (binary size, RAM) are worth ~nothing
-to Bardo, and whose costs (second language, second browser engine, no macOS automation) hit the
-three highest-weighted dimensions. If Bardo were a note-taking utility, Tauri would win. It is not.
-
-### Option 4 — Hand-Rolled Native macOS Host (Swift/AppKit + WKWebView)
-
-**What it is.** A small Xcode project: `NSWindow` + `WKWebView` loading the built game, Swift
-`WKScriptMessageHandler` bridge for saves, hand-written menus/fullscreen/lifecycle. The
-maximum-craft, maximum-ownership version of Option 3, with Mac App Store as a bonus path.
-
-**Fit / changes.** Game side identical (platform seam). Shell side: a Swift codebase, Xcode
-project files, code-signing config — all maintained by hand, no ecosystem doing the
-window/update/packaging chores Tauri and electron-builder do.
-
-**Workflow.** Browser primary as ever; shell iteration means Xcode builds. Agents can write
-Swift, but the build/debug/sign loop lives outside the repo's tooling and outside Playwright's
-reach.
-
-**Testing.** Same WKWebView automation hole as Tauri, minus even `tauri-driver`'s
-other-platform story. XCUITest could poke at the window; nothing reuses the harness.
-
-**Native UX.** The best of all options — genuinely first-class macOS citizenship, and the only
-route to the Mac App Store if that ever mattered. For a fullscreen pixel-art game, the delta over
-Electron is menus and sentiment.
-
-**Steam.** Worst path: every Steamworks call hand-bridged from Swift, and the shell contributes
-nothing when Windows arrives — you would build Option 2 or 3 *then anyway*.
-
-**Score: 58.** Beautiful, educational, and a strategic dead end: highest polish ceiling, lowest
-leverage, and it dead-ends at the macOS border while consuming shell-maintenance effort the
-2-file Electron main process never asks for.
-
-### Option 5 — Runtime/Engine Migration (port to Godot/Unity, or native renderer + ported sim)
-
-**What it is.** The "if the evidence strongly supports it" option: move the game off the web
-runtime — either wholesale into a game engine, or keep the TS sim as spec and re-implement
-sim + renderer natively.
-
-**Fit to the repo.** It doesn't fit; it replaces. The pure-TS sim is the one portable piece
-(deterministic, no DOM — it could be transliterated, and `tuning.ts` + the replay corpus would be
-the acceptance spec, which is a genuinely unusual asset for a future port). Renderer, audio,
-input, harness, gauntlet, `window.__game`, Playwright tooling: all rebuilt from zero.
-
-**Workflow.** The browser-hot-reload/agent/harness loop — the stated reason the project is
-web-first — is destroyed and must be reinvented inside an engine editor.
-
-**What it buys.** The only option that reaches consoles, and effortless Steam. Both are
-irrelevant to shipping a fun vertical slice this year, and B shows the performance motive is
-absent at any plausible scale of this game.
-
-**Score: 24.** Not a serious candidate today. Its one legitimate future use: *if* Bardo someday
-signs a console deal, the deterministic sim + pinned replays become the port's executable spec.
-That optionality exists precisely because the current architecture is disciplined — and requires
-no action now to preserve.
-
----
-
-## D. Weighted Comparison Matrix
-
-Scores are 0–100 per dimension. The **Overall** row is *judgment-weighted to Bardo's stated
-priorities* (High ≈ 3×: agility, agent-friendliness, shared code, testing, debuggability;
-Medium-High ≈ 2×: performance; Medium ≈ 1×: the rest) — not an arithmetic mean, and sanity-checked
-against the weighted average rather than derived from it.
-
-| Dimension (weight) | 1 Pure Web/PWA | **2 Electron** | 3 Tauri 2 | 4 Swift/WKWebView | 5 Engine Migration |
+| Dimension (weight) | **Electron** | Tauri 2 | PWA | Swift host | Migration |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Development agility (H) | 100 | **95** | 90 | 85 | 20 |
-| AI-agent friendliness (H) | 100 | **95** | 70 | 55 | 35 |
-| Shared code / unity (H) | 100 | **98** | 95 | 92 | 15 |
-| Testing harness compat (H) | 100 | **95** | 60 | 50 | 15 |
-| Debuggability (H) | 100 | **95** | 70 | 60 | 50 |
-| Performance (MH) | 90 | **88** | 88 | 86 | 95 |
-| Visual ceiling (M) | 90 | **90** | 88 | 88 | 95 |
-| Native UX (M) | 25 | **80** | 85 | 92 | 95 |
-| Persistence / saves (M) | 45 | **95** | 90 | 85 | 90 |
-| Local distribution (M) | 65 | **85** | 90 | 75 | 85 |
-| Steam readiness (M) | 5 | **90** | 60 | 35 | 95 |
-| Build/release simplicity (M) | 100 | **70** | 60 | 45 | 40 |
-| Long-term flexibility (M) | 40 | **85** | 75 | 50 | 90 |
-| **Overall (weighted)** | **62** | **88** | **72** | **58** | **24** |
-
-Reading the table honestly: Option 1 wins every development dimension and is therefore *kept* —
-as the primary target inside Option 2, which costs those dimensions almost nothing (the shell is
-additive, optional, and out of the inner loop). Options 3 and 4 trade the highest-weighted
-dimensions for gains in the lowest-weighted ones. Option 5 trades everything for a future that
-isn't being built yet.
+| Development agility (H) | **94** | 90 | 100 | 85 | 30 |
+| AI-agent friendliness (H) | **95** | 75 | 100 | 58 | 40 |
+| Shared code / unity (H) | **98** | 96 | 100 | 94 | 18 |
+| Testing harness compat (H) | **95** | 72 | 100 | 55 | 25 |
+| Debuggability (H) | **96** | 76 | 99 | 65 | 60 |
+| Performance (MH) | **87** | 88 | 89 | 87 | 96 |
+| Visual ceiling (M) | **92** | 90 | 90 | 90 | 96 |
+| Native UX (M) | **84** | 88 | 35 | 95 | 96 |
+| Persistence / saves (M) | **95** | 92 | 55 | 92 | 92 |
+| Local distribution (M) | **87** | 90 | 68 | 77 | 86 |
+| Steam readiness (M) | **89** | 68 | 10 | 50 | 96 |
+| Build/release simplicity (M) | **74** | 65 | 99 | 50 | 40 |
+| Long-term flexibility (M) | **87** | 82 | 55 | 55 | 90 |
+| **Overall** | **90** | **76** | **65** | **60** | **30** |
 
 ## E. Winner
 
-**Electron shell over the unchanged web game, added behind a `src/platform/` seam, with the
-browser remaining the primary development target.** Concretely: Option 2 containing Option 1.
+**Electron as an optional desktop host around the unchanged web game**, behind `src/platform/`,
+Apple Silicon macOS only at first, sandboxed with a minimal preload API and a custom `app://`
+origin for packaged assets. No React, no desktop-specific frontend, no second copy of anything.
+The browser remains the development product; Electron is the packaged player product and a
+release-validation target. Tauri stays on file as the measured fallback.
 
 ## F. Why It Wins
 
-1. **Engine identity is the whole ballgame for this repo.** Bardo's quality culture runs on
-   determinism: pinned replay hashes that must match headless Node and the browser, Playwright
-   screenshots as evidence, `frameStats` gates. Electron is the only desktop runtime where the
-   packaged app is the *same engine* those artifacts already certify. Tauri and Swift ship the
-   game on an engine (WebKit) that nothing in the repo has ever tested, with no macOS automation
-   bridge to start testing it.
-2. **The harness extends instead of forking.** `_electron.launch()` hands back the same Playwright
-   page object `tools/shot.ts` uses; the desktop smoke test is a ~50-line variation on an existing
-   tool, and it can assert sim-hash parity between the packaged app and `pnpm sim` — the strongest
-   possible "packaging did not introduce regressions" check, available on day one.
-3. **Agents stay in one language and one mental model.** The entire surface — game, tools, tests,
-   shell, save adapter — is TypeScript/JavaScript. No Cargo, no Xcode, no cross-language stack
-   traces at 2 a.m.
-4. **It fixes the only real constraints found in B** (save durability, key ownership/app identity,
-   Steam path) **and pays only costs found irrelevant in B** (bundle size, RAM).
-5. **The Steam path is the proven one for exactly this kind of game**, and the same shell carries
-   to Windows/Linux with one engine to QA instead of three.
-6. **It is reversible.** ~250 lines of shell + seam. If a better shell appears in two years, the
-   seam is the migration; the game never knew.
+1. **Engine identity with the certification chain.** Pinned replay hashes, Playwright evidence,
+   and `frameStats` gates all run on Chromium today; Electron is the only shell where the
+   packaged app is that same engine.
+2. **The harness extends instead of forking** — `_electron.launch()` returns the same Playwright
+   page `tools/shot.ts` drives; hash parity between the packaged app and `pnpm sim` is checkable
+   from day one.
+3. **One language.** Game, tools, tests, shell, save adapter: all TypeScript. No Cargo, no
+   Xcode, no cross-language stack traces.
+4. **It fixes exactly the real constraints in B** (durable saves, key ownership/app identity,
+   Steam path) **and pays only costs B shows are irrelevant** (size, RAM).
+5. **Proven Steam path** with the smallest later delta, and one engine across the eventual
+   Windows/Linux matrix instead of three.
+6. **Reversible.** ~250 lines of seam + shell; the seam is also the Tauri migration if
+   measurement ever demands it.
+
+What desktop genuinely unlocks: durable application-data saves with backups; local replay
+archive → deterministic bug reports (seed + inputs = exact repro); crash/error logs outside
+browser storage; app identity and clean fullscreen with owned keys; reproducible pinned runtime;
+controlled offline builds; later Steamworks; optional mod/user-content directories. What it does
+not unlock: combat latency, GPU capacity, frame pacing, audio quality — those were never
+constrained.
 
 ## G. Target Architecture
 
 ```
-                      ┌────────────────────────────────────────────┐
-                      │              BARDO CORE (unchanged)         │
-                      │  src/sim/      pure deterministic sim       │
-                      │  src/render/   Pixi presenter (reads only)  │
-                      │  src/audio/    Web Audio                    │
-                      │  src/input/    kb/mouse/gamepad → InputFrame│
-                      │  src/tuning.ts all numbers                  │
-                      │  save schema:  MetaStateV1, SettingsStateV1 │
-                      │                (versioned JSON, sim-owned)  │
-                      └────────────────────┬───────────────────────┘
-                                           │ consumes
-                      ┌────────────────────▼───────────────────────┐
-                      │        PLATFORM SEAM  src/platform/         │
-                      │  interface Platform {                       │
-                      │    storage: StorageLike     // exists today │
-                      │    persistHint(): void      // best-effort  │
-                      │    fullscreen(on?): void                    │
-                      │    confirmQuitDuringRun: boolean            │
-                      │    archiveReplay?(r: EncodedReplay): void   │
-                      │  }                                          │
-                      │  detect(): window.bardoDesktop ?? webPlatform│
-                      └───────┬─────────────────────────┬──────────┘
-                              │                         │
-        ┌─────────────────────▼──────────┐   ┌──────────▼──────────────────────┐
-        │  WEB HOST (primary, unchanged) │   │  DESKTOP HOST  desktop/          │
-        │  Vite dev @5173 · HMR          │   │  main.ts   BrowserWindow, menu,  │
-        │  localStorage adapter          │   │            fullscreen, quit-guard │
-        │  window.__game · URL params    │   │  preload.ts contextBridge:       │
-        │  pnpm shot/poses/sim · gauntlet│   │    fs StorageLike (atomic+.bak)  │
-        │  Playwright chromium harness   │   │    replay archive dir            │
-        └────────────────────────────────┘   │  electron-builder: dmg/zip,      │
-                                             │    sign + notarize (arm64)       │
-                                             │  dev: loads localhost:5173       │
-                                             │  prod: loads dist/               │
-                                             └──────────┬──────────────────────┘
-                                                        │ same save dir, later
-                                             ┌──────────▼──────────────────────┐
-                                             │  FUTURE STEAM ADAPTER (docs only)│
-                                             │  steamworks.js in main process   │
-                                             │  achievements ← world.events     │
-                                             │  Steam Cloud ← auto-cloud on the │
-                                             │  existing save directory         │
-                                             └─────────────────────────────────┘
+                  ┌─────────────────────────────────────────────────┐
+                  │              BARDO CORE (shared, unchanged)      │
+                  │  src/sim/     deterministic sim, RunState/meta   │
+                  │  src/render/  Pixi presenter (reads only)        │
+                  │  src/audio/   Web Audio   src/input/ InputFrame  │
+                  │  src/tuning.ts            debug API, replays     │
+                  │  save schema: versioned envelope (see H),        │
+                  │  validation + pure migrations in storage.ts      │
+                  └───────────────────────┬─────────────────────────┘
+                                          │
+                  ┌───────────────────────▼─────────────────────────┐
+                  │           PLATFORM SEAM  src/platform/           │
+                  │  interface Platform {                            │
+                  │    saves: SaveStore          // async, see H     │
+                  │    persistHint(): void                           │
+                  │    fullscreen(on?): void                         │
+                  │    confirmQuitDuringRun: boolean                 │
+                  │    archiveReplay?(r: EncodedReplay): void        │
+                  │  }                                               │
+                  │  detect(): window.bardoDesktop ?? webPlatform    │
+                  └──────────┬───────────────────────┬──────────────┘
+                             │                       │
+        ┌────────────────────▼─────────┐  ┌──────────▼───────────────────────┐
+        │ WEB HOST (primary, forever)  │  │ DESKTOP HOST  desktop/            │
+        │ Vite dev @5173 · HMR         │  │ main: sandboxed BrowserWindow,    │
+        │ localStorage SaveStore now;  │  │   app://bardo protocol for dist/, │
+        │ IndexedDB when checkpoints/  │  │   menus, fullscreen, quit-guard   │
+        │ replay archive land          │  │ preload: contextBridge → named    │
+        │ __game · shot/poses/sim ·    │  │   minimal bardoDesktop API only   │
+        │ gauntlet · Playwright        │  │ fs SaveStore (atomic + .bak)      │
+        └──────────────────────────────┘  │ dev loads :5173 · smoke via       │
+                                          │ Playwright _electron              │
+                                          └──────────┬───────────────────────┘
+                                                     │ same save dir, later
+                                          ┌──────────▼───────────────────────┐
+                                          │ FUTURE STEAM ADAPTER (docs only)  │
+                                          │ steamworks.js in main process ·   │
+                                          │ achievements ← world.events ·     │
+                                          │ Auto-Cloud on the save directory  │
+                                          └───────────────────────────────────┘
 ```
 
-Boundary rules that keep this from becoming enterprise abstraction soup:
+Boundary rules (union of both evaluations):
 
-- **The sim never learns any of this exists.** It already takes `StorageLike?`; that stays its
-  entire knowledge of the outside world. No new interface is added until a *second* real consumer
-  exists (achievements get an adapter when Steam integration starts, not before — and it will be
-  a ~30-line consumer of `world.events`, which is already the sim's outbound contract).
-- **`src/platform/` is the only file group allowed to feature-detect.** `main.ts` asks it for the
-  platform once at boot. No `if (isElectron)` anywhere else, ever.
-- **`desktop/` may not import from `src/`** except types. It is a window around the game, not part
-  of it.
+- `src/sim/` never imports Electron, Node, Tauri, Steam, IndexedDB, or filesystem APIs — its
+  entire knowledge of the outside world stays "someone hands me parsed state."
+- Feature detection lives only in `src/platform/`; `grep -r electron\|bardoDesktop src/ --exclude-dir=platform`
+  stays empty. `desktop/` may not import from `src/` except types.
+- Renderer stays shared; no per-host rendering forks (and one `preference: 'webgl'` everywhere)
+  unless a measured platform difference forces it.
+- Sandboxed renderer, context isolation on, Node integration off, allowlisted IPC only.
+- No speculative abstractions: no achievements interface until the first achievement, no
+  controller abstraction unless a native capability proves materially better than the Gamepad
+  API, no Steam SDK in the build until there is a Steam app to test against.
 
 ## H. Save Strategy
 
-The canonical representation already exists and is correct: **versioned, defensively-parsed JSON
-documents owned by the sim** (`MetaStateV1` pattern: explicit `version` field, per-field
-validation, silent fallback to defaults on corruption). Keep exactly this shape and grow it
-(pets, artifacts, currencies, story flags, realm progression, statistics, profiles as
-`profiles/<n>.json`). Migrations are `switch (version)` upgrade functions in `src/sim/storage.ts`,
-tested in Vitest with fixture files — tier-1 tests, no browser needed.
+**Canonical model (B's design, adopted, phased onto what exists).** Never serialize `World`.
+The envelope grows from today's `MetaStateV1`:
 
-| Environment | Adapter | Notes |
+```ts
+interface BardoSave {
+  schemaVersion: number        // migrations are pure functions with per-version fixtures
+  contentRevision: string      // ties a save to the content that produced it
+  profileId: string
+  revision: number             // monotonic, for backup/cloud conflict visibility
+  settings: SettingsState
+  meta: MetaProgression        // currencies, weapons/aspects, pets, artifacts,
+                               // town unlocks, story flags, statistics, heat
+  checkpoint: RunCheckpoint | null   // later: save-and-quit mid-run
+}
+```
+
+`RunCheckpoint` (deferred until the run structure stabilizes post-slice, but the envelope
+reserves the slot now) holds only resumable *sim* truth: seed + RNG stream state, weapon, boon
+stacks, realm/room and committed path, run currency/inventory, hp/status, room history,
+content version. It must never contain Pixi objects, sprite/animation/audio/particle state,
+DOM references, platform paths, debug state, or wall-clock time. Note `src/sim/session.ts`
+already models most of this in memory (`RunState`) — the checkpoint work is serialization +
+restore-equivalence tests (same hash continuing from a restored checkpoint), not a new
+extraction.
+
+**Platform interface (async, minimal):**
+
+```ts
+interface SaveStore {
+  read(profileId: string): Promise<string | null>
+  write(profileId: string, data: string): Promise<void>   // JSON; compression only if ever needed
+  delete(profileId: string): Promise<void>
+}
+```
+
+Validation, serialization, migrations, and corruption recovery live *above* the adapter in
+shared TypeScript (`storage.ts` remains the pure schema layer). Boot is already async; the sim
+stays synchronous and I/O-free.
+
+| Environment | Adapter | Discipline |
 | --- | --- | --- |
-| Browser (now) | `localStorage` (today's code) + call `navigator.storage.persist()` at boot + a save **export/import** button (downloads/reads the same JSON) | Saves are KB-scale; localStorage is honestly fine at this size. Export/import is the eviction insurance and doubles as the cross-device story. Move to OPFS/IndexedDB only if saves outgrow strings or replay archiving comes to the web build — not speculatively. |
-| Desktop | Preload fs adapter: load save dir into memory at boot; write-through with write-temp → fsync → atomic rename, keep one rolling `.bak`; on parse failure fall back to `.bak`, then defaults. Location: `~/Library/Application Support/Bardo Rogue/` | Same JSON bytes a browser export produces — a browser save imports into desktop and vice versa, for free. |
-| Steam (later) | The same files, same directory. Steamworks **auto-cloud** config on that path — zero code — or `steamworks.js` cloud API if per-file control is ever needed. | Multiple profiles = multiple files; auto-cloud handles them. |
+| Browser (now) | `localStorage` wrapped as `SaveStore` (KB-scale JSON is fine there today; churn to IndexedDB is deferred, not skipped) + `navigator.storage.persist()` at boot + **export/import** of the exact save file (eviction insurance; defines the on-disk bytes desktop will use; doubles as cross-device transfer) | Keep a `.bak` copy under a second key. |
+| Browser (later) | IndexedDB `SaveStore` when `RunCheckpoint` and/or local replay archiving arrive — one transaction holding current save, previous-known-good, and revision metadata (B's design) | Same envelope, same migrations. |
+| Desktop | Preload/main fs adapter under `~/Library/Application Support/Bardo Rogue/saves/` — serialize → validate → write temp → flush → rotate prior to `.bak` → atomic rename; in debug/test builds re-read and validate after write | On corruption: **preserve the corrupt file**, fall back to `.bak`, report the recovery visibly, never silently replace both copies. |
+| Steam (later) | Same files, same directory; Steamworks **Auto-Cloud** pointed at it — zero code. Move to explicit Remote Storage only if conflict control demands it | `revision` + `contentRevision` make conflicts diagnosable. |
 
-One deliberate simplification: `StorageLike` stays **synchronous** (it matches localStorage and
-keeps the sim boundary trivial). The desktop adapter is sync-over-memory with async flush behind
-it; at kilobyte scale this is unmeasurable and it avoids infecting the boot path with promises.
+Autosave at durable boundaries — reward commitment, room transition, return to the Bardo,
+unlock purchase — never per tick. (`main.ts` already saves meta on exactly these events.)
 
 ## I. Testing Strategy
 
-The three tiers the addendum sketches map directly onto what exists, with tier 3 as the only new
-build:
-
-- **Tier 1 — headless sim (exists):** Vitest over `tests/**` — 184 tests, ~4 s. Combat,
-  encounters, replays-with-pinned-hashes, collision, feel gates. Save-migration tests join here.
-  Runs on every change.
-- **Tier 2 — browser gameplay harness (exists):** `pnpm sim` for metrics across seed ranges,
-  `pnpm shot`/`pnpm poses` for visual evidence, bots for gameplay validation, `window.__game` for
-  state injection, the gauntlet for quality judgment. Runs many times per day; **remains the
-  arbiter of gameplay truth**.
-- **Tier 3 — desktop smoke (new, ~50 lines):** `pnpm smoke:desktop` via Playwright
-  `_electron.launch()` against the packaged (or at least production-built) app: boots, `__game`
-  present, 300 stepwise ticks, **`__game.hash()` equals `pnpm sim`'s hash for the same
-  seed/scenario**, screenshot renders non-black, save write → relaunch → read roundtrip, corrupt
-  save falls back to `.bak`, fullscreen toggles. Runs before a release or when `desktop/` or
-  `src/platform/` change — *never* in the inner gameplay loop.
-
-The invariant that makes the whole pyramid cheap: because the sim is deterministic and
-platform-blind, tiers 2 and 3 are not re-testing gameplay — they are testing *hosting*. Gameplay
-correctness lives in tier 1 and the tier-2 bots, once, for every platform at the same time.
+- **Tier 1 — pure sim + saves (exists, extend):** Vitest — combat, encounters, replay hashes,
+  collision, feel gates; add save validation, **pure migration functions with fixtures from
+  every prior schema version**, checkpoint serialize/restore/hash-equivalence, corruption →
+  backup recovery, reward exactly-once. ~seconds; runs on every change.
+- **Tier 2 — browser gameplay harness (exists, unchanged, the golden laboratory):** `pnpm sim`
+  metrics across seeds, `pnpm shot`/`poses` evidence, bots, `__game` state injection, gauntlet
+  judgment. The arbiter of gameplay truth for every platform at once — because the sim is
+  platform-blind, tiers 2 and 3 test *hosting*, not gameplay, and gameplay is certified once.
+- **Tier 3 — desktop smoke (new, ~50 lines, `pnpm smoke:desktop`):** Playwright
+  `_electron.launch()` with an isolated temporary user-data dir: app launches; window loads via
+  `app://`; WebGL initializes; `__game` exists; a pinned replay's final `hash()` **equals the
+  Node and browser hash**; preload exposes only the intended API surface; save write → relaunch
+  → load; corrupt save preserved + `.bak` recovery; fullscreen enters/exits; renderer and
+  main-process errors captured; packaged assets resolve offline; **no `public/progress`/audit
+  evidence in the bundle**. Runs when `desktop/`/`src/platform/` change or before a release —
+  never in the inner gameplay loop.
+- **Release/hardware lane (manual, before tester/Steam builds):** physical controller
+  (connect/disconnect/reconnect), audio listening pass, sleep/wake and focus changes,
+  fullscreen/Spaces, cold launch, long-session memory, the signed+notarized artifact on a
+  second Mac account; Steam overlay and Steam Input once introduced.
+- Optional: a WebKit Playwright lane *only if* Safari remains a stated web target; it never
+  enters the everyday loop.
 
 ## J. Implementation Plan
 
-Ordered so the game is never disrupted and each phase is independently shippable. Phases 1–2 are
-worth doing soon; 3–7 can wait until a native build is actually wanted (they total roughly a
-focused week); 8 is documentation.
-
-- **Phase 1 — Harden the web golden path (hours).** Add `navigator.storage.persist()` at boot and
-  a save export/import affordance (pause or meta screen). This is pure-web insurance that also
-  fixes today's one real durability risk and defines the on-disk save format desktop will use.
-  No sim change; hashes untouched.
-- **Phase 2 — Cut the platform seam (half a day).** Create `src/platform/` with the `Platform`
-  interface and the web implementation; move the `localStorage` injection, reduced-motion
-  detection, and fullscreen call from `main.ts` behind it. `main.ts` shrinks; nothing else moves.
-  Tests stay green because the sim never sees the difference.
-- **Phase 3 — Minimal desktop host (a day).** `desktop/main.ts` + `desktop/preload.ts` +
-  electron-builder config as a workspace package. Dev mode loads `:5173` (HMR inside the shell for
-  free); prod loads `dist/` with `public/progress` excluded. Acceptance: the game plays, `__game`
-  works, F fullscreen works.
-- **Phase 4 — Filesystem saves (a day).** The preload `StorageLike` adapter (atomic write, `.bak`,
-  corruption fallback) exposed as `window.bardoDesktop.storage`; platform seam prefers it.
-  Vitest-able by extracting the adapter's pure parts; roundtrip covered in tier 3.
-- **Phase 5 — Desktop quality (1–2 days).** App menu + About, quit/Cmd+W confirm during a live
-  run (the seam's `confirmQuitDuringRun`), icon, window-state persistence, replay auto-archive of
-  the last N runs into the save dir (deterministic bug reports: seed + inputs = exact repro —
-  the one genuinely new capability desktop unlocks beyond durability).
-- **Phase 6 — Tier-3 smoke (half a day).** `tools/desktop-smoke.ts` as specified in I; document in
+- **Phase 0 — Release asset boundary (do first; hours).** Make production builds exclude
+  `public/progress` and audit evidence (move it out of `public/`, or a build-time exclude), and
+  add a size/inventory assertion so a 2.5 MB game can never silently ship 125 MB of internal
+  evidence again. Decide release source-map policy explicitly.
+- **Phase 1 — Web golden-path hardening (hours).** `navigator.storage.persist()` at boot;
+  save export/import in the pause/meta UI. Fixes the eviction risk and freezes the canonical
+  save-file bytes. No sim change; hashes untouched.
+- **Phase 2 — Save envelope + platform seam (1–2 days).** Grow `storage.ts` schemas into the
+  `BardoSave` envelope (schemaVersion/contentRevision/profileId/revision; checkpoint slot
+  reserved, not implemented); pure migrations + fixtures in tier 1. Create `src/platform/`
+  (`Platform` + async `SaveStore`), move storage injection, fullscreen, and reduced-motion
+  detection out of `main.ts`. All 184 tests and every pinned hash pass unchanged.
+- **Phase 3 — Minimal desktop host (a day).** `desktop/` main + preload as a workspace package:
+  sandboxed window, context isolation, no Node integration; dev loads `:5173` (HMR in the
+  shell for free); packaged mode serves `dist/` via `app://bardo` (`protocol.handle`).
+  Acceptance: game plays, `__game` alive, F fullscreen works. Unsigned local arm64 `.app`.
+- **Phase 4 — Desktop filesystem saves (a day).** fs `SaveStore` with the atomic-write/backup/
+  preserve-corrupt discipline from H; wired through the seam; save paths inspectable in debug.
+  Prove browser and desktop deserialize the same fixture bytes.
+- **Phase 5 — Desktop quality (1–2 days, only what demonstrates value).** App menu + About;
+  quit/Cmd+W confirm during a live run; icon; window-state persistence; crash/log collection;
+  open-save-folder + export-diagnostics; replay auto-archive of the last N runs (deterministic
+  bug repro). Controller reconnect behavior. No tray, no launch-on-login, no updater yet.
+- **Phase 6 — Tier-3 smoke (half a day).** `tools/desktop-smoke.ts` per section I; document in
   `HARNESS.md`.
-- **Phase 7 — Distribution (a day, mostly Apple paperwork).** Developer ID cert, electron-builder
-  sign + notarize, `pnpm desktop:dist` → dmg/zip an outside tester can double-click. Updates: ship
-  new dmgs manually until that hurts; electron-updater only when it does.
-- **Phase 8 — Steam readiness (docs only).** Write `docs/steam.md` capturing section K. Build
-  nothing.
+- **Phase 7 — Distribution + measurement (a day + Apple paperwork).** Developer ID cert, sign +
+  notarize, `pnpm desktop:dist` → dmg/zip a tester can double-click. On the target MacBook Pro,
+  measure cold launch, memory, real rAF intervals, and a **200-projectile stress scenario** —
+  this is also the tripwire for the presenter-batching watchlist (B.4) and for the Tauri
+  fallback question. Ship new dmgs manually until that hurts.
+- **Phase 8 — Steam readiness, not Steam (docs only).** Write `docs/steam.md` from section K.
+  Keep achievement-worthy events typed; keep the SDK out of the build.
+
+The checkpoint/save-and-quit feature (`RunCheckpoint`) is scheduled by game design — when runs
+get long enough to need suspending — not by this platform work; the envelope from Phase 2 is
+ready for it whenever that day comes.
 
 ## K. Steam Path
 
-Rating for the eventual move from local Mac app to Steam release: **straightforward** — days to a
-couple of weeks of integration and store bureaucracy, and *zero architectural change*, provided
-the Phase 2 seam exists. The concrete delta:
+Overall rating: **shipping is straightforward; full Steamworks features are moderate; no
+gameplay architecture change at any point** (given the Phase 2 seam). The eventual sequence:
 
-1. Steamworks account, app ID, store metadata (bureaucracy, not engineering).
-2. Add `steamworks.js` to `desktop/` main process; init with the app ID; `steam_appid.txt` in dev.
-3. Achievements: a ~30-line main-process consumer of forwarded `world.events` (the sim already
-   emits everything interesting: kills, clears, boons, deaths). No sim change.
-4. Cloud saves: enable auto-cloud on the existing save directory in the Steamworks dashboard.
-   No code.
-5. Overlay: add the known `in-process-gpu` command-line switch and test; treat macOS overlay as
-   best-effort (it is weak platform-wide). Overlay matters more on the eventual Windows build,
-   where the same switch is the established fix.
-6. Controller: the Gamepad API path already works; verify Steam Input's virtual-gamepad mapping,
-   add a Steam Input config. Glyphs for PS/Xbox prompts are a content task, not architecture.
-7. Depots/branches: electron-builder output per OS uploaded via `steamcmd`; a `beta` branch for
-   testers. When Windows/Linux happen, it is the same shell and same engine — add builder targets
-   and QA pass, not a new stack.
+1. Steamworks account, app ID, depot, launch configuration, store metadata (bureaucracy).
+2. Produce the macOS `.app`; upload with SteamPipe; **set the `.app` bundle as the Mac launch
+   target** (Valve's recommendation; lets Apple Silicon pick the best architecture).
+3. **Auto-Cloud** on the Application Support save directory — no code.
+4. Achievements: `steamworks.js` in the main process consuming forwarded `world.events`
+   (~30 lines; the sim already emits kills/clears/boons/deaths). `steam_appid.txt` in dev.
+5. Overlay: initialize Steam **before creating the window** if hooking requires it; add the
+   known `in-process-gpu` switch; treat macOS overlay as best-effort runtime proof (it is weak
+   platform-wide; it matters more on the later Windows build, where the same switch is the
+   established fix).
+6. Bundle and sign `libsteam_api.dylib` and any native module with the app.
+7. Controller: let **Steam Input emulate a gamepad** first (Bardo's Gamepad API path already
+   understands that); adopt the full Steam Input API later only for action sets and accurate
+   glyphs.
+8. A `beta` branch for testers. Windows/Linux when the product needs them: same shell, same
+   engine, new builder targets + a per-OS Steam bridge build — game code and saves unchanged.
 
-What would make it *harder* later if skipped now: only the platform seam. Everything else in this
-plan can be deferred with no compounding cost.
+## L. Do Not Do This (union of both evaluations)
 
-## L. Do Not Do This
-
-- **Do not migrate engines** (Godot/Unity/native) for performance a 15.6 µs tick and a
-  SwiftShader-renderable frame demonstrably do not need. Revisit only if a console deal exists —
-  and then the sim + replay corpus is the port spec, which requires no preparation today.
-- **Do not fork the game.** No desktop-only gameplay code, no web-only gameplay code, ever. If a
-  feature needs the shell, it goes through `src/platform/` as a capability, and the web build gets
-  a graceful equivalent or a no-op.
-- **Do not let `desktop/` imports leak into `src/`**, and allow feature detection only inside
-  `src/platform/`. The grep for `electron`/`bardoDesktop` outside those folders should stay empty.
-- **Do not put packaging in the inner loop.** If any gameplay change ever requires launching or
-  building the Electron app to validate, the architecture has failed; fix that instead of
-  complying.
-- **Do not pick the WebView-shell aesthetic (Tauri/Swift) for its bundle size.** The 100 MB it
-  saves buys a second browser engine, a second language, and no macOS test automation — trading
-  the project's highest-weighted assets for its lowest-weighted one.
-- **Do not build speculative platform abstractions.** No achievements interface, telemetry
-  interface, or cloud-save interface until the first real second implementation is being written.
-  `StorageLike` earned its existence; the rest earn theirs the same way.
-- **Do not abandon the browser harness for native-only testing**, and do not let tier 3 grow into
-  a gameplay suite — it tests hosting; gameplay truth stays in tiers 1–2.
-- **Do not adopt IndexedDB/OPFS now** for KB-scale saves, and do not hand-write "clever"
-  save-sync; export/import + fs + Steam auto-cloud cover every stated need.
-- **Do not chase Steam before the slice is fun.** The gauntlet is the roadmap; Steam is Phase 8
-  documentation until then.
-- **Do not split rendering backends per host** (e.g., WebGPU on desktop, WebGL on web). One
-  `preference: 'webgl'` everywhere until a concrete rendering need says otherwise; the evidence
-  protocol depends on frames being comparable.
+- Do not rewrite Bardo in Godot, Unity, Swift, Rust, or C++ for theoretical performance; the
+  measured bottleneck candidate is presenter batching — shared TypeScript.
+- Do not fork the game: no separate browser/desktop gameplay entry points, room/progression/
+  save/content models, or rendering behavior (absent a measured platform difference).
+- Do not let `src/sim/` import Electron/Node/Tauri/Steam/IndexedDB/fs — and keep feature
+  detection inside `src/platform/` only (the grep stays empty).
+- Do not enable Node integration in the renderer, disable the sandbox, or expose generic
+  filesystem/shell APIs through preload.
+- Do not serialize the `World` object; the envelope in H is the only save shape.
+- Do not bind progression logic to IndexedDB, filesystem paths, or Steam Cloud specifics.
+- Do not package/rebuild desktop for normal gameplay changes; if a gameplay change ever
+  requires launching Electron to validate, fix the architecture instead of complying.
+- Do not move the primary harness into Electron; tier 3 tests hosting, never gameplay.
+- Do not implement Steam achievements, overlay control, or SDK loading before there is a Steam
+  app to test against; do not chase Steam before the slice is fun.
+- Do not ship `public/progress`, audit videos, comparison captures, or internal state as game
+  assets (Phase 0 makes this structurally impossible).
+- Do not assume "native wrapper" means better latency or rendering — it measurably does not.
+- Do not pick Tauri for bundle size alone; do not keep Electron out of familiarity alone —
+  the Phase 7 measurements are the standing test, and the seam keeps the fallback cheap.
+- Do not add platform abstractions (achievements, telemetry, cloud, controller) before the
+  first concrete second implementation exists. `StorageLike`→`SaveStore` earned its existence;
+  the rest earn theirs the same way.
+- Do not move browser saves to IndexedDB/OPFS before checkpoints or replay archiving create the
+  need — but do define the envelope (Phase 2) before meta progression grows further.
 
 ## M. Next Five Concrete Tasks
 
-1. **Save export/import + `navigator.storage.persist()`** in the web build. Defines the canonical
-   save-file bytes, kills the localStorage-eviction risk, requires no sim change. (Phase 1)
-2. **Create `src/platform/`** — `Platform` interface + web implementation; move storage injection,
-   fullscreen, and reduced-motion detection out of `main.ts` behind it. All 184 tests and every
-   pinned hash must pass unchanged. (Phase 2)
-3. **Add `desktop/`** — Electron main + preload + electron-builder config as a workspace package,
-   with `pnpm desktop:dev` (loads `:5173`) and `pnpm desktop:build`. Acceptance: the game runs in
-   the shell with `window.__game` alive. (Phase 3)
-4. **Filesystem `StorageLike` adapter** in the preload (atomic write + `.bak` + corruption
-   fallback) wired through the seam; meta progression survives relaunch of the packaged app.
-   (Phase 4)
-5. **`tools/desktop-smoke.ts` + `pnpm smoke:desktop`** — Playwright `_electron`: boot, hash-parity
-   vs. `pnpm sim`, screenshot, save roundtrip, fullscreen; documented in `HARNESS.md`. (Phase 6,
-   pulled early because it locks in the guarantee that packaging can never silently diverge from
-   the browser game.)
+1. **Release asset boundary + size assertion.** Exclude `public/progress`/audit evidence from
+   production builds; assert the built payload stays within a few MB. (Phase 0)
+2. **`navigator.storage.persist()` + save export/import** in the web build — freezes the
+   canonical save-file bytes and kills the eviction risk. (Phase 1)
+3. **Save envelope + `src/platform/` seam.** Grow the versioned envelope (with migrations +
+   fixtures, checkpoint slot reserved) and move storage/fullscreen/reduced-motion behind
+   `Platform`/`SaveStore`; 184 tests and all pinned hashes unchanged. (Phase 2)
+4. **Minimal sandboxed Electron host.** `desktop/` main + preload (named minimal API), dev
+   loads `:5173`, packaged mode serves via `app://bardo`; unsigned local arm64 `.app` with
+   `__game` alive. (Phase 3)
+5. **Desktop fs saves + first smoke test.** Atomic/backup fs `SaveStore`; Playwright
+   `_electron` smoke with isolated user-data dir proving launch, WebGL, replay-hash parity with
+   Node and browser, save→relaunch→load, corruption→`.bak`, preload surface audit, and a clean
+   evidence-free bundle. (Phases 4+6)
 
 ---
 
-**Governing principle, restated as the conclusion it survived:** the browser remains the
-laboratory; Electron is a picture frame around the same painting. One sim, one renderer, one
-tuning file, one save schema, one harness — and a platform seam thin enough to read in one
-sitting. The repository was already built for this answer; the strategy above mostly consists of
-not ruining it.
+**Governing principle, kept from both evaluations:** the browser is the laboratory; Electron is
+a picture frame around the same painting. One sim, one renderer, one tuning file, one save
+schema, one harness — a platform seam thin enough to read in one sitting, a save model designed
+before progression grows into it, and a fallback (Tauri) that stays cheap precisely because the
+seam exists.

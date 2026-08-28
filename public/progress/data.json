@@ -1,8 +1,8 @@
 {
   "title": "Bardo Rogue",
-  "subtitle": "Gauntlet against Enter the Gungeon & Hades — two marked doors, then the rest",
-  "updated": "2026-08-28T09:56:56-04:00",
-  "now": "combat-feel",
+  "subtitle": "The Greek gate: two powers, twelve vows, fire, an elite that turns a light blade, and Minos",
+  "updated": "2026-08-28T21:30:00-04:00",
+  "now": "greek-gate",
   "round": 2,
   "timeline": [
     {
@@ -15,7 +15,7 @@
     },
     {
       "t": "16:59",
-      "text": "Round 1 build in — lighting, grade, ritual floor, living air."
+      "text": "Round 1 build in \u2014 lighting, grade, ritual floor, living air."
     },
     {
       "t": "17:04",
@@ -27,19 +27,19 @@
     },
     {
       "t": "17:09",
-      "text": "Round 2 in — seal plate, nave, side aisles, wall furniture, side braziers."
+      "text": "Round 2 in \u2014 seal plate, nave, side aisles, wall furniture, side braziers."
     },
     {
       "t": "17:10",
-      "text": "R2 still lost: tan dirt + HUD-reticle seal. Approach change — opaque plate, floor wash, no ticks."
+      "text": "R2 still lost: tan dirt + HUD-reticle seal. Approach change \u2014 opaque plate, floor wash, no ticks."
     },
     {
       "t": "17:13",
-      "text": "Round 3 in — slate floor, gold seal + chevron, purple diamond rugs, graves/chest/table, wall windows."
+      "text": "Round 3 in \u2014 slate floor, gold seal + chevron, purple diamond rugs, graves/chest/table, wall windows."
     },
     {
       "t": "17:19",
-      "text": "Round 4 build — original bardo_room tileset. Kenney leaves the floor."
+      "text": "Round 4 build \u2014 original bardo_room tileset. Kenney leaves the floor."
     },
     {
       "t": "17:26",
@@ -51,11 +51,11 @@
     },
     {
       "t": "17:32",
-      "text": "Round 5 in — still pool in the steel plate, ash-leaf planters, velvet armchairs. Banner kit stripped."
+      "text": "Round 5 in \u2014 still pool in the steel plate, ash-leaf planters, velvet armchairs. Banner kit stripped."
     },
     {
       "t": "17:34",
-      "text": "Round 6 in — aisles packed with plants, well-lip on the pool, hotter window lights. Critic on the still."
+      "text": "Round 6 in \u2014 aisles packed with plants, well-lip on the pool, hotter window lights. Critic on the still."
     },
     {
       "t": "17:36",
@@ -63,7 +63,7 @@
     },
     {
       "t": "17:37",
-      "text": "Round 7 in — star well + broken ring, three plant kinds, richer runners."
+      "text": "Round 7 in \u2014 star well + broken ring, three plant kinds, richer runners."
     },
     {
       "t": "17:38",
@@ -71,7 +71,7 @@
     },
     {
       "t": "17:39",
-      "text": "Round 8 in — raised well lip, contact shadows under every prop. Still building."
+      "text": "Round 8 in \u2014 raised well lip, contact shadows under every prop. Still building."
     },
     {
       "t": "17:40",
@@ -79,7 +79,7 @@
     },
     {
       "t": "17:44",
-      "text": "Round 9 in — 32px plants and chairs, wine runners, brass threshold inlay, north counters. Critic on the still."
+      "text": "Round 9 in \u2014 32px plants and chairs, wine runners, brass threshold inlay, north counters. Critic on the still."
     },
     {
       "t": "17:45",
@@ -87,7 +87,7 @@
     },
     {
       "t": "17:47",
-      "text": "Round 10 in — Keep-light walls, bigger steel plate, quieter door. Furniture can actually be named in the wide shot."
+      "text": "Round 10 in \u2014 Keep-light walls, bigger steel plate, quieter door. Furniture can actually be named in the wide shot."
     },
     {
       "t": "17:48",
@@ -95,7 +95,7 @@
     },
     {
       "t": "17:49",
-      "text": "Round 11 in — carved dais with relief threshold, restored vignette, slight furniture asymmetry."
+      "text": "Round 11 in \u2014 carved dais with relief threshold, restored vignette, slight furniture asymmetry."
     },
     {
       "t": "17:50",
@@ -187,7 +187,7 @@
     },
     {
       "t": "22:32",
-      "text": "R2 both-order critics still on the bar. Gap: path-promise icons — north tree reads, east is a lamp blob, HUD still owns the frame."
+      "text": "R2 both-order critics still on the bar. Gap: path-promise icons \u2014 north tree reads, east is a lamp blob, HUD still owns the frame."
     },
     {
       "t": "22:36",
@@ -199,19 +199,19 @@
     },
     {
       "t": "22:51",
-      "text": "R1 critic BA picked the walk-to sequence (sixth flame, A LIFE RETURNS) but was not wowed. The bar pair was a combat still plus a heart icon — no take in frame. Swapped-order critic still out. No commit."
+      "text": "R1 critic BA picked the walk-to sequence (sixth flame, A LIFE RETURNS) but was not wowed. The bar pair was a combat still plus a heart icon \u2014 no take in frame. Swapped-order critic still out. No commit."
     },
     {
       "t": "22:53",
-      "text": "R1 critic AB picked the heart. Gap: token identity — the pedestal cone reads as a candle the banner has to name. R2: HUD life-cup at room scale; spent cup goes dark."
+      "text": "R1 critic AB picked the heart. Gap: token identity \u2014 the pedestal cone reads as a candle the banner has to name. R2: HUD life-cup at room scale; spent cup goes dark."
     },
     {
       "t": "23:00",
-      "text": "R2: one stamped HUD flame on a dark plate — the same silhouette as the life row, not a candle on furniture. Back to both-order critics."
+      "text": "R2: one stamped HUD flame on a dark plate \u2014 the same silhouette as the life row, not a candle on furniture. Back to both-order critics."
     },
     {
       "t": "23:01",
-      "text": "R2 both orders picked the bar. Gap: life-token silhouette — the floor gift is a flame-on-black square the banner has to name. No commit."
+      "text": "R2 both orders picked the bar. Gap: life-token silhouette \u2014 the floor gift is a flame-on-black square the banner has to name. No commit."
     },
     {
       "t": "23:05",
@@ -235,11 +235,11 @@
     },
     {
       "t": "23:28",
-      "text": "R5 split. AB picked the bar (sealed vessel — ours still reads as a HUD pip). BA picked the walk-to. Wow: no. No commit."
+      "text": "R5 split. AB picked the bar (sealed vessel \u2014 ours still reads as a HUD pip). BA picked the walk-to. Wow: no. No commit."
     },
     {
       "t": "23:36",
-      "text": "R6: metal heart vessel — bone/iron rim, charcoal well, crimson stamp in the well. Same silhouette as the life row."
+      "text": "R6: metal heart vessel \u2014 bone/iron rim, charcoal well, crimson stamp in the well. Same silhouette as the life row."
     },
     {
       "t": "23:40",
@@ -251,7 +251,7 @@
     },
     {
       "t": "23:45",
-      "text": "R7 split. AB: still a HUD pip. BA: beat lands, wow no. PARK the look — same family as the door seals. Mechanics stay; re-enter behind an authored token."
+      "text": "R7 split. AB: still a HUD pip. BA: beat lands, wow no. PARK the look \u2014 same family as the door seals. Mechanics stay; re-enter behind an authored token."
     },
     {
       "t": "23:52",
@@ -259,11 +259,11 @@
     },
     {
       "t": "00:00",
-      "text": "R1 in — wider gold-amber crescent, +1 damage, HUD slash mark. Blind both-order critics on the contact still."
+      "text": "R1 in \u2014 wider gold-amber crescent, +1 damage, HUD slash mark. Blind both-order critics on the contact still."
     },
     {
       "t": "00:01",
-      "text": "R1 both orders picked the bar. Gap: contact flash — gold crescent on an unchanged dummy. No wow. No commit."
+      "text": "R1 both orders picked the bar. Gap: contact flash \u2014 gold crescent on an unchanged dummy. No wow. No commit."
     },
     {
       "t": "00:04",
@@ -279,15 +279,15 @@
     },
     {
       "t": "00:12",
-      "text": "R3 split. AB picked ours (wow no). BA picked the bar — core/rim/afterimage and debris at the leading edge. PARK the look. Mechanics stay. Same family as the door seals."
+      "text": "R3 split. AB picked ours (wow no). BA picked the bar \u2014 core/rim/afterimage and debris at the leading edge. PARK the look. Mechanics stay. Same family as the door seals."
     },
     {
       "t": "00:17",
-      "text": "Next piece: a second arm. Scenario bow, draw→loose→friendly arrow. Tests green. The blade still hits close; the bow does not melee."
+      "text": "Next piece: a second arm. Scenario bow, draw\u2192loose\u2192friendly arrow. Tests green. The blade still hits close; the bow does not melee."
     },
     {
       "t": "00:23",
-      "text": "R1 both orders picked the bar, wow on the winner. Gap: the loosed shot — a standing stamp and a one-pixel hair, not a body lunge, a flare, and a bolt that occupies space. No commit."
+      "text": "R1 both orders picked the bar, wow on the winner. Gap: the loosed shot \u2014 a standing stamp and a one-pixel hair, not a body lunge, a flare, and a bolt that occupies space. No commit."
     },
     {
       "t": "00:28",
@@ -315,7 +315,7 @@
     },
     {
       "t": "00:56",
-      "text": "Next piece: death and return. You die, the card plays, R wakes you in The Bardo — not the same fight. A door starts the next attempt. Tests green. Parked looks stay parked."
+      "text": "Next piece: death and return. You die, the card plays, R wakes you in The Bardo \u2014 not the same fight. A door starts the next attempt. Tests green. Parked looks stay parked."
     },
     {
       "t": "00:59",
@@ -359,7 +359,7 @@
     },
     {
       "t": "01:34",
-      "text": "Dodge R2: both orders picked the bar. Through a brute slam the overlap reads as a hit — orange tell, yellow starburst, red wash. Stall 1. Same family: a body occupying a standing hazard, not a clash flash."
+      "text": "Dodge R2: both orders picked the bar. Through a brute slam the overlap reads as a hit \u2014 orange tell, yellow starburst, red wash. Stall 1. Same family: a body occupying a standing hazard, not a clash flash."
     },
     {
       "t": "01:42",
@@ -379,7 +379,7 @@
     },
     {
       "t": "02:08",
-      "text": "Sword-swing R1: both orders picked the bar, wow on the winner. Gap: a lunging body and a glowing blade on a white-hot torn arc — not a cream ribbon painted over the fighter."
+      "text": "Sword-swing R1: both orders picked the bar, wow on the winner. Gap: a lunging body and a glowing blade on a white-hot torn arc \u2014 not a cream ribbon painted over the fighter."
     },
     {
       "t": "02:10",
@@ -399,7 +399,7 @@
     },
     {
       "t": "02:38",
-      "text": "Brute R2: player on the rim, taller coil, bigger hammer. Split — one order wowed by painted mass, the other picked our orange lane."
+      "text": "Brute R2: player on the rim, taller coil, bigger hammer. Split \u2014 one order wowed by painted mass, the other picked our orange lane."
     },
     {
       "t": "02:44",
@@ -483,7 +483,7 @@
     },
     {
       "t": "03:54",
-      "text": "Audio-bed R2: crowd carve + delayed commit duck. Both critics still named player-commit lift. mix-hurt heavy −1.5 dB, mix dodge −0.6 dB."
+      "text": "Audio-bed R2: crowd carve + delayed commit duck. Both critics still named player-commit lift. mix-hurt heavy \u22121.5 dB, mix dodge \u22120.6 dB."
     },
     {
       "t": "03:55",
@@ -508,6 +508,38 @@
     {
       "t": "09:56",
       "text": "Kill flash 0.35 -> 0.12; it was louder than getting hurt and washed out the next telegraph. 68 -> 107 tests. Enemy tuning is the open follow-up: kite clears in 28-33s vs a 60-120s target."
+    },
+    {
+      "t": "20:08",
+      "text": "Truth pass in: seeds vary across reloads, the sim names the killer, 100/100 seeds reach home."
+    },
+    {
+      "t": "20:14",
+      "text": "CI + browser smoke + acceptance matrix. The matrix immediately reported that mashing wins 2%."
+    },
+    {
+      "t": "20:19",
+      "text": "The heavy is its own button. Ten contract tests; the neutral opener still coils 8px and throws 30."
+    },
+    {
+      "t": "20:31",
+      "text": "Two powers, twelve vows, and fire. The offer screen has a face on it now."
+    },
+    {
+      "t": "20:52",
+      "text": "Minos: three attacks, recombining at half life. The old tell drew a slam under every one of them."
+    },
+    {
+      "t": "21:05",
+      "text": "A title, held over the Bardo itself. The room breathes behind its own name."
+    },
+    {
+      "t": "21:20",
+      "text": "The Oath-Bound turns light blades. Bot fell to 76%, learned the rule, came back to 91%."
+    },
+    {
+      "t": "21:30",
+      "text": "Adversarial review found four real bugs, all mine, all silent. Fixed with regressions."
     }
   ],
   "pieces": [
@@ -551,7 +583,7 @@
       "id": "sword-swing",
       "take": "25",
       "name": "The blade commits",
-      "title": "Feel lane 1/3 — anticipation, arc, contact, a heavy that plants",
+      "title": "Feel lane 1/3 \u2014 anticipation, arc, contact, a heavy that plants",
       "blurb": "Three discrete presses. The crescent stays. The third hit plants. The still loses to a painted lunge.",
       "bar": "Committed sword-cut still",
       "status": "parked",
@@ -602,7 +634,7 @@
       "status": "parked",
       "rounds": 4,
       "verdict": "split",
-      "gap": "Authored windup mass: a body that can break the stone. Four looks — one pick-win, three splits on painted giant vs keep-out pie. Same family as the warden. Re-enter behind painted brute frames. The pie, charge, bead, and cracks stay.",
+      "gap": "Authored windup mass: a body that can break the stone. Four looks \u2014 one pick-win, three splits on painted giant vs keep-out pie. Same family as the warden. Re-enter behind painted brute frames. The pie, charge, bead, and cracks stay.",
       "before": "shots/brute-w2r6-ours.jpg",
       "after": "shots/brute-w2r9-ours.jpg",
       "ref": "ref/tell-0.jpg"
@@ -641,7 +673,7 @@
       "id": "combat-hud",
       "take": "30",
       "name": "The fight chrome",
-      "title": "Hearts, wave, place name — the inhabited combat frame",
+      "title": "Hearts, wave, place name \u2014 the inhabited combat frame",
       "blurb": "During a fight the corners tell you if you are dying and how many are left. The middle stays the fight.",
       "bar": "Mid-fight pixel HUD (not a clean room)",
       "status": "parked",
@@ -799,6 +831,66 @@
       "status": "done",
       "title": "Controls & game feel: keyboard aim, hold-to-attack, dodge ghosting, wall-safe crowds, turn rate, sword latency, perfect-dodge bullet time, flash hierarchy",
       "rounds": 0
+    },
+    {
+      "id": "truth-pass",
+      "status": "done",
+      "title": "Truth pass: attempt-keyed seeds, sim-authoritative death cause, shared tile routing (100/100 seeds traverse)",
+      "rounds": 1
+    },
+    {
+      "id": "ci-instruments",
+      "status": "done",
+      "title": "CI, a golden-path browser smoke of both endings, a seeded acceptance matrix, and doc tests that pin HARNESS.md to the encoder",
+      "rounds": 1
+    },
+    {
+      "id": "pause-audio",
+      "status": "done",
+      "title": "Pause owns the audio clock and the tab; fades before it stops the clock so transients do not click",
+      "rounds": 2
+    },
+    {
+      "id": "heavy-verb",
+      "status": "done",
+      "title": "The heavy becomes its own verb: own input, own queue, roll > heavy > light, chain-cut, roll launch",
+      "rounds": 1
+    },
+    {
+      "id": "statuses-gods",
+      "status": "done",
+      "title": "Burn joins Brand; twelve vows across the Kindly One and Hecate, with one reachable pact",
+      "rounds": 2
+    },
+    {
+      "id": "deity-offer",
+      "status": "done",
+      "title": "The offer becomes a meeting: authored 24x24 masks, name, epithet, a spoken line",
+      "rounds": 2
+    },
+    {
+      "id": "minos",
+      "status": "done",
+      "title": "Minos: gavel, verdict sweep, and the scales, recombining in phase two; per-attack telegraphs that no longer lie",
+      "rounds": 1
+    },
+    {
+      "id": "oathbound",
+      "status": "done",
+      "title": "The Oath-Bound Hoplite: one guard rule with three answers - commit, flank, or burn it",
+      "rounds": 3
+    },
+    {
+      "id": "title-screen",
+      "status": "done",
+      "title": "A title held over the living hub, which remembers your descents",
+      "rounds": 2
+    },
+    {
+      "id": "review-fixes",
+      "status": "done",
+      "title": "Adversarial review: unhashed fire, a boss/caster scratch-field collision, an unreachable duo, a swingable hub",
+      "rounds": 1
     }
   ]
 }

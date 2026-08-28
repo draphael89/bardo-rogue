@@ -50,11 +50,13 @@ export const tuning = {
     },
     attack: {
       buffer: 8,
-      steerRateDeg: 9,      // max deg/tick the swing angle may still be steered, during steerTicks only
+      steerRateDeg: 12,     // max deg/tick the swing angle may still be steered, during steerTicks only
+                            // note the press tick cannot steer (the state is entered after the steer block),
+                            // so a light's usable correction is (steerTicks - 1) * steerRateDeg
       heavyChargeTicks: 2,  // startup ticks before the heavy's blade-glow telegraph lights up (presentation)
       swings: [
-        { startup: 5, active: 4, recovery: 13, damage: 2, radius: 25, arcDeg: 130, lunge: 13, windup: 2, hitstop: 3, knockback: 90, chainFrom: 2, dodgeCancelFrom: 1, whiffPenalty: 7, moveCommit: 0.45, moveRecover: 0.7, steerTicks: 3, sweep: 1, heavy: false },
-        { startup: 5, active: 4, recovery: 13, damage: 2, radius: 25, arcDeg: 150, lunge: 15, windup: 2, hitstop: 3, knockback: 95, chainFrom: 2, dodgeCancelFrom: 1, whiffPenalty: 7, moveCommit: 0.45, moveRecover: 0.7, steerTicks: 3, sweep: -1, heavy: false },
+        { startup: 4, active: 4, recovery: 13, damage: 2, radius: 25, arcDeg: 130, lunge: 13, windup: 2, hitstop: 3, knockback: 90, chainFrom: 2, dodgeCancelFrom: 1, whiffPenalty: 7, moveCommit: 0.45, moveRecover: 0.7, steerTicks: 4, sweep: 1, heavy: false },
+        { startup: 4, active: 4, recovery: 13, damage: 2, radius: 25, arcDeg: 150, lunge: 15, windup: 2, hitstop: 3, knockback: 95, chainFrom: 2, dodgeCancelFrom: 1, whiffPenalty: 7, moveCommit: 0.45, moveRecover: 0.7, steerTicks: 4, sweep: -1, heavy: false },
         { startup: 12, active: 7, recovery: 24, damage: 4, radius: 31, arcDeg: 215, lunge: 30, windup: 8, hitstop: 8, knockback: 260, chainFrom: 999, dodgeCancelFrom: 9, whiffPenalty: 14, moveCommit: 0, moveRecover: 0.1, steerTicks: 4, sweep: 1, heavy: true },
       ] as SwingDef[],
     },

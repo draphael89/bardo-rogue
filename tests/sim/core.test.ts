@@ -160,6 +160,45 @@ describe('dodge', () => {
   })
 })
 
+describe('attack responsiveness', () => {
+  const ms = (ticks: number) => Math.round(ticks * 1000 / 60)
+
+  it('answers on the very tick the button is read', () => {
+    const w = createWorld(1, 'empty')
+    stepWorld(w, { ...emptyInput(), attack: true, aimX: 1, aimY: 0 })
+    // the swing event is what the renderer builds anticipation from: it must not wait a frame
+    expect(w.events.some(e => e.type === 'swing')).toBe(true)
+    expect(w.player.state).toBe('attack')
+  })
+
+  it('lands a light hit within 83 ms of the press', () => {
+    const w = createWorld(1, 'dummy')
+    const dummy = w.enemies.find(e => e.active)!
+    const p = w.player
+    p.x = dummy.x - 14; p.y = dummy.y
+    for (let t = 1; t <= 30; t++) {
+      stepWorld(w, { ...emptyInput(), attack: t === 1, aimX: 1, aimY: 0 })
+      const hit = w.events.some(e => e.type === 'hit')
+      w.events.length = 0
+      // 4 ticks to the first active frame; this dummy sits far enough round the arc to be caught on the next
+      if (hit) { expect(t - 1, `${ms(t - 1)} ms to contact`).toBeLessThanOrEqual(5); return }
+    }
+    throw new Error('the swing never connected')
+  })
+
+  it('can be redirected by at least 35 degrees during a light wind-up', () => {
+    const w = createWorld(1, 'empty')
+    stepWorld(w, { ...emptyInput(), attack: true, aimX: 1, aimY: 0 })
+    const start = w.player.swingAngle
+    const s = tuning.player.attack.swings[0]
+    // hold a new aim through the whole startup and see how far the blade follows
+    for (let t = 1; t < s.startup; t++) { stepWorld(w, { ...emptyInput(), aimX: 0, aimY: 1 }); w.events.length = 0 }
+    const turned = Math.abs(w.player.swingAngle - start) * 180 / Math.PI
+    // enough to re-target something that moved, not enough to swing at what is behind you
+    expect(turned, `only ${turned.toFixed(0)} degrees of correction`).toBeGreaterThanOrEqual(35)
+  })
+})
+
 describe('attack', () => {
   it('chains three swings when buffered and resets after', () => {
     const w = createWorld(1, 'empty')

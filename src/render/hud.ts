@@ -417,7 +417,7 @@ export class Hud {
     // guarded: the mercy window and the dodge's i-frames both bleach the mark, so "nothing can touch me right
     // now" is legible on the floor, not only in the flicker of the sprite.
     const d = tuning.player.dodge
-    const guard = p.iframes > 0 || (p.state === 'dodge' && p.stateTick >= d.iStart && p.stateTick <= d.iEnd)
+    const guard = p.iframes > 0 || (p.dodgeTick >= d.iStart && p.dodgeTick <= d.iEnd)
     const ink = guard ? C.cope : C.bone       // the lit half of the mark: bone, the HUD's own ink
     const far = guard ? C.bone : C.purple3    // the half turned away from the key light: wine
     // A horseshoe, open to the north: the figure stands in its mouth, so no pixel of the mark ever crosses the
@@ -425,7 +425,7 @@ export class Hud {
     // into a lit slab and the whole mark disappears at 1x, which is exactly what happens with a stroked circle.
     // The lip does NOT breathe. Everything that carries the player's state — this mark and the crown above
     // the head — holds perfectly still while nothing is happening, so any motion on the body means damage.
-    const half = 4 + (p.state === 'dodge' ? 1 : 0)
+    const half = 4 + (p.dodgeTick >= 0 ? 1 : 0)
     const arm = half + 2                      // how far the arms stand off the feet
     for (const s of [-1, 1]) {
       const x = cx + s * arm

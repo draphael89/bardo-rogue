@@ -108,7 +108,8 @@ describe('attack repeats while held', () => {
       if (t < 40) h2.win.fire('keydown', key('KeyJ', t > 0))
       else if (t === 40) h2.win.fire('keyup', key('KeyJ'))
     })
-    // the 8-tick buffer may still spend one more swing after the release, but not four more
+    // a discrete press already queued before release may still spend one more swing, but held state
+    // itself must never leave a chain of future swings behind
     expect(released.length).toBeLessThan(held.length)
     expect(released.length).toBeLessThanOrEqual(3)
   })
@@ -121,6 +122,16 @@ describe('attack repeats while held', () => {
       if (t === 20) h.win.fire('mouseup', { button: 0 })
     })
     expect(swings.length).toBeLessThanOrEqual(2)
+  })
+
+  it('drops a click latched just before focus loss', () => {
+    const h = harness()
+    const w = createWorld(1, 'empty')
+    h.canvas.fire('mousedown', { button: 0 })
+    h.win.fire('blur')
+    const f = h.input.sample(w)
+    expect(f.attack).toBe(false)
+    expect(f.attackHeld).toBe(false)
   })
 
   it('separate presses each swing, and chain when they land in recovery', () => {
@@ -203,6 +214,31 @@ describe('keyboard aim', () => {
     const f = h.input.sample(w)
     expect(aimDeg(f)).toBe(0)
     expect(f.aimSoft).toBe(true)
+  })
+
+  it('lets explicit Q lock outrank a cursor that moved earlier', () => {
+    const h = harness()
+    const w = createWorld(1, 'dummy')
+    const target = w.enemies.find(e => e.active)!
+    w.player.x = target.x - 40
+    w.player.y = target.y
+    h.canvas.fire('mousemove', { clientX: w.player.x, clientY: w.player.y - 40 })
+    h.win.fire('keydown', key('KeyQ'))
+    expect(aimDeg(h.input.sample(w))).toBe(0)
+  })
+
+  it('keeps keyboard aim ownership until the pointer actually moves again', () => {
+    const h = harness()
+    const w = createWorld(1, 'empty')
+    const p = w.player
+    h.canvas.fire('mousemove', { clientX: p.x, clientY: p.y - 40 })
+    h.win.fire('keydown', key('ArrowLeft'))
+    expect(aimDeg(h.input.sample(w))).toBe(180)
+    h.win.fire('keyup', key('ArrowLeft'))
+    h.win.fire('keydown', key('KeyD'))
+    expect(aimDeg(h.input.sample(w))).toBe(180)
+    h.canvas.fire('mousemove', { clientX: p.x, clientY: p.y + 40 })
+    expect(aimDeg(h.input.sample(w))).toBe(90)
   })
 
   it('lets the mouse outrank movement once it has actually moved', () => {

@@ -48,7 +48,7 @@ export function updatePlayerRim(v: EntityView, on: boolean, color: number): void
 }
 
 // ---------------------------------------------------------------------------------------------
-// The roll's own art. Seven authored 16 px poses, in the player sprite's exact five-colour palette
+// The roll's own art. Eight authored 16 px poses, in the player sprite's exact five-colour palette
 // (outline 3f2631, shadow 52607c, steel 8b9bb4, highlight c0cbdc, leather bd6c4a), drawn once into
 // nearest-sampled textures at first use. A dodge is NOT the standing sprite under a transform: the
 // body pitches over on the launch, leaves the floor, turns through two tuck halves whose helmet and
@@ -354,14 +354,20 @@ export function updatePlayerView(v: EntityView, p: Player, world: World, alpha: 
   let sx = 1, sy = 1, rot = 0, hop = 0
   let rollKey = ''
   let attackKey = ''
+  let moveKey = ''
   const b = v.body
   const speed = Math.hypot(p.vx, p.vy)
 
   if (p.state === 'free') {
     if (speed > 10) {
-      hop = Math.abs(Math.sin(time * 14)) * 1.5
-      rot = (p.vx / P.maxSpeed) * 0.12
-      sy = 1 + Math.sin(time * 28) * 0.04
+      // Two authored silhouettes per plane: profile for lateral movement, front for vertical
+      // movement. Facing still follows aim, so retreating and circle-strafing never flip the sword
+      // away from the target. Reusing the combat palette keeps the 16 px body visually singular.
+      const alternate = (Math.floor(time * 10) & 1) !== 0
+      const vertical = Math.abs(p.vy) > Math.abs(p.vx) * 1.15
+      moveKey = vertical ? (alternate ? 'rise' : 'absorb') : (alternate ? 'lightCut' : 'lightCoil')
+      hop = alternate ? 1 : 0
+      rot = (p.vx / P.maxSpeed) * 0.035
     } else {
       sy = 1 + Math.sin(time * 4) * 0.025
     }
@@ -426,10 +432,11 @@ export function updatePlayerView(v: EntityView, p: Player, world: World, alpha: 
   // the roll's own drawing wins over the standing sprite, but never over the hurt flash
   if (rollKey && p.flash <= 0) { const t = rollTexture(rollKey); if (t) b.texture = t }
   else if (attackKey && p.flash <= 0) { const t = rollTexture(attackKey); if (t) b.texture = t }
+  else if (moveKey && p.flash <= 0) { const t = rollTexture(moveKey); if (t) b.texture = t }
   b.alpha = p.iframes > 0 && p.state !== 'dead' ? ((p.iframes >> 2) & 1 ? 0.35 : 1) : 1
   // the shadow reports how close to the floor the body is. In the slide it stretches along the
   // travel and darkens: the body is not in the air, it is skimming.
-  if (p.state === 'dodge' && p.stateTick < P.dodge.travel) {
+  if (p.dodgeTick >= 0 && p.dodgeTick < P.dodge.travel) {
     const hx = Math.abs(p.dodgeDirX)
     v.setShadow(x, feetY - 1, 12 + 8 * hx, 5 + 3 * (1 - hx), 0.44)
   } else v.setShadow(x, feetY - 1, 12 - hop * 0.4, 5 - hop * 0.2, 0.35 - hop * 0.02)

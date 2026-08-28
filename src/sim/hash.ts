@@ -35,8 +35,9 @@ export function hashWorld(world: World): number {
   num(p.x); num(p.y); num(p.px); num(p.py); num(p.vx); num(p.vy); num(p.kbx); num(p.kby)
   int(p.hp); int(p.maxHp); int(p.facing)
   num(p.aimAngle); num(p.moveAngle); num(p.dodgeDirX); num(p.dodgeDirY)
-  int(p.swingIndex); num(p.swingAngle); int(p.swingId)
-  int(p.attackBuffer); int(p.dodgeBuffer); int(p.iframes); num(p.flash)
+  int(p.swingIndex); num(p.swingAngle); int(p.swingId); int(p.assistTargetId)
+  int(p.controlTick); int(p.attackQueuedAt); int(p.dodgeQueuedAt); int(p.dodgeTick)
+  int(p.iframes); num(p.flash); int(p.dodgeRead)
   num(p.moveX); num(p.moveY); int(p.footTick); int(p.deathTick); flag(p.god)
   if (p.arm) byte(p.arm)
 
@@ -61,7 +62,7 @@ export function hashWorld(world: World): number {
     if (!b.active) continue
     int(b.id); num(b.x); num(b.y); num(b.px); num(b.py); num(b.vx); num(b.vy)
     num(b.radius); int(b.life); num(b.angle)
-    if (b.team) { byte(b.team); int(b.damage) }
+    if (b.team) { byte(b.team); int(b.damage); int(b.actionId) }
   }
 
   const w = world.wave

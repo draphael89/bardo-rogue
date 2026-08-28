@@ -11,8 +11,12 @@ export class Camera {
   offsetX = 0; offsetY = 0; rotation = 0
   zoom = 1                 // punch scale about the player, eases back to 1
 
-  addTrauma(amount: number) { this.trauma = Math.min(1, this.trauma + amount) }
-  kick(angle: number, strength: number) { this.kickX += Math.cos(angle) * strength; this.kickY += Math.sin(angle) * strength }
+  addTrauma(amount: number, cap = 1) { this.trauma = Math.min(cap, this.trauma + amount) }
+  kick(angle: number, strength: number, cap = Infinity) {
+    this.kickX += Math.cos(angle) * strength; this.kickY += Math.sin(angle) * strength
+    const m = Math.hypot(this.kickX, this.kickY)
+    if (m > cap) { this.kickX *= cap / m; this.kickY *= cap / m }
+  }
   punchZoom(z: number) { this.zoom = Math.max(this.zoom, z) }
   // Anticipation, not impact: eases in while it is fed and eases back out the moment it stops.
   lean(angle: number, strength: number) { this.leanTX = Math.cos(angle) * strength; this.leanTY = Math.sin(angle) * strength }

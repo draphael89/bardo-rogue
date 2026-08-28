@@ -9,8 +9,9 @@ import { makeBot, type BotName } from '../src/sim/bots'
 import { quantizeFrame, replayToJson, type Replay } from '../src/sim/replay'
 import type { InputFrame } from '../src/sim/input'
 
-const FIXTURES: Array<{ bot: BotName; scenario: string; seed: number; out: string }> = [
-  { bot: 'kite', scenario: 'full', seed: 2, out: 'replays/kite-full-s2.json' },
+const FIXTURES: Array<{ bot: BotName; scenario: string; seed: number; out: string; god?: boolean }> = [
+  // The full fixture is a control/pacing proof, not a survivability claim: let it observe the whole room.
+  { bot: 'kite', scenario: 'full', seed: 2, out: 'replays/kite-full-s2.json', god: true },
   { bot: 'naive-melee', scenario: 'wave1', seed: 3, out: 'replays/naive-wave1-s3.json' },
   { bot: 'idle', scenario: 'wave1', seed: 5, out: 'replays/idle-wave1-s5.json' },
 ]
@@ -19,8 +20,8 @@ const args = Object.fromEntries(process.argv.slice(2).map((a, i, arr) => a.start
 const maxTicks = +(args.ticks ?? 60 * 180)
 
 // Same stop rule as tools/headless.ts. Frames are quantized before the sim sees them so the file replays bit-exact.
-function record(bot: BotName, scenario: string, seed: number, out: string) {
-  const world = createWorld(seed, scenario)
+function record(bot: BotName, scenario: string, seed: number, out: string, god = false) {
+  const world = createWorld(seed, scenario, { god })
   const b = makeBot(bot)
   const frames: InputFrame[] = []
   for (let i = 0; i < maxTicks; i++) {
@@ -31,15 +32,16 @@ function record(bot: BotName, scenario: string, seed: number, out: string) {
     if (world.wave.state === 'done' && world.tick - world.roomClearTick > 120) break
     if (world.player.state === 'dead' && world.tick - world.player.deathTick > 120) break
   }
-  const replay: Replay = { v: 1, seed, scenario, frames }
+  const replay: Replay = { v: 1, seed, scenario, frames, ...(god ? { god: true } : {}) }
   mkdirSync('replays', { recursive: true })
   const json = replayToJson(replay)
   writeFileSync(out, json)
-  console.log(JSON.stringify({ out, bot, scenario, seed, ticks: frames.length, bytes: json.length, hash: hashWorld(world) }))
+  console.log(JSON.stringify({ out, bot, scenario, seed, god, ticks: frames.length, bytes: json.length, hash: hashWorld(world) }))
 }
 
-if (args.all) for (const f of FIXTURES) record(f.bot, f.scenario, f.seed, f.out)
+if (args.all) for (const f of FIXTURES) record(f.bot, f.scenario, f.seed, f.out, !!f.god)
 else {
   const bot = (args.bot ?? 'kite') as BotName, scenario = args.scenario ?? 'full', seed = +(args.seed ?? 1)
-  record(bot, scenario, seed, args.out ?? `replays/${bot}-${scenario}-s${seed}.json`)
+  const god = args.god === '1' || args.god === 'true'
+  record(bot, scenario, seed, args.out ?? `replays/${bot}-${scenario}-s${seed}.json`, god)
 }

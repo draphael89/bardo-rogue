@@ -16,7 +16,7 @@ export class Metrics {
     for (const ev of events) {
       switch (ev.type) {
         case 'swing': this.swings++; this.lastSwingId = world.player.swingId; this.swingHit.set(this.lastSwingId, false); break
-        case 'hit': this.hitsLanded++; this.swingHit.set(world.player.swingId, true); break
+        case 'hit': this.hitsLanded++; this.swingHit.set(ev.actionId, true); break
         case 'kill': this.kills++; break
         case 'dodge': this.dodges++; break
         case 'dodged': this.successfulDodges++; break

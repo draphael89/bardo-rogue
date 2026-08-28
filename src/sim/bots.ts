@@ -2,6 +2,7 @@
 import type { World, Enemy } from './world'
 import { emptyInput, type InputFrame } from './input'
 import { tuning } from '@/tuning'
+import { hasLineOfSight } from './arena'
 
 export type Bot = (world: World) => InputFrame
 export type BotName = 'idle' | 'naive-melee' | 'kite'
@@ -69,15 +70,21 @@ function kite(world: World): InputFrame {
     inp.moveX = -inp.aimY; inp.moveY = inp.aimX // roll sideways
     return inp
   }
+  if (!hasLineOfSight(world.arena, p.x, p.y, e.x, e.y)) {
+    inp.moveX = -inp.aimY * e.orbitDir
+    inp.moveY = inp.aimX * e.orbitDir
+    return inp
+  }
   const punishable = e.state === 'recover' || e.state === 'stagger' || e.state === 'aim' || e.state === 'idle' || e.kind === 'caster'
   if (punishable || e.kind === 'charger') {
     if (d > 20) { inp.moveX = inp.aimX; inp.moveY = inp.aimY }
     if (d <= 26) inp.attack = world.tick % 3 === 0
   } else {
-    // hold spacing just outside brute range, poke when safe
-    if (d < 34) { inp.moveX = -inp.aimX; inp.moveY = -inp.aimY }
-    else if (d > 44) { inp.moveX = inp.aimX; inp.moveY = inp.aimY }
-    if (d <= 26 && e.state === 'chase') inp.attack = world.tick % 3 === 0
+    // Close to a real punish distance. The old 34–44 px dead band could stare at a brute across a
+    // pillar forever; a human routes around it, so the control probe must keep expressing intent too.
+    if (d < 23) { inp.moveX = -inp.aimX; inp.moveY = -inp.aimY }
+    else if (d > 25) { inp.moveX = inp.aimX; inp.moveY = inp.aimY }
+    if (d <= 27 && e.state === 'chase') inp.attack = world.tick % 3 === 0
   }
   return inp
 }

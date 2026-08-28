@@ -39,9 +39,12 @@ export async function createRenderApp(parent: HTMLElement, arenaPx: { w: number;
   const width = tuning.view.width
   const app = new Application()
   const dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1))
-  await app.init({ background: 0x0b0608, antialias: false, resolution: dpr, autoDensity: true, preference: 'webgl', powerPreference: 'high-performance' })
+  // The game loop is the one frame owner. Letting Pixi auto-start its own ticker means the stage can
+  // present the previous low-res texture before our RAF has updated it, adding a hidden display frame
+  // and making Loop.stats() stop before the work the player actually sees.
+  await app.init({ background: 0x0b0608, antialias: false, resolution: dpr, autoDensity: true, preference: 'webgl', powerPreference: 'high-performance', autoStart: false })
   parent.appendChild(app.canvas)
-  app.ticker.maxFPS = 0
+  app.ticker.stop()
 
   const rt = RenderTexture.create({ width, height, scaleMode: 'nearest' })
   const screen = new Sprite(rt)
@@ -86,7 +89,10 @@ export async function createRenderApp(parent: HTMLElement, arenaPx: { w: number;
       screen.position.set(Math.floor((w - width * s) / 2 * dpr) / dpr, Math.floor((h - height * s) / 2 * dpr) / dpr)
     },
     renderFrame() {
+      // One ordered present: build the pixel-scale scene, then immediately blit that exact texture to
+      // the canvas. This call remains inside Loop's timing window, so frame stats are complete.
       app.renderer.render({ container: root, target: rt, clear: true })
+      app.render()
     },
   }
   ra.resize()

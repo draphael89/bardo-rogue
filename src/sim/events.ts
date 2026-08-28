@@ -3,8 +3,8 @@ export type EnemyKind = 'brute' | 'caster' | 'charger' | 'dummy' | 'warden'
 
 export type SimEvent =
   | { type: 'swing'; x: number; y: number; angle: number; swing: number; heavy: boolean }
-  | { type: 'hit'; x: number; y: number; angle: number; damage: number; heavy: boolean; targetId: number; kind: EnemyKind; killed: boolean }
-  | { type: 'kill'; x: number; y: number; angle: number; kind: EnemyKind; id: number }
+  | { type: 'hit'; x: number; y: number; angle: number; damage: number; heavy: boolean; targetId: number; kind: EnemyKind; killed: boolean; actionId: number }
+  | { type: 'kill'; x: number; y: number; angle: number; kind: EnemyKind; id: number; actionId: number }
   | { type: 'playerHurt'; x: number; y: number; angle: number; hp: number }
   | { type: 'playerDeath'; x: number; y: number }
   | { type: 'dodge'; x: number; y: number; angle: number }
@@ -29,7 +29,7 @@ export type SimEvent =
   | { type: 'arrowLoose'; x: number; y: number; angle: number }
   | { type: 'arrowHitWall'; x: number; y: number }
   | { type: 'dodged'; x: number; y: number }
-  | { type: 'graze'; x: number; y: number }
+  | { type: 'graze'; x: number; y: number; nearX: number; nearY: number; angle: number }
   | { type: 'restart' }
   // a pooled slot was unavailable and the spawn/shot was dropped; the sim never fails silently
   | { type: 'poolOverflow'; pool: 'enemy'; kind: EnemyKind; x: number; y: number }

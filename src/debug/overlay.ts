@@ -73,6 +73,6 @@ export class DebugOverlay {
       h.rect(x0 + gw - 1 - i, y0 - bh, 1, bh).fill({ color: v > 16.7 ? 0xff5050 : 0x80c0ff })
     }
     const st = loop.stats()
-    this.info.text = `frame p50 ${st.p50} p95 ${st.p95} max ${st.max} ms | tick ${world.tick} freeze ${world.freeze} | p ${p.state}:${p.stateTick} hp${p.hp} | enemies ${world.aliveEnemies()} bolts ${world.projectiles.filter(b => b.active).length}`
+    this.info.text = `present p95 ${st.render.p95} sim ${st.sim.p95} total ${st.p95} ms long ${st.longPct}% | tick ${world.tick} freeze ${world.freeze} | p ${p.state}:${p.stateTick} hp${p.hp} | enemies ${world.aliveEnemies()} bolts ${world.projectiles.filter(b => b.active).length}`
   }
 }

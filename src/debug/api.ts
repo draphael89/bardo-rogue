@@ -59,7 +59,7 @@ export function installApi(host: {
     presenter: host.presenter,
     reset: (seed, scenario, opts) => host.reset(seed, scenario, opts),
     step: (n = 1) => { for (let i = 0; i < n; i++) host.tick() },
-    setInput: f => host.setOverride(f ? { moveX: 0, moveY: 0, aimX: 1, aimY: 0, aimSoft: false, attack: false, dodge: false, restart: false, ...f } : null),
+    setInput: f => host.setOverride(f ? { moveX: 0, moveY: 0, aimX: 1, aimY: 0, aimSoft: false, attack: false, attackHeld: false, dodge: false, restart: false, ...f } : null),
     bot: name => host.setBot(name ? makeBot(name) : null),
     pause: p => { host.loop.paused = p ?? !host.loop.paused; return host.loop.paused },
     hash: () => hashWorld(host.getWorld()),
@@ -77,7 +77,12 @@ export function installApi(host: {
           hasNext: w.hasNextRoom(),
           exits: w.rooms[w.roomIndex]?.exits ?? [],
         },
-        player: { x: +w.player.x.toFixed(1), y: +w.player.y.toFixed(1), hp: w.player.hp, maxHp: w.player.maxHp, state: w.player.state, stateTick: w.player.stateTick, iframes: w.player.iframes, arm: armOf(w) === ARM.bow ? 'bow' : 'blade' },
+        player: {
+          x: +w.player.x.toFixed(1), y: +w.player.y.toFixed(1), hp: w.player.hp, maxHp: w.player.maxHp,
+          state: w.player.state, stateTick: w.player.stateTick, dodgeTick: w.player.dodgeTick,
+          iframes: w.player.iframes, assistTargetId: w.player.assistTargetId,
+          arm: armOf(w) === ARM.bow ? 'bow' : 'blade',
+        },
         returns: w.returns,
         offering: w.arena.offering
           ? { kind: w.arena.offering.kind, x: +w.arena.offering.x.toFixed(1), y: +w.arena.offering.y.toFixed(1), taken: !!w.arena.offeringTaken }

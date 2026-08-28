@@ -34,10 +34,10 @@ describe('resolveAim', () => {
     expect(deg(a)).toBe(0)
   })
 
-  it('ranks sources: right stick > arrows > mouse > lock > movement > last aim', () => {
+  it('ranks sources: right stick > arrows > explicit lock > mouse > movement > last aim', () => {
     expect(deg(at({ padAimX: 0, padAimY: -1, arrowX: 1, mouseX: -1, lockX: 0, lockY: 1, moveX: 1 }))).toBe(-90)
     expect(deg(at({ arrowX: 0, arrowY: 1, mouseX: -1, lockX: 1, moveX: 1 }))).toBe(90)
-    expect(deg(at({ mouseX: -1, lockX: 0, lockY: 1, moveX: 1 }))).toBe(180)
+    expect(deg(at({ mouseX: -1, lockX: 0, lockY: 1, moveX: 1 }))).toBe(90)
     expect(deg(at({ lockX: 0, lockY: -1, moveX: 1 }))).toBe(-90)
     expect(deg(at({ moveX: 0, moveY: 1 }))).toBe(90)
     expect(deg(at({ lastAimX: 0, lastAimY: -1 }))).toBe(-90)
@@ -62,6 +62,18 @@ describe('resolveAim', () => {
     expect(hit).not.toBeNull()
     expect(deg(hit!)).toBe(6)
     expect(aimLockTarget(0, 0, 1, 0, 50, [{ x: -40, y: 0 }])).toBeNull()
+  })
+
+  it('retains a living lock through crossings and breaks it only outside the release range', () => {
+    const targets = [
+      { id: 1, x: 60, y: 8, active: true },
+      { id: 2, x: 30, y: 0, active: true },
+    ]
+    const held = aimLockTarget(0, 0, 1, 0, 50, targets, { currentId: 1, maxRange: 100, breakRange: 120 })
+    expect(held?.id).toBe(1)
+    targets[0]!.x = 121
+    const switched = aimLockTarget(0, 0, 1, 0, 50, targets, { currentId: 1, maxRange: 100, breakRange: 120 })
+    expect(switched?.id).toBe(2)
   })
 
   it('always returns a unit vector', () => {

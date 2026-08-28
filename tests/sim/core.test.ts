@@ -246,12 +246,12 @@ describe('attack', () => {
     const w = createWorld(1, 'empty')
     const swings: number[] = []
     for (let i = 0; i < 300; i++) {
-      stepWorld(w, { ...emptyInput(), attack: true })   // held, not mashed
+      stepWorld(w, { ...emptyInput(), attack: i === 0, attackHeld: true })
       for (const e of w.events) if (e.type === 'swing') swings.push(e.swing)
       w.events.length = 0
     }
     expect(swings.length).toBeGreaterThan(6)
-    // the buffer is re-armed every tick, so the gates alone must keep the loop honest
+    // held intent sustains the chain but never manufactures discrete queued presses
     for (let i = 0; i < swings.length; i++) expect(swings[i], `swing ${i}`).toBe(i % 3)
   })
   it('hits a dummy in front once per swing and applies hit-stop', () => {

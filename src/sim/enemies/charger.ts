@@ -47,7 +47,7 @@ export function updateCharger(world: World, e: Enemy): void {
         const d = distToPlayer(world, e)
         const hitR = e.radius + p.radius
         if (d <= hitR) { hurtPlayer(world, e.aimAngle, C.damage); e.hitDone = true }
-        else if (d <= hitR + tuning.bullet.grazePx) noteNearMiss(world)
+        else if (d <= hitR + tuning.bullet.grazePx) noteNearMiss(world, e.aimAngle)
       }
       if (r.hitX || r.hitY || e.stateTick >= e.dashTicks) { e.state = 'recover'; e.stateTick = 0 }
       break

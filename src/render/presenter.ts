@@ -20,6 +20,12 @@ import { DamageNumbers } from './damageNumbers'
 import { Atmosphere } from './atmosphere'
 import { seedFx } from './fxRng'
 import { hasBoon } from '@/sim/boons'
+import { crowdScreenMultiplier } from './feedback'
+
+interface ImpactStamp {
+  t: number; r: number; a: number; snap: number; sweep: number
+  wx: number; wy: number; heavy: boolean; pierce: boolean; targetId: number
+}
 
 // Reads sim state + events every frame and drives everything visible. Never mutates the sim.
 export class Presenter {
@@ -52,11 +58,11 @@ export class Presenter {
   // through its four ticks it is. Stepped on real time, one tier per tick.
   private dodgedT = -1; private dodgedStep = -1
   private dodgedX = 0; private dodgedY = 0; private dodgedA = 0
-  // the contact stamp: an arc radius/orientation about the player, plus the wound it was struck on
-  private impactT = -1; private impactR = 0; private impactA = 0; private impactSnap = 0
-  private impactSweep = 1; private impactWX = 0; private impactWY = 0; private impactHeavy = false
-  private impactPierce = false
-  private impactId = -1
+  private grazeT = -1; private grazeX = 0; private grazeY = 0; private grazeA = 0
+  // Every struck body keeps its local stamp. Only the shared screen gesture is aggregated.
+  private impacts: ImpactStamp[] = []
+  private lastScreenHitActionId = -1
+  private lastScreenKillActionId = -1
   // hit flash on real time, not sim ticks: hit-stop must not hold a target white for its whole freeze
   private hitFlash = new Map<number, number>()
   private propSprites: Sprite[] = []
@@ -105,12 +111,22 @@ export class Presenter {
     this.damageNumbers.clear()
     this.recoilX = this.recoilY = 0
     this.dodgedT = -1; this.dodgedStep = -1
-    this.impactT = -1
-    this.impactId = -1
+    this.grazeT = -1
+    this.impacts.length = 0
+    this.lastScreenHitActionId = this.lastScreenKillActionId = -1
   }
 
   handleEvents(events: readonly SimEvent[]) {
     const J = tuning.juice
+    let hitGroups: Map<number, { count: number; killed: number }> | null = null
+    for (const ev of events) {
+      if (ev.type !== 'hit') continue
+      hitGroups ??= new Map()
+      const g = hitGroups.get(ev.actionId) ?? { count: 0, killed: 0 }
+      g.count++
+      if (ev.killed) g.killed++
+      hitGroups.set(ev.actionId, g)
+    }
     for (const ev of events) {
       switch (ev.type) {
         case 'hit': {
@@ -132,34 +148,43 @@ export class Presenter {
           const p = this.world.player
           const fx = ev.x - p.x, fy = (ev.y - p.y) / 0.9
           const stepA = (Math.PI * 2) / C.snapSteps
-          this.impactT = 0
-          this.impactId = ev.targetId
-          this.impactA = Math.atan2(fy, fx)
-          this.impactSnap = Math.round(this.impactA / stepA) * stepA
-          this.impactR = Math.hypot(fx, fy) + (ev.heavy ? C.heavyOut : C.out)
-          this.impactSweep = tuning.player.attack.swings[p.swingIndex].sweep
-          // on the near edge of the body, where the blade went in — not past it
-          this.impactWX = ev.x - Math.cos(this.impactA) * 2
-          this.impactWY = ev.y - Math.sin(this.impactA) * 2 * 0.9
-          this.impactHeavy = ev.heavy || blessed
-          this.impactPierce = armOf(this.world) === ARM.bow
-          if (blessed) this.particles.ring(this.impactWX, this.impactWY, 0xffe090)
-          if (!crate) this.particles.wound(this.impactWX, this.impactWY, ev.angle, C.blood)
-          // EVERY hit moves the camera. Light hits are ~90% of all contact, so a light hit the camera
-          // ignores is a game that says nothing almost every time you connect.
-          this.camera.addTrauma(ev.heavy ? J.traumaHeavy : J.traumaLight)
-          this.camera.kick(ev.angle, ev.heavy ? H.heavyKick : H.lightKick)
-          this.camera.punchZoom(ev.heavy ? J.zoom.heavyHit : H.lightZoom)
-          this.flash(ev.heavy ? H.heavyFlash : H.lightFlash, H.flashTint)
-          // and the blow comes back up the arms: the body jolts off the blade while time is stopped
-          this.recoilX -= Math.cos(ev.angle) * H.recoil * (ev.heavy ? 1.8 : 1)
-          this.recoilY -= Math.sin(ev.angle) * H.recoil * (ev.heavy ? 1.8 : 1) * 0.7
-          if (ev.killed) this.camera.addTrauma(J.traumaKill)
+          const impactA = Math.atan2(fy, fx)
+          const impact: ImpactStamp = {
+            t: 0,
+            targetId: ev.targetId,
+            a: impactA,
+            snap: Math.round(impactA / stepA) * stepA,
+            r: Math.hypot(fx, fy) + (ev.heavy ? C.heavyOut : C.out),
+            sweep: tuning.player.attack.swings[p.swingIndex].sweep,
+            // on the near edge of the body, where the blade went in — not past it
+            wx: ev.x - Math.cos(impactA) * 2,
+            wy: ev.y - Math.sin(impactA) * 2 * 0.9,
+            heavy: ev.heavy || blessed,
+            pierce: armOf(this.world) === ARM.bow,
+          }
+          this.impacts.push(impact)
+          if (this.impacts.length > 8) this.impacts.shift()
+          if (blessed) this.particles.ring(impact.wx, impact.wy, 0xffe090)
+          if (!crate) this.particles.wound(impact.wx, impact.wy, ev.angle, C.blood)
+
+          // One action gets one screen sentence. More bodies add a restrained square-root accent;
+          // their wounds, flinches, shards and damage remain fully local and fully individual.
+          if (ev.actionId !== this.lastScreenHitActionId) {
+            this.lastScreenHitActionId = ev.actionId
+            const group = hitGroups?.get(ev.actionId) ?? { count: 1, killed: ev.killed ? 1 : 0 }
+            const S = H.screen
+            const mult = crowdScreenMultiplier(group.count)
+            this.camera.addTrauma((ev.heavy ? J.traumaHeavy : J.traumaLight) * mult + (group.killed ? J.traumaKill : 0), S.traumaCap)
+            this.camera.kick(ev.angle, (ev.heavy ? H.heavyKick : H.lightKick) * mult, S.kickCap)
+            this.camera.punchZoom(ev.heavy ? J.zoom.heavyHit : H.lightZoom)
+            this.flash(ev.heavy ? H.heavyFlash : H.lightFlash, H.flashTint)
+            this.addRecoil(ev.angle, H.recoil * (ev.heavy ? 1.8 : 1) * mult)
+          }
           // juice hooks. Only the greatsword throws grit: the soft smoke in that wave is what turned a
           // light contact into a pale smudge, and the light hit now says it with hard shapes instead.
           if (ev.heavy) {
             this.postfx.pulse()
-            this.particles.slashWave(this.impactWX, this.impactWY, ev.angle, 0.7, J.swing.waveParticles)
+            this.particles.slashWave(impact.wx, impact.wy, ev.angle, 0.7, J.swing.waveParticles)
           }
           if (J.damageNumbers) this.damageNumbers.show(ev.x, ev.y, ev.damage, ev.heavy)
           break
@@ -169,8 +194,11 @@ export class Presenter {
           if (v) { this.particles.shatter(v.body, ev.x, ev.y, ev.angle); v.destroy(); this.enemyViews.delete(ev.id) }
           this.particles.blood(ev.x, ev.y, ev.angle, ev.kind === 'charger' ? 0x6a3aa0 : 0x8a1a22)
           this.particles.puff(ev.x, ev.y, 6, 0x3a2a2a)
-          this.flash(J.killFlash, 0xffffff)
-          this.camera.punchZoom(J.zoom.kill) // juice hook
+          if (ev.actionId !== this.lastScreenKillActionId) {
+            this.lastScreenKillActionId = ev.actionId
+            this.flash(J.killFlash, 0xffffff)
+            this.camera.punchZoom(J.zoom.kill)
+          }
           break
         }
         case 'playerHurt':
@@ -203,6 +231,17 @@ export class Presenter {
           this.dodgedA = Math.atan2(q.dodgeDirY, q.dodgeDirX)
           this.camera.punchZoom(D.zoom)
           this.camera.addTrauma(D.trauma)
+          break
+        }
+        case 'graze': {
+          const dx = ev.nearX - ev.x, dy = ev.nearY - ev.y
+          const d = Math.hypot(dx, dy) || 1
+          // Put the whisper just off the silhouette, perpendicular to the passing threat. At the
+          // exact closest point the projectile sprite covers every cyan pixel that explains it.
+          this.grazeX = ev.x - dy / d * 9; this.grazeY = ev.y + dx / d * 9
+          this.grazeA = ev.angle; this.grazeT = 0
+          this.particles.graze(this.grazeX, this.grazeY, ev.angle)
+          this.camera.kick(ev.angle + Math.PI, 0.55, 1.2)
           break
         }
         case 'enemyStagger': {
@@ -321,7 +360,7 @@ export class Presenter {
   private rollX0 = 0; private rollY0 = 0
   private rollMotion(p: World['player']) {
     const d = tuning.player.dodge
-    if (p.state !== 'dodge' || p.stateTick >= d.travel) return
+    if (p.dodgeTick < 0 || p.dodgeTick >= d.travel) return
     this.camera.lean(Math.atan2(p.dodgeDirY, p.dodgeDirX), tuning.juice.roll.lean)
   }
 
@@ -331,8 +370,8 @@ export class Presenter {
   // thing about a dodge a player has to be able to see.
   private drawRollStreak(g: Graphics, p: World['player'], alpha: number) {
     const d = tuning.player.dodge, R = tuning.juice.roll
-    const over = p.stateTick - d.travel
-    if (p.state !== 'dodge' || over > R.streakFadeTicks) return
+    const over = p.dodgeTick - d.travel
+    if (p.dodgeTick < 0 || over > R.streakFadeTicks) return
     const x = lerp(p.px, p.x, alpha), y = lerp(p.py, p.y, alpha) + 1
     const dx = x - this.rollX0, dy = y - this.rollY0
     const dist = Math.hypot(dx, dy)
@@ -340,7 +379,7 @@ export class Presenter {
     const ux = dx / dist, uy = dy / dist
     const tail = Math.min(dist, R.streakLen)
     const fade = over > 0 ? 1 - over / R.streakFadeTicks : 1
-    const hot = p.stateTick >= d.iStart && p.stateTick <= d.iEnd
+    const hot = p.dodgeTick >= d.iStart && p.dodgeTick <= d.iEnd
     // rim first, one pixel proud of the core on both sides: without it a pale streak dies on a pale
     // floor, exactly as the blade's crescent does
     for (let i = 3; i < tail; i++) {
@@ -359,6 +398,36 @@ export class Presenter {
     g.fill({ color: hot ? R.streakCore : R.streakRim, alpha: (hot ? R.streakAlpha : 0.35) * fade })
   }
 
+  // Soft aim/lock ownership is shown on the floor, never painted over the target. Four restrained
+  // brass ticks make target stability legible without turning keyboard assist into a hard-lock UI.
+  private drawAssistTarget(g: Graphics, p: World['player'], alpha: number) {
+    if (!p.assistTargetId) return
+    const e = this.world.enemies.find(x => x.active && x.id === p.assistTargetId)
+    if (!e) return
+    const x = Math.round(lerp(e.px, e.x, alpha)), y = Math.round(lerp(e.py, e.y, alpha) + e.radius + 3)
+    const r = Math.round(e.radius + 4)
+    for (const side of [-1, 1]) {
+      g.rect(x + side * r - (side < 0 ? 1 : 0), y, 2, 1)
+      g.rect(x + side * (r + 1), y - 2, 1, 2)
+    }
+    g.fill({ color: 0xc9a76a, alpha: 0.72 })
+  }
+
+  // Three stepped cyan scratches at the edge of the silhouette. Perfect dodge owns the ring and
+  // white rim; a graze gets only this short directional whisper, so reward hierarchy stays honest.
+  private drawGraze(g: Graphics, dtSec: number) {
+    if (this.grazeT < 0) return
+    const G = tuning.juice.graze
+    const step = Math.floor(this.grazeT / G.stepSec)
+    this.grazeT += Math.min(dtSec, G.stepSec)
+    if (step >= G.tiers) { this.grazeT = -1; return }
+    const color = step === 0 ? G.hot : step === 1 ? G.mid : G.far
+    const nx = -Math.sin(this.grazeA), ny = Math.cos(this.grazeA)
+    for (let i = -1; i <= 1; i++) {
+      ray(g, this.grazeX + nx * i * 2, this.grazeY + ny * i * 2, this.grazeA + Math.PI, step * 2, G.len - step, 1, color)
+    }
+  }
+
   // While the greatsword is up: the camera leans off the swing line and embers gather at the blade.
   // Both stop the instant the blade drops, so the release reads as a release.
   private heavyWindup(p: World['player'], dtSec: number) {
@@ -373,6 +442,14 @@ export class Presenter {
     this.particles.chargeGlow(w.position.x, w.position.y, 7 + 13 * Math.max(0, Math.min(1, u)))
     this.emberAcc += J.swing.heavyEmberRate * dtSec
     while (this.emberAcc >= 1) { this.emberAcc -= 1; this.particles.ember(w.position.x, w.position.y) }
+  }
+
+  private addRecoil(angle: number, strength: number) {
+    this.recoilX -= Math.cos(angle) * strength
+    this.recoilY -= Math.sin(angle) * strength * 0.7
+    const cap = tuning.juice.hit.screen.recoilCap
+    const m = Math.hypot(this.recoilX, this.recoilY)
+    if (m > cap) { this.recoilX *= cap / m; this.recoilY *= cap / m }
   }
 
   // What the player's own body does about the hit: a whole-pixel jolt back off the blade, and — after a
@@ -421,19 +498,19 @@ export class Presenter {
 
   // Shove the struck sprite off the blade and tip it away. Freeze holds the pose; without this
   // the still is an idle body under a trail.
-  private flinchBody(v: EntityView): void {
+  private flinchBody(v: EntityView, impact: ImpactStamp): void {
     const H = tuning.juice.hit
     const q = Math.max(v.squash / tuning.juice.squashTicks, v.redFlash / H.redFlash)
     const kick = H.bodyKick * q
-    const dx = Math.round(Math.cos(this.impactA) * kick)
-    const dy = Math.round(Math.sin(this.impactA) * kick * 0.7)
+    const dx = Math.round(Math.cos(impact.a) * kick)
+    const dy = Math.round(Math.sin(impact.a) * kick * 0.7)
     v.body.position.x += dx
     v.body.position.y += dy
-    v.body.rotation += (Math.cos(this.impactA) >= 0 ? 1 : -1) * H.bodyLean * q
+    v.body.rotation += (Math.cos(impact.a) >= 0 ? 1 : -1) * H.bodyLean * q
     if (v.weapon) {
       v.weapon.position.x += dx
       v.weapon.position.y += dy
-      v.weapon.rotation += (Math.cos(this.impactA) >= 0 ? 1 : -1) * H.bodyLean * q * 0.6
+      v.weapon.rotation += (Math.cos(impact.a) >= 0 ? 1 : -1) * H.bodyLean * q * 0.6
     }
   }
 
@@ -441,26 +518,30 @@ export class Presenter {
   // Ground: tapered crescent UNDER both fighters. Air: a wound cut ON the body plus sparks
   // thrown through it — the still has to say meat, not only a swipe.
   private drawContact(ground: Graphics, air: Graphics, dtSec: number) {
-    if (this.impactT < 0) return
+    if (!this.impacts.length) return
     const C = tuning.juice.hit.contact
-    const tiers = this.impactHeavy ? C.heavyTiers : C.tiers
-    const step = Math.floor(this.impactT / C.stepSec)
-    // a hitch or a batched stepwise capture must not skip the stamp; one tier per drawn frame
-    this.impactT += Math.min(dtSec, C.stepSec)
-    if (step >= tiers) { this.impactT = -1; return }
-    const u = step / tiers
     // anchored to the player's DRAWN body, so the arc rides the contact recoil with him
     const b = this.playerView.body
     const cx = b.position.x, cy = b.position.y - tuning.player.radius - 1
-    const thick = (this.impactHeavy ? C.heavyThick : C.thick) * (1 - u * 0.45)
-    const span = (this.impactHeavy ? C.heavySpanDeg : C.spanDeg) * Math.PI / 180
-    // the tail chases the leading edge across the tiers: motion, without ever unsnapping the shape
-    if (this.impactPierce) pierceStamp(ground, this.impactWX, this.impactWY, this.impactSnap, step, C)
-    else crescent(ground, cx, cy, this.impactR, thick, this.impactSnap, span, this.impactSweep, u * 0.5, step === 0, C)
-    woundPool(ground, this.impactWX, this.impactWY, this.impactA, step, C)
-    const n = Math.max(2, (this.impactHeavy ? C.heavySparks : C.sparks) - step)
-    sparkCluster(air, this.impactWX, this.impactWY, this.impactA, step, n, this.impactHeavy ? C.heavyDrops : C.drops, C)
-    woundCut(air, this.impactWX, this.impactWY, this.impactA, step, this.impactHeavy, C)
+    let write = 0
+    for (const impact of this.impacts) {
+      const tiers = impact.heavy ? C.heavyTiers : C.tiers
+      const step = Math.floor(impact.t / C.stepSec)
+      // A hitch or a batched stepwise capture must not skip the stamp; one tier per drawn frame.
+      impact.t += Math.min(dtSec, C.stepSec)
+      if (step >= tiers) continue
+      const u = step / tiers
+      const thick = (impact.heavy ? C.heavyThick : C.thick) * (1 - u * 0.45)
+      const span = (impact.heavy ? C.heavySpanDeg : C.spanDeg) * Math.PI / 180
+      if (impact.pierce) pierceStamp(ground, impact.wx, impact.wy, impact.snap, step, C)
+      else crescent(ground, cx, cy, impact.r, thick, impact.snap, span, impact.sweep, u * 0.5, step === 0, C)
+      woundPool(ground, impact.wx, impact.wy, impact.a, step, C)
+      const n = Math.max(2, (impact.heavy ? C.heavySparks : C.sparks) - step)
+      sparkCluster(air, impact.wx, impact.wy, impact.a, step, n, impact.heavy ? C.heavyDrops : C.drops, C)
+      woundCut(air, impact.wx, impact.wy, impact.a, step, impact.heavy, C)
+      this.impacts[write++] = impact
+    }
+    this.impacts.length = write
   }
 
   rebuildRoom(): void {
@@ -529,7 +610,12 @@ export class Presenter {
       const hf = (this.hitFlash.get(id) ?? 0) - dtSec
       if (hf > 0) this.hitFlash.set(id, hf); else this.hitFlash.delete(id)
       v.setFlash(hf > 0)
-      if (id === this.impactId && (v.squash > 0 || v.redFlash > 0)) this.flinchBody(v)
+      if (v.squash > 0 || v.redFlash > 0) {
+        for (let i = this.impacts.length - 1; i >= 0; i--) {
+          const impact = this.impacts[i]!
+          if (impact.targetId === id) { this.flinchBody(v, impact); break }
+        }
+      }
     }
     for (const b of w.projectiles) {
       if (!b.active) continue
@@ -574,7 +660,9 @@ export class Presenter {
       drawSwingTip(this.fxGraphics, p, alpha, w)
     }
     this.drawRollStreak(this.groundFx, p, alpha)
+    this.drawAssistTarget(this.groundFx, p, slowAlpha)
     this.drawContact(this.groundFx, this.fxGraphics, dtSec)
+    this.drawGraze(this.fxGraphics, dtSec)
     this.drawDodgeMark(this.groundFx, dtSec)
     // and the one bright thing that is allowed on a body: the player's own outline, white for a
     // single tick and cold for two more. Last, so it rides the contact recoil with the body.

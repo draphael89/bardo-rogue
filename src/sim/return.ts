@@ -22,9 +22,12 @@ export function returnToHub(world: World): void {
   p.dodgeRead = 0
   p.vx = p.vy = 0
   p.kbx = p.kby = 0
-  p.attackBuffer = 0
-  p.dodgeBuffer = 0
+  p.controlTick = 0
+  p.attackQueuedAt = -1
+  p.dodgeQueuedAt = -1
+  p.dodgeTick = -1
   p.swingIndex = 0
+  p.assistTargetId = 0
   world.timeScale = 1
   world.slowmoTicks = 0
   clearBulletTime(world)

@@ -56,6 +56,25 @@ describe('dodge feel', () => {
     expect(w.player.swingIndex).toBe(0)
   })
 
+  it('keeps the full travel and safety contract under a late attack overlay', () => {
+    const w = createWorld(1, 'empty')
+    const p = w.player
+    const d = tuning.player.dodge
+    const x0 = p.x
+    let endX = NaN
+    const safeTicks: number[] = []
+    for (let t = 0; t <= d.travel; t++) {
+      stepWorld(w, { ...emptyInput(), dodge: t === 0, attack: t === d.attackCancelFrom, moveX: 1 })
+      if (p.dodgeTick >= 0 && isPlayerInvulnerable(w)) safeTicks.push(p.dodgeTick)
+      const end = w.events.find(e => e.type === 'dodgeEnd')
+      if (end && end.type === 'dodgeEnd') endX = end.x
+      w.events.length = 0
+    }
+    expect(p.state).toBe('attack')
+    expect(endX - x0, 'attack-cancel shortened the roll').toBeCloseTo(d.distance, 6)
+    expect(safeTicks).toEqual(Array.from({ length: d.travel }, (_, i) => i))
+  })
+
   it('does not swing if the cancel is asked one tick too early — it waits', () => {
     const w = createWorld(1, 'empty')
     const from = tuning.player.dodge.attackCancelFrom
@@ -91,14 +110,27 @@ describe('attack cancel windows', () => {
     expect(dodgeAt, `light dodge at t=${dodgeAt} (${ms(dodgeAt)} ms)`).toBe(s.startup + s.active)
   })
 
-  it('cannot dodge a heavy until late recovery, and then it can', () => {
+  it('can feint a heavy before the feet plant', () => {
+    const w = createWorld(1, 'empty')
+    w.player.state = 'attack'
+    w.player.swingIndex = 2
+    w.player.stateTick = 0
+    w.player.swingId = ++w.swingCounter
+    stepWorld(w, { ...emptyInput(), dodge: true, moveX: -1 })
+    expect(w.player.state).toBe('dodge')
+    expect(w.player.dodgeDirX).toBe(-1)
+  })
+
+  it('holds a committed heavy until late recovery, then honors a timely request', () => {
     const w = createWorld(1, 'empty')
     const s = tuning.player.attack.swings[2]
     let heavyAt = -1
     let dodgeAt = -1
     for (let t = 0; t < 90; t++) {
-      // dodge only after the heavy has begun, or light dodge-cancel steals the chain
-      stepWorld(w, { ...emptyInput(), attack: true, dodge: heavyAt >= 0, moveX: 1 })
+      // The committed middle deliberately ignores stale requests. Press inside the 200 ms queue
+      // horizon so the roll happens exactly at the authored recovery gate.
+      const timelyDodge = heavyAt >= 0 && w.player.swingIndex === 2 && w.player.stateTick === 11
+      stepWorld(w, { ...emptyInput(), attack: true, dodge: timelyDodge, moveX: 1 })
       for (const ev of w.events) {
         if (ev.type === 'swing' && ev.swing === 2 && heavyAt < 0) heavyAt = t
         if (ev.type === 'dodge' && dodgeAt < 0) dodgeAt = t
@@ -223,6 +255,78 @@ describe('startup steer', () => {
     }
     const turned = Math.abs(w.player.swingAngle - start) * 180 / Math.PI
     expect(turned, `${turned.toFixed(1)} deg of steer`).toBeGreaterThanOrEqual(44)
+  })
+})
+
+describe('soft aim trust', () => {
+  it('assists only reachable targets and retains the chosen target id', () => {
+    const w = createWorld(1, 'dummy')
+    const p = w.player
+    const e = w.enemies.find(x => x.active)!
+    p.x = p.px = 5.5 * 16; p.y = p.py = 5.5 * 16
+    e.x = e.px = 8.5 * 16; e.y = e.py = p.y
+    const wall = 5 * w.arena.cols + 7
+    w.arena.solid[wall] = 1
+    stepWorld(w, { ...emptyInput(), aimX: 1, aimSoft: true })
+    expect(p.assistTargetId).toBe(0)
+    w.arena.solid[wall] = 0
+    stepWorld(w, { ...emptyInput(), aimX: 1, aimSoft: true })
+    expect(p.assistTargetId).toBe(e.id)
+  })
+
+  it('honors the full authored assist cone at maximum blade range', () => {
+    const w = createWorld(1, 'empty')
+    w.arena.solid.fill(0)
+    const p = w.player
+    p.x = p.px = 160; p.y = p.py = 120
+    const angle = 27 * Math.PI / 180
+    const e = w.spawnEnemy('dummy', p.x + Math.cos(angle) * 70, p.y + Math.sin(angle) * 70)!
+    w.events.length = 0
+    stepWorld(w, { ...emptyInput(), aimX: 1, aimY: 0, aimSoft: true })
+    expect(p.assistTargetId).toBe(e.id)
+    expect(p.aimAngle * 180 / Math.PI).toBeCloseTo(27, 6)
+  })
+})
+
+describe('intent clock', () => {
+  it('does not age a discrete press during hit-stop', () => {
+    const w = createWorld(1, 'empty')
+    w.freeze = 20
+    stepWorld(w, { ...emptyInput(), attack: true })
+    for (let t = 1; t < 20; t++) stepWorld(w, emptyInput())
+    expect(w.player.state).toBe('free')
+    expect(w.player.controlTick).toBe(0)
+    stepWorld(w, emptyInput())
+    expect(w.player.state).toBe('attack')
+  })
+
+  it('release never leaves a held-only future swing behind', () => {
+    const w = createWorld(1, 'empty')
+    let swings = 0
+    for (let t = 0; t < 100; t++) {
+      stepWorld(w, { ...emptyInput(), attack: t === 0, attackHeld: t < 3 })
+      swings += w.events.filter(e => e.type === 'swing').length
+      w.events.length = 0
+    }
+    expect(swings).toBe(1)
+  })
+})
+
+describe('vector movement', () => {
+  it('accelerates cardinal and diagonal intent on the same magnitude curve', () => {
+    const speeds = (x: number, y: number) => {
+      const w = createWorld(1, 'empty')
+      const out: number[] = []
+      for (let t = 0; t < tuning.player.accelTicks; t++) {
+        stepWorld(w, { ...emptyInput(), moveX: x, moveY: y })
+        out.push(Math.hypot(w.player.vx, w.player.vy))
+      }
+      return out
+    }
+    const cardinal = speeds(1, 0)
+    const diagonal = speeds(Math.SQRT1_2, Math.SQRT1_2)
+    expect(diagonal).toEqual(cardinal.map(v => expect.closeTo(v, 8)))
+    expect(cardinal.at(-1)).toBe(tuning.player.maxSpeed)
   })
 })
 

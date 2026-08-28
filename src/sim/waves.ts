@@ -3,21 +3,54 @@ import type { World } from './world'
 import type { EnemyKind } from './events'
 import { TILE, setDoorWalkable } from './arena'
 import { clearBulletTime } from './combat'
+import { overlapsSolid } from './collision'
 
 export interface SpawnDef { kind: EnemyKind; x: number; y: number } // in tiles
-export interface WaveGroup { delay: number; spawns: SpawnDef[]; whenRemainingAtMost?: number }
+export interface WaveGroup { delay: number; spawns: SpawnDef[]; whenRemainingAtMost?: number; mirrorX?: boolean }
 export interface WaveDef { groups: WaveGroup[] }
 
+// The reference fight is a curriculum, not a pile of health: read one body, choose across a firing
+// line, route a dash, then combine the verbs under pressure. Whole formations may mirror per seed;
+// relative spacing never changes, so variation asks for a new first decision without changing fairness.
 export const ROOM_WAVES: WaveDef[] = [
-  { groups: [{ delay: 0, spawns: [{ kind: 'brute', x: 12.5, y: 4 }, { kind: 'brute', x: 22, y: 8 }] }] },
-  { groups: [{ delay: 0, spawns: [{ kind: 'brute', x: 12.5, y: 5 }, { kind: 'caster', x: 2.5, y: 3 }, { kind: 'caster', x: 23.5, y: 3 }] }] },
+  { groups: [{ delay: 0, mirrorX: true, spawns: [{ kind: 'brute', x: 8, y: 4.5 }] }] },
+  { groups: [{ delay: 0, mirrorX: true, spawns: [
+    { kind: 'brute', x: 16, y: 5.5 },
+    { kind: 'caster', x: 3, y: 3.5 },
+  ] }, { delay: 30, whenRemainingAtMost: 1, mirrorX: true, spawns: [
+    { kind: 'caster', x: 22, y: 9.5 },
+  ] }] },
+  { groups: [
+    { delay: 0, mirrorX: true, spawns: [{ kind: 'charger', x: 4, y: 10.5 }, { kind: 'caster', x: 21.5, y: 3.5 }] },
+    { delay: 45, whenRemainingAtMost: 1, mirrorX: true, spawns: [{ kind: 'brute', x: 7, y: 4.5 }] },
+  ] },
   {
     groups: [
-      { delay: 0, spawns: [{ kind: 'brute', x: 9, y: 4.5 }, { kind: 'brute', x: 16, y: 4.5 }, { kind: 'caster', x: 2.5, y: 3 }, { kind: 'caster', x: 23.5, y: 3 }] },
-      { delay: 180, spawns: [{ kind: 'charger', x: 2.5, y: 8 }, { kind: 'charger', x: 23.5, y: 8 }, { kind: 'charger', x: 6, y: 3 }, { kind: 'charger', x: 20, y: 3 }] },
-      { delay: 0, whenRemainingAtMost: 2, spawns: [{ kind: 'charger', x: 12.5, y: 3 }, { kind: 'charger', x: 12.5, y: 12.5 }] },
+      { delay: 0, mirrorX: true, spawns: [{ kind: 'brute', x: 9, y: 4.5 }, { kind: 'brute', x: 16, y: 4.5 }, { kind: 'caster', x: 2.5, y: 3 }, { kind: 'caster', x: 23.5, y: 3 }] },
+      { delay: 30, whenRemainingAtMost: 2, mirrorX: true, spawns: [{ kind: 'charger', x: 2.5, y: 8 }, { kind: 'charger', x: 23.5, y: 8 }, { kind: 'charger', x: 7, y: 3 }, { kind: 'charger', x: 19, y: 3 }] },
+      { delay: 0, whenRemainingAtMost: 2, mirrorX: true, spawns: [{ kind: 'charger', x: 12.5, y: 3 }, { kind: 'charger', x: 12.5, y: 12.5 }] },
     ],
   },
+  { groups: [
+    { delay: 0, mirrorX: true, spawns: [
+      { kind: 'caster', x: 3, y: 3.5 },
+      { kind: 'brute', x: 13, y: 5 },
+      { kind: 'charger', x: 5, y: 11 },
+    ] },
+    { delay: 20, whenRemainingAtMost: 2, mirrorX: true, spawns: [
+      { kind: 'caster', x: 22, y: 3.5 }, { kind: 'charger', x: 21, y: 11 },
+    ] },
+    { delay: 20, whenRemainingAtMost: 1, mirrorX: true, spawns: [
+      { kind: 'brute', x: 18, y: 5 }, { kind: 'charger', x: 4, y: 7.5 },
+    ] },
+  ] },
+  // Coda: three clean two-body phrases. The density falls but the verbs alternate, letting a good
+  // player finish in rhythm instead of surviving the hardest pile and then mopping up leftovers.
+  { groups: [
+    { delay: 0, mirrorX: true, spawns: [{ kind: 'brute', x: 8, y: 5 }, { kind: 'caster', x: 21, y: 4 }] },
+    { delay: 24, whenRemainingAtMost: 0, mirrorX: true, spawns: [{ kind: 'charger', x: 5, y: 10 }, { kind: 'charger', x: 21, y: 10 }] },
+    { delay: 24, whenRemainingAtMost: 0, mirrorX: true, spawns: [{ kind: 'caster', x: 4, y: 4 }, { kind: 'brute', x: 18, y: 5.5 }] },
+  ] },
 ]
 
 // Two-room run: Threshold teaches the brute, Crossing answers with range + dash. Positions stay off furniture.
@@ -31,7 +64,21 @@ export const CROSSING_RUN_WAVES: WaveDef[] = [
 ]
 
 export function queueSpawn(world: World, s: SpawnDef): void {
-  const x = s.x * TILE, y = s.y * TILE
+  let x = s.x * TILE, y = s.y * TILE
+  const radius = s.kind === 'dummy' ? 6 : tuning[s.kind].radius
+  // Authored formations can mirror into asymmetric room masonry. Resolve the telegraph itself to
+  // the nearest full-body-clear tile, so what the player sees is exactly where the enemy arrives.
+  if (overlapsSolid(world.arena, x, y, radius)) {
+    let bestX = x, bestY = y, bestD = Infinity
+    for (let dr = -4; dr <= 4; dr++) for (let dc = -4; dc <= 4; dc++) {
+      const d = dc * dc + dr * dr
+      if (d >= bestD) continue
+      const qx = x + dc * TILE, qy = y + dr * TILE
+      if (overlapsSolid(world.arena, qx, qy, radius)) continue
+      bestD = d; bestX = qx; bestY = qy
+    }
+    x = bestX; y = bestY
+  }
   world.spawnQueue.push({ kind: s.kind, x, y, ticksLeft: tuning.spawnTelegraphTicks })
   world.emit({ type: 'spawnTelegraph', x, y, kind: s.kind })
 }
@@ -71,7 +118,8 @@ export function updateWaves(world: World): void {
     const g = def.groups[w.groupIndex]
     if (g.whenRemainingAtMost !== undefined && remaining > g.whenRemainingAtMost) return
     if (w.timer < g.delay) { w.timer++; return }
-    for (const s of g.spawns) queueSpawn(world, s)
+    const mirror = !!g.mirrorX && world.rng.next() < 0.5
+    for (const s of g.spawns) queueSpawn(world, mirror ? { ...s, x: world.arena.cols - s.x } : s)
     w.groupIndex++
     w.timer = 0
     return

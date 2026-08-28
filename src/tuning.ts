@@ -26,9 +26,8 @@ export const tuning = {
 
   player: {
     radius: 5,
-    // Ticks from rest to full speed, from full speed to rest, and to cross zero when reversing.
-    // A direction change gets its own rate: braking into a reversal at the acceleration rate is
-    // what makes a turn read as a skid rather than a turn.
+    // Vector-space ticks from rest to full speed, from full speed to rest, and to cross zero when
+    // reversing. Sideways momentum brakes separately so a 90° correction stays crisp.
     maxSpeed: 95, accelTicks: 4, decelTicks: 3, turnTicks: 2,
     hp: 5,
     hurtIFrames: 40, hurtKnockback: 12, hurtHitstop: 4,
@@ -47,10 +46,11 @@ export const tuning = {
       landMoveExp: 1.2,     // steering eases in across the landing
       landMoveMin: 0.28,    // first landing tick still has ~27 px/s — a step, not a plant
       attackCancelFrom: 8,  // late travel: the swing's own startup covers the rest of the roll
-      buffer: 8,
+      buffer: 12,           // maximum age of a discrete request on the player's unfrozen control clock (200 ms)
     },
     attack: {
-      buffer: 8,
+      buffer: 12,
+      heavyCommitTick: 4,   // before this the heavy can be abandoned; after it, the visible plant is a promise
       steerRateDeg: 16,     // max deg/tick the swing angle may still be steered, during steerTicks only
                             // note the press tick cannot steer (the state is entered after the steer block),
                             // so a light's usable correction is (steerTicks - 1) * steerRateDeg — 48°,
@@ -63,7 +63,12 @@ export const tuning = {
       ] as SwingDef[],
     },
     aimAssistDeg: 28,
+    aimAssistHysteresisDeg: 8,
+    aimAssistRangeBlade: 72,
+    aimAssistRangeBow: 220,
     aimLockConeDeg: 50,
+    aimLockRange: 150,
+    aimLockBreakRange: 180,
     deathSlowmoTicks: 30, deathSlowmo: 0.25,
   },
 
@@ -167,6 +172,10 @@ export const tuning = {
       lightZoom: 1.018,                     // punch-in on a light hit (the heavy uses zoom.heavyHit)
       lightFlash: 0.11, heavyFlash: 0.20, flashTint: 0xfff0d0,
       recoil: 2.2, recoilDecay: 12,         // px the player's own body jolts back, and its decay rate
+      screen: {
+        crowdBonus: 0.18, crowdCap: 1.25,  // sqrt bonus: bodies multiply, the screen gesture does not
+        kickCap: 6.5, recoilCap: 5, traumaCap: 0.7,
+      },
       bodyKick: 3.2,                        // px the struck body is shoved along the blow during the freeze
       bodyLean: 0.22,                       // rad the struck silhouette tips away from the blade
       redFlash: 3,                          // ticks the struck body wears wine
@@ -216,6 +225,10 @@ export const tuning = {
       rim: 0xffffff,            // ONE tick of full brightness on the player's silhouette...
       rimTint: 0xa8dcff,        // ...then the cold tone, for the two ticks the mark takes to die
       rimTicks: 3,
+    },
+    graze: {
+      stepSec: 0.028, tiers: 3, len: 7,
+      hot: 0xc9f7ff, mid: 0x70d4ea, far: 0x376d82,
     },
     // The roll itself, which is not a reward and must never wear the cold colour: a dim indigo smear
     // while the body is untouchable, the camera drifting with the commitment, weight on the landing.

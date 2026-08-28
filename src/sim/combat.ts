@@ -62,12 +62,13 @@ export function clearBulletTime(world: World): void {
   world.slowTicks = 0
 }
 
-export function damageEnemy(world: World, e: Enemy, damage: number, angle: number, knockback: number, heavy: boolean, hitstop: number): void {
+export function damageEnemy(world: World, e: Enemy, damage: number, angle: number, knockback: number, heavy: boolean, hitstop: number, sourceActionId = world.player.swingId): void {
   if (!e.active || e.state === 'dead') return
   e.hp -= damage
   e.flash = tuning.juice.flashTicks
   const kind = e.kind
   const killed = e.hp <= 0
+  const actionId = sourceActionId
   const scale = kind === 'dummy' ? 0 : tuning[kind].knockbackScale
   const kb = killed ? knockback * 1.5 : knockback * scale
   e.kbx += Math.cos(angle) * kb
@@ -82,13 +83,13 @@ export function damageEnemy(world: World, e: Enemy, damage: number, angle: numbe
     e.state = 'dead'
     e.stateTick = 0
     addFreeze(world, hitstop + tuning.hitstop.killBonus)
-    world.emit({ type: 'hit', x: e.x, y: e.y, angle, damage, heavy, targetId: e.id, kind, killed: true })
-    world.emit({ type: 'kill', x: e.x, y: e.y, angle, kind, id: e.id })
+    world.emit({ type: 'hit', x: e.x, y: e.y, angle, damage, heavy, targetId: e.id, kind, killed: true, actionId })
+    world.emit({ type: 'kill', x: e.x, y: e.y, angle, kind, id: e.id, actionId })
     e.active = false
     return
   }
   addFreeze(world, hitstop)
-  world.emit({ type: 'hit', x: e.x, y: e.y, angle, damage, heavy, targetId: e.id, kind, killed: false })
+  world.emit({ type: 'hit', x: e.x, y: e.y, angle, damage, heavy, targetId: e.id, kind, killed: false, actionId })
 
   // poise: brutes only stagger from the heavy; the warden only from a heavy while not committed;
   // dummies never; everyone else staggers on any hit
@@ -123,7 +124,7 @@ export function hurtPlayer(world: World, angle: number, damage: number): boolean
   const p = world.player
   if (p.state === 'dead') return false
   if (isPlayerInvulnerable(world)) {
-    if (p.state === 'dodge' && p.dodgeRead < 2) {
+    if (p.dodgeTick >= 0 && p.dodgeRead < 2) {
       p.dodgeRead = 2
       // the read is the reward: the world drops to a crawl and the player's clock does not
       addBulletTime(world, tuning.bullet.ticks, tuning.bullet.rate)
@@ -154,23 +155,23 @@ export function hurtPlayer(world: World, angle: number, damage: number): boolean
 export function isPlayerInvulnerable(world: World): boolean {
   const p = world.player
   if (p.iframes > 0) return true
-  if (p.state === 'dodge') {
-    const d = tuning.player.dodge
-    return p.stateTick >= d.iStart && p.stateTick <= d.iEnd
-  }
-  return false
+  const d = tuning.player.dodge
+  return p.dodgeTick >= d.iStart && p.dodgeTick <= d.iEnd
 }
 
 // A hostile hitbox passed close during the roll (or just as the i-frames ended) without overlapping.
-// Once per roll; a later overlap still upgrades to the jackpot. No event — the breath is the tell,
-// and the cold floor mark stays reserved for a real pass-through.
-export function noteNearMiss(world: World): void {
+// Once per roll; a later overlap still upgrades to the jackpot. The graze emits only a short cyan
+// scratch and small breath; the cold ring and bright body rim stay reserved for a real pass-through.
+export function noteNearMiss(world: World, angle = 0, nearX?: number, nearY?: number): void {
   const p = world.player
   if (p.dodgeRead) return
-  if (p.state !== 'dodge') return
   const d = tuning.player.dodge
-  if (p.stateTick > d.iEnd + 2) return
+  if (p.dodgeTick < d.iStart || p.dodgeTick > d.iEnd + 2) return
   p.dodgeRead = 1
   addBulletTime(world, tuning.bullet.grazeTicks, tuning.bullet.grazeRate)
-  world.emit({ type: 'graze', x: p.x, y: p.y })
+  world.emit({
+    type: 'graze', x: p.x, y: p.y, angle,
+    nearX: nearX ?? p.x - Math.cos(angle) * (p.radius + 3),
+    nearY: nearY ?? p.y - Math.sin(angle) * (p.radius + 3),
+  })
 }

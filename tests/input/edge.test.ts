@@ -184,6 +184,17 @@ describe('dodge stays edge-triggered', () => {
 describe('keyboard aim', () => {
   const aimDeg = (f: { aimX: number; aimY: number }) => Math.round(Math.atan2(f.aimY, f.aimX) * 180 / Math.PI)
 
+  it('preserves a complete WASD or arrow tap between simulation samples', () => {
+    const h = harness()
+    const w = createWorld(1, 'empty')
+    h.win.fire('keydown', key('KeyD')); h.win.fire('keyup', key('KeyD'))
+    h.win.fire('keydown', key('ArrowUp')); h.win.fire('keyup', key('ArrowUp'))
+    const pulse = h.input.sample(w)
+    expect(pulse.moveX).toBe(1)
+    expect(aimDeg(pulse)).toBe(-90)
+    expect(h.input.sample(w).moveX).toBe(0) // latched intent is exactly one tick, never a phantom hold
+  })
+
   it('never aims at a cursor that has not moved', () => {
     const h = harness()
     const w = createWorld(1, 'empty')
@@ -213,7 +224,28 @@ describe('keyboard aim', () => {
     h.win.fire('keydown', key('KeyQ'))
     const f = h.input.sample(w)
     expect(aimDeg(f)).toBe(0)
-    expect(f.aimSoft).toBe(true)
+    expect(f.aimSoft).toBe(false)
+  })
+
+  it('does not let short-range assist replace a retained Q target', () => {
+    const h = harness()
+    const w = createWorld(1, 'dummy')
+    w.arena.solid.fill(0)
+    const [locked, crossing] = w.enemies
+    for (const e of w.enemies) e.active = false
+    Object.assign(w.player, { x: 100, y: 100, aimAngle: 0 })
+    Object.assign(locked, { active: true, state: 'idle', x: 220, y: 100 })
+    Object.assign(crossing, { active: false, state: 'idle', x: 140, y: 105 })
+
+    h.win.fire('keydown', key('KeyQ'))
+    expect(aimDeg(h.input.sample(w))).toBe(0) // acquire the long-range target
+    crossing.active = true                    // a closer body now crosses the same aim cone
+    const retained = h.input.sample(w)
+    expect(retained.aimSoft).toBe(false)
+    expect(aimDeg(retained)).toBe(0)
+    stepWorld(w, retained)
+    expect(w.player.assistTargetId).toBe(0)
+    expect(w.player.aimAngle).toBeCloseTo(0, 8)
   })
 
   it('lets explicit Q lock outrank a cursor that moved earlier', () => {

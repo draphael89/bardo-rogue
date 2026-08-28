@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { createWorld } from '@/sim/scenarios'
 import { stepWorld } from '@/sim/step'
 import { emptyInput } from '@/sim/input'
-import { overlapsSolid, separate } from '@/sim/collision'
+import { moveWithWalls, overlapsSolid, separate } from '@/sim/collision'
 import { makeBot } from '@/sim/bots'
 
 // Walk the player left until it is flush against a solid.
@@ -20,6 +20,19 @@ describe('collision invariants', () => {
     const cornerX = (c + 1) * 16, cornerY = (r + 1) * 16
     expect(overlapsSolid(w.arena, cornerX + 4, cornerY + 4, 5)).toBe(false)
     expect(overlapsSolid(w.arena, cornerX + 3, cornerY + 3, 5)).toBe(true)
+  })
+
+  it('stops at the true corner tangent instead of popping out to a tile face', () => {
+    const w = createWorld(1, 'empty')
+    w.arena.solid.fill(0)
+    // Bottom-right corner of this tile is (96,96). At y=100 a radius-five body touches it at
+    // x=99 by Pythagoras; the old face snap jumped two extra pixels to x=101.
+    w.arena.solid[5 * w.arena.cols + 5] = 1
+    const body = { x: 104, y: 100 }
+    const hit = moveWithWalls(w.arena, body, -6, 0, 5)
+    expect(hit).toEqual({ hitX: true, hitY: false })
+    expect(body.x).toBeCloseTo(99, 2)
+    expect(overlapsSolid(w.arena, body.x, body.y, 5)).toBe(false)
   })
 
   it('resolves a free pair completely instead of leaving a soft overlap', () => {

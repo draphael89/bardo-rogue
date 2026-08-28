@@ -14,7 +14,7 @@ Bardo Rogue already has more game-feel infrastructure than its small surface are
 The game is held below the reference bar by four more fundamental issues:
 
 1. There are two independent animation-frame owners. The custom loop updates the low-resolution render texture, while Pixi's auto-started ticker presents that texture to the canvas on a separate schedule. Instrumentation observed the final-stage render occurring before the texture update, producing a likely extra display frame of latency and making the built-in frame metrics incomplete.
-2. Input is captured reliably at the browser boundary, but the action queue is not reliable across commitment windows. The eight-tick buffers decrement while an action is locked, so early presses disappear. A dodge requested during most of the heavy attack, or an attack requested early in a roll, can do nothing with no explicit feedback.
+2. Action-button presses are latched at the browser boundary, but directional taps and focus loss are not fully reliable, and the action queue is not reliable across commitment windows. A complete WASD/arrow press-release between samples can disappear; blur can leave a just-latched mouse attack behind. Separately, the eight-tick action buffers decrement while an action is locked, so early presses disappear. A dodge requested during most of the heavy attack, or an attack requested early in a roll, can do nothing with no explicit feedback.
 3. Per-axis steering makes diagonal acceleration about 41% faster than cardinal acceleration at the start, and the roll landing returns useful movement authority very late. The result is technically controlled but direction-dependent movement and a vulnerable landing that can feel sticky.
 4. Effects are strong but not composed at the interaction level. A single heavy hitting three targets emits three full camera kicks and three recoil impulses. The measured kick was about 15.6 low-resolution pixels, making the most successful hits less readable.
 
@@ -35,7 +35,36 @@ This was a code, simulation, browser, and captured-frame audit in the cloud work
 
 This environment cannot replace hands-on play by several humans on their own keyboards, displays, speakers, and browsers. In particular, audio was inspected structurally but not judged by listening, and the synthetic graphics probe ran on cloud SwiftShader rather than a representative Mac GPU. Feel scores are therefore evidence-backed design judgments with **medium confidence**, not claims that bot success measures human enjoyment.
 
-The frame captures used during the audit are retained under `.context/` and are intentionally gitignored. The reusable audit document is this file; no gameplay implementation was changed.
+The audit's frame captures were ephemeral workspace evidence and are not committed. Generated audit output belongs in `/shots/` or `/.context/`; both are explicitly gitignored. The reusable evidence is the pinned revision plus the commands below. No gameplay implementation was changed at the audited revision.
+
+### Reproduction protocol
+
+To reproduce the historical baseline without changing the current checkout:
+
+```bash
+AUDITED=1ef5b18a7280b34b93b0ed23528bc95b3948139c
+git worktree add /tmp/bardo-feel-audit "$AUDITED"
+cd /tmp/bardo-feel-audit
+pnpm install --frozen-lockfile
+pnpm test
+pnpm typecheck
+pnpm sim -- --scenario full --bot kite --seeds 1-8 --ticks 10800
+pnpm sim -- --scenario full --bot naive-melee --seeds 1-8 --ticks 10800
+pnpm sim -- --scenario wave1 --bot kite --seeds 1-8 --ticks 10800
+pnpm sim -- --scenario wave1 --bot naive-melee --seeds 1-8 --ticks 10800
+pnpm sim -- --scenario wave3 --bot kite --seeds 1-8 --ticks 10800
+pnpm sim -- --scenario wave3 --bot naive-melee --seeds 1-8 --ticks 10800
+```
+
+For deterministic visual evidence, start `pnpm dev` in that worktree and run, in a second shell:
+
+```bash
+pnpm strip -- --scenario dummy --eval "near(first(), -18, 0)" --hold '{"attack":true,"attackHeld":true,"aimX":1}' --frames 20 --every 1 --crop player,160,120 --out shots/audit-combo.png
+pnpm strip -- --scenario wave1 --bot kite --from 300 --frames 12 --every 2 --out shots/audit-wave1.png
+pnpm shot -- --scenario full --seed 1 --ticks 600 --bot kite --stepwise 1 --out shots/audit-full-s1-t600.png
+```
+
+The strip tool writes a JSON state/event sidecar next to its PNG. These commands cover the checked tests, encounter metrics, tick-aligned animation evidence, and browser render path without depending on an untracked capture bundle.
 
 ---
 
@@ -46,7 +75,7 @@ The frame captures used during the audit are retained under `.context/` and are 
 | Concern | Current implementation | Primary code |
 |---|---|---|
 | Game loop | 60 Hz fixed simulation, interpolated display rendering, maximum five catch-up ticks, excess accumulator discarded after a severe hitch | `src/loop.ts:3-39` |
-| Browser input | DOM key/mouse latches plus gamepad sampling; key presses between ticks survive; blur clears held and latched state | `src/input/index.ts:14-46` |
+| Browser input | Action keys are latched, but WASD/arrows read held state only and can lose a full press-release between samples; blur clears keyboard state but can leave a latched mouse press | `src/input/index.ts:14-76` |
 | Keyboard controls | WASD movement; arrows aim; J/Z/left-click attack; Space/Left Shift/K/X dodge; keyboard-only play works | `src/input/index.ts:49-76` |
 | Aim selection | Right stick → arrows → mouse → movement → last aim; arrows and movement are “soft” and receive aim assist | `src/input/aim.ts:21-29` |
 | Player state | `free`, `dodge`, `attack`, `dead`; tick-indexed transitions and two simple countdown buffers | `src/sim/player.ts:12-102`, `src/sim/world.ts:10-34` |
@@ -82,7 +111,7 @@ keydown/mousedown
   → Pixi's separate auto ticker presents the screen sprite to the canvas
 ```
 
-The first half of this transaction is clean. DOM presses are latched, fixed simulation timing is deterministic, and presentation does not mutate gameplay. The latency ambiguity enters at the last two steps. `Application.init()` is not given `autoStart: false` (`src/render/app.ts:40-44`), while a separate `requestAnimationFrame` loop is started in `src/loop.ts:15-33`. The custom loop updates only the render texture (`src/main.ts:123-126`, `src/render/app.ts:88-90`); Pixi's ticker owns the final canvas draw.
+The simulation boundary is deterministic and presentation does not mutate gameplay, but the browser boundary has two edge cases: WASD/arrow directions are not latched, and blur does not clear a pending mouse click. The larger latency ambiguity enters at the last two steps. `Application.init()` is not given `autoStart: false` (`src/render/app.ts:40-44`), while a separate `requestAnimationFrame` loop is started in `src/loop.ts:15-33`. The custom loop updates only the render texture (`src/main.ts:123-126`, `src/render/app.ts:88-90`); Pixi's ticker owns the final canvas draw.
 
 Browser instrumentation confirmed `app.ticker.started === true`. A repeated call order was:
 
@@ -139,6 +168,8 @@ Keyboard-only play is genuinely supported, not just nominally mapped. A browser-
 
 The scheme is a good fit for this arena: WASD should remain locomotion, arrow keys should remain optional explicit eight-way aim, and mouse/trackpad should remain optional precision aim. It does not need to become controller-first or lock-on-first.
 
+The browser edge contract is incomplete at the audited revision. Attack/dodge action keys use the `pressed` latch, but WASD and arrows use only `down`, so a very quick press and release wholly between two 60 Hz samples produces no movement or aim tick. A blur clears `down` and keyboard `pressed` but not `mousePressed`, so a click latched just before focus loss can fire after focus returns. Acceptance requires full keyboard directional taps to produce exactly one sampled tick, and blur to clear keyboard, mouse-held, and mouse-latched state.
+
 The weakness is aim ownership. Once the mouse has moved, its world-space vector is present every tick and outranks movement whenever arrows/right stick are released (`src/input/aim.ts:24-29`). A keyboard player who briefly used a trackpad can therefore return to WASD and still aim at a stale cursor. Soft aim assist also picks the smallest angle inside 20° without distance, reachability, line-of-sight, or target hysteresis (`src/sim/player.ts:236-245`). The result is usually helpful but can switch intent in clusters.
 
 ### Attacks, feedback and readability
@@ -146,7 +177,7 @@ The weakness is aim ownership. Once the mouse has moved, its world-space vector 
 The blade model is the strongest part of the current combat:
 
 - startup, active sweep, contact, freeze and recovery are visually distinct;
-- body windup/lunge and hit sectors read the same authored curve, so the visible blade does not lie about timing;
+- body windup/lunge and hit sectors read the same authored curve, but the displayed sweep is sampled one active tick behind the live sector;
 - lights have a broad but not circular sector; the heavy's 215° arc feels like an earned combo release;
 - hit-confirm and whiff clocks differ, giving accuracy real timing value;
 - bolts can be cut and their owner punished, which creates a satisfying offensive defense;
@@ -154,6 +185,8 @@ The blade model is the strongest part of the current combat:
 - perfect dodge uses the fight's only cold palette and keeps the player at full speed while the hostile world slows.
 
 The captured light attack and combo strips read well even as still frames. The perfect-dodge strip clearly shows the cold ring and player rim. It also shows the dodged projectile visually overlapping/crawling past the player for several displayed frames; the player is safe, but the prolonged overlap makes the 25% world rate more visually ambiguous than the initial success cue.
+
+The sweep has a specific truthfulness defect despite sharing its easing function. Simulation tests active tick `k` through `sweepEase((k + 1) / active)`, while the renderer begins that displayed interval at `sweepEase(k / active)`. An enemy near the leading edge can therefore take damage one tick before the blade/crescent reaches it on screen. The contract should expose one authoritative per-tick sweep sample to both systems. Acceptance: for every swing and active tick, the displayed leading edge must equal the sector already tested by simulation throughout that display interval; it must neither lag a live sector nor predict an untested one.
 
 The main feedback defect is additive stacking. `Presenter.handleEvents` applies a complete camera/recoil/flash package for every hit event (`src/render/presenter.ts:112-165`), and camera kicks have no magnitude cap (`src/render/camera.ts:14-16`). In a controlled three-dummy heavy hit, the result was:
 
@@ -250,11 +283,11 @@ The overall **76/100** is weighted toward player authority, input/presentation l
 |---|---:|---|---|
 | Player control | **72** | Independent movement/aim, latched roll direction, steering during attacks, full-speed player during perfect-dodge slow | Reasonable next-action requests silently expire; roll landing withholds useful authority; stale mouse can own aim |
 | Movement | **82** | 67 ms cardinal acceleration, 50 ms stop, strong reversal, normalized final speed, good attack movement curves | Diagonal acceleration reaches full speed a tick earlier; early roll landing is nearly immobile |
-| Input responsiveness | **80** | DOM edges are latched, repeat handling is deliberate, hitstop preserves buffers, native keyboard path works | Separate Pixi/custom frame owners likely add a presentation frame; design buffers expire during locks |
+| Input responsiveness | **80** | Action-key edges are latched, repeat handling is deliberate, hitstop preserves buffers, native keyboard path works | WASD/arrow pulses can drop; blur can retain a mouse click; separate frame owners likely add a presentation frame; design buffers expire during locks |
 | Aiming | **77** | Keyboard-only independent aim works; mouse is transformed through live shaken world; radial gamepad deadzones; soft assist | No explicit device ownership, target hysteresis, reach/distance/LOS scoring; stale cursor can override WASD fallback |
 | Dodge/roll feel | **78** | Exact distance, body ghost, honest startup, readable i-frames, authored poses, strong perfect-dodge reward | 11-tick vulnerable landing starts with almost no control; early queued attacks disappear; 25% projectile crawl can look ambiguous |
 | Attack responsiveness | **78** | Light contact within roughly 83 ms, limited startup steering, hit-confirm chains, held combo, whiff cost | Heavy blocks dodge requests for hundreds of milliseconds; a held source and an intentional queued tap share one buffer |
-| Weapon feel | **82** | Shared visual/hit sweep, body coil/lunge, distinct light/heavy cadence, bolt cutting, poise rules | Broad arcs and current encounters make aggression overly automatic; player animation vocabulary is still limited |
+| Weapon feel | **82** | Shared sweep authoring, body coil/lunge, distinct light/heavy cadence, bolt cutting, poise rules | Displayed sweep trails the live sector by one active tick; broad arcs/current encounters make aggression overly automatic; player animation vocabulary is still limited |
 | Hit feedback | **88** | Excellent contact shape, freeze, wound, flash, body kick, recoil, knockback, sound event and kill release | Multi-target hits stack screen response linearly and can become less readable precisely when most successful |
 | Enemy feedback | **86** | Clear telegraphs, stagger/armor differentiation, distinct silhouettes, strong brute windup/recovery | Encounter density rarely tests simultaneous tell hierarchy; some spectacle can cover the next threat |
 | Physics/collision feel | **67** | Deterministic, cheap, wall-safe, roll ghosting is correct | Bounding-box circle/wall approximation and half-penetration separation produce soft crowd compression and potential corner snag |
@@ -262,7 +295,7 @@ The overall **76/100** is weighted toward player authority, input/presentation l
 | Animation responsiveness | **74** | Excellent authored roll poses and state-driven attack/enemy posing; timing follows simulation | Locomotion and much player weapon/body motion still rely on procedural transforms/static art rather than full authored clips |
 | Visual juice | **88** | Cohesive pixel-scale contact language, restrained palette hierarchy, impact/kill/perfect-dodge differentiation | More effects would now have diminishing returns; multi-hit composition and dense-frame readability need refinement |
 | Audio feedback | **80*** | Large event-specific library, buses, limiter, ducking, spatial treatment, gameplay tell band | *Low-confidence score: not auditioned in this environment; cold-cache actions can precede asset load, and time dilation needs listening tests* |
-| Combat readability | **80** | Enemy tells, cold dodge language, floor-plane effects and hitbox/arc agreement are strong | Large stacked kick/recoil and slow projectile overlap can disrupt threat tracking; dense combinations are under-tested |
+| Combat readability | **80** | Enemy tells, cold dodge language, floor-plane effects and shared sweep authoring are strong | Active blade/arc display trails collision by one tick; large stacked kick/recoil and slow projectile overlap can disrupt threat tracking; dense combinations are under-tested |
 | Encounter pacing | **55** | Immediate action, multiple enemy verbs, boss foundations | Complete clears take only ~31–36 s for the competent bot; opener is trivial; naive aggression often solves waves fastest |
 | Overall polish | **72** | Cohesive art/feedback direction, deterministic tools, replay/debug support, many details already tuned | Hidden present latency, inconsistent queue contract, collision softness, limited player clips and short encounter reveal prototype edges |
 
@@ -485,6 +518,7 @@ Acceptance gate for the pass:
 - identical acceleration response at cardinal and diagonal angles;
 - landing returns at least 25% movement authority immediately and 90% by state tick 20;
 - three-target heavy stays within the camera/recoil caps while retaining per-target feedback;
+- every active-tick blade and crescent edge exactly matches the sector already tested by simulation;
 - all deterministic hashes, 110 existing tests, new tick-table tests, keyboard smoke tests and screenshot strips pass.
 
 If those changes validate in human play, the expected experience is approximately **83–85/100** without adding a new enemy, weapon, shader, or particle class. The exact score depends on whether the new queue contract feels empowering without producing stale actions.

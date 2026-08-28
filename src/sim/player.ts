@@ -2,7 +2,7 @@ import { tuning, DT } from '@/tuning'
 import type { Player, World } from './world'
 import type { InputFrame } from './input'
 import { moveWithWalls } from './collision'
-import { arcHits, damageEnemy, addFreeze, addBulletTime, sweepEase, swingStep } from './combat'
+import { arcHits, damageEnemy, addFreeze, addBulletTime, swingProgress, swingStep } from './combat'
 import { swingReach } from './boons'
 import { ARM, armOf } from './weapons'
 import { bowMoveScale, bowSteer, looseArrow, startDraw } from './bow'
@@ -185,7 +185,7 @@ export function updatePlayer(world: World, input: InputFrame): void {
     if (k >= 0 && k < s.active) {
       // the live sector runs from the swing's start edge to wherever the blade has reached this tick
       const reach = swingReach(world, s)
-      const spanDeg = reach.arcDeg * sweepEase((k + 1) / s.active, s.heavy)
+      const spanDeg = reach.arcDeg * swingProgress(s, k)
       const mid = p.swingAngle + s.sweep * (deg(spanDeg) - deg(reach.arcDeg)) / 2
       for (const e of world.enemies) {
         if (!e.active || e.state === 'dead' || e.lastHitSwingId === p.swingId) continue

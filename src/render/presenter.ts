@@ -20,11 +20,11 @@ import { DamageNumbers } from './damageNumbers'
 import { Atmosphere } from './atmosphere'
 import { seedFx } from './fxRng'
 import { hasBoon } from '@/sim/boons'
-import { crowdScreenMultiplier } from './feedback'
+import { ActionFeedbackGate, crowdScreenMultiplier } from './feedback'
 
 interface ImpactStamp {
   t: number; r: number; a: number; snap: number; sweep: number
-  wx: number; wy: number; heavy: boolean; pierce: boolean; targetId: number
+  wx: number; wy: number; heavy: boolean; pierce: boolean
 }
 
 // Reads sim state + events every frame and drives everything visible. Never mutates the sim.
@@ -61,8 +61,7 @@ export class Presenter {
   private grazeT = -1; private grazeX = 0; private grazeY = 0; private grazeA = 0
   // Every struck body keeps its local stamp. Only the shared screen gesture is aggregated.
   private impacts: ImpactStamp[] = []
-  private lastScreenHitActionId = -1
-  private lastScreenKillActionId = -1
+  private actionFeedback = new ActionFeedbackGate()
   // hit flash on real time, not sim ticks: hit-stop must not hold a target white for its whole freeze
   private hitFlash = new Map<number, number>()
   private propSprites: Sprite[] = []
@@ -113,7 +112,7 @@ export class Presenter {
     this.dodgedT = -1; this.dodgedStep = -1
     this.grazeT = -1
     this.impacts.length = 0
-    this.lastScreenHitActionId = this.lastScreenKillActionId = -1
+    this.actionFeedback.reset()
   }
 
   handleEvents(events: readonly SimEvent[]) {
@@ -151,7 +150,6 @@ export class Presenter {
           const impactA = Math.atan2(fy, fx)
           const impact: ImpactStamp = {
             t: 0,
-            targetId: ev.targetId,
             a: impactA,
             snap: Math.round(impactA / stepA) * stepA,
             r: Math.hypot(fx, fy) + (ev.heavy ? C.heavyOut : C.out),
@@ -162,6 +160,9 @@ export class Presenter {
             heavy: ev.heavy || blessed,
             pierce: armOf(this.world) === ARM.bow,
           }
+          // The body reaction outlives the drawable contact stamp (especially through heavy
+          // hit-stop), so its direction belongs to the target view rather than the short FX queue.
+          if (v) v.hitAngle = impactA
           this.impacts.push(impact)
           if (this.impacts.length > 8) this.impacts.shift()
           if (blessed) this.particles.ring(impact.wx, impact.wy, 0xffe090)
@@ -169,8 +170,7 @@ export class Presenter {
 
           // One action gets one screen sentence. More bodies add a restrained square-root accent;
           // their wounds, flinches, shards and damage remain fully local and fully individual.
-          if (ev.actionId !== this.lastScreenHitActionId) {
-            this.lastScreenHitActionId = ev.actionId
+          if (this.actionFeedback.takeHit(ev.actionId)) {
             const group = hitGroups?.get(ev.actionId) ?? { count: 1, killed: ev.killed ? 1 : 0 }
             const S = H.screen
             const mult = crowdScreenMultiplier(group.count)
@@ -194,8 +194,7 @@ export class Presenter {
           if (v) { this.particles.shatter(v.body, ev.x, ev.y, ev.angle); v.destroy(); this.enemyViews.delete(ev.id) }
           this.particles.blood(ev.x, ev.y, ev.angle, ev.kind === 'charger' ? 0x6a3aa0 : 0x8a1a22)
           this.particles.puff(ev.x, ev.y, 6, 0x3a2a2a)
-          if (ev.actionId !== this.lastScreenKillActionId) {
-            this.lastScreenKillActionId = ev.actionId
+          if (this.actionFeedback.takeKill(ev.actionId)) {
             this.flash(J.killFlash, 0xffffff)
             this.camera.punchZoom(J.zoom.kill)
           }
@@ -310,6 +309,9 @@ export class Presenter {
           this.hud.place.text = ev.name
           break
         case 'returned': {
+          // returnToHub restarts swingCounter at zero without replacing this Presenter.
+          this.actionFeedback.reset()
+          this.impacts.length = 0
           this.rebuildRoom()
           this.particles.clear()
           this.damageNumbers.clear()
@@ -498,19 +500,19 @@ export class Presenter {
 
   // Shove the struck sprite off the blade and tip it away. Freeze holds the pose; without this
   // the still is an idle body under a trail.
-  private flinchBody(v: EntityView, impact: ImpactStamp): void {
+  private flinchBody(v: EntityView): void {
     const H = tuning.juice.hit
     const q = Math.max(v.squash / tuning.juice.squashTicks, v.redFlash / H.redFlash)
     const kick = H.bodyKick * q
-    const dx = Math.round(Math.cos(impact.a) * kick)
-    const dy = Math.round(Math.sin(impact.a) * kick * 0.7)
+    const dx = Math.round(Math.cos(v.hitAngle) * kick)
+    const dy = Math.round(Math.sin(v.hitAngle) * kick * 0.7)
     v.body.position.x += dx
     v.body.position.y += dy
-    v.body.rotation += (Math.cos(impact.a) >= 0 ? 1 : -1) * H.bodyLean * q
+    v.body.rotation += (Math.cos(v.hitAngle) >= 0 ? 1 : -1) * H.bodyLean * q
     if (v.weapon) {
       v.weapon.position.x += dx
       v.weapon.position.y += dy
-      v.weapon.rotation += (Math.cos(impact.a) >= 0 ? 1 : -1) * H.bodyLean * q * 0.6
+      v.weapon.rotation += (Math.cos(v.hitAngle) >= 0 ? 1 : -1) * H.bodyLean * q * 0.6
     }
   }
 
@@ -610,12 +612,7 @@ export class Presenter {
       const hf = (this.hitFlash.get(id) ?? 0) - dtSec
       if (hf > 0) this.hitFlash.set(id, hf); else this.hitFlash.delete(id)
       v.setFlash(hf > 0)
-      if (v.squash > 0 || v.redFlash > 0) {
-        for (let i = this.impacts.length - 1; i >= 0; i--) {
-          const impact = this.impacts[i]!
-          if (impact.targetId === id) { this.flinchBody(v, impact); break }
-        }
-      }
+      if (v.squash > 0 || v.redFlash > 0) this.flinchBody(v)
     }
     for (const b of w.projectiles) {
       if (!b.active) continue

@@ -12,6 +12,7 @@ export class EntityView {
   shadow: Sprite
   squash = 0
   redFlash = 0
+  hitAngle = 0             // latest contact direction; persists through the full held flinch
   private normalTex; private whiteTex
   constructor(atlas: Atlas, tile: number, weaponTile: number | null, layers: { entities: Container; shadows: Container }) {
     this.normalTex = atlas.tile(tile); this.whiteTex = atlas.white(tile)

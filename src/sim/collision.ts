@@ -6,20 +6,62 @@ import { TILE, type Arena } from './arena'
 export function moveWithWalls(a: Arena, e: { x: number; y: number }, dx: number, dy: number, r: number): { hitX: boolean; hitY: boolean } {
   let hitX = false, hitY = false
   if (dx !== 0) {
+    const from = e.x
     e.x += dx
     if (overlapsSolid(a, e.x, e.y, r)) {
       hitX = true
-      e.x = dx > 0 ? Math.floor((e.x + r) / TILE) * TILE - r - 0.001 : Math.ceil((e.x - r) / TILE) * TILE + r + 0.001
+      e.x = furthestClear(a, e, 'x', from, dx, r)
     }
   }
   if (dy !== 0) {
+    const from = e.y
     e.y += dy
     if (overlapsSolid(a, e.x, e.y, r)) {
       hitY = true
-      e.y = dy > 0 ? Math.floor((e.y + r) / TILE) * TILE - r - 0.001 : Math.ceil((e.y - r) / TILE) * TILE + r + 0.001
+      e.y = furthestClear(a, e, 'y', from, dy, r)
     }
   }
   return { hitX, hitY }
+}
+
+// Resolve on the actual swept axis instead of snapping every contact to a whole tile face. Twelve
+// fixed bisections put a 160 px/s body within 0.001 px of the first legal tangent, whether the
+// contact is a face, a diagonal corner, or the arena boundary. Fixed work keeps replays deterministic.
+function furthestClear(a: Arena, e: { x: number; y: number }, axis: 'x' | 'y', from: number, delta: number, r: number): number {
+  let clear = 0, blocked = 1
+  for (let i = 0; i < 12; i++) {
+    const mid = (clear + blocked) * 0.5
+    e[axis] = from + delta * mid
+    if (overlapsSolid(a, e.x, e.y, r)) blocked = mid
+    else clear = mid
+  }
+  const tangent = from + delta * clear
+  return exactFaceContact(a, e, axis, tangent, delta, r)
+}
+
+// Keep ordinary wall slides pixel-exact. Bisection is needed only where the closest point is a
+// corner; on a flat tile face the analytic contact avoids accumulating search residue along a
+// corridor.
+function exactFaceContact(a: Arena, e: { x: number; y: number }, axis: 'x' | 'y', tangent: number, delta: number, radius: number): number {
+  const span = axis === 'x' ? a.cols * TILE : a.rows * TILE
+  const boundary = delta < 0 ? radius : span - radius
+  if (Math.abs(tangent - boundary) < 0.01) return boundary
+
+  const across = axis === 'x' ? e.y : e.x
+  const acrossTile = Math.floor(across / TILE)
+  const alongTile = Math.floor(tangent / TILE)
+  for (let acrossIndex = acrossTile - 1; acrossIndex <= acrossTile + 1; acrossIndex++) {
+    const lo = acrossIndex * TILE, hi = lo + TILE
+    if (across < lo || across > hi) continue
+    for (let alongIndex = alongTile - 1; alongIndex <= alongTile + 1; alongIndex++) {
+      const cc = axis === 'x' ? alongIndex : acrossIndex
+      const rr = axis === 'x' ? acrossIndex : alongIndex
+      if (cc < 0 || rr < 0 || cc >= a.cols || rr >= a.rows || !a.solid[rr * a.cols + cc]) continue
+      const face = delta > 0 ? alongIndex * TILE - radius : (alongIndex + 1) * TILE + radius
+      if (Math.abs(tangent - face) < 0.01) return face
+    }
+  }
+  return tangent
 }
 
 export function overlapsSolid(a: Arena, x: number, y: number, r: number): boolean {

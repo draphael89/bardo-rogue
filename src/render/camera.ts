@@ -13,9 +13,20 @@ export class Camera {
 
   addTrauma(amount: number, cap = 1) { this.trauma = Math.min(cap, this.trauma + amount) }
   kick(angle: number, strength: number, cap = Infinity) {
+    const beforeX = this.kickX, beforeY = this.kickY
+    const before = Math.hypot(beforeX, beforeY)
     this.kickX += Math.cos(angle) * strength; this.kickY += Math.sin(angle) * strength
     const m = Math.hypot(this.kickX, this.kickY)
-    if (m > cap) { this.kickX *= cap / m; this.kickY *= cap / m }
+    // `cap` limits what this priority of effect may build, never what a stronger effect already
+    // earned. In particular, a 1.2 px graze cannot normalize a 6 px hit down to 1.2. If its vector
+    // opposes an already-over-cap kick, preserve the stronger magnitude while still allowing the
+    // small cue to bend its direction.
+    const ceiling = Math.max(before, cap)
+    if (m > ceiling) { this.kickX *= ceiling / m; this.kickY *= ceiling / m }
+    else if (before > cap && m < before) {
+      if (m > 0.0001) { this.kickX *= before / m; this.kickY *= before / m }
+      else { this.kickX = beforeX; this.kickY = beforeY }
+    }
   }
   punchZoom(z: number) { this.zoom = Math.max(this.zoom, z) }
   // Anticipation, not impact: eases in while it is fed and eases back out the moment it stops.

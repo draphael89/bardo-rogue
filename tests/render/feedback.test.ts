@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { Camera } from '@/render/camera'
-import { crowdScreenMultiplier } from '@/render/feedback'
+import { ActionFeedbackGate, crowdScreenMultiplier } from '@/render/feedback'
+import { displayedSwingProgress } from '@/render/views/player'
 import { tuning } from '@/tuning'
 import { createWorld } from '@/sim/scenarios'
-import { damageEnemy } from '@/sim/combat'
+import { damageEnemy, swingProgress } from '@/sim/combat'
 import { updateProjectiles } from '@/sim/projectiles'
 
 describe('action-composed screen feedback', () => {
@@ -18,6 +19,33 @@ describe('action-composed screen feedback', () => {
     c.kick(0, 5.2, 6.5)
     c.kick(0, 5.2, 6.5)
     expect(Math.hypot(c.kickX, c.kickY)).toBeCloseTo(6.5, 8)
+  })
+
+  it('never lets a low-priority kick shrink a stronger accumulated hit', () => {
+    const c = new Camera()
+    c.kick(0, 5.2, 6.5)
+    c.kick(Math.PI, 0.55, 1.2)
+    expect(Math.hypot(c.kickX, c.kickY)).toBeCloseTo(5.2, 8)
+  })
+
+  it('resets per-action presentation identity when a run returns to the hub', () => {
+    const gate = new ActionFeedbackGate()
+    expect(gate.takeHit(1)).toBe(true)
+    expect(gate.takeHit(1)).toBe(false)
+    expect(gate.takeKill(1)).toBe(true)
+    expect(gate.takeKill(1)).toBe(false)
+    gate.reset()
+    expect(gate.takeHit(1)).toBe(true)
+    expect(gate.takeKill(1)).toBe(true)
+  })
+
+  it('holds the displayed sweep on every sector the simulation has resolved', () => {
+    for (const s of tuning.player.attack.swings) {
+      for (let k = 0; k < s.active; k++) {
+        const atTick = displayedSwingProgress(s, s.startup + k)
+        expect(atTick).toBeCloseTo(swingProgress(s, k), 10)
+      }
+    }
   })
 
   it('tags every local contact from one swing with the same action id', () => {

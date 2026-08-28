@@ -24,7 +24,9 @@ function unit(x: number, y: number, soft: boolean): Aim {
 export function resolveAim(s: AimSources): Aim {
   if (s.padAimX || s.padAimY) return unit(s.padAimX, s.padAimY, false)
   if (s.arrowX || s.arrowY) return unit(s.arrowX, s.arrowY, true)
-  if (s.lockX || s.lockY) return unit(s.lockX, s.lockY, true)
+  // A held Q target is an explicit identity, not a coarse direction. Marking it soft would let the
+  // simulation's short-range assist silently replace a retained long-range lock with a nearby body.
+  if (s.lockX || s.lockY) return unit(s.lockX, s.lockY, false)
   if (s.mouseX || s.mouseY) return unit(s.mouseX, s.mouseY, false)
   if (s.moveX || s.moveY) return unit(s.moveX, s.moveY, true)
   return { x: s.lastAimX, y: s.lastAimY, soft: true }

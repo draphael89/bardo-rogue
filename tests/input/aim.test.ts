@@ -43,11 +43,11 @@ describe('resolveAim', () => {
     expect(deg(at({ lastAimX: 0, lastAimY: -1 }))).toBe(-90)
   })
 
-  it('marks only the mouse and right stick as precise', () => {
+  it('marks precision sources and explicit target identity as exact', () => {
     expect(at({ padAimX: 1 }).soft).toBe(false)
     expect(at({ mouseX: 1 }).soft).toBe(false)
+    expect(at({ lockX: 1 }).soft).toBe(false)       // never replace the target explicitly chosen by Q
     expect(at({ arrowX: 1 }).soft).toBe(true)     // 8-way is coarse; let the sim finish the angle
-    expect(at({ lockX: 1 }).soft).toBe(true)
     expect(at({ moveX: 1 }).soft).toBe(true)
     expect(at({}).soft).toBe(true)
   })

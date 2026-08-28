@@ -4,7 +4,7 @@ import type { Atlas } from '../atlas'
 import type { World, Player } from '@/sim/world'
 import { tuning } from '@/tuning'
 import { lerp, clamp01, easeOutCubic, easeInCubic, lerpAngle } from '../anim'
-import { sweepEase } from '@/sim/combat'
+import { swingProgress } from '@/sim/combat'
 import { hasBoon, swingReach } from '@/sim/boons'
 import { EntityView, SPRITE, WEAPON, HALF_PI } from './shared'
 import { ARM, armOf } from '@/sim/weapons'
@@ -476,7 +476,7 @@ function updateSword(v: EntityView, p: Player, world: World, x: number, y: numbe
         r = lerp(3, 8, u)
       }
     } else if (tk < s.startup + s.active) {
-      const u = sweepEase((tk - s.startup) / s.active, s.heavy)
+      const u = displayedSwingProgress(s, p.stateTick)
       a = start + (end - start) * u
       r = s.heavy ? lerp(12, 17, u) : 10
       ws = s.heavy ? lerp(1.38, 1.55, u) : 1
@@ -538,7 +538,7 @@ function swingArc(p: Player, alpha: number, world: World): SwingArc | null {
   const fadeTicks = s.heavy ? A.heavyFade : A.lightFade
   if (tk < s.startup || tk > s.startup + s.active + fadeTicks) return null
   const half = (reach.arcDeg * Math.PI / 180) / 2
-  const swept = s.sweep * half * 2 * sweepEase((tk - s.startup) / s.active, s.heavy)
+  const swept = s.sweep * half * 2 * displayedSwingProgress(s, p.stateTick)
   const over = tk - s.startup - s.active
   const fade = over > 0 ? 1 - over / fadeTicks : 1
   const tail = over > 0 ? Math.pow(over / fadeTicks, 0.7) * 0.9 : 0
@@ -553,6 +553,13 @@ function swingArc(p: Player, alpha: number, world: World): SwingArc | null {
     x: lerp(p.px, p.x, alpha), y: lerp(p.py, p.y, alpha),
     heavy: s.heavy, blessed, hole: A.hole,
   }
+}
+
+// Active collision is resolved once per simulation tick, not continuously between ticks. Hold the
+// rendered blade and crescent on that exact resolved sample for the display interval: this is both
+// more legible at pixel scale and guarantees that every visible contact sector is mechanically live.
+export function displayedSwingProgress(s: (typeof tuning.player.attack.swings)[number], stateTick: number): number {
+  return swingProgress(s, stateTick - s.startup)
 }
 
 // Sword arc: a crescent that grows on exactly the curve the hitbox sweeps on, so contact reads on the

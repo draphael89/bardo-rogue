@@ -16,10 +16,17 @@ export function sweepEase(u: number, heavy: boolean): number {
   return hangV + (1 - hangV) * (1 - (1 - k) ** 3)
 }
 
+// The authoritative swept fraction after active simulation tick `k` has resolved. Both collision
+// and presentation consume this sample: interpolation must never leave the blade behind a sector
+// that can already deal damage (or lead into a sector the simulation has not tested yet).
+export function swingProgress(s: SwingDef, k: number): number {
+  return sweepEase((k + 1) / s.active, s.heavy)
+}
+
 // The leading edge of swing `s` at the end of tick `k` of its active window.
 export function swingEdge(s: SwingDef, angle: number, k: number): number {
   const half = deg(s.arcDeg) / 2
-  return angle - s.sweep * half + s.sweep * half * 2 * sweepEase((k + 1) / s.active, s.heavy)
+  return angle - s.sweep * half + s.sweep * half * 2 * swingProgress(s, k)
 }
 
 // Authored body travel for one tick of the swing: a coil backwards across startup, then a forward

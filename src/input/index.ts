@@ -54,12 +54,16 @@ export class InputSystem {
     if (this.override) { const f = { ...this.override }; this.override = { ...this.override, attack: false, dodge: false, restart: false }; this.pressed.clear(); this.mousePressed = false; return f }
     const f = emptyInput()
     const d = this.down
-    let mx = (d.has('KeyD') ? 1 : 0) - (d.has('KeyA') ? 1 : 0)
-    let my = (d.has('KeyS') ? 1 : 0) - (d.has('KeyW') ? 1 : 0)
+    // A complete keydown/keyup pair can occur between two 60 Hz samples. `pressed` latches that
+    // pulse until this sample, while `down` carries a hold; treating either as active means even a
+    // very fast directional tap expresses exactly one tick of intent instead of disappearing.
+    const keyActive = (code: string) => d.has(code) || this.pressed.has(code)
+    let mx = (keyActive('KeyD') ? 1 : 0) - (keyActive('KeyA') ? 1 : 0)
+    let my = (keyActive('KeyS') ? 1 : 0) - (keyActive('KeyW') ? 1 : 0)
     // arrows are aim, not a second set of movement keys: WASD walks, arrows point, and holding one
     // pins the facing so you can circle a target instead of orbiting it face-first
-    const arrowX = (d.has('ArrowRight') ? 1 : 0) - (d.has('ArrowLeft') ? 1 : 0)
-    const arrowY = (d.has('ArrowDown') ? 1 : 0) - (d.has('ArrowUp') ? 1 : 0)
+    const arrowX = (keyActive('ArrowRight') ? 1 : 0) - (keyActive('ArrowLeft') ? 1 : 0)
+    const arrowY = (keyActive('ArrowDown') ? 1 : 0) - (keyActive('ArrowUp') ? 1 : 0)
     if (arrowX || arrowY) { this.mouseOwnsAim = false; this.explicitAimOwns = true }
 
     // mouse aim in world space. Canvas -> the 480x270 render target, then through the INVERSE of the live world
@@ -116,7 +120,7 @@ export class InputSystem {
     if (ml > 1) { mx /= ml; my /= ml }
     f.moveX = mx; f.moveY = my
     let lockX = 0, lockY = 0
-    if (d.has('KeyQ')) {
+    if (keyActive('KeyQ')) {
       const p = world.player
       const lock = aimLockTarget(
         p.x, p.y,

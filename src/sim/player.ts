@@ -44,7 +44,10 @@ export function updatePlayer(world: World, input: InputFrame): void {
   p.moveX = input.moveX; p.moveY = input.moveY
   if (mlen > 0.01) p.moveAngle = Math.atan2(input.moveY, input.moveX)
   let aim = Math.atan2(input.aimY, input.aimX)
-  if (input.aimSoft) aim = aimAssist(world, mlen > 0.01 ? p.moveAngle : p.aimAngle)
+  // soft aim is intent, not precision: assist around whatever direction was actually asked for.
+  // (Reconstructing it from moveAngle used to be equivalent, because the only soft source was a
+  // stick that aimed where it walked. Arrow-key aim points somewhere movement does not.)
+  if (input.aimSoft) aim = aimAssist(world, aim)
   p.aimAngle = aim // intent always tracks the stick, so a chained swing can be redirected
   // a roll is committed: its facing is latched at launch, so the sprite can never flip mid-tuck
   if (p.state === 'free') p.facing = Math.cos(p.aimAngle) >= 0 ? 1 : -1

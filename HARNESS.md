@@ -36,7 +36,7 @@ deaths, wavesCleared, clearSeconds, deathSeconds, avgTickUs, maxTickUs. A run st
 - `debug=1`: F1 overlay on. `mute=1`: no audio. `god=1`: player cannot take damage.
 - `bot=idle|naive-melee|kite`: a scripted player drives the sim instead of the keyboard.
 
-Keys in the game: WASD/arrows move, mouse aim, click/J attack, Space/Shift/K dodge, R restart.
+Keys in the game: WASD move, arrows aim (8-way, and holding one pins the facing so you strafe), mouse aim, click/J attack, Space/Shift/K dodge, R restart. With no arrow and an untouched mouse, aim follows movement.
 F1 toggles the debug overlay, F2 toggles recording, F3 downloads the last recording.
 
 ## `window.__game` (src/debug/api.ts)

@@ -260,6 +260,27 @@ export class AudioSystem {
     if (!m) this.ensureBed()
   }
 
+  private _suspended = false
+  get suspended(): boolean { return this._suspended }
+
+  /**
+   * Pause owns the whole clock, not the master fader. Fading to silence would leave the bed's loops
+   * and every scheduled voice running behind the pause screen, so the music would come back several
+   * bars further on than where it stopped — and a tab left paused would keep a synthesiser awake
+   * forever. Suspending the context freezes `currentTime` itself: everything resumes exactly where
+   * the player left it.
+   */
+  setSuspended(s: boolean): void {
+    if (s === this._suspended) return
+    this._suspended = s
+    const ctx = this.ctx
+    if (!ctx || !('suspend' in ctx)) return
+    const c = ctx as AudioContext
+    // Both calls return promises that reject if the context is already closed; a pause is never
+    // worth an unhandled rejection.
+    void (s ? c.suspend() : c.resume()).catch(() => { /* context closed or refused; nothing to recover */ })
+  }
+
   private masterLevel(): number { return dbToGain(MIX.masterDb) * this.slider.master }
   private now(): number { return (this.ctx?.currentTime ?? 0) + this.timeOffset }
 
@@ -287,7 +308,12 @@ export class AudioSystem {
     await this.buildBed()
     if (typeof window !== 'undefined' && 'resume' in this.ctx) {
       const c = this.ctx as AudioContext
-      const unlock = () => { c.resume(); window.removeEventListener('pointerdown', unlock); window.removeEventListener('keydown', unlock) }
+      // The gesture unlock must not undo a deliberate pause: a player who pauses before ever
+      // clicking would otherwise get the bed back by dismissing the dialog.
+      const unlock = () => {
+        if (!this._suspended) void c.resume().catch(() => {})
+        window.removeEventListener('pointerdown', unlock); window.removeEventListener('keydown', unlock)
+      }
       window.addEventListener('pointerdown', unlock); window.addEventListener('keydown', unlock)
     }
   }

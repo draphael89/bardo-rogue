@@ -173,8 +173,22 @@ async function boot() {
   }
   document.addEventListener('fullscreenchange', () => ra.resize())
 
+  // One place decides what "paused" means, so the sim, the audio clock and the overlay can never
+  // disagree. Pausing used to stop only the simulation: the bed kept playing behind the overlay and
+  // a backgrounded tab kept a synthesiser running indefinitely.
+  const setPaused = (p: boolean) => {
+    if (p === userPaused) return
+    userPaused = p
+    loop.paused = p
+    audio.setSuspended(p)
+  }
+
+  // Losing focus is a pause the player did not ask for but always wants: a tab switch should not
+  // cost health, and it should not keep making noise from behind another window.
+  document.addEventListener('visibilitychange', () => { if (document.hidden) setPaused(true) })
+
   window.addEventListener('keydown', e => {
-    if ((e.code === 'Escape' || e.code === 'KeyP') && !e.repeat) { e.preventDefault(); userPaused = !userPaused; loop.paused = userPaused }
+    if ((e.code === 'Escape' || e.code === 'KeyP') && !e.repeat) { e.preventDefault(); setPaused(!userPaused) }
     if (e.code === 'KeyV' && !e.repeat) {
       reducedEffects = !reducedEffects
       presenter.setReducedEffects(reducedEffects)

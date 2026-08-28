@@ -34,6 +34,62 @@ describe('determinism', () => {
   })
 })
 
+describe('movement authority', () => {
+  const P = tuning.player
+  const ms = (ticks: number) => Math.round(ticks * 1000 / 60)
+
+  // ticks until |vx| first reaches `frac` of max speed, driving moveX every tick
+  function ticksTo(from: number, moveX: number, done: (vx: number) => boolean): number {
+    const w = createWorld(1, 'empty')
+    w.player.vx = from
+    for (let t = 1; t <= 60; t++) {
+      stepWorld(w, { ...emptyInput(), moveX })
+      w.events.length = 0
+      if (done(w.player.vx)) return t
+    }
+    return Infinity
+  }
+
+  it('reaches full authority from rest within 67 ms', () => {
+    const t = ticksTo(0, 1, vx => vx >= P.maxSpeed * 0.9)
+    expect(t, `${ms(t)} ms to 90% speed`).toBeLessThanOrEqual(4)
+  })
+
+  it('stops within 50 ms', () => {
+    const t = ticksTo(P.maxSpeed, 0, vx => vx === 0)
+    expect(t, `${ms(t)} ms to stop`).toBeLessThanOrEqual(3)
+  })
+
+  it('reverses within 100 ms', () => {
+    // the one that decides whether a direction change reads as a turn or a skid
+    const t = ticksTo(P.maxSpeed, -1, vx => vx <= -P.maxSpeed * 0.9)
+    expect(t, `${ms(t)} ms to reverse`).toBeLessThanOrEqual(6)
+  })
+
+  it('does not let a cardinal press leave sideways drift hanging', () => {
+    // holding right while moving up-right: the y axis is being released, so it should brake, not coast
+    const w = createWorld(1, 'empty')
+    w.player.vx = P.maxSpeed; w.player.vy = -P.maxSpeed
+    let t = 0
+    for (; t < 60; t++) {
+      stepWorld(w, { ...emptyInput(), moveX: 1 })
+      w.events.length = 0
+      if (w.player.vy === 0) break
+    }
+    expect(t + 1, 'ticks to shed the sideways component').toBeLessThanOrEqual(3)
+  })
+
+  it('treats cardinals and diagonals identically', () => {
+    const diag = 1 / Math.SQRT2
+    const a = createWorld(1, 'empty'), b = createWorld(1, 'empty')
+    for (let t = 0; t < 10; t++) {
+      stepWorld(a, { ...emptyInput(), moveX: 1 }); a.events.length = 0
+      stepWorld(b, { ...emptyInput(), moveX: diag, moveY: diag }); b.events.length = 0
+    }
+    expect(Math.hypot(b.player.vx, b.player.vy)).toBeCloseTo(Math.hypot(a.player.vx, a.player.vy), 6)
+  })
+})
+
 describe('dodge', () => {
   it('has i-frames exactly in the tuned window and a cooldown', () => {
     const w = createWorld(1, 'empty')

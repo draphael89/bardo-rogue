@@ -1,5 +1,5 @@
 import { tuning, DT } from '@/tuning'
-import type { World } from './world'
+import type { Player, World } from './world'
 import type { InputFrame } from './input'
 import { moveWithWalls } from './collision'
 import { arcHits, damageEnemy, addFreeze, sweepEase, swingStep } from './combat'
@@ -106,8 +106,7 @@ export function updatePlayer(world: World, input: InputFrame): void {
     const target = mlen > 0.01 ? P.maxSpeed : 0
     const tx = mlen > 0.01 ? input.moveX / mlen * target : 0
     const ty = mlen > 0.01 ? input.moveY / mlen * target : 0
-    const rate = (mlen > 0.01 ? P.maxSpeed / P.accelTicks : P.maxSpeed / P.decelTicks)
-    p.vx = approach(p.vx, tx, rate); p.vy = approach(p.vy, ty, rate)
+    steer(p, tx, ty)
     dx = p.vx * DT; dy = p.vy * DT
     if (mlen > 0.01) {
       p.footTick++
@@ -132,14 +131,14 @@ export function updatePlayer(world: World, input: InputFrame): void {
       const scale = Math.pow((rec + 1) / (d.total - d.travel), d.landMoveExp)
       const tx = mlen > 0.01 ? input.moveX / mlen * P.maxSpeed * scale : 0
       const ty = mlen > 0.01 ? input.moveY / mlen * P.maxSpeed * scale : 0
-      p.vx = approach(p.vx, tx, P.maxSpeed / P.accelTicks); p.vy = approach(p.vy, ty, P.maxSpeed / P.accelTicks)
+      steer(p, tx, ty)
       dx = p.vx * DT; dy = p.vy * DT
     }
   } else if (p.state === 'attack' && armOf(world) === ARM.bow) {
     const scale = bowMoveScale(world)
     const tx = mlen > 0.01 ? input.moveX / mlen * P.maxSpeed * scale : 0
     const ty = mlen > 0.01 ? input.moveY / mlen * P.maxSpeed * scale : 0
-    p.vx = approach(p.vx, tx, P.maxSpeed / P.accelTicks); p.vy = approach(p.vy, ty, P.maxSpeed / P.accelTicks)
+    steer(p, tx, ty)
     dx = p.vx * DT; dy = p.vy * DT
   } else if (p.state === 'attack') {
     const s = P.attack.swings[p.swingIndex]
@@ -149,7 +148,7 @@ export function updatePlayer(world: World, input: InputFrame): void {
     const scale = rec < 0 ? s.moveCommit : s.moveRecover + (1 - s.moveRecover) * Math.min(1, rec / recLen)
     const tx = mlen > 0.01 ? input.moveX / mlen * P.maxSpeed * scale : 0
     const ty = mlen > 0.01 ? input.moveY / mlen * P.maxSpeed * scale : 0
-    p.vx = approach(p.vx, tx, P.maxSpeed / P.accelTicks); p.vy = approach(p.vy, ty, P.maxSpeed / P.accelTicks)
+    steer(p, tx, ty)
     dx = p.vx * DT; dy = p.vy * DT
     const travel = swingStep(s, p.stateTick)
     dx += Math.cos(p.swingAngle) * travel; dy += Math.sin(p.swingAngle) * travel
@@ -237,6 +236,18 @@ function applyKnockback(world: World): void {
   const decay = 1 - 1 / tuning.knockbackDecayTicks
   p.kbx *= decay; p.kby *= decay
   if (Math.abs(p.kbx) < 1 && Math.abs(p.kby) < 1) { p.kbx = 0; p.kby = 0 }
+}
+
+// One velocity rule for every state that steers. Each axis picks its own rate, because "let go" and
+// "go the other way" are different intentions and only one of them should cost the player weight:
+// releasing brakes, reversing turns, and starting from rest is the only case that should feel heavy.
+// Per axis also means a cardinal press sheds the sideways component instead of coasting on it.
+function steer(p: Player, tx: number, ty: number): void {
+  const P = tuning.player
+  const rate = (v: number, t: number) =>
+    P.maxSpeed / (t === 0 ? P.decelTicks : v * t < 0 ? P.turnTicks : P.accelTicks)
+  p.vx = approach(p.vx, tx, rate(p.vx, tx))
+  p.vy = approach(p.vy, ty, rate(p.vy, ty))
 }
 
 function approach(v: number, target: number, rate: number): number {

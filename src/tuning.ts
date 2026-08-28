@@ -26,7 +26,10 @@ export const tuning = {
 
   player: {
     radius: 5,
-    maxSpeed: 95, accelTicks: 5, decelTicks: 4,
+    // Ticks from rest to full speed, from full speed to rest, and to cross zero when reversing.
+    // A direction change gets its own rate: braking into a reversal at the acceleration rate is
+    // what makes a turn read as a skid rather than a turn.
+    maxSpeed: 95, accelTicks: 4, decelTicks: 3, turnTicks: 2,
     hp: 5,
     hurtIFrames: 40, hurtKnockback: 12, hurtHitstop: 4,
     // Launch, invulnerable traversal, landing — three readable phases in one state, and a price.

@@ -32,6 +32,8 @@ export interface RunState {
   weapon: ArmId
   boons: BoonStack[]
   boonBits: number
+  hp: number
+  maxHp: number
   depth: number
   roomId: string
   roomHistory: RoomVisit[]
@@ -85,11 +87,14 @@ export function startRun(world: World, firstRoomId: string): boolean {
   // same session commands from the same seed remains exact.
   const runSeed = streamSeed(world.seed, STREAM.gameplay ^ Math.imul(world.returns + 1, 0x45d9f3b))
   world.session.meta.attempts = attempt
+  world.player.hp = world.player.maxHp = tuning.player.hp
   world.session.run = {
     seed: runSeed,
     weapon,
     boons: [],
     boonBits: 0,
+    hp: world.player.hp,
+    maxHp: world.player.maxHp,
     depth: 0,
     roomId: firstRoomId,
     roomHistory: [],
@@ -101,11 +106,27 @@ export function startRun(world: World, firstRoomId: string): boolean {
   world.rng = new Rng(runSeed)
   world.boonBits = 0
   world.attemptStart = world.tick
-  world.player.hp = world.player.maxHp = tuning.player.hp
   world.player.armed = true
   grantArm(world, weapon)
   world.emit({ type: 'runStarted', weapon })
   return true
+}
+
+// Health belongs to the attempt, while Player is the room-combat copy. Room transitions explicitly
+// hand it across that boundary so a future per-room World rebuild cannot silently heal the player or
+// discard a Life upgrade.
+export function storeRunHealth(world: World): void {
+  const run = world.session.run
+  if (!run) return
+  run.hp = world.player.hp
+  run.maxHp = world.player.maxHp
+}
+
+export function restoreRunHealth(world: World): void {
+  const run = world.session.run
+  if (!run) return
+  world.player.maxHp = run.maxHp
+  world.player.hp = Math.min(run.hp, run.maxHp)
 }
 
 export function recordRoomEntry(world: World, id: string, via?: DoorMark): void {

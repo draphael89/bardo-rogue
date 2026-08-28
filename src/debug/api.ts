@@ -90,6 +90,8 @@ export function installApi(host: {
           meta: { ...w.session.meta },
           run: w.session.run ? {
             seed: w.session.run.seed,
+            hp: w.session.run.hp,
+            maxHp: w.session.run.maxHp,
             depth: w.session.run.depth,
             roomId: w.session.run.roomId,
             history: w.session.run.roomHistory.map(v => v.id),

@@ -106,7 +106,8 @@ function naiveMelee(world: World): InputFrame {
   if (d > 18) { inp.moveX = inp.aimX; inp.moveY = inp.aimY }
   if (d <= tuning.player.attack.swings[0].radius) inp.attack = world.tick % 4 === 0
   if (e.kind === 'brute' && e.state === 'windup' && e.stateTick > 12 && d < 40) { inp.dodge = true; inp.moveX = -inp.aimX; inp.moveY = -inp.aimY }
-  if (e.kind === 'warden' && e.state === 'windup' && e.stateTick > 20 && d < tuning.warden.slamRadius + 6) {
+  const wardenDodgeTick = (e.phase ? tuning.warden.windup2 : tuning.warden.windup) - 10
+  if (e.kind === 'warden' && e.state === 'windup' && e.stateTick > wardenDodgeTick && d < tuning.warden.slamRadius + 6) {
     inp.dodge = true; inp.moveX = -inp.aimX; inp.moveY = -inp.aimY
   }
   return inp
@@ -124,7 +125,9 @@ function kite(world: World): InputFrame {
     if (x.state !== 'windup' && x.state !== 'freeze') return false
     const reach = x.kind === 'warden' ? tuning.warden.slamRadius + 8 : 48
     if (Math.hypot(x.x - p.x, x.y - p.y) >= reach) return false
-    const late = x.kind === 'brute' ? 12 : x.kind === 'warden' ? 20 : 10
+    // Land the Warden roll inside the newly authored full-travel i-frame window. The old fixed
+    // tick 20 launched too early for the 36-tick tell and was already in landing when the slam hit.
+    const late = x.kind === 'brute' ? 12 : x.kind === 'warden' ? (x.phase ? tuning.warden.windup2 : tuning.warden.windup) - 10 : 10
     return x.stateTick > late
   })
   const incomingBolt = world.projectiles.some(b => b.active && Math.hypot(b.x - p.x, b.y - p.y) < 22)

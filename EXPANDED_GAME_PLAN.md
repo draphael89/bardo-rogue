@@ -206,6 +206,8 @@ interface RunState {
   seed: number
   weapon: ArmId
   boons: BoonStack[]
+  hp: number
+  maxHp: number
   depth: number
   roomId: string
   roomHistory: RoomVisit[]
@@ -221,7 +223,7 @@ interface MetaStateV1 {
 }
 ```
 
-`World` remains deterministic room combat. `GameSession` owns town/run transitions. Replays should record session commands (choose weapon, choose boon, choose exit) alongside combat input or lower them into the same deterministic input stream.
+`World` remains deterministic room combat. `GameSession` owns town/run transitions. Current and maximum health live canonically on `RunState`; entering a room copies them into `World.player`, and leaving or taking damage/a Life vessel copies them back. The first slice may retain one `World` as an optimization, but every transition still exercises this transfer contract so reconstructing a room cannot heal the player or discard an upgrade. Replays should record session commands (choose weapon, choose boon, choose exit) alongside combat input or lower them into the same deterministic input stream.
 
 ### 6.2 Explicit room phase
 
@@ -270,6 +272,8 @@ Demonstrated discoveries:
 - **Afterimage + Ashen Edge:** aggressive dodges seed Brand across a crowd before the real sword connects.
 - **Mirror Steel + Ashen Edge:** if all friendly weapon hits share on-hit effects, reflected bolts can mark targets for a later heavy.
 - **Cleaving Grace + Ashen Edge + Final Judgment:** wider crowd marking converts geometry into a room-clear build, not just a larger number.
+
+On-hit trigger priority is deterministic: Between-Step spends its prime and applies maximum Brand first; Final Judgment then consumes the resulting Brand on a heavy; ordinary light-hit Brand applies last. Thus a primed heavy on an unbranded target detonates immediately and cannot leave the prime armed for a later hit.
 
 The system has succeeded only when a tester can identify at least two of those interactions without being told.
 
@@ -332,7 +336,8 @@ Only four encounters are required because two boon choices are enough to start a
 
 - A guaranteed three-boon offer after each of Rooms 1–3.
 - Six total authored boons from section 6.5.
-- Door marks bias the next offer toward Blade or Veil boons; the current physical Life vessel can replace one boon offer on an optional safer route only after the guaranteed first boon.
+- A Blade- or Veil-marked door reserves at least one eligible option from that family in the destination room's offer; combo follow-ups may fill another slot but cannot displace the marked promise.
+- The physical Life vessel remains additive wherever it appears; it is not part of the four-encounter loop today and never replaces any of the three guaranteed boon offers. A future route that makes Life exclusive must be scoped and tested as an explicit exception rather than silently weakening this guarantee.
 - Selection pauses combat and uses one keyboard/gamepad focus model.
 - The chosen boon is visible in a compact run-build strip or pause summary; no inventory grid is needed.
 
@@ -493,13 +498,13 @@ Ranked by expected improvement to player experience, confidence, leverage across
 
 ### Automated
 
-- Session replay: town → weapon → Room 1 → boon → both Room 2 branches → Room 3 → boss → win → town.
+- Two seeded session replays: each runs town → weapon → Room 1 → boon → one distinct Room 2 branch → Room 3 → boss → win → town, so Room 2A and Room 2B are each completed in a physically possible attempt.
 - Death replay from every combat room: run state clears, meta counters persist, town is safe.
 - Reward determinism: same seed/history produces the same legal offer; no duplicates; follow-up weighting is bounded and testable.
-- Boon isolation and pair integration tests for all six boons and named synergies.
+- Boon isolation and pair integration tests for all six boons and named synergies, including the exact Between-Step-prime → heavy → Final-Judgment detonation order on an initially unbranded target.
 - Graph validation: all nonterminal rooms lead to a result; every exit target exists; boss has a success route.
 - Save tests: round trip, old version migration, corrupt payload fallback, no run-state leakage.
-- Existing typecheck, 110 tests, replay hashes, and browser screenshot captures remain green.
+- Existing typecheck, full test suite, replay hashes, and browser screenshot captures remain green.
 
 ### Human
 

@@ -143,6 +143,8 @@ export function hurtPlayer(world: World, angle: number, damage: number): boolean
   }
   if (p.god) damage = 0
   p.hp = Math.max(0, p.hp - damage)
+  const run = world.session.run
+  if (run) { run.hp = p.hp; run.maxHp = p.maxHp }
   p.iframes = tuning.player.hurtIFrames
   p.flash = tuning.juice.flashTicks
   p.kbx += Math.cos(angle) * tuning.player.hurtKnockback * 6

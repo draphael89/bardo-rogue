@@ -19,6 +19,7 @@ import { Recorder } from '@/input/recorder'
 import { tuning } from '@/tuning'
 import { Text } from 'pixi.js'
 import { loadMeta, loadSettings, saveMeta, saveSettings } from '@/sim/storage'
+import { defaultMetaState, type MetaStateV1 } from '@/sim/session'
 
 async function boot() {
   const q = new URLSearchParams(location.search)
@@ -70,9 +71,10 @@ async function boot() {
   // R restarts whatever is currently running (not the URL scenario), so replays and __game.reset() restart correctly
   let cur = { seed, scenario, god }
 
-  const reset = (s = cur.seed, sc = cur.scenario, opts: { god?: boolean } = { god: cur.god }) => {
+  const reset = (s = cur.seed, sc = cur.scenario, opts: { god?: boolean; meta?: MetaStateV1 } = { god: cur.god }) => {
     cur = { seed: s, scenario: sc, god: !!opts.god }
-    const meta = sc === 'loop' && world.scenario === 'loop' ? world.session.meta : undefined
+    const suppliedMeta = Object.prototype.hasOwnProperty.call(opts, 'meta')
+    const meta = sc === 'loop' ? (suppliedMeta ? opts.meta : world.scenario === 'loop' ? world.session.meta : undefined) : undefined
     world = createWorld(s, sc, { ...opts, ...(meta ? { meta } : {}) })
     metrics = new Metrics()
     replayFrames = null
@@ -106,7 +108,11 @@ async function boot() {
   }
 
   const record = (on = !recorder.recording) => {
-    if (on && !recorder.recording) { reset(); recorder.start(cur.seed, cur.scenario, cur.god); console.log('[replay] recording (fresh run)') }
+    if (on && !recorder.recording) {
+      reset()
+      recorder.start(cur.seed, cur.scenario, cur.god, cur.scenario === 'loop' ? world.session.meta : undefined)
+      console.log('[replay] recording (fresh run)')
+    }
     else if (!on && recorder.recording) stopRecord()
     return recorder.recording
   }
@@ -118,7 +124,10 @@ async function boot() {
   }
   const replay = (r: Replay | EncodedReplay) => {
     const rep = isEncodedReplay(r) ? decodeReplay(r) : r
-    reset(rep.seed, rep.scenario, { god: rep.god })
+    reset(rep.seed, rep.scenario, {
+      god: rep.god,
+      ...(rep.scenario === 'loop' ? { meta: rep.meta ?? defaultMetaState() } : {}),
+    })
     replayFrames = rep.frames.length ? rep.frames : null
     replayIdx = 0
   }

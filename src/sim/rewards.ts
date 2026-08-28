@@ -31,9 +31,14 @@ export function offerReward(world: World, family: RewardFamily): void {
   const available = BOON_IDS.filter(id => !hasBoon(world, id) && (id !== 'finalJudgment' || canBrand))
   const preferred = shuffled(world, available.filter(id => BOONS[id].family === family))
   const others = shuffled(world, available.filter(id => BOONS[id].family !== family))
+  // A marked door is a promise, not merely a weight. During this three-reward slice at least one
+  // unowned boon from either family must remain; reserve it before a cross-family combo follow-up.
+  const promised = preferred.shift()
+  if (!promised) throw new Error(`no eligible ${family} boon remains for the marked reward`)
   const picked: BoonId[] = []
   const followup = synergyFollowup(world)
-  if (followup && available.includes(followup)) picked.push(followup)
+  if (followup && available.includes(followup) && !picked.includes(followup)) picked.push(followup)
+  if (!picked.includes(promised)) picked.push(promised)
   for (const id of [...preferred, ...others]) if (!picked.includes(id) && picked.length < 3) picked.push(id)
   // The slice grants only three rewards from a six-boon pool, so this is an invariant. Keeping the
   // guard explicit makes a future content edit fail loudly instead of showing an empty card.

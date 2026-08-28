@@ -96,24 +96,31 @@ export function applyBrand(world: World, enemy: Enemy, stacks: number): void {
 // Called by any friendly weapon result: blade, reflected bolt, or afterimage. Keeping one hook is
 // what makes the interactions discoverable instead of a list of exceptions.
 export function resolveWeaponOnHit(world: World, enemy: Enemy, heavy: boolean, brandBefore: number, angle: number): void {
-  if (heavy && hasBoon(world, 'finalJudgment') && brandBefore > 0) {
+  // Trigger priority is part of the combo contract: Between-Step marks first, then a heavy may cash
+  // that mark through Final Judgment on the very same hit. The prime is spent by any weapon hit.
+  const run = world.session.run
+  const primed = !!run?.primedBrand
+  let resolvedBrand = brandBefore
+  if (primed) {
+    applyBrand(world, enemy, tuning.boons.brandMax)
+    resolvedBrand = enemy.brand
+    run!.primedBrand = false
+  }
+
+  if (heavy && hasBoon(world, 'finalJudgment') && resolvedBrand > 0) {
     enemy.brand = 0
     enemy.brandTicks = 0
-    const damage = brandBefore * tuning.boons.judgmentDamage
+    const damage = resolvedBrand * tuning.boons.judgmentDamage
     const radius = tuning.boons.judgmentRadius
     const targets = world.enemies.filter(e => e.active && e.state !== 'dead' && Math.hypot(e.x - enemy.x, e.y - enemy.y) <= radius + e.radius)
-    world.emit({ type: 'brandConsumed', id: enemy.id, stacks: brandBefore, x: enemy.x, y: enemy.y })
+    world.emit({ type: 'brandConsumed', id: enemy.id, stacks: resolvedBrand, x: enemy.x, y: enemy.y })
     for (const target of targets) {
       const hitAngle = target.id === enemy.id ? angle : Math.atan2(target.y - enemy.y, target.x - enemy.x)
       damageEnemy(world, target, damage, hitAngle, tuning.boons.judgmentKnockback, true, tuning.boons.judgmentHitstop)
     }
   }
 
-  if (!heavy) {
-    const primed = !!world.session.run?.primedBrand
-    if (hasBoon(world, 'ashenEdge') || primed) applyBrand(world, enemy, primed ? tuning.boons.brandMax : 1)
-    if (primed && world.session.run) world.session.run.primedBrand = false
-  }
+  if (!heavy && !primed && hasBoon(world, 'ashenEdge')) applyBrand(world, enemy, 1)
 }
 
 export function triggerPerfectDodge(world: World): void {

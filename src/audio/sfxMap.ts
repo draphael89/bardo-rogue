@@ -235,6 +235,12 @@ export function playEventSfx(a: AudioSystem, ev: SimEvent): void {
     case 'arrowHitWall':
       a.play('impactGeneric_light', { ...at, gain: 0.35, pitch: 1.15 })
       break
+    case 'friendlyProjectileEnded':
+      if (ev.kind === 'mirror') {
+        a.play('laserRetro', { ...at, gain: 0.35, pitch: 1.55 })
+        a.play('impactGeneric_light', { ...at, gain: 0.25, pitch: 1.4 })
+      } else a.play('woosh2', { ...at, gain: 0.28, pitch: 1.8 })
+      break
   }
   census(a, ev)
 }

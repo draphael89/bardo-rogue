@@ -100,6 +100,14 @@ export class Particles {
     this.spawn(this.atlas.particle('circle_01'), x + fxRng.particles.signed(1), y + fxRng.particles.signed(1), { maxLife: 0.16, scale0: 3, scale1: 1, tint: 0xc49058, alpha0: 0.45, alpha1: 0 })
   }
 
+  mirrorTrail(x: number, y: number) {
+    this.spawn(this.atlas.particle('star_04'), x + fxRng.particles.signed(1), y + fxRng.particles.signed(1), { maxLife: 0.18, scale0: 4, scale1: 1, tint: 0x62eaff, blend: 'add', alpha0: 0.75, alpha1: 0 })
+  }
+
+  echoTrail(x: number, y: number) {
+    this.spawn(this.atlas.particle('spark_01'), x + fxRng.particles.signed(2), y + fxRng.particles.signed(2), { maxLife: 0.14, scale0: 5, scale1: 1, tint: 0xb78cff, blend: 'add', alpha0: 0.48, alpha1: 0 })
+  }
+
   // Embers dragged in toward the blade while the greatsword is up. Nothing else in the game moves
   // inward, so the pull alone reads as the swing gathering.
   ember(x: number, y: number) {

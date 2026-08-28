@@ -46,7 +46,7 @@ export function hashWorld(world: World): number {
     const run = session.run
     flag(!!run)
     if (run) {
-      int(run.seed); int(run.depth); int(run.startedTick); byte(run.result === 'active' ? 0 : run.result === 'won' ? 1 : 2)
+      int(run.seed); int(run.hp); int(run.maxHp); int(run.depth); int(run.startedTick); byte(run.result === 'active' ? 0 : run.result === 'won' ? 1 : 2)
       flag(run.primedBrand); int(run.boonBits); int(run.roomHistory.length)
       for (const visit of run.roomHistory) { for (let i = 0; i < visit.id.length; i++) byte(visit.id.charCodeAt(i)); int(visit.enteredTick) }
       flag(!!run.pendingReward)

@@ -40,6 +40,7 @@ export type SimEvent =
   | { type: 'draw'; x: number; y: number; angle: number }
   | { type: 'arrowLoose'; x: number; y: number; angle: number }
   | { type: 'arrowHitWall'; x: number; y: number }
+  | { type: 'friendlyProjectileEnded'; kind: 'mirror' | 'echo'; x: number; y: number }
   | { type: 'dodged'; x: number; y: number }
   | { type: 'graze'; x: number; y: number; nearX: number; nearY: number; angle: number }
   | { type: 'restart' }

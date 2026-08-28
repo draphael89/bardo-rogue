@@ -6,7 +6,7 @@ import { SLOW_FULL } from '@/sim/world'
 import type { World, Enemy, Projectile } from '@/sim/world'
 import type { SimEvent } from '@/sim/events'
 import { tuning } from '@/tuning'
-import { EntityView, createPlayerView, createEnemyView, updatePlayerView, updateEnemyView, makePropSprite, SpawnMarkerView, BoltView, ArrowView, drawAimLine, drawSwingArc, drawSwingTip, drawBowAim } from './views'
+import { EntityView, createPlayerView, createEnemyView, updatePlayerView, updateEnemyView, makePropSprite, SpawnMarkerView, BoltView, ArrowView, EchoView, MirrorBoltView, drawAimLine, drawSwingArc, drawSwingTip, drawBowAim } from './views'
 import { updatePlayerRim } from './views/player'
 import { ARM, armOf } from '@/sim/weapons'
 import { buildTilemap, type TilemapView } from './tilemap'
@@ -34,6 +34,8 @@ export class Presenter {
   enemyViews = new Map<number, EntityView>()
   boltViews = new Map<number, BoltView>()
   arrowViews = new Map<number, ArrowView>()
+  mirrorViews = new Map<number, MirrorBoltView>()
+  echoViews = new Map<number, EchoView>()
   spawnMarkers: SpawnMarkerView[] = []
   tilemap: TilemapView
   camera = new Camera()
@@ -111,6 +113,8 @@ export class Presenter {
     for (const v of this.enemyViews.values()) v.destroy(); this.enemyViews.clear()
     for (const v of this.boltViews.values()) v.destroy(); this.boltViews.clear()
     for (const v of this.arrowViews.values()) v.destroy(); this.arrowViews.clear()
+    for (const v of this.mirrorViews.values()) v.destroy(); this.mirrorViews.clear()
+    for (const v of this.echoViews.values()) v.destroy(); this.echoViews.clear()
     for (const m of this.spawnMarkers) m.sprite.destroy(); this.spawnMarkers = []
     this.particles.clear()
     this.hitFlash.clear()
@@ -404,6 +408,14 @@ export class Presenter {
         case 'arrowHitWall':
           this.particles.puff(ev.x, ev.y, 2, 0xc49058)
           break
+        case 'friendlyProjectileEnded':
+          if (ev.kind === 'mirror') {
+            this.particles.ring(ev.x, ev.y, 0x62eaff)
+            this.particles.puff(ev.x, ev.y, 3, 0x49d9ff)
+          } else {
+            this.particles.hitSparks(ev.x, ev.y, 0, 5, 0xb78cff)
+          }
+          break
         case 'restart': break
       }
       this.onEvent?.(ev)
@@ -669,21 +681,37 @@ export class Presenter {
     }
     for (const b of w.projectiles) {
       if (!b.active) continue
-      if (b.team === 1) {
+      if (b.kind === 'arrow') {
         if (!this.arrowViews.has(b.id)) this.arrowViews.set(b.id, new ArrowView(this.atlas, L.fx))
+      } else if (b.kind === 'mirror') {
+        if (!this.mirrorViews.has(b.id)) this.mirrorViews.set(b.id, new MirrorBoltView(L.fx))
+      } else if (b.kind === 'echo') {
+        if (!this.echoViews.has(b.id)) this.echoViews.set(b.id, new EchoView(L.fx))
       } else if (!this.boltViews.has(b.id)) this.boltViews.set(b.id, new BoltView(this.atlas, L.fx))
     }
     for (const [id, v] of this.boltViews) {
-      const b = w.projectiles.find(x => x.id === id && x.active && x.team === 0)
+      const b = w.projectiles.find(x => x.id === id && x.active && x.kind === 'bolt')
       if (!b) { v.destroy(); this.boltViews.delete(id); continue }
       v.update(lerp(b.px, b.x, slowAlpha), lerp(b.py, b.y, slowAlpha), this.time)
       this.stampTrail(v, b, dtSec, tuning.juice.trail.boltPx, (x, y) => this.particles.boltTrail(x, y))
     }
     for (const [id, v] of this.arrowViews) {
-      const b = w.projectiles.find(x => x.id === id && x.active && x.team === 1)
+      const b = w.projectiles.find(x => x.id === id && x.active && x.kind === 'arrow')
       if (!b) { v.destroy(); this.arrowViews.delete(id); continue }
       v.update(lerp(b.px, b.x, slowAlpha), lerp(b.py, b.y, slowAlpha), b.angle)
       this.stampTrail(v, b, dtSec, tuning.juice.trail.arrowPx, (x, y) => this.particles.arrowTrail(x, y))
+    }
+    for (const [id, v] of this.mirrorViews) {
+      const b = w.projectiles.find(x => x.id === id && x.active && x.kind === 'mirror')
+      if (!b) { v.destroy(); this.mirrorViews.delete(id); continue }
+      v.update(lerp(b.px, b.x, slowAlpha), lerp(b.py, b.y, slowAlpha), b.angle, this.time)
+      this.stampTrail(v, b, dtSec, tuning.juice.trail.boltPx, (x, y) => this.particles.mirrorTrail(x, y))
+    }
+    for (const [id, v] of this.echoViews) {
+      const b = w.projectiles.find(x => x.id === id && x.active && x.kind === 'echo')
+      if (!b) { v.destroy(); this.echoViews.delete(id); continue }
+      v.update(lerp(b.px, b.x, slowAlpha), lerp(b.py, b.y, slowAlpha), b.angle, this.time)
+      this.stampTrail(v, b, dtSec, tuning.juice.trail.arrowPx, (x, y) => this.particles.echoTrail(x, y))
     }
     while (this.spawnMarkers.length < w.spawnQueue.length) this.spawnMarkers.push(new SpawnMarkerView(this.atlas, L.fx))
     for (let i = 0; i < this.spawnMarkers.length; i++) {

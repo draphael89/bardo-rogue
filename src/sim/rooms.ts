@@ -8,7 +8,7 @@ import {
 } from './waves'
 import type { World } from './world'
 import { clearBulletTime } from './combat'
-import { recordRoomEntry, startRun, type RewardFamily } from './session'
+import { recordRoomEntry, restoreRunHealth, startRun, storeRunHealth, type RewardFamily } from './session'
 
 export interface RoomExit {
   dir: DoorDir
@@ -124,6 +124,7 @@ function roomHasExits(room: RoomDef): boolean {
 
 export function enterRoom(world: World, index: number, via: 'door' | 'return' = 'door', mark?: DoorMark): void {
   if (index < 0 || index >= world.rooms.length) return
+  storeRunHealth(world)
   const room = world.rooms[index]
   world.roomIndex = index
   world.roomName = room.name
@@ -154,6 +155,7 @@ export function enterRoom(world: World, index: number, via: 'door' | 'return' = 
   p.dodgeProcTick = -1
   p.state = 'free'
   p.stateTick = 0
+  restoreRunHealth(world)
   p.armed = room.kind !== 'bardo'
   if (room.waves?.length) startWaves(world, room.waves)
   world.roomPhase = room.kind === 'bardo' ? 'town' : room.waves?.length ? 'fighting' : roomHasExits(room) ? 'exits' : 'resolved'

@@ -3,7 +3,7 @@ import { createWorld } from '@/sim/scenarios'
 import { emptyInput } from '@/sim/input'
 import { stepWorld } from '@/sim/step'
 import { TILE } from '@/sim/arena'
-import { activeBoons, applyBrand, grantBoon, hasBoon, resolveWeaponOnHit, triggerPerfectDodge } from '@/sim/boons'
+import { activeBoons, applyBrand, BOONS, grantBoon, hasBoon, resolveWeaponOnHit, triggerPerfectDodge } from '@/sim/boons'
 import { damageEnemy, hurtPlayer } from '@/sim/combat'
 import { hashWorld } from '@/sim/hash'
 import { loadMeta, loadSettings, META_KEY, saveMeta, saveSettings, SETTINGS_KEY, type StorageLike } from '@/sim/storage'
@@ -11,6 +11,8 @@ import { tuning } from '@/tuning'
 import { enterRoomById, roomsFor } from '@/sim/rooms'
 import { makeBot } from '@/sim/bots'
 import { offerReward } from '@/sim/rewards'
+import { quantizeFrame, runReplay, type Replay } from '@/sim/replay'
+import { tryCollectOffering } from '@/sim/offering'
 
 function prepareAndDescend(world = createWorld(1, 'loop')) {
   const rack = world.arena.rack!
@@ -81,9 +83,25 @@ describe('production vertical slice', () => {
     expect(world.roomName).toBe('THE THRESHOLD')
     expect(world.roomPhase).toBe('fighting')
     expect(world.session.run?.weapon).toBe('blade')
+    expect(world.session.run).toMatchObject({ hp: tuning.player.hp, maxHp: tuning.player.hp })
     expect(world.session.run?.depth).toBe(1)
     expect(world.session.run?.roomHistory.map(v => v.id)).toEqual(['threshold'])
     expect(world.session.meta.attempts).toBe(1)
+  })
+
+  it('carries damage and max-health gifts through the explicit run/room boundary', () => {
+    const world = prepareAndDescend(createWorld(8, 'loop'))
+    hurtPlayer(world, 0, 1)
+    expect(world.session.run?.hp).toBe(tuning.player.hp - 1)
+    world.arena.offering = { kind: 'life', x: world.player.x, y: world.player.y }
+    world.arena.offeringTaken = false
+    tryCollectOffering(world)
+    const hp = world.player.hp, maxHp = world.player.maxHp
+    expect(world.session.run).toMatchObject({ hp, maxHp })
+    expect(maxHp).toBe(tuning.player.hp + tuning.run.offeringHp)
+    enterRoomById(world, 'veil-path')
+    expect(world.player).toMatchObject({ hp, maxHp })
+    expect(world.session.run).toMatchObject({ hp, maxHp })
   })
 
   it('offers three deterministic unique boons and opens exits only after a choice', () => {
@@ -168,23 +186,30 @@ describe('production vertical slice', () => {
     expect(byId.get('warden')?.exits).toBeUndefined()
   })
 
-  it('replays the complete physical loop deterministically', () => {
-    const run = () => {
-      const world = createWorld(17, 'loop')
-      const bot = makeBot('slice-kite')
-      let won = false
-      for (let i = 0; i < 18_000 && world.returns === 0; i++) {
-        stepWorld(world, bot(world))
-        if (world.events.some(e => e.type === 'runWon')) won = true
-        world.events.length = 0
-      }
-      return { world, won, hash: hashWorld(world) }
+  it.each([
+    { seed: 17, branch: 'veil-path' },
+    { seed: 18, branch: 'blade-path' },
+  ])('records and replays the complete $branch session deterministically', ({ seed, branch }) => {
+    const source = createWorld(seed, 'loop')
+    const bot = makeBot('slice-kite')
+    const frames = [] as ReturnType<typeof quantizeFrame>[]
+    for (let i = 0; i < 18_000 && source.returns === 0; i++) {
+      const frame = quantizeFrame(bot(source))
+      frames.push(frame)
+      stepWorld(source, frame)
+      source.events.length = 0
     }
-    const a = run(), b = run()
-    expect(a.won).toBe(true)
+    expect(source.returns).toBe(1)
+    expect(source.session.meta.victories).toBe(1)
+    const replay: Replay = { v: 1, seed, scenario: 'loop', frames }
+    const visited = new Set<string>()
+    const a = runReplay(replay, world => visited.add(world.rooms[world.roomIndex]?.id))
+    const b = runReplay(replay)
+    expect(visited.has(branch)).toBe(true)
     expect(a.world.returns).toBe(1)
     expect(a.world.roomPhase).toBe('town')
-    expect(a.hash).toBe(b.hash)
+    expect(a.hash).toBe(hashWorld(source))
+    expect(b.hash).toBe(a.hash)
   })
 })
 
@@ -194,6 +219,17 @@ describe('boon interactions', () => {
     grantBoon(world, 'ashenEdge')
     offerReward(world, 'veil')
     expect(world.session.run?.pendingReward?.options).toContain('finalJudgment')
+    expect(world.session.run?.pendingReward?.options.some(id => BOONS[id].family === 'veil')).toBe(true)
+  })
+
+  it.each(['blade', 'veil'] as const)('guarantees an eligible %s boon behind that marked door', family => {
+    for (let seed = 1; seed <= 64; seed++) {
+      const world = prepareAndDescend(createWorld(seed, 'loop'))
+      grantBoon(world, family === 'blade' ? 'betweenStep' : 'ashenEdge')
+      offerReward(world, family)
+      const options = world.session.run!.pendingReward!.options
+      expect(options.some(id => BOONS[id].family === family), `seed ${seed}: ${options.join(',')}`).toBe(true)
+    }
   })
 
   it('lets Between-Step create Brand without requiring Ashen Edge first', () => {
@@ -225,6 +261,22 @@ describe('boon interactions', () => {
     expect(world.events.some(e => e.type === 'brandConsumed' && e.stacks === 3)).toBe(true)
   })
 
+  it('applies a Between-Step prime before Final Judgment resolves the same heavy hit', () => {
+    const world = prepareAndDescend(createWorld(11, 'loop'))
+    const marked = world.spawnEnemy('dummy', 180, 100)!
+    const nearby = world.spawnEnemy('brute', 194, 100)!
+    grantBoon(world, 'betweenStep')
+    grantBoon(world, 'finalJudgment')
+    triggerPerfectDodge(world)
+    const nearbyHp = nearby.hp
+    damageEnemy(world, marked, 1, 0, 0, true, 0)
+    resolveWeaponOnHit(world, marked, true, 0, 0)
+    expect(world.session.run?.primedBrand).toBe(false)
+    expect(marked.brand).toBe(0)
+    expect(nearby.hp).toBe(nearbyHp - tuning.boons.brandMax * tuning.boons.judgmentDamage)
+    expect(world.events.map(e => e.type)).toEqual(expect.arrayContaining(['brandApplied', 'brandConsumed']))
+  })
+
   it('turns a perfect dodge into a primed mark and an afterimage weapon hit', () => {
     const world = prepareAndDescend(createWorld(4, 'loop'))
     grantBoon(world, 'betweenStep')
@@ -252,6 +304,14 @@ describe('boon interactions', () => {
     expect(bolt.team).toBe(1)
     expect(bolt.kind).toBe('mirror')
     expect(bolt.vx).toBeGreaterThanOrEqual(0)
+  })
+
+  it.each(['mirror', 'echo'] as const)('ends %s magic with kind-specific feedback instead of an arrow impact', kind => {
+    const world = createWorld(1, 'empty')
+    world.fireProjectile(world.player.x, world.player.y, 0, 0, 3, 1, 1, 1, 0, kind)
+    stepWorld(world, emptyInput())
+    expect(world.events).toContainEqual(expect.objectContaining({ type: 'friendlyProjectileEnded', kind }))
+    expect(world.events.some(e => e.type === 'arrowHitWall')).toBe(false)
   })
 })
 

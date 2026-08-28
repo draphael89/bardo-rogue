@@ -164,6 +164,12 @@ export function migrateSave(input: unknown, opts: ParseSaveOptions = {}): Migrat
   if (sv === SAVE_SCHEMA_VERSION) {
     if (obj.meta === undefined) return { kind: 'corrupt', reason: 'missing-meta' }
     if (obj.settings === undefined) return { kind: 'corrupt', reason: 'missing-settings' }
+  } else if (obj.meta === undefined && obj.settings === undefined) {
+    // A pre-current document may legitimately lack ONE of the two (a settings-less legacy player),
+    // but never both: migrateLegacySave only ever constructs a v1 around at least one payload, so an
+    // empty {"schemaVersion":1} was never written by us -- and migrating it into all-defaults would
+    // let an import of such a file wipe real progress, the same hole the check above closes for v2.
+    return { kind: 'corrupt', reason: 'missing-meta' }
   }
 
   const meta = isObj(obj.meta) ? validateMeta(obj.meta) : defaultMetaState()

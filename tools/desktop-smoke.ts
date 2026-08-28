@@ -107,7 +107,12 @@ async function launch(): Promise<{ app: ElectronApplication; page: Page }> {
 
 async function close(a: ElectronApplication): Promise<void> {
   try { await withTimeout(a.close(), 15_000, 'app.close') }
-  catch { try { a.process().kill('SIGKILL') } catch { /* gone */ } }
+  catch (e) {
+    // Kill for cleanup, but RECORD the failure: an app that cannot exit cleanly is a shipping bug
+    // (a wedged quit guard, a hung flush), and the final no-errors check turns this into a failure.
+    errors.push(`close failed, killed: ${e instanceof Error ? e.message : String(e)}`)
+    try { a.process().kill('SIGKILL') } catch { /* gone */ }
+  }
   app = null
   await new Promise(r => setTimeout(r, 300))   // let the single-instance lock clear before relaunching
 }

@@ -84,6 +84,15 @@ describe('parseSave', () => {
     if (metaOnly.kind === 'corrupt') expect(metaOnly.reason).toBe('missing-settings')
   })
 
+  it('refuses a pre-current document that carries neither payload', () => {
+    // {"schemaVersion":1} was never written by anything: migrateLegacySave always builds a v1 around
+    // at least one payload. Migrating it into all-defaults would let importing such a file wipe real
+    // progress -- the same hole the current-schema check closes for v2.
+    const r = parseSave('{"schemaVersion":1}')
+    expect(r.kind).toBe('corrupt')
+    if (r.kind === 'corrupt') expect(r.reason).toBe('missing-meta')
+  })
+
   it('still fills fields a MIGRATED document legitimately predates', () => {
     // A v1 doc with no settings key is a real settings-less legacy player, not damage.
     const r = migrateSave({ schemaVersion: 1, meta: { version: 1, attempts: 3, victories: 0, unlockedWeapons: ['blade'] } })

@@ -132,7 +132,12 @@ export function createWebPlatform(opts: DetectOptions = {}): Platform {
     kind: 'web',
     saves: createWebSaveStore(storage, prefersReducedMotion()),
     claimSaves: profileId => {
-      const owner = crypto.randomUUID()
+      // randomUUID exists only in secure contexts, and vite.config's `host: true` exists precisely so
+      // the game can be opened over plain http from another device -- where a throw here would kill
+      // boot before window.__game appears. The fallback needs only per-tab uniqueness, not crypto.
+      const owner = (typeof crypto !== 'undefined' && crypto.randomUUID)
+        ? crypto.randomUUID()
+        : `tab-${Math.random().toString(36).slice(2)}-${Date.now().toString(36)}`
       const lock = claimProfileLock(storage, profileId, owner)
       if (!lock.claimed) return false
       heartbeat = setInterval(() => lock.refresh(), LOCK_REFRESH_MS)

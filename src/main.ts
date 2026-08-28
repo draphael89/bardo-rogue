@@ -240,6 +240,9 @@ async function boot() {
   document.addEventListener('fullscreenchange', () => ra.resize())
 
   const exportSave = async () => {
+    // Nothing was read, so there is nothing to export: serialising the in-memory defaults here would
+    // hand the player a zeroed file labelled as their backup of the inaccessible profile.
+    if (loaded.source === 'unreadable') { presenter.hud.showBanner('NOTHING TO EXPORT', 'the save could not be read', 2.4); return }
     // For a save from a newer build, export the bytes as they were READ: re-serialising would emit a
     // schemaVersion-2 document with the newer build's fields quietly dropped, which is indistinguishable
     // from a real one.

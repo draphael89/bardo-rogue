@@ -85,11 +85,16 @@ const decals: Record<string, Grid> = {}
   const g = grid(S); ellipse(g, 7.5, 7.5, 7.5, 7.5, CORE)
   particles.circle_01 = g
 }
-// circle_02: the shockwave ring. A 2px hard annulus reads as a wave front; a filled soft disc reads as
-// a bloom, and a bloom over the fight is exactly what §6.2 refuses.
+// circle_02: the shockwave ring. A hard annulus reads as a wave front; a filled soft disc reads as a
+// bloom, and a bloom over the fight is exactly what §6.2 refuses.
+//
+// The stroke is ONE pixel, not two, because this is the texture the emitters scale hardest: poiseBreak
+// takes it to 58px, i.e. 3.6x, and a hard stroke thickens with the scale. At 2px that arrives as a 7px
+// band — a filled ring, which is the bloom again by another route. At 1px the worst case is 3.6px and
+// the wave front stays a line.
 {
   const g = grid(S); ellipse(g, 7.5, 7.5, 7.5, 7.5, CORE)
-  const inner = grid(S); ellipse(inner, 7.5, 7.5, 5.5, 5.5, CORE)
+  const inner = grid(S); ellipse(inner, 7.5, 7.5, 6.5, 6.5, CORE)
   for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) if (get(inner, x, y)) put(g, x, y, 0, 0)
   particles.circle_02 = g
 }

@@ -522,11 +522,36 @@
       "luminance": 0.7615,
       "family": "supernatural",
       "role": "Doorway sill light."
+    },
+    "hurt": {
+      "hex": "#FF2A2A",
+      "rgb": [
+        255,
+        42,
+        42
+      ],
+      "band": "B2",
+      "luminance": 0.3423,
+      "family": "feedback",
+      "role": "Player-damage vignette and shockwave. The reserved damage hue: SS6.7 reserves hostile hues, and this is the one the player wears. No static asset may use it."
+    },
+    "hurtHi": {
+      "hex": "#FF6A3A",
+      "rgb": [
+        255,
+        106,
+        58
+      ],
+      "band": "B4",
+      "luminance": 0.5263,
+      "family": "feedback",
+      "role": "Player-damage shockwave, second ring."
     }
   },
   "notes": [
     "ART_DIRECTION SS1.2 hand-types bone as B4; its measured luminance is 0.7595, which is B5 by SS1.1 own definition. The computed band is authoritative here, and the SS11.1 highlight-budget gate (<=8% of static-art pixels above 72%) must therefore count bone. That is intended: bone is the eye second stop and is meant to be scarce.",
     "ART_DIRECTION SS1.2 hand-types slateHi as B4; measured 0.5083 puts it at the top of B3.",
-    "well/wellHi/sill are the open-doorway family from tools/make-bardo-tiles.ts. They are canon: the run lane depends on them."
+    "well/wellHi/sill are the open-doorway family from tools/make-bardo-tiles.ts. They are canon: the run lane depends on them.",
+    "hurt/hurtHi are the player-damage feedback hue. They were inline literals in hud.ts, which made SS1.3.2 unenforceable exactly where the player looks most. They are canon so the rule can be checked, and they are reserved: a sprite spec must never name them, and the compiler only uses the ramp a spec names."
   ]
 }

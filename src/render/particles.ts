@@ -1,14 +1,13 @@
 import { Container, Sprite, Texture, RenderTexture, Rectangle } from 'pixi.js'
 import type { Atlas } from './atlas'
-import { tuning } from '@/tuning'
 import { fxRng } from './fxRng'
 import { FX_UNIT } from './fxUnits'
 
 interface P { s: Sprite; vx: number; vy: number; life: number; maxLife: number; drag: number; grav: number; scale0: number; scale1: number; rot: number; alpha0: number; alpha1: number; ground: number | null; tint0: number; tint1: number | null; sgn: number; unit: number }
 
 // Authored FX sprites are 16x16 (tools/make-bardo-fx.ts). `scale0`/`scale1` stay in screen pixels, so
-// the sprite scale is size/unit. shatter() and afterimage() pass BODY_UNIT because they scale a body
-// texture, not an effect: their numbers were tuned against that divisor and are left exactly alone.
+// the sprite scale is size/unit. shatter() passes BODY_UNIT because it scales a body texture, not an
+// effect: its numbers were tuned against that divisor and are left exactly alone.
 const FX = FX_UNIT
 const BODY_UNIT = 64
 
@@ -48,7 +47,7 @@ export class Particles {
   private spawn(tex: Texture, x: number, y: number, o: Partial<P> & { tint?: number; tint1?: number; blend?: 'add' | 'normal' } = {}): P | null {
     if (this.live.length >= this.max) return null
     let p = this.pool.pop()
-    if (!p) { const s = new Sprite(); s.anchor.set(0.5); this.fx.addChild(s); p = { s, vx: 0, vy: 0, life: 0, maxLife: 1, drag: 1, grav: 0, scale0: 1, scale1: 1, rot: 0, alpha0: 1, alpha1: 0, ground: null, tint0: 0xffffff, tint1: null, sgn: 1, unit: FX } }
+    if (!p) { const s = new Sprite(); s.anchor.set(0.5); s.roundPixels = true; this.fx.addChild(s); p = { s, vx: 0, vy: 0, life: 0, maxLife: 1, drag: 1, grav: 0, scale0: 1, scale1: 1, rot: 0, alpha0: 1, alpha1: 0, ground: null, tint0: 0xffffff, tint1: null, sgn: 1, unit: FX } }
     p.s.texture = tex; p.s.visible = true; p.s.position.set(x, y)
     p.vx = o.vx ?? 0; p.vy = o.vy ?? 0; p.life = p.maxLife = o.maxLife ?? 0.4; p.drag = o.drag ?? 1; p.grav = o.grav ?? 0
     p.scale0 = o.scale0 ?? 1; p.scale1 = o.scale1 ?? p.scale0; p.rot = o.rot ?? 0; p.alpha0 = o.alpha0 ?? 1; p.alpha1 = o.alpha1 ?? 0; p.ground = o.ground ?? null
@@ -173,7 +172,11 @@ export class Particles {
       vx: fxRng.particles.signed(6), vy: -16 - fxRng.particles.next() * 14, maxLife: (big ? 0.5 : 0.3) + fxRng.particles.next() * 0.15, drag: 0.94,
       scale0: big ? 22 : fxRng.particles.range(14, 18), scale1: 5, rot: fxRng.particles.signed(2), tint: 0xfff0a0, tint1: 0xff5a14, alpha0: 1, alpha1: 0.55,
     })
-    if (f) f.s.rotation = quantRot(fxRng.particles.signed(0.4)) // spawn() randomises rotation; a flame must point up
+    // A flame must point up, with a little lean. Feeding a continuous +/-0.4 rad through quantRot
+    // collapsed it: the 22.5-degree step has a +/-11.25-degree capture zone, so half the draws snapped
+    // to exactly 0 and the rest to exactly one step. Pick the step directly instead — same three
+    // angles, but uniformly, so a brazier reads as several tongues rather than a picket fence.
+    if (f) f.s.rotation = QUANT * (fxRng.particles.int(0, 2) - 1)
   }
 
   // The enemy's own pixels fly apart along the hit direction, fall, and settle.
@@ -193,27 +196,7 @@ export class Particles {
     }
   }
 
-  // A ghost of a body left exactly where it stood, in its own pose. Cheap: it reuses the sprite's texture.
-  afterimage(body: Sprite, tint: number, alpha: number, life: number) {
-    const g = this.spawn(body.texture, body.position.x, body.position.y - body.height / 2, {
-      maxLife: life, scale0: 64, scale1: 64, tint, blend: 'add', alpha0: alpha, alpha1: 0, sgn: body.scale.x < 0 ? -1 : 1, unit: BODY_UNIT,
-    })
-    if (g) g.s.rotation = body.rotation
-  }
 
-  // The reward for phasing through an attack: one cold ring and a spray of cold sparks. Nothing else
-  // in the fight is this colour, so the player never confuses it with a hit or with being hit.
-  dodgeSlip(x: number, y: number, n: number, tint: number) {
-    this.spawn(this.atlas.particle('circle_02'), x, y, { maxLife: 0.22, scale0: 6, scale1: 34, tint, blend: 'add', alpha0: 0.9, alpha1: 0 })
-    for (let i = 0; i < n; i++) {
-      const a = (i / n) * 6.28 + fxRng.particles.signed(0.3)
-      const sp = fxRng.particles.range(50, 130)
-      this.spawn(this.atlas.particle('spark_01'), x, y, {
-        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp * 0.6 - 8, maxLife: fxRng.particles.range(0.22, 0.4), drag: 0.88,
-        scale0: fxRng.particles.range(4, 8), scale1: 1, tint, blend: 'add', alpha0: 0.95, alpha1: 0,
-      })
-    }
-  }
 
   // A graze is a whisper, not the perfect-dodge jackpot: three cyan needles peel off the threat
   // line and vanish before they can read as a hit spark or as the expanding cold success ring.

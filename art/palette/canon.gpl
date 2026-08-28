@@ -25,6 +25,7 @@ Columns: 8
  90  78  66	boneLo
  92  80  58	naveWarm
  72  82  98	nave1
+255  42  42	hurt
 158  70  88	purple3
  88 102 124	slate3
  94 104 118	nave2
@@ -32,6 +33,7 @@ Columns: 8
 118 126 142	brickLo
 144 128 108	boneDim
 118 132 154	slateHi
+255 106  58	hurtHi
 255 122  24	ember
 148 156 172	brick
 212 176  96	gold

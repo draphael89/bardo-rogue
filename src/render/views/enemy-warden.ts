@@ -1,7 +1,7 @@
 import { Graphics, Texture, type Container } from 'pixi.js'
 import type { Enemy } from '@/sim/world'
 import { tuning } from '@/tuning'
-import { wardenWindup } from '@/sim/enemies/warden'
+import { wardenWindup, wardenRecover } from '@/sim/enemies/warden'
 import { clamp01, lerp } from '../anim'
 import { EntityView, type EnemyFrame, type Pose } from './shared'
 
@@ -240,7 +240,7 @@ export function updateWardenView(v: EntityView, e: Enemy, f: EnemyFrame, out: Po
     rot = e.facing * lerp(-0.12, 0.22, r)
     key = 'slam'
   } else if (e.state === 'recover') {
-    const q = tk / wardenRecoverSafe(e)
+    const q = tk / wardenRecover(e)
     sx = MASS * lerp(1.22, 1.04, clamp01(q)); sy = MASS * lerp(0.78, 0.96, clamp01(q))
     key = 'recover'
   } else if (e.state === 'stagger') {
@@ -259,9 +259,6 @@ export function updateWardenView(v: EntityView, e: Enemy, f: EnemyFrame, out: Po
   out.sx = sx; out.sy = sy; out.rot = rot; out.hop = hop
 }
 
-function wardenRecoverSafe(e: Enemy): number {
-  return e.phase ? tuning.warden.recover2 : tuning.warden.recover
-}
 
 function updateWardenEyes(v: EntityView, e: Enemy, x: number, y: number, hop: number): void {
   const g = eyesFor(v)

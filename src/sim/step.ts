@@ -40,7 +40,7 @@ export function stepWorld(world: World, input: InputFrame): void {
 
   // presses during hit-stop still buffer; that is what makes chaining feel responsive
   const peaceful = world.roomPhase === 'town'
-  const playerInput = peaceful ? { ...input, attack: false, dodge: false } : input
+  const playerInput = peaceful ? { ...input, attack: false, attackHeld: false, heavy: false, dodge: false } : input
   capturePlayerInput(world, playerInput)
 
   if (world.freeze > 0) {

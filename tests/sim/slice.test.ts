@@ -657,3 +657,47 @@ describe('the realm reads as a place', () => {
     }
   })
 })
+
+describe('the duo is reachable', () => {
+  // PYRE named two prerequisites, and the shortest path to both was four picks long in a run that
+  // grants three: the game's own synergy centrepiece could never be taken. A duo that no run can
+  // reach is not a ceiling, it is dead content, and nothing about it failed loudly.
+  it('can be held by the end of a three-pick run', () => {
+    const world = prepareAndDescend(createWorld(11, 'loop'))
+    // A vow of Hecate's that primes the mark, then the Fury's collector, then the pact.
+    grantBoon(world, 'betweenStep')
+    offerReward(world, 'blade')
+    expect(world.session.run!.pendingReward!.options).toContain('finalJudgment')
+    grantBoon(world, 'finalJudgment')
+    world.session.run!.pendingReward = null
+    offerReward(world, 'blade')
+    expect(world.session.run!.pendingReward!.options).toContain('pyre')
+    grantBoon(world, 'pyre')
+    expect(world.session.run!.boons).toHaveLength(3)
+    expect(hasBoon(world, 'pyre')).toBe(true)
+  })
+
+  it('still refuses a pact with only one power at the table', () => {
+    const world = prepareAndDescend(createWorld(12, 'loop'))
+    grantBoon(world, 'ashenEdge')      // Fury
+    grantBoon(world, 'finalJudgment')  // Fury
+    offerReward(world, 'blade')
+    expect(world.session.run!.pendingReward!.options).not.toContain('pyre')
+  })
+})
+
+describe('the hub is peaceful', () => {
+  it('refuses every weapon verb in the Bardo, including the heavy', () => {
+    const world = createWorld(5, 'loop')
+    expect(world.roomPhase).toBe('town')
+    for (const frame of [
+      { ...emptyInput(), attack: true },
+      { ...emptyInput(), attackHeld: true },
+      { ...emptyInput(), heavy: true },
+      { ...emptyInput(), dodge: true },
+    ]) {
+      for (let i = 0; i < 6; i++) stepWorld(world, frame)
+      expect(world.player.state).toBe('free')
+    }
+  })
+})

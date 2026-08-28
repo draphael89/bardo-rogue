@@ -20,6 +20,8 @@ function usable(world: World, id: BoonId): boolean {
   const def = BOONS[id]
   if (def.requires?.some(req => !hasBoon(world, req))) return false
   if (id === 'finalJudgment') return hasBoon(world, 'ashenEdge') || hasBoon(world, 'betweenStep')
+  // A pact needs both powers at the table, which is a rule about the run rather than about one vow.
+  if (id === 'pyre') return BOON_IDS.some(other => BOONS[other].deity === 'hecate' && hasBoon(world, other))
   return true
 }
 

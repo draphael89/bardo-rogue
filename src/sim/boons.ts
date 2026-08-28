@@ -113,12 +113,15 @@ export const BOONS: Record<BoonId, BoonDef> = {
     id: 'crossroads', name: 'CROSSROADS', deity: 'hecate', family: 'veil', vow: 'Arrive from everywhere.',
     detail: 'A swing out of a roll cuts a full circle.',
   },
-  // The duo. It needs one vow from each power, and it is the only place the two of them agree:
-  // she marks the debt, and the river collects it from everyone standing nearby.
+  // The duo, and the only place the two powers agree: she marks the debt, and the river collects it
+  // from everyone standing near. It needs Final Judgment plus ANY vow of Hecate's — naming two
+  // specific boons made it unreachable, because the shortest path to both was four picks long in a
+  // run that grants three. The reachable path is a Hecate vow that primes the mark, then Judgment to
+  // collect it, then this; both powers are represented, which is the whole point of a pact.
   pyre: {
     id: 'pyre', name: 'PYRE', deity: 'fury', family: 'blade', vow: 'Let the whole room answer.',
     detail: 'Judgment bursts set all they touch alight.',
-    requires: ['finalJudgment', 'torchlight'],
+    requires: ['finalJudgment'],
   },
 }
 

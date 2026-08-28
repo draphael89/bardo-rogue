@@ -267,11 +267,11 @@ export class Hud {
     this.rig.scale.set(2)
     this.rig.addChild(this.rigG)
 
-    this.waveText = new Text({ text: '', style: { fontFamily: 'Kenney Pixel', fontSize: 16, fill: C.bone, dropShadow: drop }, resolution: 1 })
+    this.waveText = new Text({ text: '', style: { fontFamily: 'Kenney Pixel', fontSize: 16, fill: C.bone }, resolution: 1 })
     this.waveText.anchor.set(1, 0); this.waveText.position.set(V.width - 12, 2)
     this.bossName = new Text({
       text: 'THE WARDEN',
-      style: { fontFamily: 'Kenney Mini', fontSize: 8, fill: C.bone, letterSpacing: 2, dropShadow: drop },
+      style: { fontFamily: 'Kenney Mini', fontSize: 8, fill: C.bone, letterSpacing: 2 },
       resolution: 1,
     })
     this.bossName.anchor.set(0.5, 0)
@@ -280,7 +280,7 @@ export class Hud {
 
     this.banner = new Text({ text: '', style: { fontFamily: 'Kenney Blocks', fontSize: 24, fill: 0xffffff, stroke: { color: C.void, width: 3 } }, resolution: 1 })
     this.banner.anchor.set(0.5); this.banner.position.set(V.width / 2, BANNER_Y)
-    this.sub = new Text({ text: '', style: { fontFamily: 'Kenney Mini', fontSize: 8, fill: 0xffffff, letterSpacing: 2, dropShadow: drop }, resolution: 1 })
+    this.sub = new Text({ text: '', style: { fontFamily: 'Kenney Mini', fontSize: 8, fill: 0xffffff, letterSpacing: 2 }, resolution: 1 })
     this.sub.anchor.set(0.5); this.sub.position.set(V.width / 2, 48)
 
     this.place = new Text({
@@ -1251,12 +1251,22 @@ export class Hud {
   // canvas2d anti-aliases every glyph and cannot be asked not to, so the death card's largest type is
   // snapped back onto the pixel grid by a threshold filter (see textCrisp.ts for the measurements).
   //
-  // OPT-IN, never a sweep over every label, because thresholding is only safe where the strokes are
-  // heavy enough to survive it. Two labels proved that: the card's 8px subtitle carries a drop
-  // shadow, which is a second offset semi-transparent copy of the glyph, and thresholding broke it
-  // into fragments; and the hint row's Kenney Pixel keycaps are thinner than Kenney Mini at the same
-  // 8px, so "WASD" came out as "L^S:". Anything added here must be looked at, not assumed.
+  // OPT-IN, never a sweep, because two things stop a label being snapped to the grid and both must be
+  // removed first, not worked around:
+  //   1. a drop shadow -- a second offset semi-transparent copy of the glyph, so most of its pixels
+  //      sit at partial alpha and any threshold shreds them;
+  //   2. a fractional position -- anchor 0.5 on an odd-width label lands the left edge on a half
+  //      pixel, which is bilinear-sampled into the target before a filter ever runs.
+  // The hint row's keycaps hit case 2 and came out as "L^S:" when swept blindly. Anything added here
+  // must be looked at afterwards, not assumed.
   private applyCrisp(): void {
+    // Every label below sits on its own plate, so none of them needed the drop shadow that was
+    // stopping it being snapped to the pixel grid. `place` keeps its shadow: it is the only label
+    // drawn straight over the room with nothing behind it.
+    this.banner.filters = [crispText]
+    this.sub.filters = [crispText]
+    this.waveText.filters = [crispText]
+    this.bossName.filters = [crispText]
     this.cardTitle.filters = [crispText]
     this.cardSub.filters = [crispText]
     this.cardKey.filters = [crispText]
@@ -1293,8 +1303,8 @@ export class Hud {
     const GAP = 4, SEP = 12
     const widths = items.map(it => it.kind === 'word' ? this.measure(it.word!) + 9 : it.kind === 'lmb' ? 9 : it.kind === 'crosshair' ? 11 : 10)
     const labels = items.map(it => {
-      const t = new Text({ text: it.label, style: { fontFamily: 'Kenney Mini', fontSize: 8, fill: C.bone, letterSpacing: 1, dropShadow: drop }, resolution: 1 })
-      t.anchor.set(0, 0); this.hintRow.addChild(t); this.hintLabels.push(t); return t
+      const t = new Text({ text: it.label, style: { fontFamily: 'Kenney Mini', fontSize: 8, fill: C.bone, letterSpacing: 1 }, resolution: 1 })
+      t.anchor.set(0, 0); t.filters = [crispText]; this.hintRow.addChild(t); this.hintLabels.push(t); return t
     })
     let total = 0
     for (let i = 0; i < items.length; i++) total += widths[i] + GAP + Math.round(labels[i].width) + (i < items.length - 1 ? SEP : 0)
@@ -1328,7 +1338,12 @@ export class Hud {
     }
     const glyphText = (s: string, cx: number, cy: number, col: number) => {
       const t = new Text({ text: s, style: { fontFamily: 'Kenney Mini', fontSize: 8, fill: col }, resolution: 1 })
-      t.anchor.set(0.5, 0); t.position.set(Math.round(cx), Math.round(cy))
+      // Centre by rounding the left edge, NOT with anchor 0.5: an anchor puts an odd-width label on a
+      // half pixel, and a half-pixel sprite is bilinear-sampled into the 480x270 target before any
+      // filter can see it. That smear is why these caps read blurrier than the labels beside them.
+      t.anchor.set(0, 0)
+      t.position.set(Math.round(cx - t.width / 2), Math.round(cy))
+      t.filters = [crispText]
       this.hintRow.addChild(t); this.hintLabels.push(t)
     }
     switch (it.kind) {

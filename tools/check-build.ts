@@ -1,7 +1,7 @@
 // Release payload gate. `pnpm build` runs this after `vite build`; a non-zero exit means the build
 // shipped something it must not (gauntlet evidence, an audit video, a comparison capture) or grew
 // past budget. Standalone: `pnpm check:build` re-runs the gate against an existing dist/.
-import { existsSync, readdirSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, relative, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -9,6 +9,11 @@ const DIST = fileURLToPath(new URL('../dist', import.meta.url))
 const ALLOWED_TOP = new Set(['index.html', 'assets'])                // everything dist/ may contain
 const FORBIDDEN = /(^|\/)(progress|audit|evidence|gauntlet)(\/|$)/i  // path SEGMENTS: public/assets/audio ships round_1.ogg
 const VIDEO = /\.(mp4|mov|webm|mkv|avi)$/i
+// A denylist alone would pass a build that shipped NOTHING: publicDir is off at build time, so a bad
+// `pnpm assets`/`pnpm tiles` run, or a new file dropped anywhere in public/ but assets/, fails
+// silently and the game boots to a black screen. These are the things a build must contain.
+const REQUIRED = ['index.html', 'assets/manifest.json']
+const FLOOR_BYTES = 1.5 * 1024 * 1024     // measured shipped payload is ~2.1MB across 202 files
 const BUDGET_BYTES = 4 * 1024 * 1024      // shipped payload, .map excluded (measured ~2.2MB: pixi + 174 assets)
 const MAP_BUDGET_BYTES = 8 * 1024 * 1024  // sourcemaps are not fetched by the game; budgeted apart so a
                                           // regression in the real payload cannot hide inside pixi's 4.6MB map
@@ -67,6 +72,28 @@ for (const f of files) {
   if (FORBIDDEN.test(f.path)) flag('evidence/audit path in build', f.path)
   if (VIDEO.test(f.path)) flag('video file in build', f.path)
 }
+const present = new Set(files.map(f => f.path))
+for (const req of REQUIRED) if (!present.has(req)) flag('required file missing from the build', req)
+
+// The manifest is the game's own index of what it will fetch at runtime; every path it names has to
+// be on disk, or the build boots and then 404s.
+const manifestFile = files.find(f => f.path === 'assets/manifest.json')
+if (manifestFile) {
+  try {
+    const manifest = JSON.parse(readFileSync(join(DIST, 'assets/manifest.json'), 'utf8')) as Record<string, string[]>
+    let listed = 0
+    for (const [group, names] of Object.entries(manifest)) {
+      if (!Array.isArray(names)) continue
+      for (const name of names) {
+        listed++
+        if (!present.has(`assets/${group}/${name}`)) flag('asset named by manifest.json is not in the build', `assets/${group}/${name}`)
+      }
+    }
+    console.log(`${''.padStart(11)}  manifest lists ${listed} runtime assets`)
+  } catch (e) { flag(`manifest.json could not be read: ${String(e)}`, '') }
+}
+
+if (shippedBytes < FLOOR_BYTES) flag(`shipped payload ${kb(shippedBytes)} under the ${kb(FLOOR_BYTES)} floor - the asset copy probably failed`, '')
 if (shippedBytes > BUDGET_BYTES) flag(`shipped payload ${kb(shippedBytes)} over the ${kb(BUDGET_BYTES)} budget`, '')
 if (mapBytes > MAP_BUDGET_BYTES) flag(`sourcemaps ${kb(mapBytes)} over the ${kb(MAP_BUDGET_BYTES)} budget`, '')
 

@@ -23,7 +23,10 @@ const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } })
 const errors: string[] = []
 page.on('console', m => { if (m.type() === 'error' || m.type() === 'warning') errors.push(`${m.type()}: ${m.text()}`) })
 page.on('pageerror', e => errors.push('pageerror: ' + e.message))
-await page.goto(`${url}/?scenario=${scenario}&seed=${seed}&debug=${debug}&mute=${mute}${bot ? `&bot=${bot}` : ''}`)
+// save=off: a capture must not depend on whether this machine has played before (a persisted
+// reducedEffects would cap flashes and camera movement in every shot). Pass --save on to opt out.
+const save = args.save === 'on' ? '' : '&save=off'
+await page.goto(`${url}/?scenario=${scenario}&seed=${seed}&debug=${debug}&mute=${mute}${save}${bot ? `&bot=${bot}` : ''}`)
 await page.waitForFunction(() => !!(window as unknown as { __game?: unknown }).__game, null, { timeout: 15000 })
 await page.waitForTimeout(400)
 

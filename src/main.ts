@@ -19,7 +19,7 @@ import { Recorder } from '@/input/recorder'
 import { tuning } from '@/tuning'
 import { Text } from 'pixi.js'
 import { defaultMetaState, type MetaStateV1 } from '@/sim/session'
-import { bumpRevision, serializeSave, parseSave, type BardoSave } from '@/sim/save'
+import { bumpRevision, defaultSave, serializeSave, parseSave, type BardoSave } from '@/sim/save'
 import { detectPlatform, PROFILE_ID } from '@/platform'
 import { loadSave, saveFilename } from '@/platform/saveFile'
 
@@ -51,7 +51,13 @@ async function boot() {
   audio.load(manifest.audio) // not awaited: the game starts silent-then-sound rather than waiting
 
   const platform = detectPlatform()
-  const loaded = await loadSave(platform.saves, PROFILE_ID, { preferredReducedEffects: platform.prefersReducedMotion() })
+  // `?save=off` runs the game against a fresh profile and writes nothing. Evidence captures use it so
+  // a machine that has actually played -- attempts counted, reduced effects persisted -- cannot tint a
+  // screenshot or move a `loop` hash (hashWorld folds session.meta into that scenario's hash).
+  const noSave = q.get('save') === 'off'
+  const loaded = noSave
+    ? { save: defaultSave({ profileId: PROFILE_ID }), writable: false, source: 'default' as const }
+    : await loadSave(platform.saves, PROFILE_ID, { preferredReducedEffects: platform.prefersReducedMotion() })
   // The authoritative save document. Held here rather than read back out of the world at write time:
   // the envelope carries meta AND settings, and a non-`loop` world's session.meta is the zeroed
   // default, so composing a write from it would wipe real progress the moment V is pressed.
@@ -244,7 +250,7 @@ async function boot() {
     if (userPaused && e.code === 'KeyI' && !e.repeat) { e.preventDefault(); void importSave() }
   })
   loop.start()
-  platform.persistHint()   // after first paint: a permission prompt must never land on a black screen
+  if (!noSave) platform.persistHint()   // after first paint: a permission prompt must never land on a black screen
   if (scenario === 'run') presenter.hud.showBanner(world.roomName, 'clear the room', 1.8)
   else if (scenario === 'loop') presenter.hud.showBanner(world.roomName, '', 1.5)
   else if (scenario === 'full' || scenario === 'empty') presenter.hud.showBanner('THE THRESHOLD', '', 1.5)

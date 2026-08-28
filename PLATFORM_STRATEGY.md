@@ -441,6 +441,48 @@ gameplay architecture change at any point** (given the Phase 2 seam). The eventu
 - Do not move browser saves to IndexedDB/OPFS before checkpoints or replay archiving create the
   need — but do define the envelope (Phase 2) before meta progression grows further.
 
+## M2. Implementation Status (built and validated)
+
+Tasks 1-5 below are **done and verified in this repository**; the section that follows records what
+they were. What was proven, on the tree as it stands:
+
+- `pnpm build` went 131 MB -> 5.9 MB and 8.7 s -> 1.6 s. `tools/check-build.ts` fails on planted
+  evidence, a planted video, a missing required file, an asset the manifest names but the build lacks,
+  and either size bound. Dev still serves `/progress` and `/assets`.
+- `src/sim/save.ts` holds the envelope, its migrations and the legacy import; `src/platform/` holds
+  the seam and both adapters. `grep -rn 'localStorage|matchMedia|requestFullscreen|navigator.storage|
+  bardoDesktop|electron' src --include=*.ts` outside `src/platform/` is empty.
+- Verified in a real browser: fresh boot writes nothing; the two legacy keys migrate and survive;
+  pressing V in `?scenario=wave1` leaves meta intact; a corrupted save recovers from `.bak` with the
+  corrupt bytes preserved; a schemaVersion-99 save survives a write attempt unchanged; the exported
+  file is byte-identical to what is stored.
+- `pnpm smoke:desktop` runs the real Electron app: 15 checks, all green, including **replay hash
+  parity 4075949549 over 312 ticks** -- the same value pinned in `tests/sim/replay.test.ts` and
+  produced by `pnpm sim`. The packaged app and headless Node are the same game, provably.
+- 244 tests (was 184) in ~4 s. `tests/sim/boundary.test.ts` asserts the sim imports no host API and
+  never reaches the save layer, which is what keeps the pinned hashes meaningful.
+
+Two findings from building it that the plan did not anticipate, both now fixed in code:
+
+1. **Pixi v8 breaks under a custom scheme.** `path.isUrl()` matches only `http(s):`, so under
+   `app://bardo/` every root-relative asset URL lost its host and died cross-origin. One
+   host-agnostic line in `src/render/atlas.ts` (`Assets.resolver.rootPath`) fixes it; it is a no-op
+   on the web, verified by screenshot.
+2. **Pixi v8 requires `unsafe-eval`.** A strict CSP without it stops the renderer from starting. The
+   desktop CSP allows exactly that one token and locks down everything else; dropping it later means
+   importing `pixi.js/unsafe-eval`.
+
+Deferred deliberately, with reasons: `RunCheckpoint` stays a reserved `null` slot until run structure
+settles (the envelope is ready for it); IndexedDB stays unbuilt while saves are kilobytes; and
+electron-builder is configured (`electron-builder.yml`, `build/entitlements.mac.plist`) but not
+installed, because producing or signing a real `.app` needs macOS.
+
+**One decision this work forced, recorded here:** a desktop install starts from an empty profile. The
+`app://bardo` origin has its own storage partition and cannot read a browser's localStorage, so
+export/import (pause screen, E and I) is the documented bridge between the two. That is why Phase 1
+froze the canonical save bytes first: the file a browser exports is byte-identical to the one the
+desktop host writes.
+
 ## M. Next Five Concrete Tasks
 
 1. **Release asset boundary + size assertion.** Exclude `public/progress`/audit evidence from

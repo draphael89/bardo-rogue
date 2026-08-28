@@ -60,7 +60,7 @@ const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=sw
 const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } })
 const errors: string[] = []
 page.on('pageerror', e => errors.push('pageerror: ' + e.message))
-await page.goto(`${url}/?scenario=empty&seed=1&mute=1`)
+await page.goto(`${url}/?scenario=empty&seed=1&mute=1&save=off`)   // never let a real save tint a pose sheet
 await page.waitForFunction(() => !!(window as unknown as { __game?: unknown }).__game, null, { timeout: 15000 })
 await page.evaluate((pre) => { (window as any).__PRELUDE = pre; const g = (window as any).__game; g.pause(true); g.presenter.hud.showBanner('', '', 0) }, PRELUDE)
 

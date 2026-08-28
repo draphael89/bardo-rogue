@@ -4,6 +4,7 @@ import { emptyInput, type InputFrame } from './input'
 import { tuning } from '@/tuning'
 import { hasLineOfSight } from './arena'
 import { overlapsSolid } from './collision'
+import { pathWaypoint } from './nav'
 
 export type Bot = (world: World) => InputFrame
 export type BotName = 'idle' | 'naive-melee' | 'kite' | 'slice-naive' | 'slice-kite'
@@ -26,6 +27,31 @@ function moveToward(inp: InputFrame, world: World, x: number, y: number): number
   return d
 }
 
+// Walking to a fixture (the rack, a door) is not combat: the straight line has no enemy to route
+// around, only the room's own masonry. A human sidesteps a plinth without thinking about it, so the
+// probe does too — otherwise a bot that fights perfectly still reports a stall on the seeds whose
+// furniture happens to sit between it and the threshold.
+function routeToward(inp: InputFrame, world: World, x: number, y: number, side: 1 | -1): number {
+  const p = world.player
+  const direct = Math.hypot(x - p.x, y - p.y)
+  if (direct < 12 || !blocked(world, x, y)) return moveToward(inp, world, x, y)
+  const way = pathWaypoint(world.arena, p.x, p.y, p.radius, x, y, side)
+  if (way) moveToward(inp, world, way.x, way.y)
+  else moveToward(inp, world, x, y)
+  return direct
+}
+
+// Sample the straight line at half-body steps. Cheap, and it only runs while walking to a fixture.
+function blocked(world: World, x: number, y: number): boolean {
+  const p = world.player
+  const dx = x - p.x, dy = y - p.y
+  const d = Math.hypot(dx, dy) || 1
+  for (let n = 4; n < d; n += 4) {
+    if (overlapsSolid(world.arena, p.x + dx / d * n, p.y + dy / d * n, p.radius)) return true
+  }
+  return false
+}
+
 // Full-loop regression driver. It obeys the same physical rack, reward input, and door overlaps as a
 // player; combat delegates to the requested policy. It is intentionally stateful so one invocation
 // means one attempt, which makes pacing regressions easy to compare across seeds.
@@ -43,10 +69,10 @@ function makeSliceBot(combat: Bot): Bot {
     if (world.roomPhase === 'transitioning') return inp
     if (world.roomPhase === 'reward') { inp.confirm = true; return inp }
     if (world.roomPhase === 'town') {
-      if (!world.session.preparedWeapon && world.arena.rack) moveToward(inp, world, world.arena.rack.x, world.arena.rack.y)
+      if (!world.session.preparedWeapon && world.arena.rack) routeToward(inp, world, world.arena.rack.x, world.arena.rack.y, orbit)
       else {
         const door = world.arena.doors.find(d => d.dir === 'north')!
-        moveToward(inp, world, (door.col + 0.5) * 16, 24)
+        routeToward(inp, world, (door.col + 0.5) * 16, 24, orbit)
       }
       return inp
     }
@@ -56,7 +82,14 @@ function makeSliceBot(combat: Bot): Bot {
       const door = world.arena.doors.find(d => d.dir === dir) ?? world.arena.doors[0]
       const tx = dir === 'east' ? door.col * 16 + 4 : (door.col + 0.5) * 16
       const ty = dir === 'east' ? (door.row + 0.5) * 16 : 24
-      moveToward(inp, world, tx, ty)
+      routeToward(inp, world, tx, ty, orbit)
+      // The route is a suggestion, not a guarantee: a body wedged in the doorway or a waypoint that
+      // oscillates would otherwise burn the whole tick budget. Flip the preferred side after a
+      // second of no progress, which takes the other way around whatever is in the way.
+      const movedNow = Number.isFinite(lastX) ? Math.hypot(world.player.x - lastX, world.player.y - lastY) : 1
+      lastX = world.player.x; lastY = world.player.y
+      if (movedNow < 0.08) { if (++stuck > 60) { stuck = 0; orbit = orbit === 1 ? -1 : 1 } }
+      else stuck = 0
       return inp
     }
     const out = combat(world)

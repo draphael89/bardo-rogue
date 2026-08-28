@@ -1,6 +1,10 @@
 // Sim -> presentation messages. The sim pushes; presenter/audio/metrics consume and clear each frame.
 export type EnemyKind = 'brute' | 'caster' | 'charger' | 'dummy' | 'warden'
 
+// What landed the killing blow. 'none' covers the cases with no body behind them (a scripted hurt,
+// a debug kill), and keeps the death card honest instead of naming an innocent bystander.
+export type DeathKind = EnemyKind | 'none'
+
 import type { ArmId } from './weapons'
 import type { BoonId } from './boons'
 
@@ -9,7 +13,10 @@ export type SimEvent =
   | { type: 'hit'; x: number; y: number; angle: number; damage: number; heavy: boolean; targetId: number; kind: EnemyKind; killed: boolean; actionId: number }
   | { type: 'kill'; x: number; y: number; angle: number; kind: EnemyKind; id: number; actionId: number }
   | { type: 'playerHurt'; x: number; y: number; angle: number; hp: number }
-  | { type: 'playerDeath'; x: number; y: number }
+  // The sim names the killer. Presentation used to guess it from the nearest living body, which was
+  // wrong exactly when it mattered most: a charger that dashed past, a bolt whose caster was already
+  // dead. `ranged` separates "the mark found you" from "the body reached you".
+  | { type: 'playerDeath'; x: number; y: number; by: DeathKind; ranged: boolean }
   | { type: 'dodge'; x: number; y: number; angle: number }
   | { type: 'dodgeEnd'; x: number; y: number }
   | { type: 'footstep'; x: number; y: number }
@@ -36,7 +43,7 @@ export type SimEvent =
   | { type: 'boonChosen'; boon: BoonId; x: number; y: number }
   | { type: 'brandApplied'; id: number; stacks: number; x: number; y: number }
   | { type: 'brandConsumed'; id: number; stacks: number; x: number; y: number }
-  | { type: 'runWon' | 'runLost'; depth: number; ticks: number; boons: BoonId[] }
+  | { type: 'runWon' | 'runLost'; depth: number; ticks: number; boons: BoonId[]; by: DeathKind; ranged: boolean }
   | { type: 'draw'; x: number; y: number; angle: number }
   | { type: 'arrowLoose'; x: number; y: number; angle: number }
   | { type: 'arrowHitWall'; x: number; y: number }

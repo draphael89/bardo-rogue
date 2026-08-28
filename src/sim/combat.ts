@@ -2,6 +2,7 @@ import { tuning, type SwingDef } from '@/tuning'
 import { angleDiff, deg } from './math'
 import { SLOW_FULL } from './world'
 import type { World, Enemy } from './world'
+import type { DeathKind } from './events'
 import { finishRun } from './session'
 
 // --- swing curves -------------------------------------------------------------------------------
@@ -128,7 +129,8 @@ export function damageEnemy(world: World, e: Enemy, damage: number, angle: numbe
 }
 
 // Returns true if damage was applied. During dodge i-frames the sim records a successful dodge instead.
-export function hurtPlayer(world: World, angle: number, damage: number): boolean {
+// `by`/`ranged` name the source: the run keeps them so the death card states a fact instead of a guess.
+export function hurtPlayer(world: World, angle: number, damage: number, by: DeathKind = 'none', ranged = false): boolean {
   const p = world.player
   if (p.state === 'dead') return false
   if (isPlayerInvulnerable(world)) {
@@ -158,7 +160,8 @@ export function hurtPlayer(world: World, angle: number, damage: number): boolean
     world.timeScale = tuning.player.deathSlowmo
     world.slowmoTicks = tuning.player.deathSlowmoTicks
     clearBulletTime(world)   // death owns the clock; composing the two would crawl at 1/16 speed
-    world.emit({ type: 'playerDeath', x: p.x, y: p.y })
+    if (run) { run.killedBy = by; run.killedRanged = ranged }
+    world.emit({ type: 'playerDeath', x: p.x, y: p.y, by, ranged })
     finishRun(world, 'lost')
   }
   return true

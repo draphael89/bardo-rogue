@@ -342,3 +342,82 @@ describe('versioned meta storage', () => {
     expect(loadSettings(storage, true)).toEqual({ version: 1, reducedEffects: true })
   })
 })
+
+describe('attempt identity', () => {
+  // The defect this pins: the run seed used to key on world.returns, which resets to zero on every
+  // page load, so a player's first run was byte-identical every day. Attempts persist; returns do not.
+  it('gives a fresh profile and a returning profile different runs', () => {
+    const first = prepareAndDescend(createWorld(1, 'loop'))
+    const returning = prepareAndDescend(createWorld(1, 'loop', {
+      meta: { version: 1, attempts: 12, victories: 3, unlockedWeapons: ['blade'] },
+    }))
+    expect(first.session.run!.seed).not.toBe(returning.session.run!.seed)
+  })
+
+  it('still reproduces exactly for a given attempt number', () => {
+    const meta = { version: 1 as const, attempts: 4, victories: 1, unlockedWeapons: ['blade' as const] }
+    const a = prepareAndDescend(createWorld(3, 'loop', { meta: { ...meta } }))
+    const b = prepareAndDescend(createWorld(3, 'loop', { meta: { ...meta } }))
+    expect(a.session.run!.seed).toBe(b.session.run!.seed)
+    expect(hashWorld(a)).toBe(hashWorld(b))
+  })
+
+  it('walks the seed forward across consecutive attempts in one session', () => {
+    const seeds = new Set<number>()
+    const world = createWorld(1, 'loop')
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const rack = world.arena.rack!
+      world.player.x = rack.x; world.player.y = rack.y
+      stepWorld(world, emptyInput())
+      const north = world.arena.doors.find(d => d.dir === 'north')!
+      world.player.x = (north.col + 0.5) * TILE
+      world.player.y = tuning.run.doorEnterMaxY
+      stepWorld(world, emptyInput())
+      for (let i = 0; i < tuning.run.transitionTicks; i++) stepWorld(world, emptyInput())
+      seeds.add(world.session.run!.seed)
+      hurtPlayer(world, 0, 99)
+      for (let i = 0; i < 80; i++) stepWorld(world, emptyInput())
+      stepWorld(world, { ...emptyInput(), confirm: true })
+    }
+    expect(seeds.size).toBe(3)
+  })
+})
+
+describe('death attribution', () => {
+  it('names the source that landed the killing blow, not the nearest body', () => {
+    const world = prepareAndDescend(createWorld(1, 'loop'))
+    const p = world.player
+    // A brute is standing on top of the player; the bolt that kills came from a caster across the room.
+    const brute = world.spawnEnemy('brute', p.x + 6, p.y)!
+    expect(brute.active).toBe(true)
+    p.hp = 1
+    world.fireProjectile(p.x - 30, p.y, 0, 200, 3, 60, 0, 1, 0, 'bolt', 'caster')
+    for (let i = 0; i < 40 && p.state !== 'dead'; i++) stepWorld(world, emptyInput())
+    expect(p.state).toBe('dead')
+    expect(world.session.run!.killedBy).toBe('caster')
+    expect(world.session.run!.killedRanged).toBe(true)
+  })
+
+  it('reports a melee kill as its own kind, unranged', () => {
+    const world = prepareAndDescend(createWorld(2, 'loop'))
+    world.player.hp = 1
+    hurtPlayer(world, 0, 1, 'charger')
+    expect(world.player.state).toBe('dead')
+    expect(world.session.run!.killedBy).toBe('charger')
+    expect(world.session.run!.killedRanged).toBe(false)
+    const lost = world.events.find(e => e.type === 'runLost')
+    expect(lost).toMatchObject({ by: 'charger', ranged: false })
+  })
+
+  it('survives its killer: a bolt still names its caster after the caster dies', () => {
+    const world = prepareAndDescend(createWorld(3, 'loop'))
+    const p = world.player
+    const caster = world.spawnEnemy('caster', p.x + 60, p.y)!
+    world.fireProjectile(p.x - 30, p.y, 0, 200, 3, 60, 0, 1, 0, 'bolt', 'caster')
+    damageEnemy(world, caster, 999, 0, 0, false, 0)
+    p.hp = 1
+    for (let i = 0; i < 40 && p.state !== 'dead'; i++) stepWorld(world, emptyInput())
+    expect(p.state).toBe('dead')
+    expect(world.session.run!.killedBy).toBe('caster')
+  })
+})

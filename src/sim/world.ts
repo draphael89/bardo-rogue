@@ -68,6 +68,9 @@ export interface Projectile extends Body {
   damage: number
   actionId: number            // player action that launched it; survives later draws before impact
   kind: ProjectileKind
+  // Who loosed it. A bolt outlives its caster, so the killing blow has to carry its own attribution
+  // rather than asking the world who is still standing.
+  srcKind: EnemyKind | 'player'
 }
 
 export interface SpawnEntry { kind: EnemyKind; x: number; y: number; ticksLeft: number }
@@ -163,7 +166,7 @@ export class World {
     return e
   }
 
-  fireProjectile(x: number, y: number, angle: number, speed: number, radius: number, life: number, team: 0 | 1 = 0, damage = 1, actionId = 0, kind: ProjectileKind = team === 1 ? 'arrow' : 'bolt'): Projectile | null {
+  fireProjectile(x: number, y: number, angle: number, speed: number, radius: number, life: number, team: 0 | 1 = 0, damage = 1, actionId = 0, kind: ProjectileKind = team === 1 ? 'arrow' : 'bolt', srcKind: EnemyKind | 'player' = 'player'): Projectile | null {
     const p = this.projectiles.find(p => !p.active)
     if (!p) { this.emit({ type: 'poolOverflow', pool: 'projectile', x, y, angle }); return null }
     p.id = this.nextProjectileId++
@@ -175,6 +178,7 @@ export class World {
     p.damage = damage
     p.actionId = actionId
     p.kind = kind
+    p.srcKind = srcKind
     return p
   }
 
@@ -207,5 +211,5 @@ export function makeEnemy(): Enemy {
 }
 
 export function makeProjectile(): Projectile {
-  return { id: 0, active: false, x: 0, y: 0, px: 0, py: 0, vx: 0, vy: 0, kbx: 0, kby: 0, radius: 3, life: 0, angle: 0, team: 0, damage: 1, actionId: 0, kind: 'bolt' }
+  return { id: 0, active: false, x: 0, y: 0, px: 0, py: 0, vx: 0, vy: 0, kbx: 0, kby: 0, radius: 3, life: 0, angle: 0, team: 0, damage: 1, actionId: 0, kind: 'bolt', srcKind: 'player' }
 }

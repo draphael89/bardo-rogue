@@ -1,5 +1,6 @@
 import type { ArmId } from './weapons'
 import type { BoonId } from './boons'
+import type { DeathKind } from './events'
 import type { DoorMark } from './arena'
 import type { World } from './world'
 import { ARM, grantArm } from './weapons'
@@ -41,6 +42,8 @@ export interface RunState {
   result: RunResult
   startedTick: number
   primedBrand: boolean
+  killedBy: DeathKind          // 'none' until something lands the killing blow
+  killedRanged: boolean
 }
 
 export interface MetaStateV1 {
@@ -83,9 +86,11 @@ export function startRun(world: World, firstRoomId: string): boolean {
   const weapon = world.session.preparedWeapon
   if (!weapon) return false
   const attempt = world.session.meta.attempts + 1
-  // Each attempt gets its own deterministic stream. A second run is different, while replaying the
-  // same session commands from the same seed remains exact.
-  const runSeed = streamSeed(world.seed, STREAM.gameplay ^ Math.imul(world.returns + 1, 0x45d9f3b))
+  // Each attempt gets its own deterministic stream, keyed on the PERSISTED attempt count rather than
+  // this session's return count. Both differ run to run, but only attempts survives a reload, so
+  // yesterday's opening is not handed back to you today. Replays carry their own meta snapshot
+  // (replay.ts), so a recorded attempt still reproduces exactly.
+  const runSeed = streamSeed(world.seed, STREAM.gameplay ^ Math.imul(attempt, 0x45d9f3b))
   world.session.meta.attempts = attempt
   world.player.hp = world.player.maxHp = tuning.player.hp
   world.session.run = {
@@ -102,6 +107,8 @@ export function startRun(world: World, firstRoomId: string): boolean {
     result: 'active',
     startedTick: world.tick,
     primedBrand: false,
+    killedBy: 'none',
+    killedRanged: false,
   }
   world.rng = new Rng(runSeed)
   world.boonBits = 0
@@ -149,6 +156,8 @@ export function finishRun(world: World, result: Exclude<RunResult, 'active'>): v
     depth: run.depth,
     ticks: Math.max(0, world.tick - run.startedTick),
     boons: run.boons.map(b => b.id),
+    by: run.killedBy,
+    ranged: run.killedRanged,
   })
 }
 

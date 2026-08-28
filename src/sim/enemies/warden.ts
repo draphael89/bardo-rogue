@@ -22,7 +22,7 @@ function looseRing(world: World, e: Enemy): void {
     const a = e.aimAngle + (Math.PI * 2 * i) / W.boltCount
     const ox = e.x + Math.cos(a) * (e.radius + 4)
     const oy = e.y + Math.sin(a) * (e.radius + 4)
-    const bolt = world.fireProjectile(ox, oy, a, W.boltSpeed, W.boltRadius, W.boltLife, 0, W.boltDamage)
+    const bolt = world.fireProjectile(ox, oy, a, W.boltSpeed, W.boltRadius, W.boltLife, 0, W.boltDamage, 0, 'bolt', e.kind)
     if (bolt) world.emit({ type: 'boltFired', x: ox, y: oy, angle: a })
   }
 }

@@ -17,8 +17,10 @@ const ROOM_PHASE: Record<RoomPhase, number> = { town: 0, entering: 1, fighting: 
 const PROJECTILE_KIND: Record<ProjectileKind, number> = { bolt: 0, arrow: 1, mirror: 2, echo: 3 }
 
 // FNV-1a over a canonical snapshot of everything the sim's outcome depends on.
-// Deliberately NOT hashed: world.visualRng (cosmetic-only stream) and the arena it builds,
-// so decoration changes cannot move a gameplay hash.
+// Deliberately NOT hashed: world.visualRng (cosmetic-only stream) and the arena's DECORATION, so
+// re-dressing a room cannot move a gameplay hash. The arena's `solid` mask IS hashed: it is
+// collision, not decoration, and a builder edit that moves a wall would otherwise surface only
+// indirectly, hundreds of ticks later, as drifted trajectories.
 export function hashWorld(world: World): number {
   let h = 0x811c9dc5
   const byte = (v: number) => { h ^= v & 0xff; h = Math.imul(h, 0x01000193) }
@@ -54,6 +56,7 @@ export function hashWorld(world: World): number {
         byte(run.pendingReward.family === 'blade' ? 0 : 1); byte(run.pendingReward.focus)
         for (const id of run.pendingReward.options) int(BOON[id])
       }
+      if (run.killedBy !== 'none') { byte(ENEMY_KIND[run.killedBy] + 1); flag(run.killedRanged) }
     }
   }
 
@@ -93,7 +96,20 @@ export function hashWorld(world: World): number {
     num(b.radius); int(b.life); num(b.angle)
     if (b.team) { byte(b.team); int(b.damage); int(b.actionId) }
     if (b.kind === 'mirror' || b.kind === 'echo') byte(PROJECTILE_KIND[b.kind])
+    if (b.srcKind !== 'player') byte(ENEMY_KIND[b.srcKind] + 1)
   }
+
+  // Collision geometry, run-length folded: walls move the fight, so a builder edit must show here.
+  const solid = world.arena.solid
+  int(world.arena.cols); int(world.arena.rows)
+  let runLen = 0, runVal = solid[0] ? 1 : 0
+  for (let i = 0; i < solid.length; i++) {
+    const v = solid[i] ? 1 : 0
+    if (v === runVal) { runLen++; continue }
+    int(runLen); byte(runVal)
+    runVal = v; runLen = 1
+  }
+  int(runLen); byte(runVal)
 
   const w = world.wave
   int(w.index); byte(WAVE_STATE[w.state]); int(w.groupIndex); int(w.timer); int(w.total)

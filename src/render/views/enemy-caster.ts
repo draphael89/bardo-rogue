@@ -10,12 +10,12 @@ import { EntityView, HALF_PI, type EnemyFrame, type Pose } from './shared'
 // Presentation for "cross the line or cut the bolt": a telegraph that searches, hardens on the
 // exact tick the sim commits, and a bolt shaped like something you are meant to cut.
 
-const OVERSHOOT = 22          // px the telegraph reaches past you: it ends on you, not on a wall
+const OVERSHOOT = 3           // px past the measured range: the bracket sits on you, not through you
 const FALLBACK_LEN = 104      // when the sim has not recorded a range yet
 const SEARCH_FRAC = 0.42      // how far along the eventual reach the search beam starts
 const DASH_STEP = 5           // spacing of the searching dashes
-const CORE_STEP = 5           // spacing of the locked core pixels
-const NODE_STEP = 12          // spacing of the bright nodes on the locked line
+const CORE_STEP = 1           // locked ray is a solid 1px laser; gather still thins it
+const NODE_STEP = 14          // spacing of the bright nodes on the locked line
 const FLASH_SPEED = 22        // px/tick the lock flash races down the line
 const FLASH_WIDTH = 14
 const GATHER_TICKS = 6        // last ticks of the aim: the line pulls in and the muzzle charges
@@ -106,6 +106,7 @@ function updateCasterWeapon(v: EntityView, e: Enemy, x: number, y: number, alpha
   w.position.set(Math.round(wx), Math.round(wy))
   w.rotation = angle + HALF_PI
   w.zIndex = y + e.radius + 1 + 0.5
+  w.scale.set(e.state === 'aim' && tk >= lockTick ? 1.35 : 1)
 }
 
 // The bolt. NOTE: BoltView draws EVERY projectile, and today only the caster fires one, so this is
@@ -465,6 +466,7 @@ export class BoltView {
 const COL_SEARCH = 0x9000a8   // lum  28, chroma 104 - the searching rails, below the floor
 const COL_LOCK = 0xff00ff     // lum  52, chroma 158 - the committed ray
 const COL_NODE = 0xff40ff     // lum  89, chroma 120 - the beads on it
+const COL_SIGHT = 0xffc8ff    // the lock still: bright enough to read as a lane, not a tinted thread
 const COL_HOT = 0xffffff      // lum 197 - flash, nodes under the flash, end brackets, muzzle pip
 const COL_UNDER = 0x160320    // lum   3 - drop pixel so the line keeps its edge on a pale floor
 
@@ -476,8 +478,9 @@ export function drawAimLine(g: Graphics, e: Enemy, alpha: number): void {
   const nx = -sa, ny = ca
   const ox = e.x + ca * (e.radius + 4), oy = e.y + sa * (e.radius + 4)
   const left = C.aimTicks - tk
-  // e.targetY is the range the sim measured to you (src/sim/enemies/caster.ts); the line ends on you
-  const full = (e.targetY > 8 ? e.targetY : FALLBACK_LEN) + OVERSHOOT
+  // e.targetY is centre-to-centre. Subtract the muzzle so the bracket sits on you, not through you.
+  const toYou = e.targetY > 8 ? e.targetY : FALLBACK_LEN
+  const full = Math.max(12, toYou - (e.radius + 4) + OVERSHOOT)
 
   if (tk < lockTick) {
     // SEARCHING: two dashed rails converge onto the ray as it finds you. Dark and chromatic, so it
@@ -512,24 +515,24 @@ export function drawAimLine(g: Graphics, e: Enemy, alpha: number): void {
     return
   }
 
-  // LOCKED: it has committed. A hard dotted ray with a near-black shoulder, chromatic beads, and one
-  // white flash that races muzzle-to-target on the tick the sim stopped tracking you. As the gather
-  // runs the ray EMPTIES - the dots thin out and the charge collapses - so the frame is at its
-  // quietest one tick before the loudest frame in the attack.
+  // LOCKED: it has committed. A solid 1px ray — the same sentence as a sniper sight — with a
+  // near-black shoulder, sparse beads, and one white flash that races muzzle-to-target on the tick
+  // the sim stopped tracking you. As the gather runs the ray EMPTIES so the fire tick still owns
+  // the top of the range; the lock still itself is the laser, not a dotted crumb trail.
   const gather = left <= GATHER_TICKS ? 1 - clamp01(left / GATHER_TICKS) : 0
   const reach = full * (1 - 0.20 * gather)
   const flashD = (tk - lockTick) * FLASH_SPEED
   const beat = Math.floor(tk) % 2                      // the ray breathes by dropping dots, not by fading
   let n = 0
   for (let d = 0; d < reach; d += CORE_STEP, n++) {
-    const t = d / reach
-    if (t > 0.62 && ((n + beat) & 1)) continue                        // dithered tail
     if (gather > 0.34 && ((n + beat) & 1)) continue                   // thinning as it charges
     if (gather > 0.7 && ((n + beat) % 3) !== 0) continue              // and thinner still
     const px = Math.round(ox + ca * d), py = Math.round(oy + sa * d)
     const hot = clamp01(1 - Math.abs(d - flashD) / FLASH_WIDTH)
+    // A sight, not a shot: 1px chromatic lock over a floor bite. The racing flash is the only
+    // white on the ray — a filled core the whole length reads as already hitting.
     g.rect(px, py + 1, 1, 1).fill({ color: COL_UNDER })
-    g.rect(px, py, 1, 1).fill({ color: hot > 0.35 ? COL_HOT : COL_LOCK })
+    g.rect(px, py, 1, 1).fill({ color: hot > 0.28 ? COL_HOT : COL_SIGHT })
   }
   for (let d = NODE_STEP; d < reach; d += NODE_STEP) {
     const px = Math.round(ox + ca * d), py = Math.round(oy + sa * d)

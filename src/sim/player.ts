@@ -4,6 +4,8 @@ import type { InputFrame } from './input'
 import { moveWithWalls } from './collision'
 import { arcHits, damageEnemy, addFreeze, sweepEase, swingStep } from './combat'
 import { swingReach } from './boons'
+import { ARM, armOf } from './weapons'
+import { bowMoveScale, bowSteer, looseArrow, startDraw } from './bow'
 import { angleDiff, deg, len } from './math'
 
 export function capturePlayerInput(world: World, input: InputFrame): void {
@@ -46,14 +48,17 @@ export function updatePlayer(world: World, input: InputFrame): void {
   p.aimAngle = aim // intent always tracks the stick, so a chained swing can be redirected
   // a roll is committed: its facing is latched at launch, so the sprite can never flip mid-tuck
   if (p.state === 'free') p.facing = Math.cos(p.aimAngle) >= 0 ? 1 : -1
-  // steering: the swing angle follows the aim for the first few startup ticks, then it is committed
+  // steering: the swing/draw angle follows the aim for the first few startup ticks, then it is committed
   if (p.state === 'attack') {
-    const s = P.attack.swings[p.swingIndex]
-    if (p.stateTick < s.steerTicks) {
-      const max = deg(P.attack.steerRateDeg)
-      const d = angleDiff(p.swingAngle, aim)
-      p.swingAngle += d > max ? max : d < -max ? -max : d
-      p.facing = Math.cos(p.swingAngle) >= 0 ? 1 : -1
+    if (armOf(world) === ARM.bow) bowSteer(world, aim)
+    else {
+      const s = P.attack.swings[p.swingIndex]
+      if (p.stateTick < s.steerTicks) {
+        const max = deg(P.attack.steerRateDeg)
+        const d = angleDiff(p.swingAngle, aim)
+        p.swingAngle += d > max ? max : d < -max ? -max : d
+        p.facing = Math.cos(p.swingAngle) >= 0 ? 1 : -1
+      }
     }
   }
 
@@ -62,7 +67,7 @@ export function updatePlayer(world: World, input: InputFrame): void {
   // --- state transitions from buffered input ---
   if (p.state === 'free') {
     if (p.dodgeBuffer > 0) startDodge(world)
-    else if (p.attackBuffer > 0) startSwing(world, 0)
+    else if (p.attackBuffer > 0) beginAttack(world)
   } else if (p.state === 'dodge') {
     // `dodgeEnd` is the landing, not the end of the state: the feet touch down when the roll's own
     // momentum runs out, and the recovery the player has to pay for starts there.
@@ -72,7 +77,13 @@ export function updatePlayer(world: World, input: InputFrame): void {
       // a press made mid-roll could not latch a direction, so it takes the stick as it stands now
       if (p.dodgeBuffer > 0) latchDodgeDir(world, input)
     }
-    else if (p.attackBuffer > 0 && p.stateTick >= P.dodge.attackCancelFrom) startSwing(world, 0)
+    else if (p.attackBuffer > 0 && p.stateTick >= P.dodge.attackCancelFrom) beginAttack(world)
+  } else if (p.state === 'attack' && armOf(world) === ARM.bow) {
+    const B = tuning.bow
+    if (p.stateTick === B.draw) looseArrow(world)
+    const recoverTick = p.stateTick - B.draw
+    if (p.stateTick >= B.draw + B.recover) { p.state = 'free'; p.stateTick = 0 }
+    else if (recoverTick >= 0 && p.dodgeBuffer > 0 && recoverTick >= B.dodgeCancelFrom) startDodge(world)
   } else if (p.state === 'attack') {
     const s = P.attack.swings[p.swingIndex]
     // hit-confirm: a swing that touched something recovers on its own clock; a whiff pays for the miss
@@ -121,6 +132,12 @@ export function updatePlayer(world: World, input: InputFrame): void {
       p.vx = approach(p.vx, tx, P.maxSpeed / P.accelTicks); p.vy = approach(p.vy, ty, P.maxSpeed / P.accelTicks)
       dx = p.vx * DT; dy = p.vy * DT
     }
+  } else if (p.state === 'attack' && armOf(world) === ARM.bow) {
+    const scale = bowMoveScale(world)
+    const tx = mlen > 0.01 ? input.moveX / mlen * P.maxSpeed * scale : 0
+    const ty = mlen > 0.01 ? input.moveY / mlen * P.maxSpeed * scale : 0
+    p.vx = approach(p.vx, tx, P.maxSpeed / P.accelTicks); p.vy = approach(p.vy, ty, P.maxSpeed / P.accelTicks)
+    dx = p.vx * DT; dy = p.vy * DT
   } else if (p.state === 'attack') {
     const s = P.attack.swings[p.swingIndex]
     // committed through startup + active, then control bleeds back in across recovery
@@ -138,7 +155,7 @@ export function updatePlayer(world: World, input: InputFrame): void {
   applyKnockback(world)
 
   // --- active hit window: only the arc the blade has actually swept through is live ---
-  if (p.state === 'attack') {
+  if (p.state === 'attack' && armOf(world) === ARM.blade) {
     const s = P.attack.swings[p.swingIndex]
     const k = p.stateTick - s.startup
     if (k >= 0 && k < s.active) {
@@ -176,10 +193,15 @@ function swingConnected(world: World): boolean {
 
 function startDodge(world: World): void {
   const p = world.player
-  p.state = 'dodge'; p.stateTick = 0; p.dodgeBuffer = 0
+  p.state = 'dodge'; p.stateTick = 0; p.dodgeBuffer = 0; p.dodgeRead = 0
   if (Math.abs(p.dodgeDirX) > 0.2) p.facing = p.dodgeDirX >= 0 ? 1 : -1   // head-first along the roll
   // the direction was latched at the press (capturePlayerInput) and is never re-read here
   world.emit({ type: 'dodge', x: p.x, y: p.y, angle: Math.atan2(p.dodgeDirY, p.dodgeDirX) })
+}
+
+function beginAttack(world: World): void {
+  if (armOf(world) === ARM.bow) startDraw(world)
+  else startSwing(world, 0)
 }
 
 function startSwing(world: World, index: number): void {

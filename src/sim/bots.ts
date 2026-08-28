@@ -42,6 +42,9 @@ function naiveMelee(world: World): InputFrame {
   if (d > 18) { inp.moveX = inp.aimX; inp.moveY = inp.aimY }
   if (d <= tuning.player.attack.swings[0].radius) inp.attack = world.tick % 4 === 0
   if (e.kind === 'brute' && e.state === 'windup' && e.stateTick > 12 && d < 40) { inp.dodge = true; inp.moveX = -inp.aimX; inp.moveY = -inp.aimY }
+  if (e.kind === 'warden' && e.state === 'windup' && e.stateTick > 20 && d < tuning.warden.slamRadius + 6) {
+    inp.dodge = true; inp.moveX = -inp.aimX; inp.moveY = -inp.aimY
+  }
   return inp
 }
 
@@ -52,7 +55,14 @@ function kite(world: World): InputFrame {
   const e = nearest(world)
   if (!e) return inp
   const d = aimAt(inp, world, e)
-  const threat = world.enemies.some(x => x.active && x.state !== 'dead' && (x.state === 'windup' || x.state === 'freeze') && Math.hypot(x.x - p.x, x.y - p.y) < 48 && x.stateTick > (x.kind === 'brute' ? 12 : 10))
+  const threat = world.enemies.some(x => {
+    if (!x.active || x.state === 'dead') return false
+    if (x.state !== 'windup' && x.state !== 'freeze') return false
+    const reach = x.kind === 'warden' ? tuning.warden.slamRadius + 8 : 48
+    if (Math.hypot(x.x - p.x, x.y - p.y) >= reach) return false
+    const late = x.kind === 'brute' ? 12 : x.kind === 'warden' ? 20 : 10
+    return x.stateTick > late
+  })
   const incomingBolt = world.projectiles.some(b => b.active && Math.hypot(b.x - p.x, b.y - p.y) < 22)
   if ((threat || incomingBolt) && p.state !== 'dodge') {
     inp.dodge = true

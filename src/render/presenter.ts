@@ -4,8 +4,9 @@ import type { Atlas } from './atlas'
 import type { World, Enemy } from '@/sim/world'
 import type { SimEvent } from '@/sim/events'
 import { tuning } from '@/tuning'
-import { EntityView, createPlayerView, createEnemyView, updatePlayerView, updateEnemyView, makePropSprite, SpawnMarkerView, BoltView, drawAimLine, drawSwingArc } from './views'
+import { EntityView, createPlayerView, createEnemyView, updatePlayerView, updateEnemyView, makePropSprite, SpawnMarkerView, BoltView, ArrowView, drawAimLine, drawSwingArc, drawSwingTip, drawBowAim } from './views'
 import { updatePlayerRim } from './views/player'
+import { ARM, armOf } from '@/sim/weapons'
 import { buildTilemap, type TilemapView } from './tilemap'
 import { Camera } from './camera'
 import { Hud } from './hud'
@@ -16,12 +17,14 @@ import { PostFx } from './postfx'
 import { DamageNumbers } from './damageNumbers'
 import { Atmosphere } from './atmosphere'
 import { fxRng, seedFx } from './fxRng'
+import { hasBoon } from '@/sim/boons'
 
 // Reads sim state + events every frame and drives everything visible. Never mutates the sim.
 export class Presenter {
   playerView: EntityView
   enemyViews = new Map<number, EntityView>()
   boltViews = new Map<number, BoltView>()
+  arrowViews = new Map<number, ArrowView>()
   spawnMarkers: SpawnMarkerView[] = []
   tilemap: TilemapView
   camera = new Camera()
@@ -50,6 +53,8 @@ export class Presenter {
   // the contact stamp: an arc radius/orientation about the player, plus the wound it was struck on
   private impactT = -1; private impactR = 0; private impactA = 0; private impactSnap = 0
   private impactSweep = 1; private impactWX = 0; private impactWY = 0; private impactHeavy = false
+  private impactPierce = false
+  private impactId = -1
   // hit flash on real time, not sim ticks: hit-stop must not hold a target white for its whole freeze
   private hitFlash = new Map<number, number>()
   private propSprites: Sprite[] = []
@@ -86,6 +91,7 @@ export class Presenter {
     seedFx(world.seed)
     for (const v of this.enemyViews.values()) v.destroy(); this.enemyViews.clear()
     for (const v of this.boltViews.values()) v.destroy(); this.boltViews.clear()
+    for (const v of this.arrowViews.values()) v.destroy(); this.arrowViews.clear()
     for (const m of this.spawnMarkers) m.sprite.destroy(); this.spawnMarkers = []
     this.particles.clear()
     this.hitFlash.clear()
@@ -98,6 +104,7 @@ export class Presenter {
     this.recoilX = this.recoilY = 0
     this.dodgedT = -1; this.dodgedStep = -1
     this.impactT = -1
+    this.impactId = -1
   }
 
   handleEvents(events: readonly SimEvent[]) {
@@ -107,24 +114,35 @@ export class Presenter {
         case 'hit': {
           const H = J.hit
           const v = this.enemyViews.get(ev.targetId)
-          if (v) v.squash = J.squashTicks
-          this.hitFlash.set(ev.targetId, J.hitFlashSec)
+          const blessed = hasBoon(this.world, 'cleave')
+          const target = this.world.enemies.find(e => e.id === ev.targetId)
+          const crate = target?.kind === 'dummy'
+          if (v) {
+            v.squash = J.squashTicks
+            // a crate sprite under a wash reads as a UI badge, not a body. Real silhouettes can wear it.
+            if (!crate) v.redFlash = blessed ? J.hit.blessedRedFlash : J.hit.redFlash
+          }
+          if (!crate) this.hitFlash.set(ev.targetId, blessed ? J.hit.blessedHitFlashSec : J.hitFlashSec)
           // The contact shape: an arc on the floor plane that passes the target, snapped to one of a
           // fixed set of directions so the still reads as an authored sprite and not a free rotation.
-          // Nothing soft, nothing additive, nothing on top of either body.
+          // The crescent stays under both fighters; the wound cut sits on the body.
           const C = H.contact
           const p = this.world.player
           const fx = ev.x - p.x, fy = (ev.y - p.y) / 0.9
           const stepA = (Math.PI * 2) / C.snapSteps
           this.impactT = 0
+          this.impactId = ev.targetId
           this.impactA = Math.atan2(fy, fx)
           this.impactSnap = Math.round(this.impactA / stepA) * stepA
           this.impactR = Math.hypot(fx, fy) + (ev.heavy ? C.heavyOut : C.out)
           this.impactSweep = tuning.player.attack.swings[p.swingIndex].sweep
-          // the wound, not the target's centre: a couple of px back along the blow, on the near edge
-          this.impactWX = ev.x - Math.cos(this.impactA) * 3
-          this.impactWY = ev.y - Math.sin(this.impactA) * 3 * 0.9
-          this.impactHeavy = ev.heavy
+          // on the near edge of the body, where the blade went in — not past it
+          this.impactWX = ev.x - Math.cos(this.impactA) * 2
+          this.impactWY = ev.y - Math.sin(this.impactA) * 2 * 0.9
+          this.impactHeavy = ev.heavy || blessed
+          this.impactPierce = armOf(this.world) === ARM.bow
+          if (blessed) this.particles.ring(this.impactWX, this.impactWY, 0xffe090)
+          if (!crate) this.particles.wound(this.impactWX, this.impactWY, ev.angle, C.blood)
           // EVERY hit moves the camera. Light hits are ~90% of all contact, so a light hit the camera
           // ignores is a game that says nothing almost every time you connect.
           this.camera.addTrauma(ev.heavy ? J.traumaHeavy : J.traumaLight)
@@ -183,7 +201,6 @@ export class Presenter {
           this.dodgedA = Math.atan2(q.dodgeDirY, q.dodgeDirX)
           this.camera.punchZoom(D.zoom)
           this.camera.addTrauma(D.trauma)
-          this.postfx.pulse()
           break
         }
         case 'enemyStagger': {
@@ -212,7 +229,29 @@ export class Presenter {
         case 'boltCut': this.particles.hitSparks(ev.x, ev.y, 0, 10, 0xe0a0ff); this.camera.addTrauma(0.15); break
         case 'boltHitWall': this.particles.puff(ev.x, ev.y, 3, 0xb070ff); break
         case 'boltFired': this.particles.ring(ev.x, ev.y, 0xd070ff); break
-        case 'enemyAttack': if (ev.kind === 'brute') { this.particles.dust(ev.x, ev.y + 6, ev.angle + Math.PI, 5) } else if (ev.kind === 'charger') this.particles.dust(ev.x, ev.y + 6, ev.angle + Math.PI, 3); break
+        case 'enemyAttack':
+          if (ev.kind === 'brute') this.particles.dust(ev.x, ev.y + 6, ev.angle + Math.PI, 5)
+          else if (ev.kind === 'charger') this.particles.dust(ev.x, ev.y + 6, ev.angle + Math.PI, 3)
+          else if (ev.kind === 'warden') {
+            const Wj = J.warden
+            this.particles.dust(ev.x, ev.y + 8, 0, Wj.slamDust)
+            this.camera.addTrauma(Wj.slamTrauma)
+            this.camera.punchZoom(Wj.slamZoom)
+            this.flash(Wj.slamFlash, 0xfff0c0)
+            this.postfx.pulse()
+          }
+          break
+        case 'enemyPhase': {
+          const Wj = J.warden
+          this.particles.ring(ev.x, ev.y, 0xff7a18)
+          this.particles.puff(ev.x, ev.y, 8, 0xff8020)
+          this.camera.addTrauma(Wj.phaseTrauma)
+          this.camera.punchZoom(Wj.phaseZoom)
+          this.flash(Wj.phaseFlash, 0xff8020)
+          this.postfx.pulse()
+          this.hud.showBanner('THE VEIL BREAKS', '', 1.5)
+          break
+        }
         case 'spawn': this.particles.spawnBurst(ev.x, ev.y); this.camera.addTrauma(0.08); break
         case 'waveStart': this.hud.showBanner(ev.wave === ev.total && ev.total > 1 ? 'FINAL WAVE' : `WAVE ${ev.wave}`, '', 1.3); break
         case 'roomClear':
@@ -229,6 +268,22 @@ export class Presenter {
           this.hud.showBanner(ev.name, ev.index + 1 < ev.total ? '' : 'the last chamber', 1.8)
           this.hud.place.text = ev.name
           break
+        case 'returned': {
+          this.rebuildRoom()
+          this.particles.clear()
+          this.damageNumbers.clear()
+          const v = this.playerView
+          v.body.tint = 0xffffff
+          v.body.visible = v.shadow.visible = true
+          if (v.weapon) v.weapon.visible = true
+          this.flash(0.55, 0xfff4d0)
+          this.camera.addTrauma(0.22)
+          this.camera.punchZoom(J.zoom.roomClear)
+          this.postfx.pulse()
+          this.hud.showBanner(ev.name, 'not yet reborn', 1.8)
+          this.hud.place.text = ev.name
+          break
+        }
         case 'offeringTaken':
           this.flash(0.5, 0xfff0c0)
           this.camera.addTrauma(0.16)
@@ -237,6 +292,22 @@ export class Presenter {
           this.particles.puff(ev.x, ev.y, 5, 0xffe090)
           this.postfx.pulse()
           this.tilemap.setDoorOpen(this.world.doorOpen)
+          break
+        case 'draw':
+          this.camera.lean(ev.angle + Math.PI, J.bow.drawLean)
+          break
+        case 'arrowLoose': {
+          const B = J.bow
+          this.particles.dust(ev.x, ev.y, ev.angle + Math.PI, 4)
+          this.particles.hitSparks(ev.x, ev.y, ev.angle, 8, 0xffe090)
+          this.camera.kick(ev.angle, B.looseKick)
+          this.recoilX -= Math.cos(ev.angle) * B.looseRecoil
+          this.recoilY -= Math.sin(ev.angle) * B.looseRecoil * 0.7
+          this.flash(0.08, 0xfff0c0)
+          break
+        }
+        case 'arrowHitWall':
+          this.particles.puff(ev.x, ev.y, 2, 0xc49058)
           break
         case 'restart': break
       }
@@ -346,17 +417,34 @@ export class Presenter {
     }
   }
 
+  // Shove the struck sprite off the blade and tip it away. Freeze holds the pose; without this
+  // the still is an idle body under a trail.
+  private flinchBody(v: EntityView): void {
+    const H = tuning.juice.hit
+    const q = Math.max(v.squash / tuning.juice.squashTicks, v.redFlash / H.redFlash)
+    const kick = H.bodyKick * q
+    const dx = Math.round(Math.cos(this.impactA) * kick)
+    const dy = Math.round(Math.sin(this.impactA) * kick * 0.7)
+    v.body.position.x += dx
+    v.body.position.y += dy
+    v.body.rotation += (Math.cos(this.impactA) >= 0 ? 1 : -1) * H.bodyLean * q
+    if (v.weapon) {
+      v.weapon.position.x += dx
+      v.weapon.position.y += dy
+      v.weapon.rotation += (Math.cos(this.impactA) >= 0 ? 1 : -1) * H.bodyLean * q * 0.6
+    }
+  }
+
   // The contact stamp, stepped on REAL time so the hit-stop holds tier 0 instead of eating it.
-  // Two shapes, six tones, every edge on a whole pixel:
-  //   ground: one tapered crescent, dark-rimmed, snapped to 16 directions, UNDER both fighters
-  //   air:    a spark cluster and blood specks on the wound — small hard marks, so the target's
-  //           silhouette survives them, and the eye lands on where the damage went in
+  // Ground: tapered crescent UNDER both fighters. Air: a wound cut ON the body plus sparks
+  // thrown through it — the still has to say meat, not only a swipe.
   private drawContact(ground: Graphics, air: Graphics, dtSec: number) {
     if (this.impactT < 0) return
     const C = tuning.juice.hit.contact
     const tiers = this.impactHeavy ? C.heavyTiers : C.tiers
     const step = Math.floor(this.impactT / C.stepSec)
-    this.impactT += dtSec
+    // a hitch or a batched stepwise capture must not skip the stamp; one tier per drawn frame
+    this.impactT += Math.min(dtSec, C.stepSec)
     if (step >= tiers) { this.impactT = -1; return }
     const u = step / tiers
     // anchored to the player's DRAWN body, so the arc rides the contact recoil with him
@@ -365,9 +453,12 @@ export class Presenter {
     const thick = (this.impactHeavy ? C.heavyThick : C.thick) * (1 - u * 0.45)
     const span = (this.impactHeavy ? C.heavySpanDeg : C.spanDeg) * Math.PI / 180
     // the tail chases the leading edge across the tiers: motion, without ever unsnapping the shape
-    crescent(ground, cx, cy, this.impactR, thick, this.impactSnap, span, this.impactSweep, u * 0.5, step === 0, C)
+    if (this.impactPierce) pierceStamp(ground, this.impactWX, this.impactWY, this.impactSnap, step, C)
+    else crescent(ground, cx, cy, this.impactR, thick, this.impactSnap, span, this.impactSweep, u * 0.5, step === 0, C)
+    woundPool(ground, this.impactWX, this.impactWY, this.impactA, step, C)
     const n = Math.max(2, (this.impactHeavy ? C.heavySparks : C.sparks) - step)
     sparkCluster(air, this.impactWX, this.impactWY, this.impactA, step, n, this.impactHeavy ? C.heavyDrops : C.drops, C)
+    woundCut(air, this.impactWX, this.impactWY, this.impactA, step, this.impactHeavy, C)
   }
 
   rebuildRoom(): void {
@@ -405,20 +496,35 @@ export class Presenter {
     for (const [id, v] of this.enemyViews) {
       const e = w.enemies.find(x => x.id === id && x.active)
       if (!e) { v.destroy(); this.enemyViews.delete(id); continue }
-      if (v.squash > 0) v.squash -= dtSec * 60
+      // hit-stop holds the flinch: decaying squash/wine on real time while the sim is frozen
+      // ate the only body reaction the still had.
+      if (w.freeze <= 0) {
+        if (v.squash > 0) v.squash -= dtSec * 60
+        if (v.redFlash > 0) v.redFlash -= dtSec * 60
+      }
       updateEnemyView(v, e, w, alpha, this.time)
       const hf = (this.hitFlash.get(id) ?? 0) - dtSec
       if (hf > 0) this.hitFlash.set(id, hf); else this.hitFlash.delete(id)
       v.setFlash(hf > 0)
+      if (id === this.impactId && (v.squash > 0 || v.redFlash > 0)) this.flinchBody(v)
     }
     for (const b of w.projectiles) {
-      if (b.active && !this.boltViews.has(b.id)) this.boltViews.set(b.id, new BoltView(this.atlas, L.fx))
+      if (!b.active) continue
+      if (b.team === 1) {
+        if (!this.arrowViews.has(b.id)) this.arrowViews.set(b.id, new ArrowView(this.atlas, L.fx))
+      } else if (!this.boltViews.has(b.id)) this.boltViews.set(b.id, new BoltView(this.atlas, L.fx))
     }
     for (const [id, v] of this.boltViews) {
       const b = w.projectiles.find(x => x.id === id && x.active)
       if (!b) { v.destroy(); this.boltViews.delete(id); continue }
       v.update(lerp(b.px, b.x, alpha), lerp(b.py, b.y, alpha), this.time)
       if (fxRng.ui.next() < 0.5) this.particles.boltTrail(b.x, b.y)
+    }
+    for (const [id, v] of this.arrowViews) {
+      const b = w.projectiles.find(x => x.id === id && x.active)
+      if (!b) { v.destroy(); this.arrowViews.delete(id); continue }
+      v.update(lerp(b.px, b.x, alpha), lerp(b.py, b.y, alpha), b.angle)
+      if (fxRng.ui.next() < 0.4) this.particles.arrowTrail(b.x, b.y)
     }
     while (this.spawnMarkers.length < w.spawnQueue.length) this.spawnMarkers.push(new SpawnMarkerView(this.atlas, L.fx))
     for (let i = 0; i < this.spawnMarkers.length; i++) {
@@ -427,7 +533,7 @@ export class Presenter {
       if (s) this.spawnMarkers[i].update(s.x, s.y, s.ticksLeft, tuning.spawnTelegraphTicks)
     }
 
-    if (this.playerView.squash > 0) this.playerView.squash -= dtSec * 60
+    if (w.freeze <= 0 && this.playerView.squash > 0) this.playerView.squash -= dtSec * 60
     updatePlayerView(this.playerView, p, w, alpha, this.time)
     this.contactReaction(dtSec)
     this.rollMotion(p)
@@ -438,7 +544,12 @@ export class Presenter {
     this.fxGraphics.clear()
     this.groundFx.clear()
     for (const e of w.enemies) if (e.active && e.kind === 'caster' && e.state === 'aim') drawAimLine(this.fxGraphics, e, alpha)
-    drawSwingArc(this.fxGraphics, p, alpha, w)
+    if (armOf(w) === ARM.bow) drawBowAim(this.fxGraphics, p, alpha)
+    else {
+      // smear under the fighters so body and blade occupy the frame; the hot tip stays in air
+      drawSwingArc(this.groundFx, p, alpha, w)
+      drawSwingTip(this.fxGraphics, p, alpha, w)
+    }
     this.drawRollStreak(this.groundFx, p, alpha)
     this.drawContact(this.groundFx, this.fxGraphics, dtSec)
     this.drawDodgeMark(this.groundFx, dtSec)
@@ -516,6 +627,13 @@ function crescent(g: Graphics, cx: number, cy: number, r: number, thick: number,
 
 // The wound: sparks fanned along the blow and blood specks thrown past it. Warm and red against a
 // grey-blue arc, and small enough that they mark the target instead of covering it.
+function pierceStamp(g: Graphics, x: number, y: number, a: number, step: number, C: typeof tuning.juice.hit.contact): void {
+  const w = Math.max(1, 3 - step)
+  ray(g, x, y, a, -7, 11, w + 1, C.rim)
+  ray(g, x, y, a, -5, 9, w, C.steel)
+  if (step === 0) ray(g, x, y, a, 6, 11, 1, C.core)
+}
+
 function sparkCluster(g: Graphics, x: number, y: number, a: number, step: number, n: number, drops: number, C: typeof tuning.juice.hit.contact): void {
   const spread = C.sparkSpreadDeg * Math.PI / 180
   const base = 2 + step * C.sparkStepPx
@@ -523,16 +641,45 @@ function sparkCluster(g: Graphics, x: number, y: number, a: number, step: number
     const f = n === 1 ? 0.5 : i / (n - 1)
     const ang = a + (f - 0.5) * spread
     const d0 = base + (i & 1 ? 2 : 0)
-    ray(g, x, y, ang, d0, d0 + 2, i & 1 ? 1 : 2, i & 1 ? C.spark : C.sparkHot)
+    ray(g, x, y, ang, d0, d0 + 3, i & 1 ? 1 : 2, i & 1 ? C.spark : C.sparkHot)
   }
   for (let i = 0; i < drops; i++) {
     const f = drops === 1 ? 0.5 : i / (drops - 1)
     const ang = a + (f - 0.5) * spread * 1.5
-    const d = 4 + step * (C.sparkStepPx + 1)
+    const d = 3 + step * (C.sparkStepPx + 1)
     const px = Math.round(x + Math.cos(ang) * d), py = Math.round(y + Math.sin(ang) * d * 0.9 + step * step * 0.7)
-    g.rect(px, py, 2, 1)
+    g.rect(px, py, 2, 2)
   }
   if (drops > 0) g.fill({ color: C.blood, alpha: 1 })
+}
+
+// A short red cut through the contact, with a hot core on tier 0 and shards thrown along the blow.
+function woundCut(g: Graphics, x: number, y: number, a: number, step: number, heavy: boolean, C: typeof tuning.juice.hit.contact): void {
+  const len = (heavy ? C.heavyWoundLen : C.woundLen) - step
+  const thick = heavy ? C.heavyWoundThick : C.woundThick
+  if (len < 2) return
+  ray(g, x, y, a, -2, len, thick + 1, C.rim)
+  ray(g, x, y, a, -1, len - 1, thick, C.blood)
+  if (step === 0) ray(g, x, y, a, 0, 3, 1, C.core)
+  const n = (heavy ? C.heavyShards : C.shards) - step
+  const spread = C.sparkSpreadDeg * Math.PI / 180
+  for (let i = 0; i < n; i++) {
+    const f = n === 1 ? 0.5 : i / (n - 1)
+    const ang = a + (f - 0.5) * spread
+    const d0 = 2 + (i & 1 ? 1 : 0) + step
+    ray(g, x, y, ang, d0, d0 + C.shardLen - step, i & 1 ? 1 : 2, i < 2 && step === 0 ? C.sparkHot : C.blood)
+  }
+}
+
+// Dark red blot on the floor under the wound, so the still keeps a stain after the air shards.
+function woundPool(g: Graphics, x: number, y: number, a: number, step: number, C: typeof tuning.juice.hit.contact): void {
+  const px = Math.round(x + Math.cos(a) * (2 + step))
+  const py = Math.round(y + 5 + Math.sin(a) * step)
+  const w = C.poolW - step, h = C.poolH
+  if (w < 3) return
+  g.rect(px - (w >> 1), py, w, h)
+  g.rect(px - (w >> 1) + 1, py + h, w - 2, 1)
+  g.fill({ color: C.blood, alpha: 1 })
 }
 
 // One tapered spike of whole pixels, from radius r0 to r1 along `a`. The 0.85 flattens it into the

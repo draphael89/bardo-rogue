@@ -24,6 +24,7 @@ export interface PlayOpts {
   startSilent?: boolean // start at silence and wait for a fade; used by the combat layers
   ducked?: boolean     // route through the bus's duck stage: the bed and the ambience, never a stinger
   flat?: boolean       // place it in the stereo image but do not attenuate it with distance
+  lead?: boolean       // skip the SFX crowd stage: your verbs and the danger tells stay full
 }
 
 /** A started sound. Buffer sources free themselves on end; only hold a Voice for loops. */
@@ -80,9 +81,10 @@ export const MIX = {
   // recover to a stale level, does not touch the SFX that triggered it, and — the reason the
   // stage sits in front of the fader rather than behind it — does not duck the struck bowls that
   // ARE the wave-start stinger, which share the Music bus with the bed.
-  // Four callers, three depths (see `by`): -13 dB when the player is hit, -9 dB under a
-  // wave-start bowl, -6 dB for the length of an enemy wind-up or a spawn telegraph, so the tell
-  // is heard rather than shouted.
+  // Five callers, four depths (see `by`): -13 dB when the player is hit, -9 dB under a
+  // wave-start bowl, -6 dB for the length of an enemy wind-up or a spawn telegraph, -5 dB
+  // under the player's own commit so a swing or dodge still clears the bed in a pile-up.
+  // A tell is always deeper than a commit, so the warning still wins arbitration.
   // `hold` is the time at full depth before the release starts. It is longer than the fastest
   // re-trigger the game can produce, so a second duck arriving mid-gesture deepens it instead of
   // catching the release halfway back up and pumping.
@@ -107,6 +109,12 @@ export const MIX = {
       waveStart: [-9, 0.6, 0],
       enemyWindup: [-6, 0.15, 0],
       spawnTelegraph: [-6, 0.2, 0],
+      // Shallower than a tell. Delayed 80 ms, same reason as playerHurt: a duck that
+      // starts with the woosh measures as a HOLE (the bed falls more than the 30 ms
+      // sweep adds). The duck lengthens the commit's tail. A light-swing chain
+      // re-triggers inside the hold, so the bed stays down for the string and recovers
+      // once, instead of pumping once per press.
+      playerCommit: [-5, 0.16, 0.08],
     } as Record<string, readonly [number, number, number]>,
   },
   // Buses with a duck stage in front of the fader. The rest have no stage at all.
@@ -211,6 +219,8 @@ export class AudioSystem {
   bus: Record<BusName, GainNode> | null = null
   /** Pre-fader duck stage for the bed legs. 1.0 when nothing is making room. */
   duckStage: Partial<Record<BusName, GainNode>> = {}
+  /** Competing SFX sit here. Lead voices (your swing, a tell) join the SFX fader past it. */
+  crowd: GainNode | null = null
   /** The static 2-4 kHz cut that reserves the tell band, one per ducked bus. */
   bedNotch: Partial<Record<BusName, BiquadFilterNode>> = {}
   /** Offline rendering only: added to ctx.currentTime so a whole fight can be scheduled ahead. */
@@ -318,6 +328,9 @@ export class AudioSystem {
       return g
     }
     this.bus = { music: mk('music'), ambience: mk('ambience'), sfx: mk('sfx'), ui: mk('ui') }
+    this.crowd = ctx.createGain()
+    this.crowd.gain.value = 1
+    this.crowd.connect(this.bus.sfx)
   }
 
   /** 0..1 slider on a dB curve. `master` scales everything; a bus scales one leg. */
@@ -461,7 +474,7 @@ export class AudioSystem {
     const silent = !!o.startSilent || !!(o.fadeIn && o.fadeIn > 0)
     g.gain.setValueAtTime(silent ? 0.0001 : level, t)
     if (o.fadeIn && o.fadeIn > 0 && !o.startSilent) g.gain.setTargetAtTime(level, t, o.fadeIn / 3)
-    src.connect(g); this.route(g, pos, o.bus ?? 'sfx', !!o.ducked)
+    src.connect(g); this.route(g, pos, o.bus ?? 'sfx', !!o.ducked, !!o.lead)
     src.start(t)
     const voice: Voice = {
       src, gain: g, level,
@@ -484,8 +497,9 @@ export class AudioSystem {
    * splitter's up-mix is discrete, so the gain node is forced to stereo first — otherwise a
    * mono clip would arrive with one silent side.
    */
-  private route(g: GainNode, pos: { pan: number; itd: number } | null, bus: BusName, ducked = false): void {
-    const target = (ducked ? this.duckStage[bus] : undefined) ?? this.bus![bus]
+  private route(g: GainNode, pos: { pan: number; itd: number } | null, bus: BusName, ducked = false, lead = false): void {
+    const target = (ducked ? this.duckStage[bus] : undefined)
+      ?? (bus === 'sfx' && !lead && this.crowd ? this.crowd : this.bus![bus])
     if (!pos || Math.abs(pos.pan) < MIX.space.panDeadzone) { g.connect(target); return }
     const ctx = this.ctx!
     const panner = ctx.createStereoPanner()
@@ -525,7 +539,7 @@ export class AudioSystem {
   }
 
   /** Short synthesized noise sweep layered under the sword whoosh. Placed with its whoosh. */
-  swish(gain = 0.35, ms = 120, pitch = 1, at?: { x: number; y: number }): void {
+  swish(gain = 0.35, ms = 120, pitch = 1, at?: { x: number; y: number }, lead = false): void {
     if (this._muted || !this.ctx || !this.bus) return
     if (!this.allow('swish')) return
     const ctx = this.ctx
@@ -539,7 +553,7 @@ export class AudioSystem {
     f.frequency.setValueAtTime(600 * pitch, t0); f.frequency.exponentialRampToValueAtTime(2600 * pitch, t0 + ms / 1000)
     const pos = at ? this.spatial(at.x, at.y) : null
     const g = ctx.createGain(); g.gain.setValueAtTime(gain * (pos ? pos.gain : 1), t0)
-    src.connect(f); f.connect(g); this.route(g, pos, 'sfx'); src.start(t0)
+    src.connect(f); f.connect(g); this.route(g, pos, 'sfx', false, lead); src.start(t0)
   }
 
   /**
@@ -577,7 +591,7 @@ export class AudioSystem {
     let peak = 0
     for (let i = 0; i < n; i++) peak = Math.max(peak, Math.abs(d[i]))
     if (peak > 0) for (let i = 0; i < n; i++) d[i] = d[i] / peak * 0.9
-    this.start(buf, { gain, bus, delay, x: o.x, y: o.y, flat: true })
+    this.start(buf, { gain, bus, delay, x: o.x, y: o.y, flat: true, lead: bus === 'sfx' })
   }
 
   /**
@@ -609,7 +623,7 @@ export class AudioSystem {
     let peak = 0
     for (let i = 0; i < n; i++) peak = Math.max(peak, Math.abs(d[i]))
     if (peak > 0) for (let i = 0; i < n; i++) d[i] = d[i] / peak * 0.9
-    this.start(buf, { gain, bus: 'sfx', x: o.x, y: o.y, flat: true })
+    this.start(buf, { gain, bus: 'sfx', x: o.x, y: o.y, flat: true, lead: true })
   }
 
   // -------------------------------------------------------------------------
@@ -637,6 +651,14 @@ export class AudioSystem {
       g.cancelScheduledValues(t)
       g.setTargetAtTime(depth, t, MIX.duck.attack / 3)
       g.setTargetAtTime(1, holdEnd, release / 3)
+    }
+    // The same gesture carves the SFX pile: lead voices (your swing, a tell) already
+    // joined the fader past this node, so they stay full while the crowd leans back.
+    const crowd = this.crowd?.gain
+    if (crowd) {
+      crowd.cancelScheduledValues(t)
+      crowd.setTargetAtTime(depth, t, MIX.duck.attack / 3)
+      crowd.setTargetAtTime(1, holdEnd, release / 3)
     }
   }
 

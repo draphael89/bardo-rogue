@@ -69,16 +69,31 @@ export function damageEnemy(world: World, e: Enemy, damage: number, angle: numbe
   addFreeze(world, hitstop)
   world.emit({ type: 'hit', x: e.x, y: e.y, angle, damage, heavy, targetId: e.id, kind, killed: false })
 
-  // poise: brutes only stagger from the heavy hit; everyone else staggers on any hit
-  const staggers = kind === 'brute' ? heavy : kind !== 'dummy'
-  if (staggers) {
+  // poise: brutes only stagger from the heavy; the warden only from a heavy while not committed;
+  // dummies never; everyone else staggers on any hit
+  if (kind === 'warden') {
+    const armored = e.state === 'windup' || e.state === 'attack'
+    if (heavy && !armored) {
+      e.state = 'stagger'
+      e.stateTick = 0
+      e.hitDone = false
+      world.emit({ type: 'enemyStagger', id: e.id, x: e.x, y: e.y })
+    }
+  } else if (kind === 'brute') {
+    if (heavy) {
+      e.state = 'stagger'
+      e.stateTick = 0
+      e.hitDone = false
+      world.emit({ type: 'enemyStagger', id: e.id, x: e.x, y: e.y })
+    } else {
+      e.kbx += Math.cos(angle) * tuning.brute.lightNudge * 10
+      e.kby += Math.sin(angle) * tuning.brute.lightNudge * 10
+    }
+  } else if (kind !== 'dummy') {
     e.state = 'stagger'
     e.stateTick = 0
     e.hitDone = false
     world.emit({ type: 'enemyStagger', id: e.id, x: e.x, y: e.y })
-  } else if (kind === 'brute') {
-    e.kbx += Math.cos(angle) * tuning.brute.lightNudge * 10
-    e.kby += Math.sin(angle) * tuning.brute.lightNudge * 10
   }
 }
 
@@ -87,7 +102,10 @@ export function hurtPlayer(world: World, angle: number, damage: number): boolean
   const p = world.player
   if (p.state === 'dead') return false
   if (isPlayerInvulnerable(world)) {
-    if (p.state === 'dodge') world.emit({ type: 'dodged', x: p.x, y: p.y })
+    if (p.state === 'dodge' && !p.dodgeRead) {
+      p.dodgeRead = 1
+      world.emit({ type: 'dodged', x: p.x, y: p.y })
+    }
     return false
   }
   if (p.god) damage = 0

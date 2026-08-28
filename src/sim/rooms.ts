@@ -19,22 +19,40 @@ export interface RoomDef {
   exits?: RoomExit[]
 }
 
+export const HUB_ID = 'bardo'
+
+function runGraph(): RoomDef[] {
+  return [
+    {
+      id: 'threshold',
+      name: 'THE THRESHOLD',
+      kind: 'threshold',
+      waves: THRESHOLD_RUN_WAVES,
+      exits: [
+        { dir: 'north', to: 'crossing', mark: 'combat' },
+        { dir: 'east', to: 'shore', mark: 'gift' },
+      ],
+    },
+    { id: 'crossing', name: 'THE CROSSING', kind: 'crossing', waves: CROSSING_RUN_WAVES },
+    { id: 'shore', name: 'THE FAR SHORE', kind: 'shore' },
+    {
+      id: HUB_ID,
+      name: 'THE BARDO',
+      kind: 'crossing',
+      startDoorOpen: true,
+      exits: [{ dir: 'north', to: 'threshold', mark: 'combat' }],
+    },
+  ]
+}
+
 export function roomsFor(scenario: string): RoomDef[] {
-  if (scenario === 'run') {
-    return [
-      {
-        id: 'threshold',
-        name: 'THE THRESHOLD',
-        kind: 'threshold',
-        waves: THRESHOLD_RUN_WAVES,
-        exits: [
-          { dir: 'north', to: 'crossing', mark: 'combat' },
-          { dir: 'east', to: 'shore', mark: 'gift' },
-        ],
-      },
-      { id: 'crossing', name: 'THE CROSSING', kind: 'crossing', waves: CROSSING_RUN_WAVES },
-      { id: 'shore', name: 'THE FAR SHORE', kind: 'shore' },
-    ]
+  if (scenario === 'run' || scenario === 'loop') {
+    const rooms = runGraph()
+    if (scenario === 'loop') {
+      const i = rooms.findIndex(r => r.id === HUB_ID)
+      if (i > 0) rooms.unshift(rooms.splice(i, 1)[0]!)
+    }
+    return rooms
   }
   if (scenario === 'shore') {
     return [{ id: 'shore', name: 'THE FAR SHORE', kind: 'shore' }]
@@ -46,7 +64,7 @@ function roomHasExits(room: RoomDef): boolean {
   return (room.exits?.length ?? 0) > 0
 }
 
-export function enterRoom(world: World, index: number): void {
+export function enterRoom(world: World, index: number, via: 'door' | 'return' = 'door'): void {
   if (index < 0 || index >= world.rooms.length) return
   const room = world.rooms[index]
   world.roomIndex = index
@@ -70,13 +88,14 @@ export function enterRoom(world: World, index: number): void {
   p.vx = p.vy = 0
   p.kbx = p.kby = 0
   if (room.waves?.length) startWaves(world, room.waves)
-  world.emit({ type: 'roomEnter', name: room.name, index, total: world.rooms.length })
+  if (via === 'return') world.emit({ type: 'returned', name: room.name, x: p.x, y: p.y })
+  else world.emit({ type: 'roomEnter', name: room.name, index, total: world.rooms.length })
 }
 
-export function enterRoomById(world: World, id: string): void {
+export function enterRoomById(world: World, id: string, via: 'door' | 'return' = 'door'): void {
   const index = world.rooms.findIndex(r => r.id === id)
   if (index < 0) return
-  enterRoom(world, index)
+  enterRoom(world, index, via)
 }
 
 function overlapsDoor(px: number, py: number, dir: DoorDir, col: number, row: number): boolean {

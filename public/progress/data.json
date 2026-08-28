@@ -1,9 +1,9 @@
 {
   "title": "Bardo Rogue",
   "subtitle": "Gauntlet against Enter the Gungeon & Hades \u2014 two marked doors, then the rest",
-  "updated": "2026-08-28T00:00:00-04:00",
-  "now": "boons",
-  "round": 1,
+  "updated": "2026-08-28T03:55:00-04:00",
+  "now": "audio-bed",
+  "round": 2,
   "timeline": [
     {
       "t": "16:54",
@@ -252,6 +252,242 @@
     {
       "t": "23:45",
       "text": "R7 split. AB: still a HUD pip. BA: beat lands, wow no. PARK the look — same family as the door seals. Mechanics stay; re-enter behind an authored token."
+    },
+    {
+      "t": "23:52",
+      "text": "Next piece: the blessing bites. One modifier (cleave) changes reach, arc, and damage. No card screen."
+    },
+    {
+      "t": "00:00",
+      "text": "R1 in — wider gold-amber crescent, +1 damage, HUD slash mark. Blind both-order critics on the contact still."
+    },
+    {
+      "t": "00:01",
+      "text": "R1 both orders picked the bar. Gap: contact flash — gold crescent on an unchanged dummy. No wow. No commit."
+    },
+    {
+      "t": "00:04",
+      "text": "R2: struck body goes wine, blessed hits use the heavy contact stamp, stepwise no longer skips the stamp. Back to critics."
+    },
+    {
+      "t": "00:06",
+      "text": "R2 both orders picked the bar. Gap: the dummy wash reads as a red rectangle on the swing, not a body being cut. No commit."
+    },
+    {
+      "t": "00:10",
+      "text": "R3: blessing on a brute, spaced so two silhouettes read. Contact stamp held through stepwise."
+    },
+    {
+      "t": "00:12",
+      "text": "R3 split. AB picked ours (wow no). BA picked the bar — core/rim/afterimage and debris at the leading edge. PARK the look. Mechanics stay. Same family as the door seals."
+    },
+    {
+      "t": "00:17",
+      "text": "Next piece: a second arm. Scenario bow, draw→loose→friendly arrow. Tests green. The blade still hits close; the bow does not melee."
+    },
+    {
+      "t": "00:23",
+      "text": "R1 both orders picked the bar, wow on the winner. Gap: the loosed shot — a standing stamp and a one-pixel hair, not a body lunge, a flare, and a bolt that occupies space. No commit."
+    },
+    {
+      "t": "00:28",
+      "text": "R2: thicker shaft, muzzle lobe, body pop on the loose. Recaptured the release, not the draw."
+    },
+    {
+      "t": "00:30",
+      "text": "R2 both orders picked the bar. Same gap: the loose is a five-spark fan, not a lunging body and a glowing shot. PARK the look. Mechanics stay. Same family as the blessed smear."
+    },
+    {
+      "t": "00:39",
+      "text": "Next piece: the first judge. Scenario boss, one warden: plant, radial slam, veil-break at half life. Tests green. Parked looks stay parked."
+    },
+    {
+      "t": "00:45",
+      "text": "R1 both orders picked the bar, wow on the winner. Gap: the hood is player-height and upright inside a dotted ring. The smash has to live in a bigger body with the weapon already up. No commit."
+    },
+    {
+      "t": "00:48",
+      "text": "R2: 1.85x mass, staff in the wind pose, gold rim only after commit. Recentered the still."
+    },
+    {
+      "t": "00:50",
+      "text": "R2 both orders picked the bar, wow on the winner. Same gap: the smash has to live in a raised weapon and a body that fills the light, not a cloak and a floor ring. PARK the look. Mechanics stay. Re-enter only behind authored boss frames."
+    },
+    {
+      "t": "00:56",
+      "text": "Next piece: death and return. You die, the card plays, R wakes you in The Bardo — not the same fight. A door starts the next attempt. Tests green. Parked looks stay parked."
+    },
+    {
+      "t": "00:59",
+      "text": "R1 captured: death card (THE BARDO PULLS YOU BACK / RETURN) then standing in THE BARDO, alive, door open, no enemies. Blind against the house courtyard."
+    },
+    {
+      "t": "01:00",
+      "text": "R1 both orders picked the bar, wow on the winner. Gap: the next-attempt door is a side prop; the title card is doing the return."
+    },
+    {
+      "t": "01:02",
+      "text": "R2: banner gone, player facing the north opening. Same gap: a lamp-hole, not a monumental gate. Same family as the parked door seals."
+    },
+    {
+      "t": "01:05",
+      "text": "R3 sequence (card then hub vs void then house) split, no wow either order. PARK the look. Mechanics stay: die, R, wake in The Bardo, door starts the next attempt. Re-enter only behind an authored gate and a death that leaves the fight."
+    },
+    {
+      "t": "01:08",
+      "text": "Next piece: the hit lands. Light contact is 90% of the fight. Capture the stamp against a real melee still. Parked looks stay parked."
+    },
+    {
+      "t": "01:14",
+      "text": "Hit-impact R1 (evidence r2): both orders picked the bar, no wow. Gap: a wound on the body and a flinch, not a white trail plus three sparks."
+    },
+    {
+      "t": "01:18",
+      "text": "Hit-impact R2: freeze now holds the squash and wine tint; a pixel cut and floor stain sit on the wound; the body tips off the blade."
+    },
+    {
+      "t": "01:21",
+      "text": "R2 both orders picked the bar, wow on the winner. Same family: a crumpled silhouette that keeps its outline, not a knot of flash. Two stalls. PARK. Re-enter behind an authored hit pose. Juice stays in the tree."
+    },
+    {
+      "t": "01:22",
+      "text": "Next piece: the dodge roll. Authored 16px poses already in the tree. Motion strip against a real roll, not a painted still."
+    },
+    {
+      "t": "01:28",
+      "text": "Dodge R1: split, no wow. AB liked our tumble and blue permission pulse; BA read a smear through a burst. Fair bar is Gungeon through-bullets, not an empty-room strip."
+    },
+    {
+      "t": "01:34",
+      "text": "Dodge R2: both orders picked the bar. Through a brute slam the overlap reads as a hit — orange tell, yellow starburst, red wash. Stall 1. Same family: a body occupying a standing hazard, not a clash flash."
+    },
+    {
+      "t": "01:42",
+      "text": "Dodge R3: roll through a bolt column, one dodged announce, no screen pulse. Split, wow on both winners. AB wants a flat dive the glow occludes; BA wants our cyan ring. Hold the dive through the beam next."
+    },
+    {
+      "t": "01:48",
+      "text": "Dodge R4: dive held through occupy. Both orders picked the bar, wow on the winner. Same occupancy gap: a painted body the beam swallows, not a grey dive plus a ring. Two looks. PARK. Re-enter behind authored roll-through frames. Juice stays."
+    },
+    {
+      "t": "01:50",
+      "text": "Next feel-lane piece: the sword swing. Parked looks stay parked. Do not grind the roll."
+    },
+    {
+      "t": "02:05",
+      "text": "Sword-swing R1 captured: discrete light-light-heavy, heavy contact still vs a committed sword-cut still. Coil, embers, plant dust, crescent kept. Critics on the unlabeled boards."
+    },
+    {
+      "t": "02:08",
+      "text": "Sword-swing R1: both orders picked the bar, wow on the winner. Gap: a lunging body and a glowing blade on a white-hot torn arc — not a cream ribbon painted over the fighter."
+    },
+    {
+      "t": "02:10",
+      "text": "Sword-swing R2: smear under the fighters, hole around the body, hot tip in air, larger warm blade. Same bar. Critics on the unlabeled boards."
+    },
+    {
+      "t": "02:12",
+      "text": "Sword-swing R2: both orders picked the bar, wow on the winner. Same family: an authored follow-through the crescent is the wake of, not a sticker on a 16px sprite. Two looks. PARK. Re-enter behind authored swing poses. Juice stays. Feel lane is parked. Next: the brute tell."
+    },
+    {
+      "t": "02:20",
+      "text": "Brute tell R1: committed windup still vs a heavy melee windup. Floor pie already in the tree. HUD stripped. Critics on the unlabeled boards."
+    },
+    {
+      "t": "02:28",
+      "text": "Brute R1: both orders picked ours, no wow. Gap: the pie is a stamp; the hammer has to author it. Idle bot was standing inside the brute."
+    },
+    {
+      "t": "02:38",
+      "text": "Brute R2: player on the rim, taller coil, bigger hammer. Split — one order wowed by painted mass, the other picked our orange lane."
+    },
+    {
+      "t": "02:44",
+      "text": "Brute R3: falling charge from hammer to landing bead. Split again. Next: cracks under the filled pie so the axe is glued to broken tiles."
+    },
+    {
+      "t": "02:50",
+      "text": "Brute R4: cracks above the lightmap. Split on the same family. PARK. Keep-out pie stays. Re-enter behind authored brute frames. Next: the caster."
+    },
+    {
+      "t": "02:55",
+      "text": "Caster bar locked: Sniper Shell aim still, not a Beholster density room. Solid 1px lock, player on the line."
+    },
+    {
+      "t": "03:00",
+      "text": "Caster R1: both orders picked ours, no wow. The body is on the line. Gap they named was the bar's empty floor."
+    },
+    {
+      "t": "03:04",
+      "text": "Caster R3: both orders picked the bar, wow. Hairline overlay vs a glowing sight from a scoped rifle."
+    },
+    {
+      "t": "03:08",
+      "text": "Caster R4: split on the same family. PARK. Solid lock, stop-on-body, brighter sight, staff scale, detached bolt stay. Next: the charger."
+    },
+    {
+      "t": "03:12",
+      "text": "Charger bar locked: a charge-lane telegraph still, not a density room. Judging the existing lock still."
+    },
+    {
+      "t": "03:20",
+      "text": "Charger R1: both orders picked the bar. Rails + chevrons read as a HUD box, not a floor stain."
+    },
+    {
+      "t": "03:24",
+      "text": "Charger R2: still a pasted rectangle. R3 bound the stain to the tiles. Same family. PARK."
+    },
+    {
+      "t": "03:28",
+      "text": "Charger PARK. Tile stain, grout cuts, lock burst, dash wake stay. Next: the death card."
+    },
+    {
+      "t": "03:32",
+      "text": "Death-card bar locked: Gungeon run-end killscreen (card vs card), not the House of Hades. Fight chrome now leaves when the stele owns the frame. Capturing the settled card."
+    },
+    {
+      "t": "03:22",
+      "text": "Death-card R1: split. One order picked the stele (no wow). The other picked the bar. Same gap both ways: the page must show the last moment and name who sent you back. Not a pause menu. R2: stele beside the body; TAKEN BY on the stone."
+    },
+    {
+      "t": "03:25",
+      "text": "Death-card R2 in. Stele left of the corpse, TAKEN BY THE HEAVY. Same killscreen bar. Critics on the unlabeled stills."
+    },
+    {
+      "t": "03:26",
+      "text": "Death-card R2: both orders picked ours. No wow. Body still a leftover cloak. R3: wine well under the corpse."
+    },
+    {
+      "t": "03:28",
+      "text": "Death-card R3: both orders picked ours again. Still no wow. Material/composition stuck at 3. PARK. Fight chrome off, left stele, TAKEN BY, wine well stay. Re-enter behind an authored fallen pose. Next: combat HUD."
+    },
+    {
+      "t": "03:35",
+      "text": "Combat-HUD bar locked: mid-fight pixel HUD (hearts / resources / weapon), not a clean room. Judging the current fight chrome as-is. Spec defects (sim-clock banners, pad glyphs) already in the tree."
+    },
+    {
+      "t": "03:38",
+      "text": "Combat-HUD R1: both orders picked the bar. Gap: countable icons and numbers, not WAVE 1/1 and unlabeled ticks. Do not invent a gun."
+    },
+    {
+      "t": "03:42",
+      "text": "Combat-HUD R2: empty heart outlines and LEFT N. Both orders still picked the bar. Same family: a plated pistol and 42/330. We will not invent a gun."
+    },
+    {
+      "t": "03:45",
+      "text": "Combat-HUD PARK. Two losses on weapon-and-ammo chrome. Empty outlines, LEFT N, mercy groove stay. Re-enter behind authored HUD stamps. Next: the audio bed."
+    },
+    {
+      "t": "03:50",
+      "text": "Audio-bed R1 (structure, not taste): both critics named the same gap. Swing/dodge sit at ~0 dB over the bed in a live mix. Solo-over-bed is fine. R2: bed leans back 5 dB under a commit."
+    },
+    {
+      "t": "03:54",
+      "text": "Audio-bed R2: crowd carve + delayed commit duck. Both critics still named player-commit lift. mix-hurt heavy −1.5 dB, mix dodge −0.6 dB."
+    },
+    {
+      "t": "03:55",
+      "text": "Audio-bed PARK. Two losses on the same family. Buses, bed, announcer-off, crowd, lead stay. Re-enter behind authored combat stems."
     }
   ],
   "pieces": [
@@ -293,57 +529,138 @@
     },
     {
       "id": "sword-swing",
-      "status": "queued",
-      "title": "Feel lane 1/3 \u2014 the three-hit chain",
-      "rounds": 0
+      "take": "25",
+      "name": "The blade commits",
+      "title": "Feel lane 1/3 — anticipation, arc, contact, a heavy that plants",
+      "blurb": "Three discrete presses. The crescent stays. The third hit plants. The still loses to a painted lunge.",
+      "bar": "Committed sword-cut still",
+      "status": "parked",
+      "rounds": 2,
+      "verdict": "theirs",
+      "gap": "Authored follow-through: a body and a physical blade the crescent is the wake of. Two still rounds lost on the same family. Re-enter behind painted swing poses. Under-fighter smear, hole, hot tip, and warm heavy blade stay.",
+      "before": "shots/swing-w2r1-ours.jpg",
+      "after": "shots/swing-w2r2-ours.jpg",
+      "ref": "ref/swing-0.jpg"
     },
     {
       "id": "hit-impact",
-      "status": "queued",
-      "title": "Feel lane 2/3 \u2014 light hits move the camera 0.19px; two reward channels are dead code",
-      "rounds": 0
+      "take": "23",
+      "name": "The hit lands",
+      "title": "Light contact: freeze, wound, flinch, camera",
+      "blurb": "Ninety percent of swings are light. The camera moves, the body tips, a cut sits on the wound. The still still loses to a painted crumple.",
+      "bar": "Hades sword contact",
+      "status": "parked",
+      "rounds": 2,
+      "verdict": "theirs",
+      "gap": "Authored hit pose: a crumpled silhouette that keeps its outline, plus a wound burst on flesh. Two still rounds lost on the same gap. Re-enter behind painted contact frames. Freeze-hold, flinch, and the pixel cut stay in the tree.",
+      "before": "shots/hit-r2-crop.png",
+      "after": "shots/hit-r3-crop.png",
+      "ref": "ref/hades-0.jpg"
     },
     {
       "id": "dodge-roll",
-      "status": "queued",
-      "title": "Feel lane 3/3 \u2014 the roll is 54% faster than running",
-      "rounds": 0
+      "take": "24",
+      "name": "The roll",
+      "title": "Launch, through, plant. Authored 16px poses.",
+      "blurb": "A bolt column you can occupy, one permission ring, no slam flash. The still loses to a painted body the beam swallows.",
+      "bar": "Gungeon dodge through bullets",
+      "status": "parked",
+      "rounds": 4,
+      "verdict": "theirs",
+      "gap": "Authored roll-through: a tumbling silhouette the hazard bloom swallows, plus plant dust. Two occupancy rounds lost after the slam-as-hit exhibit was retired. Re-enter behind painted through-frames. Dive-through-occupy, one-shot dodged, and no screen pulse stay.",
+      "before": "shots/dodge-r3-ours.jpg",
+      "after": "shots/dodge-r4-ours.jpg",
+      "ref": "ref/roll-0.jpg"
     },
     {
       "id": "brute",
-      "status": "queued",
-      "title": "Readability is colour memory, not geometry",
-      "rounds": 0
+      "take": "26",
+      "name": "Get out of the red",
+      "title": "The brute tell is geometry, not a shared hue",
+      "blurb": "Chase, plant, committed lunge, a long punish. A pie on the floor says where the hammer lands.",
+      "bar": "Heavy melee windup still",
+      "status": "parked",
+      "rounds": 4,
+      "verdict": "split",
+      "gap": "Authored windup mass: a body that can break the stone. Four looks — one pick-win, three splits on painted giant vs keep-out pie. Same family as the warden. Re-enter behind painted brute frames. The pie, charge, bead, and cracks stay.",
+      "before": "shots/brute-w2r6-ours.jpg",
+      "after": "shots/brute-w2r9-ours.jpg",
+      "ref": "ref/tell-0.jpg"
     },
     {
       "id": "caster",
-      "status": "queued",
-      "title": "Bolt-cutting is the best idea in the combat and the least rewarded",
-      "rounds": 0
+      "take": "27",
+      "name": "Cross the line or cut the bolt",
+      "title": "A searching aim that hardens, a bolt you can cut",
+      "blurb": "Range, a dotted line that locks, one cuttable bolt. The sentence has to read before the shot leaves.",
+      "bar": "Sniper lock-line still",
+      "status": "parked",
+      "rounds": 4,
+      "verdict": "split",
+      "gap": "Authored staff and a fat sight that owns the floor. Four looks: pick-win, split, loss, split. Thick reads as a hit; thin reads as overlay. Re-enter behind painted caster frames. Solid lock, stop-on-body, brighter sight, staff scale, detached bolt stay.",
+      "before": "shots/caster-w2r7-ours.jpg",
+      "after": "shots/caster-w2r10-ours.jpg",
+      "ref": "ref/aim-0.jpg"
     },
     {
       "id": "charger",
-      "status": "queued",
-      "title": "Red tell lasts ~147ms; four chargers read as four identical blinks",
-      "rounds": 0
+      "take": "28",
+      "name": "Count the tremble",
+      "title": "A freeze, a lane, a dash you can step off",
+      "blurb": "Orbit, a planted tremble, one committed dash. Four chargers cannot read as four identical blinks.",
+      "bar": "Dash-lane telegraph still (not a density room)",
+      "status": "parked",
+      "rounds": 3,
+      "verdict": "theirs",
+      "gap": "Painted floor wound that grows out of the body. Rails, stain-quad, and tile fills all read as a pasted rectangle. Re-enter behind authored stone. Tile stain, grout, lock burst, dash wake stay.",
+      "before": "shots/charger-w2r6-ours.jpg",
+      "after": "shots/charger-w2r8-ours.jpg",
+      "ref": "ref/dash-0.jpg"
     },
     {
       "id": "combat-hud",
-      "status": "queued",
-      "title": "Banners desync from sim time; no gamepad glyphs",
-      "rounds": 0
+      "take": "30",
+      "name": "The fight chrome",
+      "title": "Hearts, wave, place name — the inhabited combat frame",
+      "blurb": "During a fight the corners tell you if you are dying and how many are left. The middle stays the fight.",
+      "bar": "Mid-fight pixel HUD (not a clean room)",
+      "status": "parked",
+      "rounds": 2,
+      "verdict": "theirs",
+      "gap": "Authored HUD stamps: hearts plus a blade that is ours. Two losses on Gungeon weapon-and-ammo chrome. We will not invent a gun. Empty outlines, LEFT N, mercy groove stay.",
+      "before": "shots/hud-w2r1-ours.jpg",
+      "after": "shots/hud-w2r2-ours.jpg",
+      "ref": "ref/hud-0.jpg"
     },
     {
       "id": "death-card",
-      "status": "queued",
-      "title": "'YOU DIED / press R' over an indigo death-realm, under a fighter-game announcer",
-      "rounds": 0
+      "take": "29",
+      "name": "Not yet reborn",
+      "title": "The run ends; a stele names the pull back",
+      "blurb": "You are already dead. Losing a run is being pulled back to the bardo, not a game over. The card is the threshold: a star-sky arch, a tally, a way back.",
+      "bar": "Gungeon run-end death page (not a hub room)",
+      "status": "parked",
+      "rounds": 3,
+      "verdict": "ours",
+      "gap": "Authored fallen pose and a carved stele. Two no-wow wins after a split; Graphics plaque over a standing heap. Fight chrome off, left stele, TAKEN BY, wine well, star-sky arch stay.",
+      "before": "shots/death-w2r4-ours.jpg",
+      "after": "shots/death-w2r6-ours.jpg",
+      "ref": "ref/death-0.jpg"
     },
     {
       "id": "audio-bed",
-      "status": "queued",
-      "title": "One master bus, no loop flag, ambience literally cannot play",
-      "rounds": 0
+      "take": "31",
+      "name": "The floor of sound",
+      "title": "A bed under the fight, buses that can grow",
+      "blurb": "The room has a drone. The fight has a second layer. Foley rides its own bus. No image can judge this.",
+      "bar": "Structure and levels, not a still",
+      "status": "parked",
+      "rounds": 2,
+      "verdict": "theirs",
+      "gap": "Authored combat stems and recorded swing takes. Two losses on player-commit lift in a stacked mix. Buses, bed, announcer-off, crowd, lead stay.",
+      "before": "shots/audio-w2r5-gates.png",
+      "after": "shots/audio-w2r6-gates.png",
+      "ref": null
     },
     {
       "id": "arena-first-look",
@@ -396,6 +713,66 @@
       "before": "shots/offering-r1-approach.png",
       "after": "shots/offering-r7-approach.png",
       "ref": "ref/gift-0.jpg"
+    },
+    {
+      "id": "boons",
+      "take": "19",
+      "name": "The blessing bites",
+      "title": "One modifier changes how the blade cuts",
+      "blurb": "A single blessing on the sword: longer reach, a wider hotter arc, a harder hit. The room plays differently. No card screen this piece.",
+      "bar": "Hades boon-modified attack",
+      "status": "parked",
+      "rounds": 3,
+      "verdict": "theirs",
+      "gap": "Authored layered cut: core, rim, afterimage, and debris through a body. Three rounds of a TypeScript smear lost or split; same family as The Threshold. Re-enter behind authored slash art.",
+      "before": "shots/boons-r1-vanilla.png",
+      "after": "shots/boons-r3-exhibit.png",
+      "ref": "ref/boon-0.jpg"
+    },
+    {
+      "id": "arm",
+      "take": "20",
+      "name": "The string is taut",
+      "title": "A second weapon: draw, loose, an arrow that hits past the blade",
+      "blurb": "The player controller is a weapon system. Scenario bow starts already armed. One press draws, looses a friendly arrow, hits at a range the sword cannot. No weapon-select UI.",
+      "bar": "Hades bow shot",
+      "status": "parked",
+      "rounds": 2,
+      "verdict": "theirs",
+      "gap": "Authored release: a lunging body, a glowing shot with mass, and light on the stone. Two rounds of a TypeScript fan lost; same family as the blessed smear. Re-enter behind authored bow and arrow art.",
+      "before": "shots/arm-r1-draw.png",
+      "after": "shots/arm-r2-loose.png",
+      "ref": "ref/arm-0.jpg"
+    },
+    {
+      "id": "warden",
+      "take": "21",
+      "name": "The first judge",
+      "title": "One boss: a plant, a radial slam, the veil breaks at half life",
+      "blurb": "The room has a judge. A long windup, a slam you can walk out of, a long punish. At half life the next slam throws a ring of bolts. Named bar. Scenario boss.",
+      "bar": "Hades named-boss windup",
+      "status": "parked",
+      "rounds": 2,
+      "verdict": "theirs",
+      "gap": "Authored windup: a body whose raised weapon and mass are the tell. Two rounds of a scaled hood and a floor ring lost on the same gap. Re-enter only behind painted boss frames.",
+      "before": "shots/warden-r1-windup.png",
+      "after": "shots/warden-r2-windup.png",
+      "ref": "ref/warden-0.jpg"
+    },
+    {
+      "id": "return",
+      "take": "22",
+      "name": "Not yet reborn",
+      "title": "Death pulls you back to The Bardo; a door starts the next attempt",
+      "blurb": "A run is one attempt. Dying is not a restart of the same fight. The card plays, you press R, you wake in a named quiet place with a door out.",
+      "bar": "House after death",
+      "status": "parked",
+      "rounds": 3,
+      "verdict": "theirs",
+      "gap": "Authored attempt gate and a death that leaves the fight (a body, not a form over a stance). Two still rounds lost on the same door-look as Two doors; sequence split with no wow. Re-enter only behind authored hub art.",
+      "before": "shots/return-r1-death.png",
+      "after": "shots/return-r2-hub.png",
+      "ref": "ref/return-0.jpg"
     }
   ]
 }

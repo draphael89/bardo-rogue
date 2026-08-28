@@ -1,8 +1,8 @@
-import { Container, Sprite } from 'pixi.js'
+import { Container, Sprite, Texture } from 'pixi.js'
 import type { Atlas } from '../atlas'
 
 // Kenney Tiny Dungeon indices (atlas.tile / atlas.white, 12 columns).
-export const SPRITE = { player: 96, brute: 109, caster: 84, charger: 122, dummy: 54 } as const
+export const SPRITE = { player: 96, brute: 109, caster: 84, charger: 122, dummy: 54, warden: 109 } as const
 export const WEAPON = { player: 106, brute: 118, caster: 129 } as const
 export const HALF_PI = Math.PI / 2
 
@@ -25,6 +25,12 @@ export class EntityView {
     layers.shadows.addChild(this.shadow)
   }
   setFlash(on: boolean) { this.body.texture = on ? this.whiteTex : this.normalTex }
+  // Authored bodies: replace both flash slots so a later setFlash(false) cannot restore Kenney.
+  bindBody(tex: Texture) {
+    this.normalTex = tex
+    this.whiteTex = tex
+    this.body.texture = tex
+  }
   setShadow(x: number, y: number, w: number, h: number, alpha = 0.35) {
     this.shadow.position.set(Math.round(x), Math.round(y)); this.shadow.scale.set(w / 64, h / 64); this.shadow.alpha = alpha
   }

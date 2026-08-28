@@ -8,6 +8,7 @@ import { updateBruteView } from './enemy-brute'
 import { updateCasterView } from './enemy-caster'
 import { updateChargerView } from './enemy-charger'
 import { updateDummyView } from './enemy-dummy'
+import { updateWardenView } from './enemy-warden'
 
 export function createEnemyView(atlas: Atlas, e: Enemy, layers: { entities: Container; shadows: Container }): EntityView {
   const w = e.kind === 'brute' ? WEAPON.brute : e.kind === 'caster' ? WEAPON.caster : null
@@ -34,6 +35,8 @@ export function updateEnemyView(v: EntityView, e: Enemy, world: World, alpha: nu
     case 'caster': updateCasterView(v, e, frame, pose); break
     case 'charger': updateChargerView(v, e, frame, pose); break
     case 'dummy': updateDummyView(v, e, frame, pose); break
+    case 'warden': updateWardenView(v, e, frame, pose); break
+    default: { const _n: never = e.kind; void _n }
   }
 
   let sx = pose.sx, sy = pose.sy, tint = pose.tint
@@ -46,7 +49,8 @@ export function updateEnemyView(v: EntityView, e: Enemy, world: World, alpha: nu
   b.rotation = rot
   b.tint = tint
   b.zIndex = feetY
-  v.setFlash(e.flash > 0)
-  v.setShadow(x, feetY - 1, 14 - hop * 0.5, 6 - hop * 0.2, 0.35 - hop * 0.02)
+  if (e.kind !== 'warden') v.setFlash(e.flash > 0 && e.kind !== 'dummy')
+  if (e.kind === 'warden') v.setShadow(x, feetY - 1, 32 - hop * 0.35, 11 - hop * 0.15, 0.48 - hop * 0.02)
+  else v.setShadow(x, feetY - 1, 14 - hop * 0.5, 6 - hop * 0.2, 0.35 - hop * 0.02)
   void world
 }

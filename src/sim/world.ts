@@ -28,6 +28,8 @@ export interface Player extends Body {
   footTick: number
   deathTick: number
   god: boolean
+  arm: number                 // ARM.blade | ARM.bow; 0 is stock so hashes stay put
+  dodgeRead: number           // 1 after this roll already announced a pass-through; 0 is stock
 }
 
 export interface Enemy extends Body {
@@ -44,9 +46,14 @@ export interface Enemy extends Body {
   cooldown: number
   dashTicks: number
   spawnTick: number
+  phase: number                 // 0 stock; bosses write 1+ so hashes stay put
 }
 
-export interface Projectile extends Body { id: number; active: boolean; life: number; angle: number }
+export interface Projectile extends Body {
+  id: number; active: boolean; life: number; angle: number
+  team: 0 | 1                 // 0 hostile (hurts the player), 1 friendly (hurts enemies)
+  damage: number
+}
 
 export interface SpawnEntry { kind: EnemyKind; x: number; y: number; ticksLeft: number }
 
@@ -82,6 +89,8 @@ export class World {
   roomIndex = 0
   roomName = 'THE THRESHOLD'
   boonBits = 0
+  returns = 0
+  attemptStart = 0
 
   constructor(seed: number, scenario: string) {
     this.seed = seed
@@ -125,7 +134,7 @@ export class World {
     return e
   }
 
-  fireProjectile(x: number, y: number, angle: number, speed: number, radius: number, life: number): Projectile | null {
+  fireProjectile(x: number, y: number, angle: number, speed: number, radius: number, life: number, team: 0 | 1 = 0, damage = 1): Projectile | null {
     const p = this.projectiles.find(p => !p.active)
     if (!p) { this.emit({ type: 'poolOverflow', pool: 'projectile', x, y, angle }); return null }
     p.id = this.nextProjectileId++
@@ -133,6 +142,8 @@ export class World {
     p.x = p.px = x; p.y = p.py = y
     p.vx = Math.cos(angle) * speed; p.vy = Math.sin(angle) * speed
     p.radius = radius; p.life = life; p.angle = angle
+    p.team = team
+    p.damage = damage
     return p
   }
 
@@ -150,6 +161,7 @@ export function makePlayer(x: number, y: number): Player {
     state: 'free', stateTick: 0, facing: 1, aimAngle: 0, moveAngle: 0,
     dodgeDirX: 1, dodgeDirY: 0, swingIndex: 0, swingAngle: 0, swingId: 0,
     attackBuffer: 0, dodgeBuffer: 0, iframes: 0, flash: 0, moveX: 0, moveY: 0, footTick: 0, deathTick: -1, god: false,
+    arm: 0, dodgeRead: 0,
   }
 }
 
@@ -158,9 +170,10 @@ export function makeEnemy(): Enemy {
     id: 0, active: false, kind: 'brute', x: 0, y: 0, px: 0, py: 0, vx: 0, vy: 0, kbx: 0, kby: 0, radius: 6,
     hp: 1, maxHp: 1, state: 'idle', stateTick: 0, facing: 1, aimAngle: 0, targetX: 0, targetY: 0,
     lastHitSwingId: -1, flash: 0, hitDone: false, orbitAngle: 0, orbitDir: 1, hoverTicks: 0, cooldown: 0, dashTicks: 0, spawnTick: 0,
+    phase: 0,
   }
 }
 
 export function makeProjectile(): Projectile {
-  return { id: 0, active: false, x: 0, y: 0, px: 0, py: 0, vx: 0, vy: 0, kbx: 0, kby: 0, radius: 3, life: 0, angle: 0 }
+  return { id: 0, active: false, x: 0, y: 0, px: 0, py: 0, vx: 0, vy: 0, kbx: 0, kby: 0, radius: 3, life: 0, angle: 0, team: 0, damage: 1 }
 }

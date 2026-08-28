@@ -48,7 +48,7 @@ export const tuning = {
     attack: {
       buffer: 8,
       steerRateDeg: 9,      // max deg/tick the swing angle may still be steered, during steerTicks only
-      heavyChargeTicks: 5,  // startup ticks before the heavy's blade-glow telegraph lights up (presentation)
+      heavyChargeTicks: 2,  // startup ticks before the heavy's blade-glow telegraph lights up (presentation)
       swings: [
         { startup: 5, active: 4, recovery: 13, damage: 2, radius: 25, arcDeg: 130, lunge: 13, windup: 2, hitstop: 3, knockback: 90, chainFrom: 2, dodgeCancelFrom: 1, whiffPenalty: 7, moveCommit: 0.45, moveRecover: 0.7, steerTicks: 3, sweep: 1, heavy: false },
         { startup: 5, active: 4, recovery: 13, damage: 2, radius: 25, arcDeg: 150, lunge: 15, windup: 2, hitstop: 3, knockback: 95, chainFrom: 2, dodgeCancelFrom: 1, whiffPenalty: 7, moveCommit: 0.45, moveRecover: 0.7, steerTicks: 3, sweep: -1, heavy: false },
@@ -57,6 +57,23 @@ export const tuning = {
     },
     aimAssistDeg: 20,
     deathSlowmoTicks: 30, deathSlowmo: 0.25,
+  },
+
+  // One committed draw → loose. Attack is still edge-triggered; no hold-to-charge this piece.
+  bow: {
+    draw: 10,
+    recover: 14,
+    dodgeCancelFrom: 3,
+    steerTicks: 8,
+    muzzle: 10,
+    speed: 260,
+    radius: 3,
+    life: 72,
+    damage: 2,
+    knockback: 50,
+    hitstop: 2,
+    moveDraw: 0.2,
+    moveRecover: 0.55,
   },
 
   hitstop: { killBonus: 2, max: 12, boltCut: 3 },
@@ -89,6 +106,18 @@ export const tuning = {
     freezeTicks: 16, dashSpeed: 160, dashDist: 80, recovery: 30, damage: 1, staggerTicks: 8, knockbackScale: 1.2,
     hoverMinTicks: 40, hoverMaxTicks: 90,
   },
+  // First judge. A long plant, a radial slam you can walk out of, a long punish. At half life the
+  // veil breaks and the slam throws a ring of bolts. Poise: lights bounce; heavies stagger only
+  // while he is not committed.
+  warden: {
+    hp: 24, radius: 10, speed: 28, orbitMin: 52, orbitMax: 76, orbitSpeed: 0.9,
+    windup: 36, windup2: 24, commitLead: 8,
+    slamRadius: 42, slamTicks: 4, slamDamage: 2,
+    recover: 48, recover2: 32, cooldown: 18,
+    staggerTicks: 10, knockbackScale: 0.22,
+    boltCount: 8, boltSpeed: 96, boltRadius: 3, boltLife: 84, boltDamage: 1, boltDelay: 6,
+    idleTicks: 20,
+  },
 
   juice: {
     shakeMax: 4, shakeRotMaxDeg: 0.5, shakeDecay: 1.6,
@@ -108,6 +137,11 @@ export const tuning = {
       lightZoom: 1.018,                     // punch-in on a light hit (the heavy uses zoom.heavyHit)
       lightFlash: 0.11, heavyFlash: 0.20, flashTint: 0xfff0d0,
       recoil: 2.2, recoilDecay: 12,         // px the player's own body jolts back, and its decay rate
+      bodyKick: 3.2,                        // px the struck body is shoved along the blow during the freeze
+      bodyLean: 0.22,                       // rad the struck silhouette tips away from the blade
+      redFlash: 3,                          // ticks the struck body wears wine
+      blessedRedFlash: 8,
+      blessedHitFlashSec: 0.08,
       heavySparks: 16,
       // The contact stamp. Two authored shapes, no soft sprites: a crescent of whole pixels UNDER both
       // fighters (so neither silhouette is ever touched) and a chromatic spark cluster ON the wound.
@@ -122,10 +156,16 @@ export const tuning = {
         rim: 0x120d18,           // 1px dark contrast rim: without it pale steel dies on a pale floor
         steel: 0xbfd0ea,
         core: 0xfff8ec,          // hot leading half, tier 0 only
-        sparks: 5, heavySparks: 8,
-        sparkSpreadDeg: 46, sparkStepPx: 4,
+        sparks: 6, heavySparks: 9,
+        sparkSpreadDeg: 52, sparkStepPx: 3,
         sparkHot: 0xffeeb0, spark: 0xffa832,
-        drops: 3, heavyDrops: 5, blood: 0xb62a26,   // the wound itself, thrown past the target
+        drops: 5, heavyDrops: 7, blood: 0xb62a26,
+        // the wound: a short red cut ON the body plus shards thrown through it. The crescent stays
+        // under the fighters; this is the sentence that says meat, not a swipe.
+        woundLen: 7, heavyWoundLen: 13,
+        woundThick: 2, heavyWoundThick: 4,
+        shards: 5, heavyShards: 7, shardLen: 5,
+        poolW: 7, poolH: 3,
       },
     },
     // A successful i-frame dodge-through is the hardest input in the game. It is the only cold-coloured
@@ -141,8 +181,8 @@ export const tuning = {
       r0: 7, rStep: 5,          // the open ring's radius per tier. It expands and thins; it never fills.
       ringDark: 0x121a2c,       // the dark stroke that lets a cold ring read on a lit floor
       ringCore: 0xdff2ff, ringMid: 0x8fc4e8, ringFar: 0x486d94,
-      smearBack: 17, smearFront: 8, smearThick: 3,   // the bar along the roll axis: which way the read went
-      sparks: 6, sparkR: 12, sparkLen: 4,            // hard cold ticks on the floor, thrown clear of both bodies
+      smearBack: 6, smearFront: 3, smearThick: 2,    // a short heading tick, not a bar that eats the body
+      sparks: 4, sparkR: 10, sparkLen: 3,            // hard cold ticks on the floor, thrown clear of both bodies
       rim: 0xffffff,            // ONE tick of full brightness on the player's silhouette...
       rimTint: 0xa8dcff,        // ...then the cold tone, for the two ticks the mark takes to die
       rimTicks: 3,
@@ -153,11 +193,11 @@ export const tuning = {
       // The smear is an authored whole-pixel streak on the floor, like the contact crescent, not a
       // stack of ghost sprites: at 16 px a ghost of the body reads as a second body. Its hot core
       // burns only while the i-frames are live, so the frame you become touchable again is visible.
-      streakLen: 18,          // px of smear kept behind the body
+      streakLen: 8,           // px of smear kept behind the body — long enough to read speed, short enough the tuck still shows
       streakCore: 0x9a8ad8, streakRim: 0x241a38,
-      streakAlpha: 0.78, streakFadeTicks: 3,
+      streakAlpha: 0.48, streakFadeTicks: 3,
       lean: 1.8,              // px the camera drifts along the roll while the body is committed
-      landTrauma: 0.05, landDust: 5, launchDust: 6,
+      landTrauma: 0.05, landDust: 7, launchDust: 8,
       // The roll's own animation table. Each row owns dodge-state ticks from `tick` up to the next
       // row: an authored 16 px pose (drawn in src/render/views/player.ts, not a transform of the
       // standing sprite), how far that pose leans into the travel, and how close to the floor it
@@ -166,13 +206,13 @@ export const tuning = {
       // the body actually turning over, the extend into the brake, the plant, and the rise.
       pose: [
         { tick: 0, key: 'launch', leanDeg: 9, hop: 0 },
-        { tick: 1, key: 'dive', leanDeg: 17, hop: 1 },
-        { tick: 2, key: 'tuckA', leanDeg: 6, hop: -1 },
-        { tick: 5, key: 'tuckB', leanDeg: -7, hop: -1 },
-        { tick: 8, key: 'extend', leanDeg: 10, hop: 0 },
-        { tick: 11, key: 'plant', leanDeg: 4, hop: 0 },
-        { tick: 14, key: 'absorb', leanDeg: 2, hop: 0 },
-        { tick: 17, key: 'rise', leanDeg: 1, hop: 0 },
+        { tick: 1, key: 'dive', leanDeg: 22, hop: 1 },   // hold the flat dive through the beam
+        { tick: 6, key: 'tuckA', leanDeg: 6, hop: -1 },  // curl only after the column is cleared
+        { tick: 8, key: 'tuckB', leanDeg: -7, hop: -1 },
+        { tick: 10, key: 'extend', leanDeg: 10, hop: 0 },
+        { tick: 12, key: 'plant', leanDeg: 4, hop: 0 },
+        { tick: 15, key: 'absorb', leanDeg: 2, hop: 0 },
+        { tick: 18, key: 'rise', leanDeg: 1, hop: 0 },
         { tick: 21, key: '', leanDeg: 0, hop: 0 },
       ] as { tick: number; key: string; leanDeg: number; hop: number }[],
     },
@@ -180,19 +220,29 @@ export const tuning = {
     stagger: { trauma: 0.10, bruteTrauma: 0.26, bruteZoom: 1.02, bruteFlash: 0.10 },
     // the greatsword's own feedback chain: the wind-up pulls the camera back, contact shoves it through
     swing: {
-      heavyWindTrauma: 0.12, heavyWindKick: 1.7,   // camera drifts opposite the swing while the blade is up
-      heavyEmberRate: 110,                          // embers/s drawn into the blade during the heavy wind-up
-      heavyPlantDust: 7,                           // dust puffed at the feet when the heavy plants
+      heavyWindTrauma: 0.16, heavyWindKick: 2.4,   // camera drifts opposite the swing while the blade is up
+      heavyEmberRate: 160,                          // embers/s drawn into the blade during the heavy wind-up
+      heavyPlantDust: 11,                          // dust puffed at the feet when the heavy plants
       waveParticles: 12,                           // ground wave thrown along a heavy contact
+    },
+    bow: {
+      looseKick: 1.8,
+      looseRecoil: 2.6,
+      drawLean: 1.4,
+    },
+    warden: {
+      slamTrauma: 0.44, slamKick: 3.4, slamZoom: 1.045, slamFlash: 0.20, slamDust: 12,
+      phaseTrauma: 0.38, phaseZoom: 1.055, phaseFlash: 0.30,
     },
     // the crescent: build on it, do not replace it
     arc: {
-      lightThick: 6, heavyThick: 12,
-      spanLight: 100, spanHeavy: 125,   // degrees of smear kept behind the leading edge
-      lightAlpha: 0.70, heavyAlpha: 0.90,
+      lightThick: 6, heavyThick: 15,
+      spanLight: 90, spanHeavy: 105,   // degrees of smear kept behind the leading edge
+      lightAlpha: 0.76, heavyAlpha: 1,
       lightFade: 5, heavyFade: 6,
-      ghostAlpha: 0.30,      // warm inner glow the greatsword adds under its crescent
-      rimColor: 0x150f1e, rimAlpha: 0.55,   // dark rim behind the crescent, so steel reads on any floor
+      ghostAlpha: 0.48,      // warm inner glow the greatsword adds under its crescent
+      rimColor: 0x150f1e, rimAlpha: 0.62,   // dark rim behind the crescent, so steel reads on any floor
+      hole: 13,              // px left clear around the fighter so body and hilt occupy the frame
     },
     damageNumbers: false,
     light: {

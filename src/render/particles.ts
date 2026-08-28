@@ -96,6 +96,10 @@ export class Particles {
     this.spawn(this.atlas.particle('circle_01'), x + fxRng.particles.signed(2), y + fxRng.particles.signed(2), { maxLife: 0.25, scale0: 5, scale1: 1, tint: 0xb060ff, blend: 'add', alpha0: 0.7, alpha1: 0 })
   }
 
+  arrowTrail(x: number, y: number) {
+    this.spawn(this.atlas.particle('circle_01'), x + fxRng.particles.signed(1), y + fxRng.particles.signed(1), { maxLife: 0.16, scale0: 3, scale1: 1, tint: 0xc49058, alpha0: 0.45, alpha1: 0 })
+  }
+
   // Embers dragged in toward the blade while the greatsword is up. Nothing else in the game moves
   // inward, so the pull alone reads as the swing gathering.
   ember(x: number, y: number) {
@@ -219,6 +223,23 @@ export class Particles {
       const sc = fxRng.particles.range(12, 24) / 32
       this.stamp.scale.set(sc)
       this.stamp.position.set(x + 32 + Math.cos(angle) * d + fxRng.particles.signed(6), y + 15 + 4 + Math.sin(angle) * d * 0.6 + fxRng.particles.signed(4))
+      this.renderer.render({ container: this.decalContainer, target: this.decalRt, clear: false })
+    }
+  }
+
+  // A light hit's floor wound: two small directional stamps along the blow, under the feet. The
+  // kill's blood() is larger and random; this has to read as the same event as the pixel cut.
+  wound(x: number, y: number, angle: number, tint: number) {
+    if (!this.renderer) return
+    for (let i = 0; i < 2; i++) {
+      const d = 3 + i * 5
+      this.stamp.texture = this.atlas.decal('splat' + String((i * 3) % 12).padStart(2, '0'))
+      this.stamp.tint = tint
+      this.stamp.alpha = i === 0 ? 0.85 : 0.55
+      this.stamp.rotation = angle + (i === 0 ? 0.2 : -0.35)
+      const sc = (i === 0 ? 14 : 10) / 32
+      this.stamp.scale.set(sc, sc * 0.7)
+      this.stamp.position.set(x + 32 + Math.cos(angle) * d, y + 19 + Math.sin(angle) * d * 0.6)
       this.renderer.render({ container: this.decalContainer, target: this.decalRt, clear: false })
     }
   }

@@ -9,6 +9,9 @@ import { tuning } from '@/tuning'
 import { isPlayerInvulnerable } from '@/sim/combat'
 import { arcHits } from '@/sim/combat'
 import { grantBoon, hasBoon, swingReach } from '@/sim/boons'
+import { ARM, grantArm } from '@/sim/weapons'
+import { damageEnemy, hurtPlayer } from '@/sim/combat'
+import { HUB_ID } from '@/sim/rooms'
 
 function run(world: ReturnType<typeof createWorld>, ticks: number, bot = makeBot('idle'), metrics?: Metrics) {
   for (let i = 0; i < ticks; i++) {
@@ -63,6 +66,22 @@ describe('dodge', () => {
     for (let i = 0; i < 30; i++) { stepWorld(w, emptyInput()); if (w.events.some(e => e.type === 'playerHurt')) hurt = true; w.events.length = 0 }
     expect(hurt).toBe(false)
     expect(p.hp).toBe(tuning.player.hp)
+  })
+  it('announces a bolt-through once and keeps the bolt', () => {
+    const w = createWorld(1, 'empty')
+    const p = w.player
+    const bolt = w.fireProjectile(p.x + 16, p.y, Math.PI, 110, 3, 200)
+    expect(bolt).toBeTruthy()
+    stepWorld(w, { ...emptyInput(), dodge: true, moveX: 1 })
+    let reads = 0
+    for (let i = 0; i < 20; i++) {
+      stepWorld(w, emptyInput())
+      reads += w.events.filter(e => e.type === 'dodged').length
+      w.events.length = 0
+    }
+    expect(reads).toBe(1)
+    expect(p.hp).toBe(tuning.player.hp)
+    expect(bolt!.active).toBe(true)
   })
 })
 
@@ -372,5 +391,267 @@ describe('boons', () => {
     const close = swingAtGap(createWorld(1, 'empty'), 14)
     expect(close.hits).toBe(1)
     expect(close.dmg).toBe(tuning.player.attack.swings[0].damage)
+  })
+})
+
+describe('weapons', () => {
+  it('the dummy room stays on the blade; the bow room starts armed', () => {
+    const blade = createWorld(1, 'dummy')
+    const bow = createWorld(1, 'bow')
+    expect(blade.player.arm).toBe(ARM.blade)
+    expect(bow.player.arm).toBe(ARM.bow)
+    expect(hashWorld(blade)).not.toBe(hashWorld(bow))
+  })
+
+  it('the blade still hits close', () => {
+    const close = swingAtGap(createWorld(1, 'empty'), 14)
+    expect(close.hits).toBe(1)
+    expect(close.dmg).toBe(tuning.player.attack.swings[0].damage)
+  })
+
+  it('the bow does not melee-hit during the draw', () => {
+    const w = createWorld(1, 'empty')
+    grantArm(w, 'bow')
+    const dummy = w.spawnEnemy('dummy', w.player.x + 14, w.player.y)!
+    const hp0 = dummy.hp
+    let hits = 0
+    let swings = 0
+    let draws = 0
+    for (let i = 0; i < tuning.bow.draw; i++) {
+      stepWorld(w, { ...emptyInput(), attack: i === 0, aimX: 1, aimY: 0 })
+      hits += w.events.filter(e => e.type === 'hit').length
+      swings += w.events.filter(e => e.type === 'swing').length
+      draws += w.events.filter(e => e.type === 'draw').length
+      w.events.length = 0
+    }
+    expect(hits).toBe(0)
+    expect(swings).toBe(0)
+    expect(draws).toBe(1)
+    expect(dummy.hp).toBe(hp0)
+  })
+
+  it('the bow looses an arrow that hits past the blade', () => {
+    const miss = swingAtGap(createWorld(1, 'empty'), 80)
+    expect(miss.hits).toBe(0)
+    const w = createWorld(1, 'empty')
+    grantArm(w, 'bow')
+    // north of the start is open floor; east dies in the bell
+    const dummy = w.spawnEnemy('dummy', w.player.x, w.player.y - 80)!
+    const hp0 = dummy.hp
+    let loosed = 0
+    let hits = 0
+    for (let i = 0; i < 80; i++) {
+      stepWorld(w, { ...emptyInput(), attack: i === 0, aimX: 0, aimY: -1 })
+      loosed += w.events.filter(e => e.type === 'arrowLoose').length
+      hits += w.events.filter(e => e.type === 'hit').length
+      w.events.length = 0
+    }
+    expect(loosed).toBe(1)
+    expect(hits).toBe(1)
+    expect(hp0 - dummy.hp).toBe(tuning.bow.damage)
+  })
+
+  it('a friendly arrow does not hurt the player', () => {
+    const w = createWorld(1, 'empty')
+    const p = w.player
+    const hp0 = p.hp
+    w.fireProjectile(p.x + 24, p.y, Math.PI, 200, 3, 80, 1, 2)
+    let hurt = false
+    for (let i = 0; i < 30; i++) {
+      stepWorld(w, emptyInput())
+      if (w.events.some(e => e.type === 'playerHurt')) hurt = true
+      w.events.length = 0
+    }
+    expect(hurt).toBe(false)
+    expect(p.hp).toBe(hp0)
+  })
+
+  it('an unarmed empty room hashes like an unarmed empty room', () => {
+    const a = createWorld(1, 'empty'), b = createWorld(1, 'empty')
+    for (let i = 0; i < 60; i++) { stepWorld(a, emptyInput()); stepWorld(b, emptyInput()) }
+    expect(hashWorld(a)).toBe(hashWorld(b))
+    expect(a.player.arm).toBe(0)
+  })
+})
+
+function plantWarden(w: ReturnType<typeof createWorld>, dy: number) {
+  const e = w.spawnEnemy('warden', w.player.x, w.player.y + dy)!
+  e.state = 'windup'
+  e.stateTick = 0
+  return e
+}
+
+function stepUntil(w: ReturnType<typeof createWorld>, pred: () => boolean, max = 200): boolean {
+  for (let i = 0; i < max; i++) {
+    if (pred()) return true
+    stepWorld(w, emptyInput())
+  }
+  return pred()
+}
+
+describe('warden', () => {
+  it('the boss room births one warden; stock rooms do not', () => {
+    const empty = createWorld(1, 'empty')
+    for (let i = 0; i < 90; i++) stepWorld(empty, emptyInput())
+    expect(empty.enemies.some(e => e.active && e.kind === 'warden')).toBe(false)
+
+    const boss = createWorld(1, 'boss')
+    expect(stepUntil(boss, () => boss.enemies.some(e => e.active && e.kind === 'warden'), 120)).toBe(true)
+    expect(boss.enemies.filter(e => e.active && e.kind === 'warden')).toHaveLength(1)
+  })
+
+  it('a slam in range hurts; a slam outside does not', () => {
+    const hit = createWorld(1, 'empty')
+    plantWarden(hit, -20)
+    let hurt = 0
+    const windup = tuning.warden.windup + tuning.warden.slamTicks + 2
+    for (let i = 0; i < windup; i++) {
+      stepWorld(hit, emptyInput())
+      hurt += hit.events.filter(e => e.type === 'playerHurt').length
+      hit.events.length = 0
+    }
+    expect(hurt).toBe(1)
+    expect(hit.player.hp).toBe(tuning.player.hp - tuning.warden.slamDamage)
+
+    const miss = createWorld(1, 'empty')
+    plantWarden(miss, -80)
+    let missHurt = 0
+    for (let i = 0; i < windup; i++) {
+      stepWorld(miss, emptyInput())
+      missHurt += miss.events.filter(e => e.type === 'playerHurt').length
+      miss.events.length = 0
+    }
+    expect(missHurt).toBe(0)
+    expect(miss.player.hp).toBe(tuning.player.hp)
+  })
+
+  it('half life breaks the veil and the next slam throws a ring', () => {
+    const w = createWorld(1, 'empty')
+    const e = plantWarden(w, -80)
+    e.hp = Math.floor(e.maxHp / 2)
+    stepWorld(w, emptyInput())
+    expect(e.phase).toBe(1)
+    expect(w.events.some(ev => ev.type === 'enemyPhase' && ev.phase === 1)).toBe(true)
+    w.events.length = 0
+
+    e.state = 'attack'
+    e.stateTick = 0
+    e.hitDone = true
+    e.dashTicks = 0
+    let bolts = 0
+    for (let i = 0; i < tuning.warden.slamTicks + tuning.warden.boltDelay + 2; i++) {
+      stepWorld(w, emptyInput())
+      bolts += w.events.filter(ev => ev.type === 'boltFired').length
+      w.events.length = 0
+    }
+    expect(bolts).toBe(tuning.warden.boltCount)
+    expect(w.projectiles.filter(b => b.active && b.team === 0).length).toBe(tuning.warden.boltCount)
+  })
+
+  it('a light hit does not stagger; a heavy in recover does; a heavy in windup does not', () => {
+    const w = createWorld(1, 'empty')
+    const e = plantWarden(w, -80)
+    e.state = 'recover'
+    damageEnemy(w, e, 1, 0, 10, false, 0)
+    expect(e.state).toBe('recover')
+
+    damageEnemy(w, e, 1, 0, 10, true, 0)
+    expect(e.state).toBe('stagger')
+
+    e.state = 'windup'
+    e.stateTick = 8
+    damageEnemy(w, e, 1, 0, 10, true, 0)
+    expect(e.state).toBe('windup')
+  })
+
+  it('same seed + idle is deterministic', () => {
+    const a = createWorld(3, 'boss'), b = createWorld(3, 'boss')
+    for (let i = 0; i < 240; i++) { stepWorld(a, emptyInput()); stepWorld(b, emptyInput()) }
+    expect(hashWorld(a)).toBe(hashWorld(b))
+  })
+})
+
+function killPlayer(w: ReturnType<typeof createWorld>): void {
+  w.player.god = false
+  w.player.iframes = 0
+  w.player.hp = 1
+  hurtPlayer(w, 0, 99)
+}
+
+describe('return', () => {
+  it('death then R in a run wakes in the bardo, alive, no enemies, door open', () => {
+    const w = createWorld(1, 'run')
+    expect(w.rooms.some(r => r.id === HUB_ID)).toBe(true)
+    expect(w.roomName).toBe('THE THRESHOLD')
+    killPlayer(w)
+    expect(w.player.state).toBe('dead')
+    w.events.length = 0
+    stepWorld(w, { ...emptyInput(), restart: true })
+    expect(w.wantsRestart).toBe(false)
+    expect(w.player.state).toBe('free')
+    expect(w.player.hp).toBe(w.player.maxHp)
+    expect(w.player.maxHp).toBe(tuning.player.hp)
+    expect(w.rooms[w.roomIndex]?.id).toBe(HUB_ID)
+    expect(w.roomName).toBe('THE BARDO')
+    expect(w.doorOpen).toBe(true)
+    expect(w.aliveEnemies()).toBe(0)
+    expect(w.returns).toBe(1)
+    expect(w.events.some(e => e.type === 'returned' && e.name === 'THE BARDO')).toBe(true)
+    expect(w.events.some(e => e.type === 'roomEnter')).toBe(false)
+  })
+
+  it('walking north from the bardo starts the first fight again', () => {
+    const w = createWorld(1, 'run')
+    killPlayer(w)
+    stepWorld(w, { ...emptyInput(), restart: true })
+    expect(w.rooms[w.roomIndex]?.id).toBe(HUB_ID)
+    let entered = false
+    for (let i = 0; i < 400 && w.rooms[w.roomIndex]?.id === HUB_ID; i++) {
+      stepWorld(w, { ...emptyInput(), moveY: -1, aimY: -1 })
+      if (w.events.some(e => e.type === 'roomEnter' && e.name === 'THE THRESHOLD')) entered = true
+      w.events.length = 0
+    }
+    expect(entered).toBe(true)
+    expect(w.roomName).toBe('THE THRESHOLD')
+    expect(w.doorOpen).toBe(false)
+    expect(w.wave.state).toBe('pending')
+    expect(w.player.state).toBe('free')
+  })
+
+  it('the loop starts in the bardo; empty death then R still asks for a full restart', () => {
+    const loop = createWorld(1, 'loop')
+    expect(loop.rooms[0]?.id).toBe(HUB_ID)
+    expect(loop.roomName).toBe('THE BARDO')
+    expect(loop.doorOpen).toBe(true)
+    expect(loop.aliveEnemies()).toBe(0)
+    expect(loop.player.state).toBe('free')
+
+    const empty = createWorld(1, 'empty')
+    killPlayer(empty)
+    stepWorld(empty, { ...emptyInput(), restart: true })
+    expect(empty.wantsRestart).toBe(true)
+    expect(empty.player.state).toBe('dead')
+    expect(empty.roomName).toBe('THE THRESHOLD')
+    expect(empty.returns).toBe(0)
+  })
+
+  it('R while alive still asks for a full restart', () => {
+    const w = createWorld(1, 'run')
+    stepWorld(w, { ...emptyInput(), restart: true })
+    expect(w.wantsRestart).toBe(true)
+    expect(w.roomName).toBe('THE THRESHOLD')
+    expect(w.returns).toBe(0)
+  })
+
+  it('same seed + death + R is deterministic', () => {
+    const play = (w: ReturnType<typeof createWorld>) => {
+      killPlayer(w)
+      stepWorld(w, { ...emptyInput(), restart: true })
+      for (let i = 0; i < 30; i++) stepWorld(w, emptyInput())
+    }
+    const a = createWorld(3, 'run'), b = createWorld(3, 'run')
+    play(a); play(b)
+    expect(a.roomName).toBe('THE BARDO')
+    expect(hashWorld(a)).toBe(hashWorld(b))
   })
 })

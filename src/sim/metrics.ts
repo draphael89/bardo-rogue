@@ -7,7 +7,7 @@ export class Metrics {
   dodges = 0; successfulDodges = 0
   boltsFired = 0; boltsCut = 0
   enemyAttacks = 0; damageTaken = 0; deaths = 0
-  wavesCleared = 0; clearTick = -1; deathTick = -1
+  wavesCleared = 0; clearTick = -1; deathTick = -1; returns = 0
   private swingHit = new Map<number, boolean>()
   private lastSwingId = 0
 
@@ -21,12 +21,14 @@ export class Metrics {
         case 'dodge': this.dodges++; break
         case 'dodged': this.successfulDodges++; break
         case 'boltFired': this.boltsFired++; break
+        case 'arrowLoose': this.boltsFired++; break
         case 'boltCut': this.boltsCut++; break
         case 'enemyAttack': this.enemyAttacks++; break
         case 'playerHurt': this.damageTaken++; break
         case 'playerDeath': this.deaths++; this.deathTick = world.tick; break
         case 'waveClear': this.wavesCleared++; break
         case 'roomClear': this.clearTick = world.tick; break
+        case 'returned': this.returns++; break
       }
     }
   }
@@ -40,7 +42,7 @@ export class Metrics {
       dodges: this.dodges, successfulDodges: this.successfulDodges,
       boltsFired: this.boltsFired, boltsCut: this.boltsCut,
       enemyAttacks: this.enemyAttacks, damageTaken: this.damageTaken, deaths: this.deaths,
-      wavesCleared: this.wavesCleared,
+      wavesCleared: this.wavesCleared, returns: this.returns,
       clearSeconds: this.clearTick >= 0 ? +(this.clearTick / 60).toFixed(1) : null,
       deathSeconds: this.deathTick >= 0 ? +(this.deathTick / 60).toFixed(1) : null,
     }

@@ -30,7 +30,8 @@ deaths, wavesCleared, clearSeconds, deathSeconds, avgTickUs, maxTickUs. A run st
 
 `http://localhost:5173/?scenario=wave2&seed=7&debug=1&mute=1&god=1&bot=kite`
 
-- `scenario`: `empty`, `dummy` (3 static targets), `blessed` (dummy room with the cleave blessing on), `brute-only`, `caster-only`, `charger-swarm`, `wave1`, `wave2`, `wave3`, `full` (default), `run` (Threshold fight → two marked doors → Crossing fight north, or The Far Shore east), `shore` (quiet gift room, a life vessel to walk into).
+- `scenario`: `empty`, `dummy` (3 static targets), `blessed` (dummy room with the cleave blessing on), `bow` (dummy room, already armed with the bow), `boss` (one warden: plant, radial slam, veil-break at half life), `brute-only`, `caster-only`, `charger-swarm`, `wave1`, `wave2`, `wave3`, `full` (default), `run` (Threshold fight → two marked doors → Crossing fight north, or The Far Shore east; death then R returns to The Bardo), `loop` (starts in The Bardo; the north door begins a run), `shore` (quiet gift room, a life vessel to walk into).
+- Death then R: scenarios whose room graph includes The Bardo (`run`, `loop`) revive in that hub — same world, not a rebuild. Every other scenario still sets `wantsRestart` and rebuilds the same fight.
 - `seed`: integer, default 1. Same seed + same inputs = same run.
 - `debug=1`: F1 overlay on. `mute=1`: no audio. `god=1`: player cannot take damage.
 - `bot=idle|naive-melee|kite`: a scripted player drives the sim instead of the keyboard.

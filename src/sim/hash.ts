@@ -8,7 +8,7 @@ const ENEMY_STATE: Record<EnemyState, number> = {
   idle: 0, chase: 1, windup: 2, attack: 3, recover: 4, stagger: 5, dead: 6,
   position: 7, aim: 8, hover: 9, freeze: 10, dash: 11,
 }
-const ENEMY_KIND: Record<EnemyKind, number> = { brute: 0, caster: 1, charger: 2, dummy: 3 }
+const ENEMY_KIND: Record<EnemyKind, number> = { brute: 0, caster: 1, charger: 2, dummy: 3, warden: 4 }
 const WAVE_STATE: Record<WaveState, number> = { idle: 0, pending: 1, active: 2, done: 3 }
 
 // FNV-1a over a canonical snapshot of everything the sim's outcome depends on.
@@ -25,6 +25,8 @@ export function hashWorld(world: World): number {
   int(world.swingCounter); int(world.nextEnemyId); int(world.nextProjectileId)
   int(world.roomClearTick); flag(world.doorOpen); flag(world.wantsRestart)
   if (world.boonBits) int(world.boonBits)
+  if (world.returns) int(world.returns)
+  if (world.roomIndex) int(world.roomIndex)
   int(world.rng.state)
 
   const p = world.player
@@ -35,6 +37,7 @@ export function hashWorld(world: World): number {
   int(p.swingIndex); num(p.swingAngle); int(p.swingId)
   int(p.attackBuffer); int(p.dodgeBuffer); int(p.iframes); num(p.flash)
   num(p.moveX); num(p.moveY); int(p.footTick); int(p.deathTick); flag(p.god)
+  if (p.arm) byte(p.arm)
 
   let active = 0
   for (const e of world.enemies) if (e.active) active++
@@ -47,6 +50,7 @@ export function hashWorld(world: World): number {
     num(e.aimAngle); num(e.targetX); num(e.targetY)
     int(e.lastHitSwingId); num(e.flash); flag(e.hitDone)
     num(e.orbitAngle); int(e.orbitDir); int(e.hoverTicks); int(e.cooldown); int(e.dashTicks); int(e.spawnTick)
+    if (e.phase) byte(e.phase)
   }
 
   let bolts = 0
@@ -56,6 +60,7 @@ export function hashWorld(world: World): number {
     if (!b.active) continue
     int(b.id); num(b.x); num(b.y); num(b.px); num(b.py); num(b.vx); num(b.vy)
     num(b.radius); int(b.life); num(b.angle)
+    if (b.team) { byte(b.team); int(b.damage) }
   }
 
   const w = world.wave

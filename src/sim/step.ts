@@ -6,13 +6,17 @@ import { updateProjectiles } from './projectiles'
 import { updateSpawnQueue, updateWaves } from './waves'
 import { tryEnterDoor } from './rooms'
 import { tryCollectOffering } from './offering'
+import { canReturn, returnToHub } from './return'
 import { separate } from './collision'
 import { isPlayerInvulnerable } from './combat'
 
 // One deterministic tick. Presentation must never call anything else on the sim.
 export function stepWorld(world: World, input: InputFrame): void {
   world.tick++
-  if (input.restart) world.wantsRestart = true
+  if (input.restart) {
+    if (canReturn(world)) returnToHub(world)
+    else world.wantsRestart = true
+  }
 
   // snapshot previous positions for render interpolation
   const p = world.player

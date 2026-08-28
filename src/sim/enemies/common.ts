@@ -37,6 +37,14 @@ export function facePlayer(world: World, e: Enemy): void {
   e.facing = world.player.x >= e.x ? 1 : -1
 }
 
+// Full circle around the enemy. Returns true when the player was in range (damage or i-frames).
+export function enemyRadialAttack(world: World, e: Enemy, radius: number, damage: number): boolean {
+  const p = world.player
+  if (Math.hypot(p.x - e.x, p.y - e.y) > radius + p.radius) return false
+  hurtPlayer(world, Math.atan2(p.y - e.y, p.x - e.x), damage)
+  return true
+}
+
 // Enemy melee arc against the player. Returns true when damage was applied (or absorbed by i-frames).
 export function enemyArcAttack(world: World, e: Enemy, radius: number, arcDeg: number, damage: number): boolean {
   const p = world.player

@@ -98,7 +98,6 @@ import { EntityView, type EnemyFrame, type Pose } from './shared'
 const LANE_START = 1
 const BEATS = 3          // rungs on the lane == trembles in the crouch
 const PRE_TICKS = 10     // hover ticks of "armed" gathering before the freeze
-const BAR_STEP = 2       // px between the 2x2 blocks of a perpendicular bar (solid at this step)
 const IGNITE_TICKS = 2.6 // how long the lock flash takes to fall back to the steady beam
 
 // The lane starts this far out from the charger's centre. The body is what carries "count the
@@ -110,9 +109,6 @@ const BODY_CLEAR = 6
 // the floor: the floor, and anything standing on it, has to survive underneath. At hw = 9 the mark
 // owns pixel 11 (outline), 9-10 (red body) and 8 (white core) on each side - 8 of 18 px - and the
 // middle 14 px carry nothing but a tint.
-const RAIL_BODY = 2      // px thickness of the red rail
-const RAIL_CORE = 1      // px thickness of the white-hot core just inside it
-
 // The dash. At 160 px/s the charger only clears 2.7 px a tick, so honest one-tick afterimages would
 // stack on top of each other and read as nothing: the ghosts are spaced by DISTANCE, not by frame,
 // and the wake is a drawn volume rather than a smear of past positions.
@@ -139,6 +135,7 @@ const WHITE = 0xffffff
 const SCORCH = 0x4a1208  // the ground the lane claims: at 0.34 over the room's blue-grey floor this
                          // lands warm, not neutral. 0x240e0a was so dark that the tint read as plain
                          // grey concrete once the alpha came down off the old opaque 0.86.
+const WOUND = 0x8a1c10   // locked tile stain: red enough to read as danger, not a shadow on blue stone
 const EDGE = 0x08040c    // near-black outline: holds the rail's edge over both the lit floor and the dark tile
 const GLOW_T = 0xff6a14   // spill while it is still tracking you
 const GLOW_L = 0xff2c12   // spill once it has committed
@@ -371,7 +368,6 @@ function capture(lane: Lane, e: Enemy, f: EnemyFrame): void {
 
 function drawTelegraph(lane: Lane, e: Enemy, f: EnemyFrame): void {
   const g = lane.gm, hg = lane.hot
-  const C = tuning.charger
   const LOCK = chargerLockTick()
   const tk = f.tk
   if (tk < LANE_START) { drawGather(lane, f); return }          // the aim is one tick stale here
@@ -379,132 +375,20 @@ function drawTelegraph(lane: Lane, e: Enemy, f: EnemyFrame): void {
   const hw = e.radius + tuning.player.radius                    // the true danger half-width
   const { ox, oy, ang, len } = lane
   const cx = Math.cos(ang), cy = Math.sin(ang)
-  const nx = -cy, ny = cx
   const { k, beat } = laneClock(tk, LOCK)
   const grow = clamp01(k / BEATS)
   const reach = locked ? len : Math.max(BODY_CLEAR + 6, grow * len)
   // every continuous stroke starts outside the body, so the crouch is never under paint
   const d0 = Math.min(BODY_CLEAR, reach - 2)
-  const bx = ox + cx * d0, by = oy + cy * d0
-  const run = reach - d0
   const strobe = locked ? (strobeFrame(f.time) ? 1 : 0.72) : 1
-  // the lock is a flash, not a colour change: two ticks of white-hot wash falling back to the beam
   const ignite = locked ? clamp01(1 - (tk - LOCK) / IGNITE_TICKS) ** 0.7 : 0
 
-  const bodyCol = locked ? mixTint(RED, RED_HOT, ignite * 0.6) : EMBER
-  const coreCol = locked ? WHITE : mixTint(EMBER_HOT, WHITE, 0.3)
-  const glowCol = locked ? GLOW_L : GLOW_T
+  // w2r7 still lost: a rotated stain quad is a pasted rectangle. The tell has to be the floor
+  // tiles themselves going bad — axis-aligned, grout-cut, no overlay sprite.
+  stainTiles(g, ox, oy, cx, cy, d0, reach, hw, locked ? WOUND : SCORCH, locked ? 0.50 * strobe : 0.10 + 0.16 * grow)
+  stainTiles(g, ox, oy, cx, cy, d0, d0 + 24, hw, WOUND, locked ? 0.18 : 0.05)
+  groutCuts(g, hg, ox, oy, cx, cy, d0, reach, hw, locked, strobe, k, beat)
 
-  // 1. GROUND. The scorch: a TINT, not a lid. It drops the floor the lane crosses so the rails have
-  //    dark to sit against, and it stops there - at 0.34 the carpet's own pattern, the mandala and
-  //    anything standing in the lane all still read straight through it. The old 0.86 turned the
-  //    lane into an opaque brown plank that erased the floor, the charger and the player at the one
-  //    tick the player has to read all three. It is exactly the danger width - no apron, no soft
-  //    skirt, because a translucent quad wider than the hitbox lies about the hitbox.
-  stroke(lane.apronIn, bx, by, nx, ny, 0, ang, run + 1, hw * 2 + 2, SCORCH, locked ? 0.34 : 0.09 + 0.09 * grow)
-
-  // 2. HEAT. The bloom, hugging each rail. A lane-wide additive field just washes the whole 18x80
-  //    rect into a pale slab with no structure; the light has to come from the edges.
-  for (const side of [1, -1]) {
-    stroke(side > 0 ? lane.glowL : lane.glowR, bx, by, nx, ny, side * (hw - 1), ang, run, 4 + ignite * 2, glowCol,
-      ((locked ? 0.30 : 0.13 + 0.08 * grow) + 0.14 * ignite) * strobe)
-  }
-  // and the ignition: two ticks in which the inside of the lane is lit, then it is a beam again
-  // and the ignition, plus a whisper of the same warmth held for the rest of the commit, so the
-  // inside of a committed lane is heat over the floor and not grey over the floor
-  stroke(lane.wash, bx, by, nx, ny, 0, ang, run, hw * 2 + 4, mixTint(glowCol, 0xffb070, 0.4), (locked ? 0.055 : 0) + 0.09 * ignite)
-
-  // 3. The beam, at the true danger edge: near-black outline (ground) / red body (heat) / white-hot
-  //    core (heat). The red says "committed", the white is what makes the telegraph the brightest
-  //    object in the frame instead of a shadow crossing the carpet. While it is still tracking you
-  //    the rail is a dashed ember line drawn in whole pixels - a solid stroke that early reads as a
-  //    built object, a crate lid lying on the floor, rather than as something about to happen.
-  if (locked) {
-    for (const side of [1, -1]) {
-      // Bands that do not overlap, so the red stays the dominant colour, and thin enough that the
-      // pair of them plus the outline claim 8 of the lane's 18 px: for hw = 9 the outline is pixel
-      // 11, the red body is 9-10 (straddling the true danger edge at 9), the white core is 8, and
-      // 0-7 is floor under a tint. Fat rails and a fat core are what turned the beam into a
-      // red-and-white slab with no game visible inside it.
-      stroke(side > 0 ? lane.railL : lane.railR, bx, by, nx, ny, side * (hw - 0.5), ang, run, RAIL_BODY, bodyCol, strobe)
-      stroke(side > 0 ? lane.coreL : lane.coreR, bx, by, nx, ny, side * (hw - 2), ang, run, RAIL_CORE, coreCol, 0.9 * strobe)
-    }
-  } else {
-    for (let d = d0; d <= reach; d += 3) railDot(hg, ox, oy, cx, cy, nx, ny, d, hw + 0.5, 2)
-    hg.fill({ color: bodyCol, alpha: 0.95 })
-    for (let d = d0; d <= reach; d += 3) railDot(hg, ox, oy, cx, cy, nx, ny, d, hw + 0.5, 1)
-    hg.fill({ color: coreCol, alpha: 0.35 + 0.35 * grow })     // one hot pixel in each dash, not a second line
-  }
-  // the outline sits one pixel outside the body, stepped whole-pixel so it keeps its edge
-  for (let d = d0; d <= reach; d += 1) railDot(g, ox, oy, cx, cy, nx, ny, d, hw + 2, 1)
-  g.fill({ color: EDGE, alpha: locked ? 0.95 : 0.85 })
-
-  // 4. a centre track of dashes running outward. A field of dots would read as decoration; dashes
-  //    that all point the same way can only read as travel.
-  const flow = (f.time * 40) % 7
-  for (let d = d0 + flow; d < reach - 1; d += 7) {
-    for (let q = 0; q < 3; q++) hg.rect(Math.round(ox + cx * (d + q)), Math.round(oy + cy * (d + q)), 1, 1)
-  }
-  hg.fill({ color: locked ? WHITE : EMBER_HOT, alpha: (locked ? 0.38 : 0.45) * strobe })
-
-  // 5. the lock runs one white FRONT down the lane, so the commit is a direction and not just a
-  //    colour. A front, not a wedge of 2x2 blocks: that filled the lane wall to wall for twenty
-  //    px at a time, which is a solid white bar sliding over the floor and over whoever is standing
-  //    on it. A chevron is the mark the beats are already made of, and it is two pixels thick.
-  if (locked) {
-    const flashD = (tk - LOCK + 0.5) * (len / Math.max(1, C.freezeTicks - LOCK))
-    if (flashD > d0 && flashD < len + 4) {
-      for (let i = 0; i < 2; i++) chevron(hg, ox, oy, cx, cy, nx, ny, flashD - i * 2, hw - 1, 0)
-      hg.fill({ color: WHITE, alpha: 0.85 })
-    }
-  }
-
-  // 6. gate bar at the edge of its silhouette: the lane leaves the charger, it does not float in
-  //    front of it, and it does not cross it either.
-  perpBar(g, ox + cx * d0, oy + cy * d0, nx, ny, hw - 1, 1)
-  g.fill({ color: EDGE, alpha: 0.55 })
-  perpBar(hg, ox + cx * d0, oy + cy * d0, nx, ny, hw - 1, 0)
-  hg.fill({ color: locked ? mixTint(RED_HOT, WHITE, 0.5) : EMBER_HOT, alpha: (locked ? 0.9 : 0.5) * strobe })
-
-  // 7. the beats. One CHEVRON lands on the lane per beat, pointing the way the charger will go, and
-  //    the body trembles on the same tick. Chevrons, not perpendicular rungs: three rungs across a
-  //    dark rectangle read as a ladder or a crate, three arrowheads read as travel and as a count.
-  for (let i = 0; i < BEATS; i++) {
-    if (k < i + 1) continue
-    chevron(g, ox, oy, cx, cy, nx, ny, len * (i + 1) / BEATS, hw - 2, 1)
-  }
-  g.fill({ color: EDGE, alpha: 0.7 })
-  for (let i = 0; i < BEATS; i++) {
-    if (k < i + 1) continue
-    chevron(hg, ox, oy, cx, cy, nx, ny, len * (i + 1) / BEATS, hw - 2, 0)
-  }
-  // Once it commits, the beats step back into the red: they have finished counting, and eight
-  // white chevrons in one lane (three beats, three in the arrowhead, two in the moving front)
-  // is a scribble in which the one mark that still means something - the front - is lost.
-  hg.fill(locked
-    ? { color: mixTint(RED_HOT, WHITE, 0.3), alpha: 0.5 * strobe }
-    : { color: mixTint(EMBER, EMBER_HOT, 0.45), alpha: 0.95 * strobe })
-
-  // 8. the landing itself: the chevron that just arrived flares for three ticks
-  for (let i = 0; i < BEATS; i++) {
-    const age = (k - (i + 1)) * beat
-    if (age < 0 || age >= 3) continue
-    const d = len * (i + 1) / BEATS
-    chevron(hg, ox, oy, cx, cy, nx, ny, d + 3, hw, 0)
-    hg.fill({ color: mixTint(EMBER_HOT, WHITE, 0.6), alpha: 0.8 * (1 - age / 3) })
-  }
-
-  // 9. the head between beats, or the white-hot arrowhead once the far end is committed
-  if (!locked) {
-    chevron(hg, ox, oy, cx, cy, nx, ny, reach, hw - 2, 0)
-    hg.fill({ color: EMBER_HOT, alpha: 0.85 })
-  } else {
-    drawTip(g, hg, ox, oy, cx, cy, len, WHITE, 0.98 * strobe)
-  }
-
-  // 10. and the lock itself is a light: an overexposed star at the charger's head, plus light
-  //     thrown across the floor as a ring of whole pixels - a ring has no rectangle edge, so the
-  //     spill never reads as a translucent quad pasted over the art.
   if (ignite > 0.02) burst(hg, ox + cx * (d0 + 2), oy + cy * (d0 + 2), 7 + ignite * 9, 0.62 * ignite ** 0.6, WHITE, cx, cy)
 }
 
@@ -549,14 +433,8 @@ function drawDash(lane: Lane, v: EntityView, e: Enemy, f: EnemyFrame): void {
   const fade = clamp01(1 - f.tk / FORWARD_TICKS)
   const left = len - dist
   if (fade > 0.02 && left > 2) {
-    stroke(lane.apronIn, hx, hy, nx, ny, 0, ang, left, hw * 2 + 2, SCORCH, 0.26 * fade)
-    for (const side of [1, -1]) {
-      stroke(side > 0 ? lane.glowL : lane.glowR, hx, hy, nx, ny, side * (hw - 1), ang, left, 4, GLOW_L, 0.28 * fade)
-      stroke(side > 0 ? lane.railL : lane.railR, hx, hy, nx, ny, side * (hw - 0.5), ang, left, RAIL_BODY, mixTint(RED, RED_HOT, blow * 0.6), 0.92 * fade)
-      stroke(side > 0 ? lane.coreL : lane.coreR, hx, hy, nx, ny, side * (hw - 2), ang, left, RAIL_CORE, WHITE, 0.8 * fade)
-    }
-    for (let d = dist; d <= len; d += 1) railDot(g, ox, oy, cx, cy, nx, ny, d, hw + 2, 1)
-    g.fill({ color: EDGE, alpha: 0.75 * fade })
+    stainTiles(g, ox, oy, cx, cy, dist, len, hw, SCORCH, 0.28 * fade)
+    groutCuts(g, hg, ox, oy, cx, cy, dist, len, hw, true, fade, BEATS, 1)
   }
 
   // 3b. and the point it left from keeps burning for nine ticks. Without it the first third of the
@@ -688,8 +566,68 @@ function drawResidue(lane: Lane, e: Enemy, f: EnemyFrame): void {
 
 // ---------------------------------------------------------------- primitives
 
-function perpBar(g: Graphics, px: number, py: number, nx: number, ny: number, hw: number, dy: number): void {
-  for (let s = -hw; s <= hw; s += BAR_STEP) g.rect(Math.round(px + nx * s), Math.round(py + ny * s + dy), 2, 2)
+function eachLaneTile(ox: number, oy: number, cx: number, cy: number, d0: number, reach: number, hw: number,
+                      visit: (tx: number, ty: number, along: number) => void): void {
+  if (reach <= d0) return
+  const pad = hw + TILE * 0.55
+  const x0 = Math.min(ox + cx * d0, ox + cx * reach) - pad
+  const x1 = Math.max(ox + cx * d0, ox + cx * reach) + pad
+  const y0 = Math.min(oy + cy * d0, oy + cy * reach) - pad
+  const y1 = Math.max(oy + cy * d0, oy + cy * reach) + pad
+  const tx0 = Math.floor(x0 / TILE), tx1 = Math.floor(x1 / TILE)
+  const ty0 = Math.floor(y0 / TILE), ty1 = Math.floor(y1 / TILE)
+  for (let ty = ty0; ty <= ty1; ty++) {
+    for (let tx = tx0; tx <= tx1; tx++) {
+      const mx = tx * TILE + TILE * 0.5
+      const my = ty * TILE + TILE * 0.5
+      const dx = mx - ox, dy = my - oy
+      if (dx * dx + dy * dy < (BODY_CLEAR + 4) * (BODY_CLEAR + 4)) continue
+      const along = dx * cx + dy * cy
+      if (along < d0 - 4 || along > reach + 6) continue
+      const across = Math.abs(dx * -cy + dy * cx)
+      if (across > hw + TILE * 0.45) continue
+      visit(tx, ty, along)
+    }
+  }
+}
+
+function stainTiles(g: Graphics, ox: number, oy: number, cx: number, cy: number,
+                    d0: number, reach: number, hw: number, color: number, alpha: number): void {
+  if (alpha <= 0.02) return
+  eachLaneTile(ox, oy, cx, cy, d0, reach, hw, (tx, ty) => {
+    g.rect(tx * TILE, ty * TILE, TILE, TILE)
+  })
+  g.fill({ color, alpha })
+}
+
+function groutCuts(g: Graphics, hg: Graphics, ox: number, oy: number, cx: number, cy: number,
+                   d0: number, reach: number, hw: number, locked: boolean, kAlpha: number,
+                   clock: number, beat: number): void {
+  eachLaneTile(ox, oy, cx, cy, d0, reach, hw, (tx, ty) => {
+    const x = tx * TILE, y = ty * TILE
+    if (Math.abs(cx) >= Math.abs(cy)) {
+      const gx = cx >= 0 ? x + TILE - 1 : x
+      for (let i = 0; i < TILE; i += 2) g.rect(gx, y + i, 1, 1)
+    } else {
+      const gy = cy >= 0 ? y + TILE - 1 : y
+      for (let i = 0; i < TILE; i += 2) g.rect(x + i, gy, 1, 1)
+    }
+  })
+  g.fill({ color: EDGE, alpha: (locked ? 0.72 : 0.4) * kAlpha })
+
+  for (let i = 0; i < BEATS; i++) {
+    if (clock < i + 1) continue
+    const d = d0 + (reach - d0) * (i + 1) / BEATS
+    const age = (clock - (i + 1)) * beat
+    const flare = age >= 0 && age < 3 ? 1 - age / 3 : 0.4
+    const px = Math.round(ox + cx * d), py = Math.round(oy + cy * d)
+    const gx = Math.abs(cx) >= Math.abs(cy) ? (cx >= 0 ? px + 4 : px - 4) : px
+    const gy = Math.abs(cx) >= Math.abs(cy) ? py : (cy >= 0 ? py + 4 : py - 4)
+    for (let s = -5; s <= 5; s += 2) {
+      hg.rect(gx + (Math.abs(cx) >= Math.abs(cy) ? 0 : s), gy + (Math.abs(cx) >= Math.abs(cy) ? s : 0), 1, 1)
+    }
+    hg.fill({ color: locked ? RED_HOT : EMBER, alpha: 0.7 * flare * kAlpha })
+  }
 }
 
 // One pixel pair on the two rails, at perpendicular offset s from the centre line.
@@ -708,16 +646,6 @@ function chevron(g: Graphics, ox: number, oy: number, cx: number, cy: number, nx
       g.rect(Math.round(ox + cx * back + nx * side * s), Math.round(oy + cy * back + ny * side * s + dy), 1, 1)
     }
   }
-}
-
-// The far end: three stacked chevrons, the same mark the beats are made of, so the arrowhead is
-// built from the vocabulary the tell already taught instead of a splayed V of loose dots.
-function drawTip(g: Graphics, hg: Graphics, ox: number, oy: number, cx: number, cy: number, len: number, color: number, alpha: number): void {
-  const nx = -cy, ny = cx
-  for (let i = 0; i < 3; i++) chevron(g, ox, oy, cx, cy, nx, ny, len - i * 2.5, 6, 1)
-  g.fill({ color: EDGE, alpha: alpha * 0.8 })
-  for (let i = 0; i < 3; i++) chevron(hg, ox, oy, cx, cy, nx, ny, len - i * 2.5, 6, 0)
-  hg.fill({ color, alpha })
 }
 
 // A flash in whole pixels: stepped rings instead of a soft gaussian blob, so the overexposure at the

@@ -8,6 +8,7 @@ import type { Replay, EncodedReplay } from '@/sim/replay'
 import type { Loop } from '@/loop'
 import { seedFx } from '@/render/fxRng'
 import { activeBoons } from '@/sim/boons'
+import { ARM, armOf } from '@/sim/weapons'
 
 // window.__game: what an agent (or Playwright) uses to drive and inspect the live game.
 export interface GameApi {
@@ -75,12 +76,13 @@ export function installApi(host: {
           hasNext: w.hasNextRoom(),
           exits: w.rooms[w.roomIndex]?.exits ?? [],
         },
-        player: { x: +w.player.x.toFixed(1), y: +w.player.y.toFixed(1), hp: w.player.hp, maxHp: w.player.maxHp, state: w.player.state, stateTick: w.player.stateTick, iframes: w.player.iframes },
+        player: { x: +w.player.x.toFixed(1), y: +w.player.y.toFixed(1), hp: w.player.hp, maxHp: w.player.maxHp, state: w.player.state, stateTick: w.player.stateTick, iframes: w.player.iframes, arm: armOf(w) === ARM.bow ? 'bow' : 'blade' },
+        returns: w.returns,
         offering: w.arena.offering
           ? { kind: w.arena.offering.kind, x: +w.arena.offering.x.toFixed(1), y: +w.arena.offering.y.toFixed(1), taken: !!w.arena.offeringTaken }
           : null,
         boons: activeBoons(w),
-        enemies: w.enemies.filter(e => e.active).map(e => ({ id: e.id, kind: e.kind, x: +e.x.toFixed(1), y: +e.y.toFixed(1), hp: e.hp, state: e.state, stateTick: e.stateTick })),
+        enemies: w.enemies.filter(e => e.active).map(e => ({ id: e.id, kind: e.kind, x: +e.x.toFixed(1), y: +e.y.toFixed(1), hp: e.hp, state: e.state, stateTick: e.stateTick, phase: e.phase })),
         bolts: w.projectiles.filter(b => b.active).length,
         metrics: host.metrics.summary(),
       }

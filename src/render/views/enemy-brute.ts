@@ -25,7 +25,7 @@ import { EntityView, HALF_PI, type EnemyFrame, type Pose } from './shared'
 const SCORCH_TICKS = 16    // ground mark left after the swing lands
 const TAU = Math.PI * 2
 const CONTACT_LEAD = 1     // attack stateTick on which the sim's arc first tests (stateTick > lungeTicks)
-const WINDUP_RISE = 4.5    // px the body climbs across the wind-up — monotone, and the shadow shrinks with it
+const WINDUP_RISE = 7      // px the body climbs across the wind-up — monotone, and the shadow shrinks with it
 const RUNG_GAP = 7         // px between the marching rungs: three of them span 14px of "time to arrival"
 
 function tellSpan(): number { return tuning.brute.windup + tuning.brute.lungeTicks + CONTACT_LEAD }
@@ -47,15 +47,15 @@ export function updateBruteView(v: EntityView, e: Enemy, f: EnemyFrame, out: Pos
     // ground rim going from broken to solid, which costs the body nothing.
     const u = clamp01(tk / B.windup)
     hop = WINDUP_RISE * u
-    sy = 1 + 0.28 * u
-    sx = 1 - 0.16 * u
-    rot = -e.facing * 0.40 * u
+    sy = 1 + 0.40 * u
+    sx = 1 - 0.22 * u
+    rot = -e.facing * 0.55 * u
   } else if (e.state === 'attack') {
     // the release picks the body up exactly where the wind-up left it and keeps going the other way:
     // the widest, lowest, most extended frame of the whole cycle IS the damage frame.
     const r = clamp01(tk / (B.lungeTicks + CONTACT_LEAD))
     hop = WINDUP_RISE * (1 - r) * (1 - r)
-    sx = lerp(0.84, 1.42, r); sy = lerp(1.28, 0.66, r); rot = e.facing * lerp(-0.40, 0.48, r)
+    sx = lerp(0.78, 1.42, r); sy = lerp(1.40, 0.66, r); rot = e.facing * lerp(-0.55, 0.48, r)
     const after = tk - (B.lungeTicks + CONTACT_LEAD)
     if (after > 0) {                                   // the active tail: settle, never re-extend
       const s2 = clamp01(after / Math.max(1, B.active - 1))
@@ -94,7 +94,8 @@ function updateBruteWeapon(v: EntityView, e: Enemy, x: number, y: number, alpha:
     // before, made the tallest frame of the tell land 10 ticks early and then sink.
     const u = clamp01(tk / B.windup)
     angle = lerpAngle(-HALF_PI + f * 1.35, -HALF_PI - f * 0.35, u)
-    wx = x + f * (4 - 5 * u); wy = y - 2 - hop - 6 * u; front = true
+    wx = x + f * (4 - 5 * u); wy = y - 2 - hop - 8 * u; front = true
+    w.scale.set(1 + 0.42 * u)
   } else if (e.state === 'attack') { const u = easeOutCubic(Math.min(1, tk / (B.lungeTicks + B.active))); angle = lerpAngle(-HALF_PI - f * 0.35, e.aimAngle + f * 0.4, u); wx = x + Math.cos(angle) * 9; wy = y - hop + Math.sin(angle) * 7; front = true }
   else if (e.state === 'recover') {
     // the head stays planted on the ground through the punish window, then drags back up.
@@ -107,6 +108,7 @@ function updateBruteWeapon(v: EntityView, e: Enemy, x: number, y: number, alpha:
   w.position.set(Math.round(wx), Math.round(wy))
   w.rotation = angle + HALF_PI
   w.zIndex = y + e.radius + 1 + (front ? 0.5 : -0.5)
+  if (e.state !== 'windup') w.scale.set(e.state === 'attack' ? 1.28 : 1)
 }
 
 // --- ground telegraph -----------------------------------------------------------------------------
@@ -296,8 +298,63 @@ function updateBruteTell(v: EntityView, e: Enemy, x: number, y: number, tk: numb
     hi.fill({ color: mixCol(0xff7a1e, 0xffa040, qb), alpha: (0.14 + 0.3 * qb) * bloom })
     blob(hi, head.x, head.y, cr, cr)
     hi.fill({ color: mixCol(0xff9a3a, 0xffc070, qb), alpha: (0.4 + 0.5 * qb) * bloom })
+    // The hammer authors the mark. Four falling motes plus a bead on the landing spot: the raised
+    // head, the path of the blow, and the place that will hurt you are one sentence. Not a laser —
+    // that is the caster's language. The filled pie stays the keep-out; cracks live under it.
+    const n = 4
+    for (let i = 1; i <= n; i++) {
+      const t = i / (n + 1)
+      const r = 1.2 + 1.8 * t * q
+      blob(hi, Math.round(head.x + (cx - head.x) * t), Math.round(head.y + (cy - head.y) * t), r, r * 0.7)
+    }
+    hi.fill({ color: mixCol(0xc45a18, 0xff9c4a, qb), alpha: (0.34 + 0.46 * qb) * bloom })
+    const bead = 2.2 + 3.2 * q
+    blob(hi, cx, cy, bead + 2.4, (bead + 2.4) * 0.62)
+    hi.fill({ color: mixCol(0xff6a18, 0xffa040, qb), alpha: (0.22 + 0.4 * qb) * bloom })
+    blob(hi, cx, cy, bead, bead * 0.58)
+    hi.fill({ color: mixCol(0xff9a3a, 0xffd070, qb), alpha: (0.55 + 0.4 * qb) * bloom })
+    // Cracks above the lightmap or they die in the dither: the burn is on broken stone.
+    for (let i = 0; i < CRACKS.length; i++) {
+      const off = CRACKS[i][0], len = CRACKS[i][1] * q
+      const ca = Math.cos(aim + off), sa = Math.sin(aim + off)
+      for (let d = 1; d <= len; d++) {
+        const jag = ((d + i * 3) & 2) === 0 ? 1 : -1
+        const px = Math.round(cx + ca * d + ((d >> 1) & 1) * jag)
+        const py = Math.round(cy + sa * d * 0.7)
+        hi.rect(px, py, 1, 1)
+        if ((d & 1) === 0) hi.rect(px + jag, py, 1, 1)
+      }
+    }
+    if (q >= 0.35) {
+      for (let i = 0; i < SPLOTS.length; i++) hi.rect(cx + SPLOTS[i][0], cy + Math.round(SPLOTS[i][1] * 0.7), 1, 1)
+    }
+    hi.fill({ color: 0x1a0808, alpha: (0.72 + 0.2 * q) * bloom })
   }
 
+  // Weight on the floor: a contact shadow that leans into the blow, so the coil has a footprint
+  // even when the 16px body is small. This is the lean, not a second tell colour.
+  if (!scorching) {
+    const lean = 2 + 6 * q
+    blob(g, fx + Math.round(cos * lean), fy + 1, 5 + 3 * q, 2.4 + q)
+    g.fill({ color: 0x050208, alpha: (0.38 + 0.22 * q) * bloom })
+    // World-space break: jagged dark strokes from the landing, so the axe is glued to broken
+    // tiles and the pie is a burn on stone, not a hatch sticker.
+    for (let i = 0; i < CRACKS.length; i++) {
+      const off = CRACKS[i][0], len = CRACKS[i][1] * q
+      const ca = Math.cos(aim + off), sa = Math.sin(aim + off)
+      for (let d = 1; d <= len; d++) {
+        const jag = ((d + i * 3) & 2) === 0 ? 1 : -1
+        const px = Math.round(cx + ca * d + ((d >> 1) & 1) * jag)
+        const py = Math.round(cy + sa * d * 0.7)
+        g.rect(px, py, 1, 1)
+        if ((d & 1) === 0) g.rect(px + jag, py, 1, 1)
+      }
+    }
+    if (q >= 0.35) {
+      for (let i = 0; i < SPLOTS.length; i++) g.rect(cx + SPLOTS[i][0], cy + Math.round(SPLOTS[i][1] * 0.7), 1, 1)
+    }
+    g.fill({ color: 0x080308, alpha: (0.58 + 0.28 * q) * bloom })
+  }
   // Footprint: the spot the lunge puts him on, so the mark reads as "he arrives here and swings across
   // that", not as a glow leaking out of whoever happens to be standing in it.
   if (!scorching && ahead > 2) {
@@ -338,6 +395,15 @@ const INNER = { x0: TILE, y0: 2 * TILE, x1: (ARENA_COLS - 1) * TILE, y1: (ARENA_
 
 // 4x4 ordered dither, used by the impact's dark ramp below.
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5]
+// Floor breaks under the pie. Angle offset from aim, length in px. Authored, same every run —
+// the filled keep-out sits on cracked stone, not on a separate box.
+const CRACKS: readonly (readonly [number, number])[] = [
+  [0.00, 20], [0.42, 17], [0.88, 13], [1.28, 10],
+  [-0.38, 16], [-0.82, 12], [-1.22, 9],
+]
+const SPLOTS: readonly (readonly [number, number])[] = [
+  [3, -2], [-4, 3], [6, 4], [-5, -3], [1, 6], [-2, 5], [7, -1], [-6, 1],
+]
 
 // --- contact flash --------------------------------------------------------------------------------
 // A hot POINT plus DIRECTION. Everything above this line is floor paint: it lives in the shadows

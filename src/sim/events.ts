@@ -1,5 +1,5 @@
 // Sim -> presentation messages. The sim pushes; presenter/audio/metrics consume and clear each frame.
-export type EnemyKind = 'brute' | 'caster' | 'charger' | 'dummy'
+export type EnemyKind = 'brute' | 'caster' | 'charger' | 'dummy' | 'warden'
 
 export type SimEvent =
   | { type: 'swing'; x: number; y: number; angle: number; swing: number; heavy: boolean }
@@ -13,6 +13,7 @@ export type SimEvent =
   | { type: 'enemyWindup'; id: number; kind: EnemyKind; x: number; y: number }
   | { type: 'enemyAttack'; id: number; kind: EnemyKind; x: number; y: number; angle: number }
   | { type: 'enemyStagger'; id: number; x: number; y: number }
+  | { type: 'enemyPhase'; id: number; kind: EnemyKind; x: number; y: number; phase: number }
   | { type: 'boltFired'; x: number; y: number; angle: number }
   | { type: 'boltCut'; x: number; y: number }
   | { type: 'boltHitWall'; x: number; y: number }
@@ -22,7 +23,11 @@ export type SimEvent =
   | { type: 'waveClear'; wave: number }
   | { type: 'roomClear'; hasNext: boolean }
   | { type: 'roomEnter'; name: string; index: number; total: number }
+  | { type: 'returned'; name: string; x: number; y: number }
   | { type: 'offeringTaken'; kind: 'life'; x: number; y: number }
+  | { type: 'draw'; x: number; y: number; angle: number }
+  | { type: 'arrowLoose'; x: number; y: number; angle: number }
+  | { type: 'arrowHitWall'; x: number; y: number }
   | { type: 'dodged'; x: number; y: number }
   | { type: 'restart' }
   // a pooled slot was unavailable and the spawn/shot was dropped; the sim never fails silently

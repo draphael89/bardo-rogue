@@ -88,3 +88,27 @@ still not answerable by a combat lane: it is a lighting problem in `src/render/l
 Caveat on the numbers: these frames were captured while another agent had in-flight rooms-as-data
 work touching `light.ts` and `tilemap.ts`, so part of the quiet-frame brightness may be theirs.
 Re-measure in isolation before assigning R2.
+
+
+## R3 — R1's clamp left impact nowhere to go  (LANDED)
+
+Two blind critics caught this independently, in different lanes, without being told about the
+grade. The charger critic: "no pixel in ANY of our rendered frames exceeds (236,240,246)". The arena
+critic asked for the black point to be pulled to 0. That ceiling was mine: R1 clamped the composited
+frame to `#08070E`-`#ECF0F6` to enforce ART_DIRECTION 1.3.4's ban on pure black and pure white.
+
+The reasoning was wrong. 1.3.4 governs AUTHORED ART -- section 5's acceptance test says "static-art
+pixels above 72% luminance" in as many words -- not a two-frame additive spark. Policing the palette
+is the art's job. The grade's job is to leave the top and bottom of the range free so events have
+somewhere to go. Clamp is back to 0..1.
+
+Measured after, with the arena lane's darker room in place:
+
+| | mean | p99 | max | over 72% |
+| --- | --- | --- | --- | --- |
+| quiet room | 22 | 144 | 242 | 0.3% |
+| busy wave-3 combat | 21 | 130 | **255** | 0.5% |
+
+That also closes R2. The room no longer owns the top of the range: static pixels above 72%
+luminance fell from 8.7% to 0.3%, and the brightest thing in a busy frame is now a hit spark rather
+than a wall. Dark room, bright events, which is what the critics were asking for all along.

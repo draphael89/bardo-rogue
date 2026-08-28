@@ -248,11 +248,9 @@
         "src/sim/enemies/charger.ts",
         "src/render/views/enemy-charger.ts"
       ],
-      "protocol": "Motion. Dev server must already be on :5173; never start a second. 1) `pnpm strip -- --scenario charger --seed 1 --from freeze start --frames 12 --every 2 --crop 144,72,192,128 --out <E>/strip.png` \u2014 tick-labelled, --stepwise discipline, NEAREST upscale only. 2) the sidecar `<E>/strip.png.json` state+event trace. 3) `pnpm poses -- --only charger --out <E>/poses.png`. 4) the single most load-bearing frame, 4x NEAREST crop, as `<E>/exhibit.png` \u2014 this is the blind-comparison exhibit and it must be the same medium as the reference. 5) startup/active/recovery tick counts read from the trace, written to `<E>/timing.json`. Same seed, same crop box, every round. Also capture a 4-charger frame from scenario wave3 as `<E>/exhibit-crowd.png`: if four tells are indistinguishable, that is the gap.",
+      "protocol": "Motion. Dev server must already be on :5173; never start a second. 1) `pnpm strip -- --scenario charger-swarm --seed 1 --from freeze start --frames 12 --every 2 --crop 160,104,160,80 --out <E>/strip.png` \u2014 tick-labelled, --stepwise discipline, NEAREST upscale only. 2) the sidecar `<E>/strip.png.json` state+event trace. 3) `pnpm poses -- --only charger --out <E>/poses.png`. 4) the single most load-bearing frame, 4x NEAREST crop, as `<E>/exhibit.png` \u2014 this is the blind-comparison exhibit and it must be the same medium as the reference. 5) startup/active/recovery tick counts read from the trace, written to `<E>/timing.json`. Same seed, same crop box, every round. Also capture a 4-charger frame from scenario wave3 as `<E>/exhibit-crowd.png`: if four tells are indistinguishable, that is the gap.",
       "reference": [
-        "gauntlet/evidence/reference/ref-density-01.jpg",
-        "gauntlet/evidence/reference/ref-density-02.jpg",
-        "gauntlet/evidence/reference/ref-density-03.jpg"
+        "gauntlet/evidence/reference/ref-dash-01.jpg"
       ],
       "status": "open",
       "rounds": 3,
@@ -277,12 +275,11 @@
       ],
       "protocol": "Still plus short motion. `pnpm strip -- --scenario wave1 --seed 5 --from <the killing blow> --frames 10 --every 3 --out <E>/strip.png` for the death sequence, plus the settled card as `<E>/exhibit.png` at 2x NEAREST. Same seed and start tick every round.",
       "reference": [
-        "gauntlet/evidence/reference/ref-ui-01.jpg",
-        "gauntlet/evidence/reference/ref-ui-02.jpg"
+        "gauntlet/evidence/reference/ref-death-01.jpg"
       ],
-      "status": "open",
-      "rounds": 0,
-      "stalls": 0,
+      "status": "parked",
+      "rounds": 3,
+      "stalls": 2,
       "memo": [
         {
           "wave": 1,
@@ -290,6 +287,20 @@
           "element": "wave-1 verdicts lost",
           "stronger_does": "n/a - infrastructure, not a gap",
           "fix": "Re-enter at wave 2 round 1. The critic verdicts lived only in the Workflow return and died with the process, and repair R1 then changed the global colour grade (p99 178 -> 229), so every wave-1 capture is non-comparable to anything captured from now on. Wave 2 round 1 is the new baseline for this piece."
+        },
+        {
+          "wave": 2,
+          "round": 0,
+          "element": "bar locked",
+          "stronger_does": "a run-end death page (taped kill still + named killer), not a hub room or a combat HUD",
+          "fix": "Judge the settled card against ref-death-01. Fight chrome leaves when the stele owns the frame."
+        },
+        {
+          "wave": 2,
+          "round": 3,
+          "element": "authored fallen pose",
+          "stronger_does": "a body that has fallen and a stele that is carved stone, not a Graphics plaque over a standing heap",
+          "fix": "PARK. Two no-wow wins after a split. Re-enter behind authored death art. Fight chrome off, left stele, TAKEN BY, wine well, star-sky arch stay."
         }
       ],
       "latest": [],
@@ -303,19 +314,25 @@
       ],
       "protocol": "Still. `pnpm shot -- --scenario wave3 --seed 1 --ticks 500 --bot kite --stepwise 1 --out <E>/still.png` (a busy frame, not an empty room), plus a 2x NEAREST crop of the HUD corners as `<E>/crop.png` with the SAME crop box every round, plus a room-clear frame and a death frame. Same seed and ticks each round.",
       "reference": [
-        "gauntlet/evidence/reference/ref-ui-01.jpg",
-        "gauntlet/evidence/reference/ref-ui-02.jpg"
+        "gauntlet/evidence/reference/ref-hud-01.jpg"
       ],
-      "status": "open",
-      "rounds": 3,
-      "stalls": 0,
+      "status": "parked",
+      "rounds": 2,
+      "stalls": 2,
       "memo": [
         {
           "wave": 1,
           "round": 3,
           "element": "wave-1 verdicts lost",
           "stronger_does": "n/a - infrastructure, not a gap",
-          "fix": "Re-enter at wave 2 round 1. The critic verdicts lived only in the Workflow return and died with the process, and repair R1 then changed the global colour grade (p99 178 -> 229), so every wave-1 capture is non-comparable to anything captured from now on. Wave 2 round 1 is the new baseline for this piece."
+          "fix": "Re-enter at wave 2 round 1."
+        },
+        {
+          "wave": 2,
+          "round": 2,
+          "element": "weapon-and-ammo chrome",
+          "stronger_does": "frames a live pistol and a 42/330 count",
+          "fix": "PARK. Two losses on the same family. We will not invent a gun. Re-enter behind authored HUD stamps. Empty outlines, LEFT N, mercy groove stay."
         }
       ],
       "latest": [],
@@ -333,16 +350,23 @@
         "gauntlet/evidence/reference/ref-density-02.jpg",
         "gauntlet/evidence/reference/ref-density-03.jpg"
       ],
-      "status": "open",
+      "status": "parked",
       "rounds": 2,
-      "stalls": 0,
+      "stalls": 2,
       "memo": [
         {
           "wave": 1,
           "round": 2,
           "element": "wave-1 verdicts lost",
           "stronger_does": "n/a - infrastructure, not a gap",
-          "fix": "Re-enter at wave 2 round 1. The critic verdicts lived only in the Workflow return and died with the process, and repair R1 then changed the global colour grade (p99 178 -> 229), so every wave-1 capture is non-comparable to anything captured from now on. Wave 2 round 1 is the new baseline for this piece."
+          "fix": "Re-enter at wave 2 round 1."
+        },
+        {
+          "wave": 2,
+          "round": 2,
+          "element": "player-commit lift",
+          "stronger_does": "keeps swing and dodge clearly above the combat bed under full voice load",
+          "fix": "PARK. Two losses on the same family. Re-enter behind authored combat stems. Buses, bed, announcer-off, crowd, lead stay."
         }
       ],
       "latest": [],

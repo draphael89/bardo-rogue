@@ -24,7 +24,7 @@ function census(a: AudioSystem, ev: SimEvent): void {
     case 'kill': alive = Math.max(0, alive - 1); break
     case 'playerHurt': hp01 = Math.max(0, ev.hp / tuning.player.hp); break
     case 'roomClear': case 'playerDeath': alive = 0; break
-    case 'restart': alive = 0; hp01 = 1; a.resumeBed(); break
+    case 'restart': case 'returned': alive = 0; hp01 = 1; a.resumeBed(); break
     default: return
   }
   a.setCombat(alive, hp01)
@@ -37,15 +37,17 @@ export function playEventSfx(a: AudioSystem, ev: SimEvent): void {
   const at = 'x' in ev ? { x: ev.x, y: ev.y } : {}
   switch (ev.type) {
     case 'swing':
-      // your own commit: it has to clear the bed, and its air sits above the impact it will cause
-      a.play('woosh', { ...at, gain: ev.heavy ? 1 : 0.78, pitch: ev.heavy ? 0.8 : 1.1, pitchVar: 0.1 })
-      a.swish(ev.heavy ? 1.06 : 0.85, ev.heavy ? 170 : 110, ev.heavy ? 0.95 : 1.35, ev)
+      // your own commit: it has to clear the bed even in a pile-up (w2r5: 0.5 dB mixed lift).
+      // The bed leans back 5 dB for the length of the string; the woosh itself stays on SFX.
+      a.duck(...MIX.duck.by.playerCommit)
+      a.play('woosh', { ...at, gain: ev.heavy ? 1.35 : 1.2, pitch: ev.heavy ? 0.8 : 1.1, pitchVar: 0.1, lead: true })
+      a.swish(ev.heavy ? 1.4 : 1.3, ev.heavy ? 170 : 110, ev.heavy ? 1.2 : 1.45, ev, true)
       break
     case 'hit':
       // the consequence, deliberately under the cause: a landed hit is confirmation, not news.
       // It still owns 200-600 Hz, where nothing else in the mix is competing for the top.
       a.play('impactPunch_medium', { ...at, gain: 0.5, pitch: ev.heavy ? 0.85 : 1 })
-      if (ev.kind === 'brute') a.play('impactPlate_medium', { ...at, gain: 0.24, pitch: 1.1 })
+      if (ev.kind === 'brute' || ev.kind === 'warden') a.play('impactPlate_medium', { ...at, gain: ev.kind === 'warden' ? 0.32 : 0.24, pitch: ev.kind === 'warden' ? 0.85 : 1.1 })
       if (ev.kind === 'charger') a.play('impactGeneric_light', { ...at, gain: 0.32, pitch: 1.3 })
       if (ev.killed) { a.play('impactPunch_heavy', { ...at, gain: 0.5, pitch: 0.9 }); a.play('creature', { ...at, gain: 0.28, pitch: 0.9 }) }
       break
@@ -59,12 +61,12 @@ export function playEventSfx(a: AudioSystem, ev: SimEvent): void {
       // instead of hollowing out its front, which is what made the damage moment measure
       // quieter than the bed it plays over.
       a.thump(1.05, 190, 58, 0.24, { click: 1.1 })
-      a.play('hurt4', { gain: 0.62, pitchVar: 0.05 })
-      a.play('hitHelmet3', { gain: 0.42, pitchVar: 0.05 })
+      a.play('hurt4', { gain: 0.62, pitchVar: 0.05, lead: true })
+      a.play('hitHelmet3', { gain: 0.42, pitchVar: 0.05, lead: true })
       a.duck(...MIX.duck.by.playerHurt)
       break
     case 'playerDeath':
-      a.play('impactSoft_heavy', { gain: 0.8, pitch: 0.75 })
+      a.play('impactSoft_heavy', { gain: 0.8, pitch: 0.75, lead: true })
       a.bell(1.2, 98, 4.5)                  // one low bowl, struck once
       a.stopBed(1.8)
       break
@@ -73,13 +75,15 @@ export function playEventSfx(a: AudioSystem, ev: SimEvent): void {
       // One fixed take, never the round-robin: the cloth group spans 15 dB between its takes
       // (cloth1 -13 dBFS, cloth4 -28), and the i-frame confirmation is the one sound that must
       // never arrive quieter than the last time you dodged.
-      a.play('woosh3', { gain: 1.4, pitch: 1.45, pitchVar: 0 })
-      a.play('cloth1', { gain: 1.28, pitch: 1.2, pitchVar: 0.04 })
-      a.swish(1.28, 90, 1.7, ev)
+      // Same commit duck as the swing: w2r5 mixed dodge lift was -0.1 dB.
+      a.duck(...MIX.duck.by.playerCommit)
+      a.play('woosh3', { gain: 1.55, pitch: 1.45, pitchVar: 0, lead: true })
+      a.play('cloth1', { gain: 1.4, pitch: 1.2, pitchVar: 0.04, lead: true })
+      a.swish(1.45, 90, 1.7, ev, true)
       break
     case 'dodged':
       // an attack passed through the i-frames: the near miss is the reward, never varied
-      a.play('woosh4', { gain: 1.2, pitch: 0.55, pitchVar: 0 }); a.swish(1.2, 220, 0.6)
+      a.play('woosh4', { gain: 1.2, pitch: 0.55, pitchVar: 0, lead: true }); a.swish(1.2, 220, 0.6, undefined, true)
       break
     case 'dodgeEnd':
       a.play('cloth2', { gain: 2.2, pitch: 1.15, pitchVar: 0.12 })   // the quiet take: a tail, not a cue
@@ -104,10 +108,13 @@ export function playEventSfx(a: AudioSystem, ev: SimEvent): void {
       a.duck(...MIX.duck.by.enemyWindup)
       if (ev.kind === 'brute') {
         a.bell(1.2, 3000, 0.3, 'sfx', 0, { ...at, partials: 'plate', glideTo: 2450, strike: 0.55, cap: 'tell' })
-        a.play('swordMetal', { ...at, gain: 0.3, pitch: 0.7 })
+        a.play('swordMetal', { ...at, gain: 0.3, pitch: 0.7, lead: true })
       } else if (ev.kind === 'caster') {
         a.bell(0.72, 2100, 0.3, 'sfx', 0, { ...at, partials: 'tone', glideTo: 3600, strike: 0.25, cap: 'tell' })
-        a.play('laserRetro', { ...at, gain: 0.22, pitch: 1.6 })
+        a.play('laserRetro', { ...at, gain: 0.22, pitch: 1.6, lead: true })
+      } else if (ev.kind === 'warden') {
+        a.bell(1.35, 196, 0.7, 'sfx', 0, { ...at, partials: 'plate', glideTo: 130, strike: 0.7, cap: 'tell' })
+        a.play('creature', { ...at, gain: 0.4, pitch: 0.5 })
       } else {
         a.bell(1.07, 2200, 0.24, 'sfx', 0, { ...at, partials: 'plate', glideTo: 3400, strike: 0.4, cap: 'tell' })
         a.play('creature', { ...at, gain: 0.28, pitch: 1.4 })
@@ -123,7 +130,17 @@ export function playEventSfx(a: AudioSystem, ev: SimEvent): void {
         a.play('woosh', { ...at, gain: 0.9, pitch: 1.5 })
         a.bell(0.82, 3200, 0.16, 'sfx', 0, { ...at, partials: 'plate', glideTo: 2000, cap: 'strike' })
         a.swish(0.5, 120, 1.5, ev)
+      } else if (ev.kind === 'warden') {
+        a.play('woosh', { ...at, gain: 1.4, pitch: 0.55 })
+        a.thump(1.05, 150, 46, 0.26, { click: 0.85 })
+        a.bell(1.05, 180, 0.28, 'sfx', 0, { ...at, partials: 'plate', glideTo: 80, cap: 'strike' })
       }
+      break
+    case 'enemyPhase':
+      a.bell(1.15, 147, 3.4)
+      a.bell(0.7, 220, 2.6, 'music', 0.22)
+      a.play('creature', { ...at, gain: 0.45, pitch: 0.48 })
+      a.duck(...MIX.duck.by.enemyWindup)
       break
     case 'enemyStagger':
       a.play('impactPlate_medium', { ...at, gain: 0.4, pitch: 1.35 })
@@ -155,9 +172,26 @@ export function playEventSfx(a: AudioSystem, ev: SimEvent): void {
       a.play('doorOpen_1', { gain: 0.45, bus: 'ui' })
       a.bell(0.6, 196, 1.8)
       break
+    case 'returned':
+      a.play('doorOpen_1', { gain: 0.45, bus: 'ui' })
+      a.bell(0.7, 196, 2.2)
+      a.bell(0.4, 293.66, 1.6, 'music', 0.2)
+      break
     case 'offeringTaken':
       a.bell(0.55, 392, 2.4)
       a.bell(0.28, 523.25, 1.8, 'music', 0.2)
+      break
+    case 'draw':
+      a.play('cloth3', { ...at, gain: 0.55, pitch: 0.85, pitchVar: 0.04 })
+      a.swish(0.42, 70, 0.7, ev)
+      break
+    case 'arrowLoose':
+      a.play('woosh2', { ...at, gain: 0.9, pitch: 1.55, pitchVar: 0.06 })
+      a.play('swordStone1', { ...at, gain: 0.28, pitch: 1.6 })
+      a.swish(0.7, 140, 1.55, ev)
+      break
+    case 'arrowHitWall':
+      a.play('impactGeneric_light', { ...at, gain: 0.35, pitch: 1.15 })
       break
   }
   census(a, ev)
@@ -171,7 +205,8 @@ export function playEventSfx(a: AudioSystem, ev: SimEvent): void {
 function listen(a: AudioSystem, ev: SimEvent): void {
   switch (ev.type) {
     case 'footstep': case 'swing': case 'dodge': case 'dodgeEnd': case 'dodged':
-    case 'playerHurt': case 'playerDeath': a.setListener(ev.x, ev.y)
+    case 'draw': case 'arrowLoose':
+    case 'playerHurt': case 'playerDeath': case 'returned': a.setListener(ev.x, ev.y)
   }
 }
 

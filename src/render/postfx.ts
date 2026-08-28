@@ -75,10 +75,12 @@ void main(void)
     c = mix(c, c * uHighlightTint, hi * 0.38);
     c = (c - 0.5) * uContrast + 0.5;
     c = mix(vec3(luma), c, uSat);
-    // ART_DIRECTION.md 1.3.4 fixes the ends of the scale at #08070E and #ECF0F6 and bans pure black
-    // and pure white pixels outright. The grade is the one place that can enforce that globally, so
-    // it clamps to those endpoints rather than to 0..1.
-    c = mix(src.rgb, clamp(c, vec3(0.0314, 0.0275, 0.0549), vec3(0.9255, 0.9412, 0.9647)), uStrength);
+    // Clamped to the palette's ends here once. That was wrong and two blind critics caught it
+    // independently: it left impact nowhere to go ("no pixel in ANY of our rendered frames exceeds
+    // (236,240,246)"). ART_DIRECTION.md 1.3.4 governs AUTHORED ART -- its acceptance test in 5 says
+    // "static-art pixels" -- not a transient additive spark. The palette is the art's job; the grade
+    // must leave the top and bottom of the range free for events.
+    c = mix(src.rgb, clamp(c, 0.0, 1.0), uStrength);
     finalColor = vec4(c, src.a);
 }
 `

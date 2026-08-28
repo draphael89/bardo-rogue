@@ -1,7 +1,9 @@
 import { Container, Graphics, Text } from 'pixi.js'
 import type { Atlas } from './atlas'
+import type { EnemyKind } from '@/sim/events'
 import type { World } from '@/sim/world'
 import { hasBoon } from '@/sim/boons'
+import { HUB_ID } from '@/sim/rooms'
 import { tuning } from '@/tuning'
 
 // Presentation clock in SIM TICKS. Every HUD timer (and the world-space damage pop-ups) ages against this instead
@@ -58,8 +60,11 @@ const BANNER_Y = 44, BAND_H = 28, OPEN = 8, CLOSE = 10   // the card sits clear 
 //   §8.2.5 one of what the dead use — a single arch, never a pair.
 // §7.1 (HUD in the outer band) is deliberately not applied: at the moment of death there is no fight left to
 // occlude, and the card is the frame's subject.
-const CARD = { w: 224, h: 190, top: 42 }
-const CARD_X = Math.round((V.width - CARD.w) / 2)
+// The camera holds the corpse at the centre of the frame. A centred slab buried the last moment — the thing
+// both R1 critics named. The stele stands to the left of the body so the live room is the death snapshot
+// (§8.2.1 still owns the arch: star-sky, never a pasted still of the room).
+const CARD = { w: 216, h: 190, top: 42, left: 10 }
+const CARD_X = CARD.left
 const CARD_CX = CARD_X + Math.round(CARD.w / 2)
 const ARCH_TOP = CARD.top + 14
 const ARCH_ROWS = 46, SILL_ROWS = 4, CROWN_ROWS = 4
@@ -78,6 +83,49 @@ const SILL_HALF = 28
 // card's border on screen 3 ticks after the killing blow and had the arena at a flat (8,7,14) by tick 15, so the
 // death showed the player neither his corpse, nor his killer, nor the room.
 const CT = { hold: 4, dim: 12, stele: 12, steleOpen: 8, sky: 20, title: 22, cross: 26, sub: 30, rows: [34, 37, 40], act: 46 }
+// Fight chrome (life plate, wave, boss) holds through the contact hold, then hands the frame to the stele.
+// Settled is 0 — a dim WAVE box and an empty heart plate at 0.4 were still the second-brightest objects
+// beside the card's gold. The place name stays; it is the named floor (§8.2.3), not a survival readout.
+const CHROME_OUT = 6
+function fightChrome(cardAge: number): number {
+  if (cardAge < CT.stele) return 1
+  if (cardAge < CT.stele + CHROME_OUT) return 0.7
+  return 0
+}
+
+function takenBy(kind: EnemyKind | 'none'): string {
+  switch (kind) {
+    case 'brute': return 'THE HEAVY'
+    case 'caster': return 'THE MARK'
+    case 'charger': return 'THE RUSH'
+    case 'warden': return 'THE WARDEN'
+    case 'dummy': return 'A BLOW'
+    case 'none': return 'A BLOW'
+    default: {
+      const _n: never = kind
+      return _n
+    }
+  }
+}
+
+// Presentation-only: nearest living body (or hostile bolt) on the killing frame. The sim does not
+// store a killer id; this lane does not own combat.ts. Latch the result — do not re-pick as they walk off.
+function inferKiller(world: World): EnemyKind | 'none' {
+  const p = world.player
+  let best: EnemyKind | 'none' = 'none'
+  let bestD = 40 * 40
+  for (const e of world.enemies) {
+    if (!e.active) continue
+    const d = (e.x - p.x) * (e.x - p.x) + (e.y - p.y) * (e.y - p.y)
+    if (d < bestD) { bestD = d; best = e.kind }
+  }
+  for (const b of world.projectiles) {
+    if (!b.active || b.team !== 0) continue
+    const d = (b.x - p.x) * (b.x - p.x) + (b.y - p.y) * (b.y - p.y)
+    if (d < bestD) { bestD = d; best = 'caster' }
+  }
+  return best
+}
 // The veil: five nested ellipses centred on the corpse, each contributing one hard step. Composited they reach
 // ~0.33 at the frame corner and exactly 0 on the body, so the world stays the card's ground (§3.2.3 — light
 // pools, it does not wash) instead of a blackout. Radii are in view px, x and y, at the settled step.
@@ -173,6 +221,8 @@ export class Hud {
   private plateG = new Graphics()     // life panel
   private rigG = new Graphics()       // flames + smoke, drawn at 1px and scaled 2x
   private waveG = new Graphics()      // wave panel + remaining-enemy pips
+  private bossG = new Graphics()      // named judge bar, only while a warden lives
+  private bossName: Text
   private bandG = new Graphics()      // banner slab + rules
   private footG = new Graphics()      // place-name rules
   private hintG = new Graphics()      // key caps / pad buttons
@@ -188,6 +238,7 @@ export class Hud {
   private cardKeyStr = 'boot'         // last drawn card geometry; the card is redrawn only when its pose changes
   private veilKey = ''                // last drawn veil step; ~540 whole-pixel rects, so it redraws 8 times, not 60/s
   private deathAt: { x: number; y: number } | null = null   // the corpse's screen pixel, latched on the killing frame
+  private deathKiller: EnemyKind | 'none' | null = null     // latched with deathAt; who stood over you
   waveText: Text
   banner: Text
   sub: Text
@@ -217,6 +268,14 @@ export class Hud {
 
     this.waveText = new Text({ text: '', style: { fontFamily: 'Kenney Pixel', fontSize: 16, fill: C.bone, dropShadow: drop }, resolution: 1 })
     this.waveText.anchor.set(1, 0); this.waveText.position.set(V.width - 12, 2)
+    this.bossName = new Text({
+      text: 'THE WARDEN',
+      style: { fontFamily: 'Kenney Mini', fontSize: 8, fill: C.bone, letterSpacing: 2, dropShadow: drop },
+      resolution: 1,
+    })
+    this.bossName.anchor.set(0.5, 0)
+    this.bossName.position.set(Math.round(V.width / 2), 4)
+    this.bossName.visible = false
 
     this.banner = new Text({ text: '', style: { fontFamily: 'Kenney Blocks', fontSize: 24, fill: 0xffffff, stroke: { color: C.void, width: 3 } }, resolution: 1 })
     this.banner.anchor.set(0.5); this.banner.position.set(V.width / 2, BANNER_Y)
@@ -262,7 +321,7 @@ export class Hud {
     this.cardAct.anchor.set(0, 0)
 
     layer.addChild(this.markG, this.crownG, this.hurtG, this.bandG, this.banner, this.sub,
-      this.plateG, this.rig, this.waveG, this.waveText,
+      this.plateG, this.rig, this.waveG, this.waveText, this.bossG, this.bossName,
       this.footG, this.place, this.hintRow, this.hint,
       this.scrimG, this.cardG, this.cardTitle, this.cardSub, this.cardKey, this.cardAct)
     for (const r of this.cardRows) layer.addChild(r.label, r.value)
@@ -305,10 +364,11 @@ export class Hud {
     const hurtAge = p.iframes > 0 && p.state !== 'dead' ? tuning.player.hurtIFrames - p.iframes : 999
     const at = this.playerPx()
     this.updateMark(p, now)
-    this.updateCrown(p, at, hurtAge)
+    this.updateCrown(world, p, at, hurtAge)
     this.updateHurtLight(p, at, hurtAge)
     this.updateLife(world, now, hurtAge)
     this.updateWave(world)
+    this.updateBoss(world)
     this.updateBanner(world, now)
     this.updateFooter(world, now)
   }
@@ -338,10 +398,14 @@ export class Hud {
   private updateMark(p: World['player'], _now: number) {
     const g = this.markG
     g.clear()
-    if (p.state === 'dead') { g.visible = false; return }
-    g.visible = true
     const at = this.playerPx()
-    if (!at) return
+    if (!at) { g.visible = false; return }
+    if (p.state === 'dead') {
+      g.visible = true
+      this.drawDeathStain(g, at)
+      return
+    }
+    g.visible = true
     const cx = at.x
     const cy = at.y + FEET
 
@@ -370,6 +434,27 @@ export class Hud {
     g.rect(cx - half + 1, cy + 1, half * 2 - 1, 1).fill({ color: far, alpha: 0.45 })
   }
 
+  // The living mark shuts. A wine well under the corpse, gold only on the north lip — they crossed
+  // (§8.2.2). Whole-pixel steps, no idle motion. R2 won both orders and was not wowed: the body
+  // still read as a leftover cloak. This is the floor of the last moment.
+  private drawDeathStain(g: Graphics, at: { x: number; y: number }) {
+    const cx = at.x, cy = at.y + FEET
+    const well: [number, number, number, number, number][] = [
+      [-3, -3, 7, C.gold, 1],
+      [-2, -5, 11, C.purple1, 0.95],
+      [-1, -6, 13, C.purple2, 0.9],
+      [0, -7, 15, C.purple2, 0.95],
+      [1, -6, 13, C.purple1, 0.9],
+      [2, -5, 11, C.purple0, 0.95],
+      [3, -3, 7, C.purple0, 0.9],
+    ]
+    for (const [oy, ox, w, col, a] of well) {
+      g.rect(cx + ox, cy + oy, w, 1).fill({ color: col, alpha: a })
+    }
+    g.rect(cx - 4, cy - 2, 9, 1).fill({ color: C.goldDim, alpha: 0.75 })
+    g.rect(cx - 6, cy + 4, 13, 1).fill({ color: C.void, alpha: 0.9 })
+  }
+
   // --- the life crown: the health read, on the body -------------------------------------------------------------
   // A survival readout in the far corner of the screen is a readout you never look at: during a fight your eyes
   // are locked on your own body and on the thing about to hit it, 268 px away from the corner panel. So the
@@ -383,10 +468,12 @@ export class Hud {
   //      flames come and go.
   //   3. Lit and empty separate by value AND by hue: a warm flame at L~180 in a cup whose empty interior is
   //      L~10, so the count survives a dim corner, a lit slab, and the death grade.
-  private updateCrown(p: World['player'], at: { x: number; y: number } | null, hurtAge: number) {
+  private updateCrown(world: World, p: World['player'], at: { x: number; y: number } | null, hurtAge: number) {
     const g = this.crownG
     g.clear()
     if (!at || p.state === 'dead') { g.visible = false; return }
+    for (const e of world.enemies) if (e.active && e.kind === 'warden') { g.visible = false; return }
+    if (world.rooms[world.roomIndex]?.id === HUB_ID) { g.visible = false; return }
     g.visible = true
     const n = p.maxHp
     const PITCH = 4, ARC = [1, 0, -1, 0, 1, 0, 1, 0]
@@ -485,7 +572,7 @@ export class Hud {
     const n = p.maxHp
     const low = p.hp === 1 && p.state !== 'dead'
     const blessed = hasBoon(world, 'cleave')
-    const panelW = (n - 1) * STEP * 2 + FW * 2 + 8 + (blessed ? 18 : 0)
+    const panelW = (n - 1) * STEP * 2 + FW * 2 + 8 + (blessed ? 12 : 0)
 
     // panel: five sockets on a rail, and the crown's redundant copy. NOTHING on it moves unless the sim says
     // you were hit: the old ambient flame flicker moved ~150 px per frame at idle, which is more pixels than
@@ -496,18 +583,14 @@ export class Hud {
     // fight left; leaving it at full value made the empty life plate the brightest object in the frame beside
     // the card's own gold, which is a §3.2.5 and a §7.6 violation on the one frame that matters most.
     const cardAge = p.state === 'dead' && p.deathTick >= 0 ? now - p.deathTick : -1
-    const back = cardAge < CT.stele ? 1 : cardAge < CT.stele + 6 ? 0.7 : 0.4
+    const back = fightChrome(cardAge)
     pg.alpha = this.rig.alpha = back
+    pg.visible = this.rig.visible = back > 0
     // the panel edge takes the wine of the death card once you are out, and embers when you are one hit from it
     const edge = p.state === 'dead' ? C.purple2 : low && Math.floor(now / 12) % 2 ? C.emberLo : C.goldDim
     plate(pg, HEART_X - 4 + shake, 2, panelW, 26, edge)
-    for (let i = 0; i < n; i++) {
-      // The shelf-rule is issued ONLY under a living flame. Drawn under the spent cells too, its gold was the
-      // brightest pixel in an empty socket and it flattened full-vs-empty to nothing at the top of the range.
-      const x = HEART_X + i * STEP * 2 + shake
-      if (i < p.hp) { pg.rect(x, 23, FW * 2, 1).fill(C.gold); pg.rect(x, 24, FW * 2, 1).fill(C.emberLo) }
-      else pg.rect(x, 23, FW * 2, 1).fill(C.mortar)
-    }
+    // Capacity is the heart stamps themselves (lit vs bone outline). A gold dash under every socket
+    // was the unlabeled tick strip the w2r1 critics named. The groove below is only the mercy window.
     // groove under the rail: bare stone until the mercy window fills it with gold
     const gx = HEART_X - 1 + shake, gw = panelW - 6
     pg.rect(gx, 25, gw, 1).fill(C.mortar)
@@ -535,7 +618,7 @@ export class Hud {
       else if (dying) {
         const hot = hurtAge < 4
         this.drawFlame(g, x, 0, hot ? C.wickWhite : C.emberLo, hot ? C.wickWhite : C.emberLo, hot ? 0xffffff : C.ember, i % 3)
-      } else this.drawFlame(g, x, 0, C.ironHi, C.mortar, 0, 0, 6)   // spent: an empty socket - grey lip, black inside
+      } else this.drawEmptyHeart(g, x, 0)   // §7.5: spent is a boneDim outline, not a grey fill
       if (!lit && i === p.hp && hurtAge >= 6 && hurtAge < 34) {
         const t = hurtAge - 6
         const sy = -Math.floor(t / 4)
@@ -574,11 +657,11 @@ export class Hud {
   // A wide slash, not a heart: the blessing that changes the blade, in the HUD band, ember not gold.
   private drawCleaveMark(g: Graphics, ox: number, oy: number) {
     const M = [
+      '....XX.',
       '..XXXXX',
-      '.XXXXX.',
-      'XXXX...',
-      '.XXX...',
-      '..XX...',
+      'XXXXX..',
+      '.XXX..X',
+      '..XX.X.',
       '...X...',
     ]
     for (let y = 0; y < M.length; y++) {
@@ -586,7 +669,7 @@ export class Hud {
         if (M[y][x] !== 'X') continue
         const edge = (M[y][x - 1] !== 'X') || (M[y][x + 1] !== 'X') || (M[y - 1]?.[x] !== 'X') || (M[y + 1]?.[x] !== 'X')
         const tip = x >= 5 && y <= 1
-        g.rect(ox + x * 2, oy + y * 2, 2, 2).fill(tip ? C.emberHi : edge ? C.emberLo : C.ember)
+        g.rect(ox + x, oy + y + 4, 1, 1).fill(tip ? C.emberHi : edge ? C.emberLo : C.ember)
       }
     }
   }
@@ -603,7 +686,50 @@ export class Hud {
     }
   }
 
+  // Spent life: the same stamp as a hollow. §7.5 forbids a grey fill — the empty state is a boneDim lip
+  // so five sockets still read as five, and full-vs-empty is a hue step plus a fill step.
+  private drawEmptyHeart(g: Graphics, ox: number, oy: number) {
+    for (let y = 0; y < FH; y++) {
+      for (let x = 0; x < FW; x++) {
+        if (FLAME[y][x] !== 'X') continue
+        const edge = !inFlame(x - 1, y) || !inFlame(x + 1, y) || !inFlame(x, y - 1) || !inFlame(x, y + 1)
+        if (edge) g.rect(ox + x, oy + y, 1, 1).fill(C.boneDim)
+      }
+    }
+  }
+
   // --- wave counter + remaining-enemy pips ---------------------------------------------------------------------
+  private updateBoss(world: World) {
+    let e: World['enemies'][number] | null = null
+    for (const x of world.enemies) if (x.active && x.kind === 'warden') { e = x; break }
+    const g = this.bossG
+    if (!e) { g.visible = false; this.bossName.visible = false; return }
+    const dp = world.player
+    const cardAge = dp.state === 'dead' && dp.deathTick >= 0 ? world.tick - dp.deathTick : -1
+    const back = fightChrome(cardAge)
+    const bw = 168, bh = 16
+    const bx = Math.round((V.width - bw) / 2), by = 2
+    const cracked = e.phase > 0
+    const edge = cracked ? C.ember : C.goldDim
+    g.visible = back > 0
+    g.alpha = back
+    g.clear()
+    plate(g, bx, by, bw, bh, edge)
+    const inner = bw - 10
+    const fill = Math.max(0, Math.round(inner * (e.hp / e.maxHp)))
+    g.rect(bx + 5, by + 11, inner, 3).fill(C.mortar)
+    if (fill > 0) {
+      g.rect(bx + 5, by + 11, fill, 3).fill(cracked ? C.ember : C.gold)
+      g.rect(bx + 5, by + 11, fill, 1).fill(cracked ? C.emberHi : C.goldHot)
+    }
+    const mid = bx + 5 + Math.round(inner * 0.5)
+    g.rect(mid, by + 10, 1, 5).fill(C.void)
+    this.bossName.visible = back > 0
+    this.bossName.alpha = back
+    this.bossName.tint = cracked ? C.emberHi : C.bone
+    this.bossName.position.set(Math.round(V.width / 2), by + 3)
+  }
+
   private updateWave(world: World) {
     const w = world.wave
     const live = w.state === 'active' || w.state === 'pending'
@@ -611,20 +737,21 @@ export class Hud {
     // the same step-back the life plate takes: the readouts hold at full through the hold, then hand the frame
     // to the card. Ages are sim ticks off deathTick, so a stepwise capture shows exactly what the tick implies.
     const cardAge = dp.state === 'dead' && dp.deathTick >= 0 ? world.tick - dp.deathTick : -1
-    const back = cardAge < 0 ? 1 : cardAge < CT.stele ? 1 : cardAge < CT.stele + 6 ? 0.7 : 0.4
-    this.waveText.visible = live
+    const back = fightChrome(cardAge)
+    this.waveText.visible = live && back > 0
     this.waveText.alpha = back
     this.waveG.alpha = back
+    this.waveG.visible = live && back > 0
     const g = this.waveG
     g.clear()
-    if (!live) return
-    this.waveText.text = `WAVE ${Math.max(1, w.index + 1)}/${w.total}`
-
-    // one mark per body still owed to you
+    if (!live || back <= 0) return
+    // one mark per body still owed to you. The number is the language (w2r1: unlabeled ticks lost).
     let alive = 0
     for (const e of world.enemies) if (e.active && e.state !== 'dead') alive++
     const pending = world.spawnQueue.length
-    const total = Math.min(alive + pending, 16)
+    const owed = alive + pending
+    this.waveText.text = `LEFT ${owed}`
+    const total = Math.min(owed, 16)
     const tw = Math.max(58, Math.round(this.waveText.width))
     const px = V.width - 8 - tw - 4, pw = tw + 8
     plate(g, px, 2, pw, 26, C.goldDim)
@@ -724,7 +851,7 @@ export class Hud {
   // --- the death card -------------------------------------------------------------------------------------------
   private hideDeathCard() {
     if (this.cardKeyStr === '') return
-    this.cardKeyStr = ''; this.veilKey = ''; this.deathAt = null
+    this.cardKeyStr = ''; this.veilKey = ''; this.deathAt = null; this.deathKiller = null
     this.scrimG.clear(); this.cardG.clear()
     this.cardTitle.visible = this.cardSub.visible = this.cardKey.visible = this.cardAct.visible = false
     for (const r of this.cardRows) r.label.visible = r.value.visible = false
@@ -741,6 +868,7 @@ export class Hud {
     //    The corpse's screen pixel is latched on the killing frame and every later beat is anchored to it, so the
     //    veil never slides when the camera's death trauma shakes the world under it.
     if (!this.deathAt || age <= 1) this.deathAt = this.playerPx() ?? this.deathAt
+    if (this.deathKiller === null || age <= 1) this.deathKiller = inferKiller(world)
     const at = this.deathAt
     // The veil: an aperture closing on the corpse in eight whole steps, not a scrim dropped over the frame. It is
     // 0 on the body and ~0.33 at the far corner, so the room keeps its texture and its hierarchy and becomes the
@@ -777,9 +905,14 @@ export class Hud {
     let standing = 0
     for (const e of world.enemies) if (e.active) standing++
     const felled = Math.max(0, world.nextEnemyId - 1 - standing)
-    const secs = Math.max(0, Math.floor(p.deathTick / 60))
+    const secs = Math.max(0, Math.floor((p.deathTick - world.attemptStart) / 60))
+    const hub = world.rooms.some(r => r.id === HUB_ID)
+    const pulls = hub ? 'THE BARDO PULLS YOU BACK' : 'THE THRESHOLD PULLS YOU BACK'
+    if (this.cardSub.text !== pulls) this.cardSub.text = pulls
+    const act = hub ? 'RETURN' : 'BEGIN AGAIN'
+    if (this.cardAct.text !== act) this.cardAct.text = act
     const rows: [string, string][] = [
-      ['WAVE', `${Math.max(1, world.wave.index + 1)} / ${Math.max(1, world.wave.total)}`],
+      ['TAKEN BY', takenBy(this.deathKiller ?? 'none')],
       ['SENT ONWARD', `${felled}`],
       ['HELD', `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`],
     ]

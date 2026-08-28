@@ -3,7 +3,7 @@ import type { Atlas } from './atlas'
 import { fxRng } from './fxRng'
 import { FX_UNIT } from './fxUnits'
 
-interface P { s: Sprite; vx: number; vy: number; life: number; maxLife: number; drag: number; grav: number; scale0: number; scale1: number; rot: number; alpha0: number; alpha1: number; ground: number | null; tint0: number; tint1: number | null; sgn: number; unit: number }
+interface P { s: Sprite; spin: number; vx: number; vy: number; life: number; maxLife: number; drag: number; grav: number; scale0: number; scale1: number; rot: number; alpha0: number; alpha1: number; ground: number | null; tint0: number; tint1: number | null; sgn: number; unit: number }
 
 // Authored FX sprites are 16x16 (tools/make-bardo-fx.ts). `scale0`/`scale1` stay in screen pixels, so
 // the sprite scale is size/unit. shatter() passes BODY_UNIT because it scales a body texture, not an
@@ -47,13 +47,16 @@ export class Particles {
   private spawn(tex: Texture, x: number, y: number, o: Partial<P> & { tint?: number; tint1?: number; blend?: 'add' | 'normal' } = {}): P | null {
     if (this.live.length >= this.max) return null
     let p = this.pool.pop()
-    if (!p) { const s = new Sprite(); s.anchor.set(0.5); s.roundPixels = true; this.fx.addChild(s); p = { s, vx: 0, vy: 0, life: 0, maxLife: 1, drag: 1, grav: 0, scale0: 1, scale1: 1, rot: 0, alpha0: 1, alpha1: 0, ground: null, tint0: 0xffffff, tint1: null, sgn: 1, unit: FX } }
+    if (!p) { const s = new Sprite(); s.anchor.set(0.5); s.roundPixels = true; this.fx.addChild(s); p = { s, spin: 0, vx: 0, vy: 0, life: 0, maxLife: 1, drag: 1, grav: 0, scale0: 1, scale1: 1, rot: 0, alpha0: 1, alpha1: 0, ground: null, tint0: 0xffffff, tint1: null, sgn: 1, unit: FX } }
     p.s.texture = tex; p.s.visible = true; p.s.position.set(x, y)
     p.vx = o.vx ?? 0; p.vy = o.vy ?? 0; p.life = p.maxLife = o.maxLife ?? 0.4; p.drag = o.drag ?? 1; p.grav = o.grav ?? 0
     p.scale0 = o.scale0 ?? 1; p.scale1 = o.scale1 ?? p.scale0; p.rot = o.rot ?? 0; p.alpha0 = o.alpha0 ?? 1; p.alpha1 = o.alpha1 ?? 0; p.ground = o.ground ?? null
     p.tint0 = o.tint ?? 0xffffff; p.tint1 = o.tint1 ?? null; p.sgn = o.sgn ?? 1; p.unit = o.unit ?? FX
     p.s.tint = p.tint0; p.s.blendMode = o.blend ?? 'normal'
-    p.s.rotation = quantRot(fxRng.particles.next() * 6.28)
+    // `spin` is the true angle; the sprite only ever shows it quantised. Accumulating on the sprite
+    // itself discards the remainder every frame, and a slow spin never advances a step at all.
+    p.spin = fxRng.particles.next() * 6.28
+    p.s.rotation = quantRot(p.spin)
     p.s.scale.set(p.scale0 / p.unit * p.sgn, p.scale0 / p.unit)
     this.live.push(p)
     return p
@@ -69,7 +72,7 @@ export class Particles {
       p.vx *= Math.pow(p.drag, dt * 60); p.vy *= Math.pow(p.drag, dt * 60)
       p.s.x += p.vx * dt; p.s.y += p.vy * dt
       if (p.ground !== null && p.s.y > p.ground) { p.s.y = p.ground; p.vy = -Math.abs(p.vy) * 0.3; p.vx *= 0.6 }
-      if (p.rot !== 0) p.s.rotation = quantRot(p.s.rotation + p.rot * dt)
+      if (p.rot !== 0) { p.spin += p.rot * dt; p.s.rotation = quantRot(p.spin) }
       const sc = p.scale0 + (p.scale1 - p.scale0) * u
       p.s.scale.set(sc / p.unit * p.sgn, sc / p.unit)
       p.s.alpha = p.alpha0 + (p.alpha1 - p.alpha0) * u
@@ -176,7 +179,7 @@ export class Particles {
     // collapsed it: the 22.5-degree step has a +/-11.25-degree capture zone, so half the draws snapped
     // to exactly 0 and the rest to exactly one step. Pick the step directly instead — same three
     // angles, but uniformly, so a brazier reads as several tongues rather than a picket fence.
-    if (f) f.s.rotation = QUANT * (fxRng.particles.int(0, 2) - 1)
+    if (f) { f.spin = QUANT * (fxRng.particles.int(0, 2) - 1); f.s.rotation = f.spin }
   }
 
   // The enemy's own pixels fly apart along the hit direction, fall, and settle.

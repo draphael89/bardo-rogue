@@ -16,6 +16,38 @@ import sharp from 'sharp'
 import type { SheetDef, SheetFrame, SheetClip, SheetProvenance } from '../../src/render/sheet'
 import { validateSheetDef } from '../../src/render/sheet'
 import { canon, subset, nearestIndex, luminance, rgbToHex, liftLightness, solveLiftGamma, type PaletteSubset, type RGB } from './palette'
+import { tuning } from '../../src/tuning'
+
+/** Timing fields that make a tuning node a window a clip can legitimately hang off. */
+const WINDOW_KEYS = ['startup', 'active', 'recovery', 'windup', 'total', 'travel', 'freeze', 'draw', 'lungeTicks']
+
+/**
+ * Resolve every sim-timed clip's `ref` against tuning, and fail the compile if it does not land on a
+ * real timing window.
+ *
+ * The contract's header promises the compiler "validates that assertion against tuning and fails the
+ * build on a mismatch". Checking only that `ref` is a non-empty string does not do that: a typo, or a
+ * reference left stale after tuning.ts is reorganised, sails through while the sidecar still claims a
+ * machine-checked link — which is worse than no claim, because it invites trust.
+ */
+export function validateClipRefs(def: SheetDef, where: string): void {
+  for (const [name, clip] of Object.entries(def.clips ?? {})) {
+    if (clip.timing !== 'sim' || !clip.sim?.ref) continue
+    const parts = clip.sim.ref.split('.')
+    let node: unknown = tuning as unknown
+    for (const part of parts) {
+      if (node === null || typeof node !== 'object') { node = undefined; break }
+      node = (node as Record<string, unknown>)[part]
+    }
+    if (node === undefined || node === null || typeof node !== 'object') {
+      throw new Error(`sheet ${where}: clip "${name}" names tuning window "${clip.sim.ref}", which does not resolve`)
+    }
+    const keys = Object.keys(node as Record<string, unknown>)
+    if (!WINDOW_KEYS.some(k => keys.includes(k))) {
+      throw new Error(`sheet ${where}: clip "${name}" resolves "${clip.sim.ref}" to an object with no timing window (has: ${keys.slice(0, 8).join(', ')})`)
+    }
+  }
+}
 
 export const COMPILER_VERSION = 'bardo-art/1'
 
@@ -204,6 +236,27 @@ function dropStrayIslands(idx: Int16Array, cell: number, minPixels: number): num
 
 interface Cell { data: Uint8Array; w: number; h: number }
 
+/**
+ * Pad a cropped pose into a square, so reducing it cannot stretch it.
+ *
+ * `reduce` maps width and height onto the output cell independently, which is right for a square
+ * source and wrong for a cropped silhouette: a tall pose squashed into a square cell is exactly the
+ * distortion `fit: "pose"` exists to prevent. Centre horizontally, anchor south — the sprite stands
+ * on the bottom of its cell, which is where the foot pivot is measured from.
+ */
+function padToSquare(c: Cell): Cell {
+  const side = Math.max(c.w, c.h)
+  if (side === c.w && side === c.h) return c
+  const out = new Uint8Array(side * side * 4)
+  const ox = Math.floor((side - c.w) / 2)
+  const oy = side - c.h
+  for (let y = 0; y < c.h; y++) {
+    const from = y * c.w * 4
+    out.set(c.data.subarray(from, from + c.w * 4), ((y + oy) * side + ox) * 4)
+  }
+  return { data: out, w: side, h: side }
+}
+
 function extractCell(src: Uint8Array, sw: number, x0: number, y0: number, w: number, h: number): Cell {
   const out = new Uint8Array(w * h * 4)
   for (let y = 0; y < h; y++) {
@@ -348,7 +401,7 @@ export async function compileSheet(spec: CompileSpec, specPath = '<inline>'): Pr
       if (fit === 'pose') {
         const b = silhouetteBounds(region, chromaKey)
         if (!b) throw new Error(`compile: cell ${index} ("${fs.name}") has no opaque pose`)
-        region = extractCell(region.data as Uint8Array, region.w, b.x0, b.y0, b.x1 - b.x0 + 1, b.y1 - b.y0 + 1)
+        region = padToSquare(extractCell(region.data as Uint8Array, region.w, b.x0, b.y0, b.x1 - b.x0 + 1, b.y1 - b.y0 + 1))
       }
 
       const available = cell - margin * 2
@@ -435,6 +488,7 @@ export async function compileSheet(spec: CompileSpec, specPath = '<inline>'): Pr
     },
   }
   validateSheetDef(def, spec.id)
+  validateClipRefs(def, spec.id)
 
   const report: CompileReport = {
     spec: specPath,

@@ -7,14 +7,14 @@
 //
 // Compiled output goes to public/assets. Candidates never do — they live in .art-cache/ until a human
 // approves them into art/approved/.
-import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync, existsSync, copyFileSync } from 'node:fs'
 import { dirname, basename, join } from 'node:path'
 import sharp from 'sharp'
 import { canon, luminance, type RGB } from './art/palette'
 import { compileSheet, writeSidecar, type CompileSpec } from './art/compile'
 import { makeContext, runGates, formatGates, summarise, loadPixels } from './art/gates'
 import type { SheetDef } from '../src/render/sheet'
-import { buildPrompt, generate, promptHash, request, tokenFor, type GenerateSpec, type ProviderName } from './art/generate'
+import { buildPrompt, generate, promptHash, requests, referenceImages, tokenFor, type GenerateSpec, type ProviderName } from './art/generate'
 
 const argv = process.argv.slice(2)
 const cmd = argv[0]
@@ -81,9 +81,17 @@ async function cmdCompile(): Promise<void> {
   // Redirecting the image redirects its sidecar too. A candidate that leaves half of itself in
   // public/assets is not a candidate — it is a half-promoted asset nobody approved.
   if (flag('out')) { spec.output = flag('out')!; spec.sidecar = undefined }
+  const destPng = spec.output
+  const destSidecar = spec.sidecar ?? destPng.replace(/\.png$/, '.json')
+
+  // Compile into the cache and PROMOTE only after the gates pass. Writing the declared destination
+  // first means a rejected candidate has already replaced the last good production asset by the time
+  // the command exits nonzero — which is the opposite of what the rejection message promises, and
+  // breaks the lifecycle rule at the top of this file.
+  const stage = join('.art-cache/staging', basename(destPng))
+  mkdirSync(dirname(stage), { recursive: true })
+  spec.output = stage
   const { def, report } = await compileSheet(spec, specPath)
-  const sidecar = spec.sidecar ?? spec.output.replace(/\.png$/, '.json')
-  writeSidecar(sidecar, def)
 
   const ctx = await makeContext(def, report)
   const gates = runGates(ctx)
@@ -94,12 +102,15 @@ async function cmdCompile(): Promise<void> {
 
   console.log(`compiled ${spec.id}: ${report.atlas.width}x${report.atlas.height}, ${report.atlas.colors} colours, ${report.atlas.indexed ? 'indexed' : 'RGBA'}`)
   console.log(`  source ${report.source.width}x${report.source.height} sha ${report.source.hash}`)
-  console.log(`  sidecar ${sidecar}`)
   console.log(formatGates(gates))
   if (!pass && flag('no-gate') === undefined) {
-    console.error(`\nBUILD REJECTED: ${failed.length} hard gate failure(s). The asset is written for inspection but must not be promoted.`)
+    console.error(`\nBUILD REJECTED: ${failed.length} hard gate failure(s).`)
+    console.error(`The candidate is at ${stage} for inspection. ${destPng} is untouched.`)
     process.exit(2)
   }
+  copyFileSync(stage, destPng)
+  writeSidecar(destSidecar, def)
+  console.log(`  promoted -> ${destPng} + ${destSidecar}`)
   if (warned.length) console.log(`(${warned.length} warnings — judged, not blocking)`)
 }
 
@@ -118,11 +129,14 @@ async function cmdGate(): Promise<void> {
     if (data[i + 3] < 255) partialAlpha++
     distinct.add('#' + [data[i], data[i + 1], data[i + 2]].map(v => v.toString(16).padStart(2, '0')).join('').toUpperCase())
   }
+  const canonHex = new Set(Object.values(canon().colors).map(c => c.hex))
   const report = {
     spec: sidecarPath, input: png, output: png, sidecar: sidecarPath,
     source: { width, height, hash: '' },
     atlas: { cell: def.cell, cols: def.cols, rows: def.rows, width, height, colors: distinct.size, partialAlpha, indexed: false },
-    palette: [...distinct].sort(), offPalette: [] as string[], frames: [],
+    palette: [...distinct].sort(),
+    offPalette: [...distinct].filter(h => !canonHex.has(h)).sort(),
+    frames: [],
   }
   const ctx = await makeContext(def, report as never)
   const gates = runGates(ctx)
@@ -161,13 +175,17 @@ async function cmdGenerate(): Promise<void> {
   const provider = (flag('provider') ?? 'retrodiffusion') as ProviderName
   const prompt = buildPrompt(spec)
   if (flag('dry-run') !== undefined || !tokenFor(provider)) {
-    const req = request(provider, spec, '<TOKEN>')
+    const reqs = await requests(provider, spec, '<TOKEN>')
+    const refs = await referenceImages(spec.references)
     console.log(`--- prompt (sha ${promptHash(prompt)}) ---\n${prompt}`)
-    console.log(`\n--- request ---\n${req.method} ${req.url}`)
-    const body = req.body as Record<string, unknown>
-    const redacted = { ...body }
-    for (const k of ['input_palette', 'color_image']) if (k in redacted) redacted[k] = '<base64 palette>'
+    console.log(`\n--- style references: ${refs.length} resolved from ${JSON.stringify(spec.references ?? [])} ---`)
+    console.log(`\n--- ${reqs.length} request(s) ---\n${reqs[0].method} ${reqs[0].url}`)
+    const redacted = { ...(reqs[0].body as Record<string, unknown>) }
+    for (const k of ['input_palette', 'color_image', 'reference_images', 'style_image']) {
+      if (k in redacted) redacted[k] = Array.isArray(redacted[k]) ? `<${(redacted[k] as unknown[]).length} base64 image(s)>` : '<base64 image>'
+    }
     console.log(JSON.stringify(redacted, null, 2))
+    if (reqs.length > 1) console.log(`(${reqs.length - 1} further identical request(s) with incremented seeds — this provider returns one image per call)`)
     if (!tokenFor(provider)) console.log(`\n(no API key in the environment — this was a dry run. Set the provider's key to generate.)`)
     return
   }

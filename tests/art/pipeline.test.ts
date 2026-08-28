@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import sharp from 'sharp'
 import { validateSheetDef, type SheetDef } from '../../src/render/sheet'
-import { compileSheet } from '../../tools/art/compile'
+import { compileSheet, validateClipRefs } from '../../tools/art/compile'
 import { makeContext, runGates, summarise } from '../../tools/art/gates'
 import { canon, rgbToHex, type RGB } from '../../tools/art/palette'
 
@@ -255,5 +255,60 @@ describe('HUD palette', () => {
       }
     })
     expect(off, 'HUD paints off-palette colour').toEqual([])
+  })
+})
+
+// Every fault below was found by a review bot on PR #7 and verified against the code before fixing.
+describe('review findings', () => {
+  it('resolves a sim clip reference against tuning, and rejects one that does not', () => {
+    const base = {
+      id: 'x', version: 1, kind: 'character' as const, cell: 32, cols: 2, rows: 2,
+      palette: 'p', maxColors: 16, frames: { a: { i: 0, pivot: [16, 30] }, b: { i: 1, pivot: [16, 30] } },
+    }
+    const withRef = (ref: string) =>
+      ({ ...base, clips: { c: { frames: ['a', 'b'], timing: 'sim', sim: { ref } } } }) as unknown as SheetDef
+
+    for (const ok of ['player.attack.swings.0', 'player.attack.swings.2', 'player.dodge', 'brute']) {
+      expect(() => validateClipRefs(withRef(ok), 'x'), ok).not.toThrow()
+    }
+    // A typo, or a ref left stale after tuning.ts moves, must fail the build — the sidecar claims a
+    // machine-checked link, and an unchecked claim is worse than no claim.
+    expect(() => validateClipRefs(withRef('player.attack.swings.9'), 'x')).toThrow(/does not resolve/)
+    expect(() => validateClipRefs(withRef('player.nonesuch'), 'x')).toThrow(/does not resolve/)
+    // Resolves to a real object, but one with no timing window in it.
+    expect(() => validateClipRefs(withRef('view'), 'x')).toThrow(/no timing window/)
+  })
+
+  it('every shipped sidecar names a tuning window that still exists', () => {
+    for (const n of SHEETS) {
+      const def = JSON.parse(readFileSync(sidecarPath(n), 'utf8')) as SheetDef
+      expect(() => validateClipRefs(def, n), n).not.toThrow()
+    }
+  })
+
+  it('pose fit preserves aspect instead of stretching a cropped silhouette', async () => {
+    // A tall, narrow bar on a green matte inside a WIDE cell. Fitting its crop to a square cell by
+    // mapping width and height independently would square it up; the whole point of `fit: "pose"` is
+    // that it must not.
+    const W = 240, H = 120
+    const buf = Buffer.alloc(W * H * 4)
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const i = (y * W + x) * 4
+      const inBar = x > 40 && x < 60 && y > 10 && y < 110      // 20 wide x 100 tall => aspect 0.2
+      if (inBar) { buf[i] = 110; buf[i + 1] = 44; buf[i + 2] = 70; buf[i + 3] = 255 }
+      else { buf[i] = 0; buf[i + 1] = 255; buf[i + 2] = 0; buf[i + 3] = 255 }
+    }
+    const dir = mkdtempSync(join(tmpdir(), 'bardo-pose-'))
+    const src = join(dir, 'src.png')
+    await sharp(buf, { raw: { width: W, height: H, channels: 4 } }).png().toFile(src)
+    const { report } = await compileSheet({
+      id: 'test.pose', kind: 'character', input: src, output: join(dir, 'out.png'),
+      cell: 32, cols: 1, rows: 1, fit: 'pose', minIsland: 0, despeckle: false,
+      palette: ['mortar', 'purple1', 'purple2'],
+      frames: [{ name: 'bar', i: 0 }],
+    }, 'test')
+    const b = report.frames[0].bounds!
+    expect(b.w / b.h).toBeLessThan(0.5)      // still clearly tall and narrow
+    expect(b.w / b.h).toBeGreaterThan(0.05)
   })
 })

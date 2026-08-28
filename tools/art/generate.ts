@@ -11,8 +11,10 @@
 // forbidden list) is the same instruction every time, and its hash is recorded in the sheet's
 // provenance so a result can be traced back to the exact words that produced it.
 import { createHash } from 'node:crypto'
-import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs'
+import { mkdirSync, writeFileSync, readFileSync, existsSync, statSync, readdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import sharp from 'sharp'
 import { canon, subset } from './palette'
 
 export type ProviderName = 'retrodiffusion' | 'pixellab'
@@ -85,16 +87,47 @@ export function buildPrompt(spec: GenerateSpec): string {
 
 export const promptHash = (prompt: string): string => createHash('sha256').update(prompt).digest('hex').slice(0, 16)
 
-/** The canon palette as a base64 PNG, which is what both providers take as a palette lock. */
-export function palettePng(names?: string[]): string {
-  const p = join(dirname(new URL(import.meta.url).pathname), '..', '..', 'art', 'palette', 'canon.png')
-  if (!existsSync(p)) throw new Error('generate: art/palette/canon.png is missing — run `pnpm palette`')
-  if (!names) return readFileSync(p).toString('base64')
-  // A per-asset ramp is a stricter lock than the whole canon; build it on the fly.
+/**
+ * The canon palette as a base64 PNG, which is what both providers take as a palette lock.
+ *
+ * A per-asset ramp is a stricter lock than the whole canon, so it is encoded on the fly — as an actual
+ * PNG. Returning the raw RGBA bytes has no header and no dimensions, so the provider either rejects
+ * the request or silently ignores the lock, which quietly removes the one mechanism this pipeline
+ * relies on to stop palette drift at the source.
+ */
+export async function palettePng(names?: string[]): Promise<string> {
+  const p = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'art', 'palette', 'canon.png')
+  if (!names) {
+    if (!existsSync(p)) throw new Error('generate: art/palette/canon.png is missing — run `pnpm palette`')
+    return readFileSync(p).toString('base64')
+  }
   const sub = subset(names)
   const raw = Buffer.alloc(sub.rgb.length * 4)
   sub.rgb.forEach((c, i) => { raw[i * 4] = c[0]; raw[i * 4 + 1] = c[1]; raw[i * 4 + 2] = c[2]; raw[i * 4 + 3] = 255 })
-  return raw.toString('base64')
+  const png = await sharp(raw, { raw: { width: sub.rgb.length, height: 1, channels: 4 } })
+    .png({ palette: false, compressionLevel: 9 }).toBuffer()
+  return png.toString('base64')
+}
+
+/**
+ * Resolve the spec's style references to base64 PNGs.
+ *
+ * `references` may name files or directories; `art/approved/` is a directory by design, because the
+ * approved pool IS the style reference and it grows. Without this the field was inert and adding an
+ * approved master conditioned nothing — the pipeline's advertised consistency mechanism was a
+ * comment. Newest first, capped, since both providers take only a handful.
+ */
+export async function referenceImages(refs: readonly string[] | undefined, max = 4): Promise<string[]> {
+  if (!refs?.length) return []
+  const files: string[] = []
+  for (const r of refs) {
+    if (!existsSync(r)) continue
+    if (statSync(r).isDirectory()) {
+      for (const f of readdirSync(r)) if (/\.png$/i.test(f)) files.push(join(r, f))
+    } else if (/\.png$/i.test(r)) files.push(r)
+  }
+  files.sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs)
+  return files.slice(0, max).map(f => readFileSync(f).toString('base64'))
 }
 
 export interface ProviderRequest {
@@ -105,32 +138,49 @@ export interface ProviderRequest {
 }
 
 /**
- * The exact HTTP call each provider needs. Kept as data rather than buried in a fetch so
- * `pnpm art generate --dry-run` can print precisely what would be sent, and so the request shape is
- * reviewable without a key.
+ * The exact HTTP calls each provider needs, as data rather than buried in a fetch, so
+ * `pnpm art generate --dry-run` prints precisely what would be sent and the shape is reviewable
+ * without a key.
+ *
+ * Returns a LIST because the providers batch differently: Retro Diffusion takes `num_images` and
+ * returns a batch from one call, while PixelLab returns a single image per call. Issuing one request
+ * per candidate is what makes `count` mean the same thing on a provider-neutral spec — otherwise the
+ * identical spec yields eight candidates on one provider and one on the other.
  */
-export function request(provider: ProviderName, spec: GenerateSpec, token: string): ProviderRequest {
+export async function requests(provider: ProviderName, spec: GenerateSpec, token: string): Promise<ProviderRequest[]> {
   const prompt = buildPrompt(spec)
+  const palette = await palettePng(spec.palette)
+  const refs = await referenceImages(spec.references)
+  const count = Math.max(1, spec.count ?? 8)
+
   if (provider === 'retrodiffusion') {
-    return {
+    return [{
       url: 'https://api.retrodiffusion.ai/v1/inferences',
       method: 'POST',
       headers: { 'X-RD-Token': token, 'Content-Type': 'application/json' },
       body: {
         prompt,
-        prompt_style: spec.kind === 'tile' ? 'rd_tile__tileset' : 'rd_plus__retro',
+        // Reference images are an RD Pro feature, so supplying the approved pool selects that style.
+        prompt_style: spec.kind === 'tile' ? 'rd_tile__tileset' : refs.length ? 'rd_pro__default' : 'rd_plus__retro',
         width: spec.size,
         height: spec.size,
-        num_images: spec.count ?? 8,
+        num_images: count,
         remove_bg: true,
-        input_palette: palettePng(spec.palette),
+        input_palette: palette,
+        ...(refs.length ? { reference_images: refs } : {}),
         ...(spec.seed !== undefined ? { seed: spec.seed } : {}),
       },
-    }
+    }]
   }
-  return {
-    url: 'https://api.pixellab.ai/v2/generate-image-pixflux',
-    method: 'POST',
+
+  // PixelLab: bitforge is the endpoint that takes a style image, so the approved pool selects it;
+  // pixflux is the plain text-to-sprite path when there is nothing to condition on.
+  const url = refs.length
+    ? 'https://api.pixellab.ai/v2/generate-image-bitforge'
+    : 'https://api.pixellab.ai/v2/generate-image-pixflux'
+  return Array.from({ length: count }, (_, i) => ({
+    url,
+    method: 'POST' as const,
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: {
       description: prompt,
@@ -140,10 +190,12 @@ export function request(provider: ProviderName, spec: GenerateSpec, token: strin
       shading: 'basic shading',
       detail: 'medium detail',
       no_background: true,
-      color_image: { type: 'base64', base64: palettePng(spec.palette) },
-      ...(spec.seed !== undefined ? { seed: spec.seed } : {}),
+      color_image: { type: 'base64', base64: palette },
+      ...(refs.length ? { style_image: { type: 'base64', base64: refs[0] }, style_strength: 0.5 } : {}),
+      // One call per candidate, so vary the seed or every candidate comes back identical.
+      ...(spec.seed !== undefined ? { seed: spec.seed + i } : {}),
     },
-  }
+  }))
 }
 
 const TOKEN_ENV: Record<ProviderName, string> = {
@@ -163,19 +215,27 @@ export function tokenFor(provider: ProviderName): string | null {
 export async function generate(provider: ProviderName, spec: GenerateSpec, outDir = '.art-cache/candidates'): Promise<GenerateResult> {
   const token = tokenFor(provider)
   if (!token) throw new Error(`generate: ${TOKEN_ENV[provider]} is not set — export it, or use --dry-run to review the request`)
-  const req = request(provider, spec, token)
+  const reqs = await requests(provider, spec, token)
   const prompt = buildPrompt(spec)
-  const res = await fetch(req.url, { method: req.method, headers: req.headers, body: JSON.stringify(req.body) })
-  if (!res.ok) throw new Error(`generate: ${provider} returned ${res.status} ${res.statusText}: ${(await res.text()).slice(0, 400)}`)
-  const json = await res.json() as Record<string, unknown>
+  const images: string[] = []
+  let jobId: string | undefined
+  let seed: number | undefined = spec.seed
 
-  // Both providers return base64 images; the key differs and has changed across versions, so accept
-  // any of the documented shapes rather than pinning one and breaking on the next release.
-  const images: string[] =
-    (json.base64_images as string[]) ??
-    (json.images as string[]) ??
-    (json.image ? [json.image as string] : [])
-  if (!images.length) throw new Error(`generate: ${provider} returned no images: ${JSON.stringify(json).slice(0, 400)}`)
+  for (const req of reqs) {
+    const res = await fetch(req.url, { method: req.method, headers: req.headers, body: JSON.stringify(req.body) })
+    if (!res.ok) throw new Error(`generate: ${provider} returned ${res.status} ${res.statusText}: ${(await res.text()).slice(0, 400)}`)
+    const json = await res.json() as Record<string, unknown>
+    // Both providers return base64; the key differs and has changed across versions, so accept any of
+    // the documented shapes rather than pinning one and breaking on the next release.
+    const batch: string[] =
+      (json.base64_images as string[]) ??
+      (json.images as string[]) ??
+      (json.image ? [(json.image as { base64?: string })?.base64 ?? json.image as string] : [])
+    if (!batch.length) throw new Error(`generate: ${provider} returned no images: ${JSON.stringify(json).slice(0, 400)}`)
+    images.push(...batch)
+    jobId ??= (json.job_id ?? json.id) as string | undefined
+    seed ??= json.seed as number | undefined
+  }
 
   mkdirSync(outDir, { recursive: true })
   const hash = promptHash(prompt)
@@ -185,9 +245,5 @@ export async function generate(provider: ProviderName, spec: GenerateSpec, outDi
     return file
   })
   writeFileSync(join(outDir, `${provider}-${hash}.prompt.txt`), prompt + '\n')
-  return {
-    provider, promptHash: hash, files,
-    jobId: (json.job_id ?? json.id) as string | undefined,
-    seed: (json.seed as number | undefined) ?? spec.seed,
-  }
+  return { provider, promptHash: hash, files, jobId, seed }
 }

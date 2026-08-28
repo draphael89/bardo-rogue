@@ -159,12 +159,17 @@ export function bindSheet(def: SheetDef, source: Texture, whiteSource: Texture):
     has: name => name in def.frames || !!def.aliases?.[name],
     names: () => Object.keys(def.frames).sort((a, b) => def.frames[a].i - def.frames[b].i),
     frame(name: string): SheetFrameView {
-      const hit = cache.get(name)
+      // Resolve the alias FIRST, so an alias and its target share one cache entry and therefore one
+      // Texture. Caching per name minted a second Texture for the same cell, and every consumer that
+      // keys a map on texture identity (the player rim's white-silhouette lookup, the shatter
+      // sub-texture cache) missed on it — the rim stamped the coloured body instead of a silhouette.
+      const key = def.frames[name] ? name : (def.aliases?.[name] ?? name)
+      const hit = cache.get(key)
       if (hit) return hit
-      const f = def.frames[name] ?? def.frames[def.aliases?.[name] ?? '']
+      const f = def.frames[key]
       if (!f) throw new Error(`sheet ${def.id}: no frame "${name}"`)
       const view: SheetFrameView = {
-        name,
+        name: key,
         index: f.i,
         texture: cut(source, f.i),
         white: cut(whiteSource, f.i),
@@ -172,7 +177,7 @@ export function bindSheet(def: SheetDef, source: Texture, whiteSource: Texture):
         anchorY: f.pivot[1] / def.cell,
         sockets: f.sockets ?? EMPTY_SOCKETS,
       }
-      cache.set(name, view)
+      cache.set(key, view)
       return view
     },
   }

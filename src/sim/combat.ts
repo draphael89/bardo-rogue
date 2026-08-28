@@ -50,8 +50,10 @@ export function addFreeze(world: World, ticks: number): void {
 // deepen or extend the effect; they can never stack into a permanent slow.
 export function addBulletTime(world: World, ticks: number, rate: number): void {
   if (ticks <= 0) return   // or slowRate would be set with no countdown to ever restore it
+  const add = Math.min(tuning.bullet.maxTicks, ticks)
   world.slowRate = world.slowTicks > 0 ? Math.min(world.slowRate, rate) : rate
-  world.slowTicks = Math.min(tuning.bullet.maxTicks, Math.max(world.slowTicks, ticks))
+  // longest tail wins: cap the incoming window, never shrink a longer one already running
+  world.slowTicks = Math.max(world.slowTicks, add)
 }
 
 export function clearBulletTime(world: World): void {
@@ -71,6 +73,10 @@ export function damageEnemy(world: World, e: Enemy, damage: number, angle: numbe
   e.kbx += Math.cos(angle) * kb
   e.kby += Math.sin(angle) * kb
   e.facing = Math.cos(angle) > 0 ? -1 : 1 // face the attacker
+
+  // A heavy is the committed swing. The world takes a short breath; the player does not.
+  // Dummies are a training bag — they must not put the room in slow motion.
+  if (heavy && kind !== 'dummy') addBulletTime(world, tuning.bullet.heavyTicks, tuning.bullet.heavyRate)
 
   if (killed) {
     e.state = 'dead'
@@ -117,8 +123,8 @@ export function hurtPlayer(world: World, angle: number, damage: number): boolean
   const p = world.player
   if (p.state === 'dead') return false
   if (isPlayerInvulnerable(world)) {
-    if (p.state === 'dodge' && !p.dodgeRead) {
-      p.dodgeRead = 1
+    if (p.state === 'dodge' && p.dodgeRead < 2) {
+      p.dodgeRead = 2
       // the read is the reward: the world drops to a crawl and the player's clock does not
       addBulletTime(world, tuning.bullet.ticks, tuning.bullet.rate)
       world.emit({ type: 'dodged', x: p.x, y: p.y })
@@ -153,4 +159,18 @@ export function isPlayerInvulnerable(world: World): boolean {
     return p.stateTick >= d.iStart && p.stateTick <= d.iEnd
   }
   return false
+}
+
+// A hostile hitbox passed close during the roll (or just as the i-frames ended) without overlapping.
+// Once per roll; a later overlap still upgrades to the jackpot. No event — the breath is the tell,
+// and the cold floor mark stays reserved for a real pass-through.
+export function noteNearMiss(world: World): void {
+  const p = world.player
+  if (p.dodgeRead) return
+  if (p.state !== 'dodge') return
+  const d = tuning.player.dodge
+  if (p.stateTick > d.iEnd + 2) return
+  p.dodgeRead = 1
+  addBulletTime(world, tuning.bullet.grazeTicks, tuning.bullet.grazeRate)
+  world.emit({ type: 'graze', x: p.x, y: p.y })
 }

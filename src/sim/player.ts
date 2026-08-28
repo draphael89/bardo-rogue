@@ -2,7 +2,7 @@ import { tuning, DT } from '@/tuning'
 import type { Player, World } from './world'
 import type { InputFrame } from './input'
 import { moveWithWalls } from './collision'
-import { arcHits, damageEnemy, addFreeze, sweepEase, swingStep } from './combat'
+import { arcHits, damageEnemy, addFreeze, addBulletTime, sweepEase, swingStep } from './combat'
 import { swingReach } from './boons'
 import { ARM, armOf } from './weapons'
 import { bowMoveScale, bowSteer, looseArrow, startDraw } from './bow'
@@ -85,9 +85,8 @@ export function updatePlayer(world: World, input: InputFrame): void {
   } else if (p.state === 'attack' && armOf(world) === ARM.bow) {
     const B = tuning.bow
     if (p.stateTick === B.draw) looseArrow(world)
-    const recoverTick = p.stateTick - B.draw
     if (p.stateTick >= B.draw + B.recover) { p.state = 'free'; p.stateTick = 0 }
-    else if (recoverTick >= 0 && p.dodgeBuffer > 0 && recoverTick >= B.dodgeCancelFrom) startDodge(world)
+    else if (p.dodgeBuffer > 0 && p.stateTick >= B.dodgeCancelFrom) startDodge(world)
   } else if (p.state === 'attack') {
     const s = P.attack.swings[p.swingIndex]
     // hit-confirm: a swing that touched something recovers on its own clock; a whiff pays for the miss
@@ -126,10 +125,11 @@ export function updatePlayer(world: World, input: InputFrame): void {
       dx = p.dodgeDirX * peak * w; dy = p.dodgeDirY * peak * w
       p.vx = dx / DT; p.vy = dy / DT
     } else {
-      // Landing. The feet are planted and steering bleeds back in — this is the price of the roll,
-      // and it is why rolling everywhere is slower than running everywhere.
+      // Landing. The roll's cooldown, not a stumble: a steer floor so the first step is a step,
+      // then the curve gives the rest of the feet back. The lock is still the price.
       const rec = p.stateTick - d.travel
-      const scale = Math.pow((rec + 1) / (d.total - d.travel), d.landMoveExp)
+      const u = (rec + 1) / (d.total - d.travel)
+      const scale = Math.max(d.landMoveMin, Math.pow(u, d.landMoveExp))
       const tx = mlen > 0.01 ? input.moveX / mlen * P.maxSpeed * scale : 0
       const ty = mlen > 0.01 ? input.moveY / mlen * P.maxSpeed * scale : 0
       steer(p, tx, ty)
@@ -183,6 +183,7 @@ export function updatePlayer(world: World, input: InputFrame): void {
           // one tick and goes stale when a hub return recycles projectile ids.
           punishBoltOwner(world, b.id, b.x, b.y)
           addFreeze(world, tuning.hitstop.boltCut)
+          addBulletTime(world, tuning.bullet.cutTicks, tuning.bullet.cutRate)
           world.emit({ type: 'boltCut', x: b.x, y: b.y })
         }
       }

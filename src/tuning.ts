@@ -33,34 +33,37 @@ export const tuning = {
     hp: 5,
     hurtIFrames: 40, hurtKnockback: 12, hurtHitstop: 4,
     // Launch, invulnerable traversal, landing — three readable phases in one state, and a price.
-    // Measured: the burst peaks at 191 px/s against a 95 px/s run, but the whole 24-tick cycle
-    // averages 94.8 px/s, so the roll is an escape and no longer a faster way to travel. It is
-    // untouchable for 10 of the cycle's 25 ticks (was 11 of 19), and the brake plus the whole landing are open,
-    // so a player who only rolls gets hit.
+    // Travel is the escape; landing is the cooldown. i-frames cover the whole travel so the roll
+    // you asked for is the roll you got. Landing keeps a steer floor so the feet come back under
+    // you instead of gluing to the floor. Seven landing ticks, not eleven: the roll ends on the
+    // feet, not in a stumble. Distance is 24 px so a held roll still cannot beat a run.
     dodge: {
-      total: 24,            // whole dodge state: travel + landing recovery
+      total: 20,            // whole dodge state: travel + landing recovery
       travel: 13,           // ticks the roll's own momentum owns the body
-      distance: 32,         // px covered across those travel ticks
+      distance: 24,         // px covered across those travel ticks — landing mobility uses the rest of the budget so a held roll cannot beat a run
       push: 0.55,           // speed scale on the launch tick: the shove off the back foot
       brake: 5,             // closing travel ticks, decelerating to a dead stop
-      iStart: 1, iEnd: 10,  // i-frames: one honest tick of commitment, then the pass-through window
-      landMoveExp: 2.4,     // steering returns across the landing on u^exp — planted, then back on the feet
-      attackCancelFrom: 11, // the roll can be cut into a swing from here: the aggressive exit
+      iStart: 0, iEnd: 12,  // i-frames: the whole travel, including the launch and the brake
+      landMoveExp: 1.2,     // steering eases in across the landing
+      landMoveMin: 0.28,    // first landing tick still has ~27 px/s — a step, not a plant
+      attackCancelFrom: 8,  // late travel: the swing's own startup covers the rest of the roll
       buffer: 8,
     },
     attack: {
       buffer: 8,
-      steerRateDeg: 12,     // max deg/tick the swing angle may still be steered, during steerTicks only
+      steerRateDeg: 16,     // max deg/tick the swing angle may still be steered, during steerTicks only
                             // note the press tick cannot steer (the state is entered after the steer block),
-                            // so a light's usable correction is (steerTicks - 1) * steerRateDeg
+                            // so a light's usable correction is (steerTicks - 1) * steerRateDeg — 48°,
+                            // enough for an 8-way tap to finish a cardinal-to-diagonal redirect
       heavyChargeTicks: 2,  // startup ticks before the heavy's blade-glow telegraph lights up (presentation)
       swings: [
-        { startup: 4, active: 4, recovery: 13, damage: 2, radius: 25, arcDeg: 130, lunge: 13, windup: 2, hitstop: 3, knockback: 90, chainFrom: 2, dodgeCancelFrom: 1, whiffPenalty: 7, moveCommit: 0.45, moveRecover: 0.7, steerTicks: 4, sweep: 1, heavy: false },
-        { startup: 4, active: 4, recovery: 13, damage: 2, radius: 25, arcDeg: 150, lunge: 15, windup: 2, hitstop: 3, knockback: 95, chainFrom: 2, dodgeCancelFrom: 1, whiffPenalty: 7, moveCommit: 0.45, moveRecover: 0.7, steerTicks: 4, sweep: -1, heavy: false },
-        { startup: 12, active: 7, recovery: 24, damage: 4, radius: 31, arcDeg: 215, lunge: 30, windup: 8, hitstop: 8, knockback: 260, chainFrom: 999, dodgeCancelFrom: 9, whiffPenalty: 14, moveCommit: 0, moveRecover: 0.1, steerTicks: 4, sweep: 1, heavy: true },
+        { startup: 4, active: 4, recovery: 13, damage: 2, radius: 25, arcDeg: 130, lunge: 13, windup: 2, hitstop: 3, knockback: 90, chainFrom: 2, dodgeCancelFrom: 0, whiffPenalty: 7, moveCommit: 0.45, moveRecover: 0.7, steerTicks: 4, sweep: 1, heavy: false },
+        { startup: 4, active: 4, recovery: 13, damage: 2, radius: 25, arcDeg: 150, lunge: 15, windup: 2, hitstop: 3, knockback: 95, chainFrom: 2, dodgeCancelFrom: 0, whiffPenalty: 7, moveCommit: 0.45, moveRecover: 0.7, steerTicks: 4, sweep: -1, heavy: false },
+        { startup: 12, active: 7, recovery: 24, damage: 4, radius: 31, arcDeg: 215, lunge: 30, windup: 8, hitstop: 8, knockback: 260, chainFrom: 999, dodgeCancelFrom: 4, whiffPenalty: 14, moveCommit: 0, moveRecover: 0.35, steerTicks: 4, sweep: 1, heavy: true },
       ] as SwingDef[],
     },
-    aimAssistDeg: 20,
+    aimAssistDeg: 28,
+    aimLockConeDeg: 50,
     deathSlowmoTicks: 30, deathSlowmo: 0.25,
   },
 
@@ -68,7 +71,7 @@ export const tuning = {
   bow: {
     draw: 10,
     recover: 14,
-    dodgeCancelFrom: 3,
+    dodgeCancelFrom: 6,   // state ticks from the draw start: cancel the string, or roll after the loose
     steerTicks: 8,
     muzzle: 10,
     speed: 260,
@@ -89,7 +92,15 @@ export const tuning = {
   // `rate` is per-mille of normal speed and should divide 1000, or the stretched clock is not exact.
   // Short on purpose: at rate 250 the player gets four times the real time to act AND four times the
   // real-time damage, so the window is the lever, not the depth.
-  bullet: { rate: 250, ticks: 24, maxTicks: 24 },
+  // heavyRate/heavyTicks: a short breath on a committed connect. 500 divides 1000 exactly.
+  // graze: a hostile hitbox passed close during the roll without overlapping. Short, half-speed,
+  // once per roll. The jackpot (overlap) still owns the long deep window.
+  bullet: {
+    rate: 250, ticks: 24, maxTicks: 24,
+    heavyRate: 500, heavyTicks: 8,
+    cutRate: 500, cutTicks: 4,
+    grazeRate: 500, grazeTicks: 6, grazePx: 8,
+  },
   spawnTelegraphTicks: 40,
   waveGapTicks: 60,
   roomClearSlowmo: 0.2, roomClearSlowmoTicks: 12,
@@ -230,9 +241,9 @@ export const tuning = {
         { tick: 8, key: 'tuckB', leanDeg: -7, hop: -1 },
         { tick: 10, key: 'extend', leanDeg: 10, hop: 0 },
         { tick: 12, key: 'plant', leanDeg: 4, hop: 0 },
-        { tick: 15, key: 'absorb', leanDeg: 2, hop: 0 },
-        { tick: 18, key: 'rise', leanDeg: 1, hop: 0 },
-        { tick: 21, key: '', leanDeg: 0, hop: 0 },
+        { tick: 14, key: 'absorb', leanDeg: 2, hop: 0 },
+        { tick: 16, key: 'rise', leanDeg: 1, hop: 0 },
+        { tick: 19, key: '', leanDeg: 0, hop: 0 },
       ] as { tick: number; key: string; leanDeg: number; hop: number }[],
     },
     // Poise break. Only the heavy breaks a brute, so only that one earns the camera.

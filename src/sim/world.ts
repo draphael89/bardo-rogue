@@ -31,7 +31,7 @@ export interface Player extends Body {
   deathTick: number
   god: boolean
   arm: number                 // ARM.blade | ARM.bow; 0 is stock so hashes stay put
-  dodgeRead: number           // 1 after this roll already announced a pass-through; 0 is stock
+  dodgeRead: number           // 0 stock; 1 this roll already grazed; 2 this roll already announced a pass-through
 }
 
 export interface Enemy extends Body {

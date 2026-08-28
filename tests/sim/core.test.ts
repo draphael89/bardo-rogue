@@ -116,7 +116,7 @@ describe('dodge', () => {
   it('rolls through a bolt without taking damage', () => {
     const w = createWorld(1, 'empty')
     const p = w.player
-    w.fireProjectile(p.x + 30, p.y, Math.PI, 110, 3, 200)
+    w.fireProjectile(p.x + 16, p.y, Math.PI, 110, 3, 200)
     stepWorld(w, { ...emptyInput(), dodge: true, moveX: 1 })
     let hurt = false
     for (let i = 0; i < 30; i++) { stepWorld(w, emptyInput()); if (w.events.some(e => e.type === 'playerHurt')) hurt = true; w.events.length = 0 }

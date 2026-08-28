@@ -201,6 +201,96 @@ const ROLL_ART: Record<string, string[]> = {
     '...kk.kddk.kk...',
     '......klk.......',
   ],
+  lightCoil: [
+    '................',
+    '......kkkk......',
+    '.....kllllk.....',
+    '.....kllllk.....',
+    '.....kmlmlk.....',
+    '....kmmmmmk.....',
+    '....kmmmmmk.....',
+    '...kkmmmmmk.....',
+    '..kdmkkkkmk.....',
+    '..kdmssssmk.....',
+    '..kdkkmmmkk.....',
+    '..kdk.kddk......',
+    '..kk..kddk......',
+    '......kddk......',
+    '......klk.......',
+    '................',
+  ],
+  lightCut: [
+    '................',
+    '....kkkk........',
+    '...kllllk.......',
+    '...kllllk.......',
+    '...kmllmk.......',
+    '..kmmmmmmk......',
+    '..kmmkmkmk......',
+    '.kmmmmmmmmk.....',
+    'kdmkkkkkkmk.....',
+    'kdk.sssss.k.....',
+    'kk.kmmmmmk......',
+    '...kdddddk......',
+    '...kddkkddk.....',
+    '...kdk..kdk.....',
+    '...klk..klk.....',
+    '................',
+  ],
+  heavyCoil: [
+    '................',
+    '................',
+    '......kkkk......',
+    '.....kllllk.....',
+    '.....kllllk.....',
+    '....kmllllmk....',
+    '....kmmmmmmk....',
+    '...kmmmmmmmmk...',
+    '..kmmkkkkmmmk...',
+    '.kdmssssssmdk...',
+    '.kdkkmmmmkkdk...',
+    '.kk.kddddddk.k..',
+    '....kddk.kddk...',
+    '...kddk...kddk..',
+    '...klk.....klk..',
+    '................',
+  ],
+  heavyCut: [
+    '................',
+    '...kkkk.........',
+    '..kllllk........',
+    '..kllllkk.......',
+    '..kmllmmmk......',
+    '.kmmmmmmmmk.....',
+    'kmmmmmmmmmmk....',
+    'kdmkkkkkkkmk....',
+    'kdk.ssssssmk....',
+    'kk..kmmmmmmk....',
+    '....kddddddk....',
+    '...kddk.kddk....',
+    '..kddk...kdk....',
+    '..klk....klk....',
+    '................',
+    '................',
+  ],
+  heavyHold: [
+    '................',
+    '................',
+    '.....kkkkk......',
+    '....klllllk.....',
+    '....klllllk.....',
+    '...kmlllllmk....',
+    '...kmmmmmmmk....',
+    '..kmmmmmmmmmk...',
+    '.kmmkkkkkmmmk...',
+    'kdmkssssskmdk...',
+    'kdk.kmmmmk.kdk..',
+    'kk.kddddddk.kk..',
+    '...kddk.kddk....',
+    '..kddk...kddk...',
+    '..klk.....klk...',
+    '................',
+  ],
 }
 
 let rollTextures: Record<string, Texture> | null = null
@@ -237,12 +327,33 @@ function rollPose(stateTick: number): { key: string; leanDeg: number; hop: numbe
   return row
 }
 
+// Authored swing silhouettes. Recovery hands the Kenney body back (`key: ''`) so the
+// fighter reads as "on the feet" the moment the blade is done. Lights share one pair;
+// the heavy gets its own plant / throw / hold so a still frame names the swing.
+function attackPose(p: Player): { key: string; leanDeg: number; hop: number } {
+  const s = tuning.player.attack.swings[p.swingIndex]
+  const tk = p.stateTick
+  if (tk < s.startup) {
+    return s.heavy
+      ? { key: 'heavyCoil', leanDeg: -14, hop: -2 }
+      : { key: 'lightCoil', leanDeg: -8, hop: 0 }
+  }
+  if (tk < s.startup + s.active) {
+    return s.heavy
+      ? { key: 'heavyCut', leanDeg: 16, hop: 2 }
+      : { key: 'lightCut', leanDeg: 10, hop: 1 }
+  }
+  if (s.heavy && tk < s.startup + s.active + 8) return { key: 'heavyHold', leanDeg: 6, hop: 0 }
+  return { key: '', leanDeg: 0, hop: 0 }
+}
+
 export function updatePlayerView(v: EntityView, p: Player, world: World, alpha: number, time: number): void {
   const P = tuning.player
   const x = lerp(p.px, p.x, alpha), y = lerp(p.py, p.y, alpha)
   const feetY = y + p.radius + 1
   let sx = 1, sy = 1, rot = 0, hop = 0
   let rollKey = ''
+  let attackKey = ''
   const b = v.body
   const speed = Math.hypot(p.vx, p.vy)
 
@@ -284,31 +395,22 @@ export function updatePlayerView(v: EntityView, p: Player, world: World, alpha: 
       hop = 2.6 * pop
     }
   } else if (p.state === 'attack') {
-    const s = P.attack.swings[p.swingIndex]
-    const tk = p.stateTick + alpha
+    const pose = attackPose(p)
+    attackKey = pose.key
     const lean = Math.cos(p.swingAngle)
-    if (tk < s.startup) {
-      if (s.heavy) {
-        // greatsword coil: plant, sink, widen — and keep deepening, so the hold is never a dead frame
-        const u = Math.pow(tk / s.startup, 0.7)
-        sx = 1 + 0.18 * u; sy = 1 - 0.22 * u; rot = -lean * 0.42 * u
-        hop = -3 * u + (tk > s.startup - 4 ? Math.sin(time * 90) * 0.6 : 0)
-      } else {
-        const u = easeInCubic(tk / s.startup)
-        sx = 1 - 0.12 * u; sy = 1 + 0.12 * u; rot = -lean * 0.14 * u
-      }
-    } else if (tk < s.startup + s.active) {
-      // the body throws itself along the blade's own curve, so torso and blade arrive together
-      const u = sweepEase((tk - s.startup) / s.active, s.heavy)
-      const peak = s.heavy ? 0.44 : 0.20
-      sx = lerp(1, s.heavy ? 1.38 : 1.18, u); sy = lerp(1, s.heavy ? 0.70 : 0.86, u)
-      rot = lean * peak * u
-      if (s.heavy) hop = -1 + 4 * u
+    const dirSign = (lean >= 0 ? 1 : -1) * p.facing
+    if (attackKey) {
+      // authored frame: do not squash it. Lean names the heading the way the roll does.
+      rot = deg(pose.leanDeg) * dirSign
+      hop = pose.hop
     } else {
+      const s = P.attack.swings[p.swingIndex]
+      const tk = p.stateTick + alpha
       const u = easeOutCubic((tk - s.startup - s.active) / s.recovery)
-      sx = lerp(s.heavy ? 1.38 : 1.18, 1, u); sy = lerp(s.heavy ? 0.70 : 0.86, 1, u)
-      rot = lean * (s.heavy ? 0.44 : 0.20) * (1 - u)
-      if (s.heavy) hop = 3 * (1 - u)
+      sx = lerp(s.heavy ? 1.18 : 1.08, 1, u)
+      sy = lerp(s.heavy ? 0.86 : 0.94, 1, u)
+      rot = lean * (s.heavy ? 0.16 : 0.08) * (1 - u)
+      if (s.heavy) hop = 1 * (1 - u)
     }
   } else if (p.state === 'dead') {
     rot = HALF_PI * p.facing; b.tint = 0x777777
@@ -323,6 +425,7 @@ export function updatePlayerView(v: EntityView, p: Player, world: World, alpha: 
   v.setFlash(p.flash > 0)
   // the roll's own drawing wins over the standing sprite, but never over the hurt flash
   if (rollKey && p.flash <= 0) { const t = rollTexture(rollKey); if (t) b.texture = t }
+  else if (attackKey && p.flash <= 0) { const t = rollTexture(attackKey); if (t) b.texture = t }
   b.alpha = p.iframes > 0 && p.state !== 'dead' ? ((p.iframes >> 2) & 1 ? 0.35 : 1) : 1
   // the shadow reports how close to the floor the body is. In the slide it stretches along the
   // travel and darkens: the body is not in the air, it is skimming.

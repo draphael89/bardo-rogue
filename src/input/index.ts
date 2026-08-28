@@ -1,6 +1,7 @@
 import { Point } from 'pixi.js'
 import { emptyInput, type InputFrame } from '@/sim/input'
-import { resolveAim } from './aim'
+import { aimLockTarget, resolveAim } from './aim'
+import { tuning } from '@/tuning'
 import type { World } from '@/sim/world'
 import type { RenderApp } from '@/render/app'
 
@@ -105,9 +106,20 @@ export class InputSystem {
     const ml = Math.hypot(mx, my)
     if (ml > 1) { mx /= ml; my /= ml }
     f.moveX = mx; f.moveY = my
+    let lockX = 0, lockY = 0
+    if (d.has('KeyQ')) {
+      const lock = aimLockTarget(
+        world.player.x, world.player.y,
+        this.lastAim.x, this.lastAim.y,
+        tuning.player.aimLockConeDeg,
+        world.enemies.filter(e => e.active && e.state !== 'dead'),
+      )
+      if (lock) { lockX = lock.x; lockY = lock.y }
+    }
     const aim = resolveAim({
       padAimX, padAimY, arrowX, arrowY,
       mouseX: mouseAimX, mouseY: mouseAimY,
+      lockX, lockY,
       moveX: mx, moveY: my,
       lastAimX: this.lastAim.x, lastAimY: this.lastAim.y,
     })

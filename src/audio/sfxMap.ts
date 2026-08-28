@@ -193,7 +193,9 @@ export function playEventSfx(a: AudioSystem, ev: SimEvent): void {
     case 'roomClear':
       a.bell(1, 261.63, 3.6)
       a.bell(0.6, 392, 3.0, 'music', 0.45)
-      a.play('doorOpen_1', { gain: 0.6, delay: 1.2, bus: 'ui' })
+      // The door only sounds when a door is actually opening: a clear with nowhere onward (the
+      // final room, a debug arena) gets the bells and nothing creaking.
+      if (ev.hasNext && !ev.reward && !ev.victory) a.play('doorOpen_1', { gain: 0.6, delay: 1.2, bus: 'ui' })
       break
     case 'roomEnter':
       a.play('doorOpen_1', { gain: 0.45, bus: 'ui' })

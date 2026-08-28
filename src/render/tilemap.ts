@@ -1,5 +1,5 @@
 import { Container, Sprite, RenderTexture, Graphics, type DestroyOptions, type Renderer } from 'pixi.js'
-import { TILE, T, type Arena, type ArenaDoor, type DoorMark, type ArenaOffering, type ArenaRack } from '@/sim/arena'
+import { TILE, T, type Arena, type ArenaDoor, type DoorMark, type ArenaOffering, type ArenaRack, doorOpens } from '@/sim/arena'
 import type { Atlas } from './atlas'
 import { tuning } from '@/tuning'
 
@@ -93,7 +93,7 @@ function paintMark(g: Graphics, mark: DoorMark): void {
   }
 }
 
-function makeDoorCluster(atlas: Atlas, d: ArenaDoor): { root: Container; door: ArenaDoor; setOpen: (open: boolean) => void } {
+function makeDoorCluster(atlas: Atlas, d: ArenaDoor): { root: Container; setOpen: (open: boolean) => void } {
   const root = new Container()
   const spr = new Sprite(atlas.room(T.doorClosed))
   const wingA = new Sprite(atlas.room(T.doorOpen))
@@ -133,8 +133,9 @@ function makeDoorCluster(atlas: Atlas, d: ArenaDoor): { root: Container; door: A
   root.addChild(glow, spr, wingA, wingB, mark)
   return {
     root,
-    door: d,
-    setOpen(open) {
+    setOpen(roomOpen) {
+      // The cluster owns the exit gating, so a second caller can never forget it.
+      const open = doorOpens(d, roomOpen)
       spr.texture = atlas.room(open ? T.doorOpen : T.doorClosed)
       const show = open && !!d.mark
       wingA.visible = wingB.visible = show
@@ -472,9 +473,7 @@ export function buildTilemap(renderer: Renderer, atlas: Atlas, arena: Arena, are
   return {
     sprite, door, voidLayer,
     setDoorOpen(open) {
-      // Only the doors that are exits of this room open; a doorway that leads nowhere stays shut
-      // in paint exactly as it stays shut in collision (see setDoorWalkable).
-      for (const c of clusters) c.setOpen(open && !!c.door.exit)
+      for (const c of clusters) c.setOpen(open)
       gift?.sync(!!arena.offeringTaken)
       rack?.sync(!!arena.rackTaken)
     },

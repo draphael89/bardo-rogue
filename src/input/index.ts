@@ -11,7 +11,9 @@ import type { RenderApp } from '@/render/app'
 const PAD_ATTACK = [2, 5, 7]      // X / RB / RT
 const PAD_HEAVY = [3, 6]          // Y / LT — the weight sits under a different finger than the light
 const PAD_DODGE = [0, 1, 4]       // A / B / LB
-const PAD_RESTART = [9]           // start
+// Start. Exported because main.ts's controller-pause poll listens to the same physical button:
+// one constant, or remapping it here would silently split "pause" and "restart" onto different keys.
+export const PAD_RESTART = [9]
 const PAD_CHOICE_LEFT = 14
 const PAD_CHOICE_RIGHT = 15
 const PAD_EDGE = new Set([...PAD_ATTACK, ...PAD_HEAVY, ...PAD_DODGE, ...PAD_RESTART, PAD_CHOICE_LEFT, PAD_CHOICE_RIGHT])

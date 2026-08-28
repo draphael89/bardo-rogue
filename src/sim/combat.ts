@@ -177,6 +177,7 @@ export function hurtPlayer(world: World, angle: number, damage: number, by: Deat
     return false
   }
   if (p.god) damage = 0
+  const hpBefore = p.hp
   p.hp = Math.max(0, p.hp - damage)
   const run = world.session.run
   if (run) { run.hp = p.hp; run.maxHp = p.maxHp }
@@ -185,7 +186,10 @@ export function hurtPlayer(world: World, angle: number, damage: number, by: Deat
   p.kbx += Math.cos(angle) * tuning.player.hurtKnockback * 6
   p.kby += Math.sin(angle) * tuning.player.hurtKnockback * 6
   addFreeze(world, tuning.player.hurtHitstop)
-  world.emit({ type: 'playerHurt', x: p.x, y: p.y, angle, hp: p.hp, damage })
+  // The event reports what was TAKEN, not what was swung: a 2-damage blow on the last vessel took
+  // one. Metrics sum this into vessels lost, and an overkill inflating it would skew exactly the
+  // lethal hits the balance experiments care about.
+  world.emit({ type: 'playerHurt', x: p.x, y: p.y, angle, hp: p.hp, damage: hpBefore - p.hp })
   if (p.hp <= 0) {
     p.state = 'dead'
     p.stateTick = 0

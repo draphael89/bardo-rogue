@@ -188,7 +188,10 @@ export function updateWaves(world: World): void {
       const production = world.scenario === 'loop'
       const reward = production ? room.reward : undefined
       const victory = production && !!room.boss
-      world.doorOpen = !reward && !victory
+      // The flag means "the way onward is open", so it is only ever raised when there IS a way
+      // onward. Raising it in an exit-less debug room made the clear play a door-opening sound and
+      // flare the door glow over doors that (correctly) stayed shut.
+      world.doorOpen = !reward && !victory && world.hasNextRoom()
       world.roomClearTick = world.tick
       world.timeScale = tuning.roomClearSlowmo
       world.slowmoTicks = tuning.roomClearSlowmoTicks
@@ -201,7 +204,7 @@ export function updateWaves(world: World): void {
         // A sentence that never fell is dismissed, not deflected: it earns no impact sound.
         if (b.kind !== 'verdict') world.emit({ type: 'boltHitWall', x: b.x, y: b.y })
       }
-      if (world.doorOpen && world.hasNextRoom()) setDoorWalkable(world.arena, true)
+      if (world.doorOpen) setDoorWalkable(world.arena, true)
       world.emit({ type: 'roomClear', hasNext: world.hasNextRoom(), reward: !!reward, victory })
       if (victory) finishRun(world, 'won')
       else if (reward) offerReward(world, reward)

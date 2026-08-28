@@ -119,9 +119,12 @@ balance number it does not control.
 
 - Floor: `pnpm sim -- --scenario wave1 --bot idle --seeds 1-8` — `deaths` is 1 on every seed.
 - **Variance.** `pnpm sim -- --scenario full --bot kite --seeds 1-8` — `clearSeconds` spread
-  (max minus min) at or above 6 s, AND `damageTaken` not identical across all 8 seeds. Today the
-  spread is 5.5 s and `damageTaken` is exactly 4 on every seed: the room is solved and memorizable,
-  which is the deepest fun deficit in the slice. Seeds must change the fight, not the décor.
+  (max minus min) at or above 6 s, AND `damageTaken` not identical across all 8 seeds. NOTE:
+  `damageTaken` now sums HP actually lost rather than counting hits (`hitsTaken` is the count, and
+  the one to read under god mode, where every blow takes zero) — baselines recorded before that
+  change are counts and must not be compared against sums where any 2-damage source lands. The
+  historical reading stands: a spread of 5.5 s with identical damage on every seed meant the room
+  was solved and memorizable. Seeds must change the fight, not the décor.
 - Dodge economy, measured directly rather than through a bot's policy: (a) roll travel speed
   (`dodge.distance / dodge.ticks * 60`) must not exceed `player.maxSpeed` by more than 20 percent —
   today it is 146.7 px/s against 95 px/s, a 54 percent free-travel bonus that makes rolling strictly

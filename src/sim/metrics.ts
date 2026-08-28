@@ -6,7 +6,10 @@ export class Metrics {
   swings = 0; hitsLanded = 0; kills = 0; whiffSwings = 0
   dodges = 0; successfulDodges = 0; grazes = 0
   boltsFired = 0; boltsCut = 0
-  enemyAttacks = 0; damageTaken = 0; deaths = 0
+  // damageTaken sums HP actually lost (vessels); hitsTaken counts times touched. Both exist
+  // because they answer different questions: balance reads vessels, and a god-mode probe — where
+  // every blow takes zero — still needs to know whether the bot was tagged at all.
+  enemyAttacks = 0; damageTaken = 0; hitsTaken = 0; deaths = 0
   wavesCleared = 0; clearTick = -1; deathTick = -1; returns = 0
   roomsEntered = 0; boonsChosen = 0; runEndTick = -1; runDurationTicks = -1; runResult: 'won' | 'lost' | null = null
   private swingHit = new Map<number, boolean>()
@@ -26,7 +29,7 @@ export class Metrics {
         case 'arrowLoose': this.boltsFired++; break
         case 'boltCut': this.boltsCut++; break
         case 'enemyAttack': this.enemyAttacks++; break
-        case 'playerHurt': this.damageTaken += ev.damage; break
+        case 'playerHurt': this.damageTaken += ev.damage; this.hitsTaken++; break
         case 'playerDeath': this.deaths++; this.deathTick = world.tick; break
         case 'waveClear': this.wavesCleared++; break
         case 'roomClear': this.clearTick = world.tick; break
@@ -47,7 +50,7 @@ export class Metrics {
       swings: this.swings, hitsLanded: this.hitsLanded, whiffSwings: whiffs, kills: this.kills,
       dodges: this.dodges, successfulDodges: this.successfulDodges, grazes: this.grazes,
       boltsFired: this.boltsFired, boltsCut: this.boltsCut,
-      enemyAttacks: this.enemyAttacks, damageTaken: this.damageTaken, deaths: this.deaths,
+      enemyAttacks: this.enemyAttacks, damageTaken: this.damageTaken, hitsTaken: this.hitsTaken, deaths: this.deaths,
       wavesCleared: this.wavesCleared, returns: this.returns,
       roomsEntered: this.roomsEntered, boonsChosen: this.boonsChosen, runResult: this.runResult,
       runSeconds: this.runDurationTicks >= 0 ? +(this.runDurationTicks / 60).toFixed(1) : null,

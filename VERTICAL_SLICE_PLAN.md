@@ -11,7 +11,7 @@
 ## STATUS — what has since been built
 
 The sections below are the plan as written. This block records what was executed against it, so the
-document does not become the next stale audit. Tests: **271 passing**; `pnpm matrix` 100/100 seeds
+document does not become the next stale audit. Tests: **275 passing**; `pnpm matrix` 100/100 seeds
 resolve on both loop bots (kite 93%, naive 0%); `pnpm smoke` boots the title with a real keypress,
 drives both endings through a real browser taking opposite sides of the toll, and requires real
 frames to render over every key screen (hub, toll, offer, boss, death and victory cards). An

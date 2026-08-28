@@ -1,7 +1,7 @@
 {
   "title": "Bardo Rogue",
   "subtitle": "The Greek gate: two powers, twelve vows, fire, an elite that turns a light blade, a ferryman who is owed, and Minos",
-  "updated": "2026-08-28T23:05:00-04:00",
+  "updated": "2026-08-28T23:35:00-04:00",
   "now": "greek-gate",
   "round": 2,
   "timeline": [
@@ -552,6 +552,10 @@
     {
       "t": "23:05",
       "text": "An external audit graded the branch 78 and was right: hashWorld's conditional writes were an aliasing machine (three reproduced collisions, now impossible), the matrix and smoke could pass on zero cases, and the smoke never rendered a frame over the screens it claimed to prove. All fixed; the smoke now boots the title with a real keypress."
+    },
+    {
+      "t": "23:35",
+      "text": "An eight-angle code review of the controller-pause commit: the sealed doorway still glowed 'open' in two more renderers, the death-screen Start press paused the game on arrival, and damageTaken counted vessels the player never had. All eight findings fixed; doorOpens() is now the one place the open-door rule lives."
     }
   ],
   "pieces": [

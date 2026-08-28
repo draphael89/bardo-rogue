@@ -400,6 +400,38 @@ describe('room clear', () => {
   })
 })
 
+describe('the clear only announces a door when there is one', () => {
+  it('an exit-less debug room finishes with the flag down and no door sound queued', () => {
+    const w = createWorld(1, 'wave1')
+    forceRoomClear(w)
+    // The room is done, but there is nowhere onward: the flag stays down, so the door glow, the
+    // door sprites, and the doorOpen_1 sound (all keyed to it) stay quiet over doors that are shut.
+    expect(w.wave.state).toBe('done')
+    expect(w.doorOpen).toBe(false)
+    expect(w.events.some(e => e.type === 'roomClear' && !e.hasNext)).toBe(true)
+  })
+
+  it('a blow reports the vessels it took, not the vessels it swung for', () => {
+    const w = createWorld(1, 'empty')
+    w.player.hp = 1
+    hurtPlayer(w, 0, 2)
+    const hurt = w.events.find(e => e.type === 'playerHurt')!
+    expect(hurt).toBeDefined()
+    expect(hurt.type === 'playerHurt' && hurt.damage).toBe(1)
+  })
+
+  it('god mode loses no vessels but still counts its touches', () => {
+    const w = createWorld(1, 'empty')
+    w.player.god = true
+    const m = new Metrics()
+    hurtPlayer(w, 0, 2)
+    m.consume(w, w.events)
+    expect(w.player.hp).toBe(tuning.player.hp)
+    expect(m.damageTaken).toBe(0)
+    expect(m.hitsTaken).toBe(1)
+  })
+})
+
 describe('run rooms', () => {
   it('starts the first fight with the door sealed', () => {
     const w = createWorld(1, 'run')

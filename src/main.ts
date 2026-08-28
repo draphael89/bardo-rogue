@@ -6,7 +6,7 @@ import { stepWorld } from '@/sim/step'
 import { canReturn } from '@/sim/return'
 import type { World } from '@/sim/world'
 import type { InputFrame } from '@/sim/input'
-import { InputSystem } from '@/input'
+import { InputSystem, PAD_RESTART } from '@/input'
 import { Loop } from '@/loop'
 import { AudioSystem } from '@/audio/audio'
 import { playEventSfx } from '@/audio/sfxMap'
@@ -85,6 +85,10 @@ async function boot() {
   }
 
   const tick = () => {
+    // The Start press that confirms a death/victory return is consumed by THIS tick — and by the
+    // time render() runs, canReturn is already false again. Latch the pre-tick state so the pause
+    // toggle can tell "the run is live" apart from "you just confirmed a return with this press".
+    if (canReturn(world)) returnOpenThisFrame = true
     // always sample live input, even when a bot or replay drives the sim, so latched presses do not pile up
     const live = input.sample(world)
     let frame: InputFrame
@@ -145,24 +149,28 @@ async function boot() {
     tick,
     render: (alpha, dt) => {
       // The pad is polled here rather than in the input system because the simulation is stopped
-      // while the title is up, and a controller player must not be the one person who cannot start.
+      // while the title is up (and while paused), and a controller player must not be the one
+      // person who cannot start — or unpause. One snapshot per frame; getGamepads() allocates.
       // The same poll keeps asking for the audio clock: a gamepad button is not a user activation,
       // and the unlock listeners inside AudioSystem only hear mouse and keyboard, so a controller-
       // only player was also the one person who got a silent game.
-      if (padAnyButton()) audio.tryUnlock()
+      const pad = firstPad()
+      if (padAnyButton(pad)) audio.tryUnlock()
       const titleWasUp = presenter.title.visible
-      if (titleWasUp && padWantsStart()) dismissTitle()
+      if (titleWasUp && padWantsStart(pad)) dismissTitle()
       // Start is the controller's pause. During the loop's live gameplay the sim ignores the pad's
       // legacy restart mapping entirely, so a controller-only player had NO route to the pause
       // screen — the only listeners are keyboard P and Escape. Edge-triggered against its own
       // previous state, and never on the frame that dismissed the title, or the same press would
       // land the player straight in the pause card. On the death and victory screens Start keeps
-      // its existing job (confirm the return), so the toggle stands down while a return is open.
-      const startNow = padStartButton()
-      if (startNow && !padStartPrev && !titleWasUp && world.scenario === 'loop' && !canReturn(world)) {
+      // its existing job (confirm the return) — judged by whether a return was open when this
+      // frame's ticks BEGAN, because the tick that consumed the press has already closed it.
+      const startNow = padStartButton(pad)
+      if (startNow && !padStartPrev && !titleWasUp && world.scenario === 'loop' && !returnOpenThisFrame && !canReturn(world)) {
         setPaused(!userPaused)
       }
       padStartPrev = startNow
+      returnOpenThisFrame = false
       presenter.reward.setPaused(userPaused)
       presenter.render(alpha, dt)
       overlay.update(world, loop)
@@ -173,21 +181,21 @@ async function boot() {
   })
 
   // Start, A, X, or either shoulder — the same buttons that confirm everywhere else in the game.
-  const PAD_START = [0, 2, 3, 5, 7, 9]
+  // The pause listens to PAD_RESTART, the input system's own Start mapping, so remapping the button
+  // there moves both jobs together.
+  const PAD_START = [0, 2, 3, 5, 7, ...PAD_RESTART]
   let padStartPrev = false
-  const padStartButton = (): boolean => !!firstPad()?.buttons[9]?.pressed
+  let returnOpenThisFrame = false
   const firstPad = (): Gamepad | null => {
     const pads = typeof navigator !== 'undefined' && navigator.getGamepads ? navigator.getGamepads() : []
     return (pads && pads[0]) || null
   }
-  const padWantsStart = (): boolean => {
-    const pad = firstPad()
-    return !!pad && PAD_START.some(i => !!pad.buttons[i]?.pressed)
-  }
-  const padAnyButton = (): boolean => {
-    const pad = firstPad()
-    return !!pad && pad.buttons.some(b => b?.pressed)
-  }
+  const padStartButton = (pad: Gamepad | null): boolean =>
+    !!pad && PAD_RESTART.some(i => !!pad.buttons[i]?.pressed)
+  const padWantsStart = (pad: Gamepad | null): boolean =>
+    !!pad && PAD_START.some(i => !!pad.buttons[i]?.pressed)
+  const padAnyButton = (pad: Gamepad | null): boolean =>
+    !!pad && pad.buttons.some(b => b?.pressed)
 
   installApi({
     getWorld: () => world,

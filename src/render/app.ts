@@ -13,13 +13,30 @@ export interface RenderApp {
   rt: RenderTexture
   screen: Sprite
   scale: number
+  viewOverride: number
   arenaOffset: { x: number; y: number }
   resize(): void
+  onViewResize?: () => void          // fired when the target's WIDTH changed and the scene must re-bake
   renderFrame(): void
 }
 
+// The target's width follows the window's aspect so the room is not letterboxed into the middle of a
+// wide monitor. HEIGHT NEVER CHANGES: sprite scale, the 16px grid and every tuned distance stay as
+// authored; only how much starfield you see to the sides moves. Snapped to 16 so the tile grid still
+// lands on whole tiles, floored at 480 so the HUD never has less room than it was laid out for, and
+// recomputed on every resize because fullscreen changes the aspect -- a 576-wide target would cap
+// fullscreen at the same integer scale as the window and make the button pointless.
+// A 16:9 viewport computes to exactly 480, which is what tools/shot.ts opens, so every pinned
+// evidence crop keeps its coordinates.
+export function fitViewWidth(override = 0): number {
+  if (override >= 480) return Math.round(override / 16) * 16
+  const aspect = window.innerWidth / Math.max(1, window.innerHeight)
+  return Math.max(480, Math.min(768, Math.round((tuning.view.height * aspect) / 16) * 16))
+}
+
 export async function createRenderApp(parent: HTMLElement, arenaPx: { w: number; h: number }): Promise<RenderApp> {
-  const { width, height } = tuning.view
+  const { height } = tuning.view
+  const width = tuning.view.width
   const app = new Application()
   const dpr = Math.max(1, Math.min(3, window.devicePixelRatio || 1))
   await app.init({ background: 0x0b0608, antialias: false, resolution: dpr, autoDensity: true, preference: 'webgl', powerPreference: 'high-performance' })
@@ -44,8 +61,18 @@ export async function createRenderApp(parent: HTMLElement, arenaPx: { w: number;
   world.position.set(arenaOffset.x, arenaOffset.y)
 
   const ra: RenderApp = {
-    app, root, world, layers, rt, screen, scale: 1, arenaOffset,
+    app, root, world, layers, rt, screen, scale: 1, arenaOffset, viewOverride: 0,
     resize() {
+      // The target may need to get wider or narrower before we fit it: fullscreen changes the aspect.
+      const wantW = fitViewWidth(ra.viewOverride)
+      if (wantW !== tuning.view.width) {
+        tuning.view.width = wantW
+        rt.resize(wantW, height)
+        arenaOffset.x = Math.floor((wantW - arenaPx.w) / 2)     // mutated in place: light.ts holds this object
+        world.position.set(arenaOffset.x, arenaOffset.y)
+        ra.onViewResize?.()                                      // re-bake the void and re-place the HUD
+      }
+      const width = tuning.view.width
       // integer scale in PHYSICAL pixels (crisp on 2x displays); fall back to a fractional fit when the integer
       // scale would waste more than ~30% of the window
       const w = parent.clientWidth || window.innerWidth, h = parent.clientHeight || window.innerHeight

@@ -1,4 +1,4 @@
-import { createRenderApp } from '@/render/app'
+import { createRenderApp, fitViewWidth } from '@/render/app'
 import { loadAtlas, loadFonts } from '@/render/atlas'
 import { Presenter } from '@/render/presenter'
 import { createWorld } from '@/sim/scenarios'
@@ -36,12 +36,7 @@ async function boot() {
   // A 16:9 window computes to exactly 480, and tools/shot.ts opens a 1920x1080 viewport, so every
   // pinned evidence crop and every gauntlet protocol keeps its coordinates. `?view=480` forces it.
   const viewOverride = +(q.get('view') ?? 0)
-  if (viewOverride >= 480) tuning.view.width = Math.round(viewOverride / 16) * 16
-  else {
-    const aspect = window.innerWidth / Math.max(1, window.innerHeight)
-    const want = Math.round((tuning.view.height * aspect) / 16) * 16
-    tuning.view.width = Math.max(480, Math.min(768, want))
-  }
+  tuning.view.width = fitViewWidth(viewOverride)
 
   const manifest = await (await fetch('/assets/manifest.json')).json() as Record<string, string[]>
   await loadFonts()
@@ -56,6 +51,8 @@ async function boot() {
   const presenter = new Presenter(ra, atlas, world)
   presenter.particles.attachRenderer(ra.app.renderer)
   presenter.onEvent = ev => playEventSfx(audio, ev)
+  ra.viewOverride = viewOverride
+  ra.onViewResize = () => { presenter.rebuildRoom(); presenter.hud.relayout() }
   const input = new InputSystem(ra)
   const overlay = new DebugOverlay(ra.layers.debug, ra.layers.hud)
   overlay.setVisible(debug)
@@ -143,10 +140,24 @@ async function boot() {
     download: name => { if (recorder.recording) stopRecord(); recorder.download(name) },
   })
 
+  // Fullscreen is the only lever that actually enlarges the stage. The target is drawn at an INTEGER
+  // scale in physical pixels, so the room's size on screen steps rather than slides: a 713px-tall
+  // viewport caps it at 5, and 6 needs 810 (270 * 6 / dpr 2). Fullscreen buys exactly that, which is
+  // a 20% larger room, and it costs nothing in crispness because the scale stays a whole number.
+  // Re-running resize() after the change lets the view re-fit to the new aspect.
+  const toggleFullscreen = async () => {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen()
+      else await document.documentElement.requestFullscreen({ navigationUI: 'hide' })
+    } catch { /* the browser refused; nothing to recover, the game keeps running windowed */ }
+  }
+  document.addEventListener('fullscreenchange', () => ra.resize())
+
   window.addEventListener('keydown', e => {
     if (e.code === 'F1') { e.preventDefault(); overlay.toggle() }
     if (e.code === 'F2') { e.preventDefault(); record() }
     if (e.code === 'F3') { e.preventDefault(); if (recorder.recording) stopRecord(); recorder.download() }
+    if (e.code === 'KeyF' && !e.repeat) { e.preventDefault(); void toggleFullscreen() }
   })
   loop.start()
   if (scenario === 'run') presenter.hud.showBanner(world.roomName, 'clear the room', 1.8)

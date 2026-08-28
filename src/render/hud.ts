@@ -1240,6 +1240,19 @@ export class Hud {
     this.hintRow.visible = this.hintRow.alpha > 0.02
   }
 
+  // The render target's width follows the window's aspect and changes on fullscreen, so anything
+  // placed against V.width once in the constructor has to be placed again. Everything not listed
+  // here already re-positions itself every frame in update().
+  relayout(): void {
+    this.waveText.position.set(V.width - 12, 2)
+    this.bossName.position.set(Math.round(V.width / 2), 4)
+    this.banner.position.set(V.width / 2, BANNER_Y)
+    this.sub.position.set(V.width / 2, 48)
+    this.place.position.set(V.width / 2, V.height - 6)
+    this.hintRow.position.set(0, V.height - 34)
+    this.buildHint()
+  }
+
   // Rebuilt only when the input device changes, so there is no per-frame text churn.
   private buildHint() {
     const pads = typeof navigator !== 'undefined' && navigator.getGamepads ? navigator.getGamepads() : []

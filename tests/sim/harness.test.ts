@@ -36,6 +36,12 @@ describe('hashWorld covers the whole sim state', () => {
     b.player.iframes = 4
     expect(hashWorld(a)).not.toBe(hashWorld(b))
   })
+
+  it('sees whether the current blade action connected', () => {
+    const a = createWorld(1, 'empty'), b = createWorld(1, 'empty')
+    b.player.bladeActionConnected = true
+    expect(hashWorld(a)).not.toBe(hashWorld(b))
+  })
 })
 
 describe('rng streams', () => {

@@ -3,7 +3,13 @@
     "tiny_dungeon.png",
     "micro.png",
     "bardo_room.png",
-    "bardo_props.png"
+    "bardo_props.png",
+    "bardo_hero.png",
+    "bardo_hero_north.png",
+    "bardo_hero_north_roll.png",
+    "bardo_hero_south.png",
+    "bardo_hero_south_roll.png",
+    "bardo_brute.png"
   ],
   "particles": [
     "spark_01.png",

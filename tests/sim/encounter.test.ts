@@ -4,7 +4,7 @@ import { makeBot } from '@/sim/bots'
 import { stepWorld } from '@/sim/step'
 
 describe('control-proof encounter', () => {
-  it('runs a fair 60–90 second curriculum across seeded formations', () => {
+  it('runs a fair 55–75 second high-tempo curriculum across seeded formations', () => {
     let totalCuts = 0
     for (let seed = 1; seed <= 8; seed++) {
       const w = createWorld(seed, 'full', { god: true })

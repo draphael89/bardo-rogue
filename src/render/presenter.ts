@@ -4,7 +4,7 @@ import type { Atlas } from './atlas'
 import { slowAlphaFor } from './slowAlpha'
 import { SLOW_FULL } from '@/sim/world'
 import type { World, Enemy, Projectile } from '@/sim/world'
-import type { SimEvent } from '@/sim/events'
+import type { HitSource, SimEvent } from '@/sim/events'
 import { tuning } from '@/tuning'
 import { EntityView, createPlayerView, createEnemyView, updatePlayerView, updateEnemyView, makePropSprite, SpawnMarkerView, BoltView, ArrowView, EchoView, MirrorBoltView, drawAimLine, drawSwingArc, drawSwingTip, drawBowAim } from './views'
 import { updatePlayerRim } from './views/player'
@@ -19,14 +19,11 @@ import { PostFx } from './postfx'
 import { DamageNumbers } from './damageNumbers'
 import { Atmosphere } from './atmosphere'
 import { seedFx } from './fxRng'
-import { BOONS, hasBoon } from '@/sim/boons'
-import { ActionFeedbackGate, crowdScreenMultiplier } from './feedback'
+import { BOONS } from '@/sim/boons'
+import { ActionFeedbackGate, crowdScreenMultiplier, guardedHitScreenScale, wardenAttackFeedback } from './feedback'
 import { RewardOverlay } from './reward'
-
-interface ImpactStamp {
-  t: number; r: number; a: number; snap: number; sweep: number
-  wx: number; wy: number; heavy: boolean; pierce: boolean
-}
+import { HardLockFeedback } from './hardLock'
+import { impactStampForHit, type ImpactStamp } from './contact'
 
 // Reads sim state + events every frame and drives everything visible. Never mutates the sim.
 export class Presenter {
@@ -70,6 +67,9 @@ export class Presenter {
   private hitFlash = new Map<number, number>()
   private propSprites: Sprite[] = []
   private reducedEffects = false
+  private hardLock = new HardLockFeedback()
+  // Last valid floor-space pose lets target loss release outward instead of popping with no cause.
+  private hardLockLast = { x: 0, y: 0, radius: 0 }
 
   constructor(public ra: RenderApp, public atlas: Atlas, public world: World) {
     seedFx(world.seed)
@@ -105,6 +105,17 @@ export class Presenter {
     if (reduced) this.flashAlpha = Math.min(this.flashAlpha, 0.12)
   }
 
+  // Input owns Q and target selection. The presenter only receives a read-only identity, keeping
+  // live UI feedback outside the replayable simulation state.
+  setHardLockTarget(id: number | null): void {
+    if (id !== null) {
+      const e = this.world.enemies.find(x => x.id === id && x.active && x.state !== 'dead')
+      if (!e) id = null
+      else this.hardLockLast = { x: e.x, y: e.y, radius: e.radius }
+    }
+    this.hardLock.setTarget(id)
+  }
+
   // Called when the world object is replaced (restart).
   bindWorld(world: World) {
     this.world = world
@@ -129,17 +140,22 @@ export class Presenter {
     this.grazeT = -1
     this.impacts.length = 0
     this.actionFeedback.reset()
+    this.hardLock.reset()
   }
 
   handleEvents(events: readonly SimEvent[]) {
     const J = tuning.juice
-    let hitGroups: Map<number, { count: number; killed: number }> | null = null
+    // A head-on wall emits dodgeWall + dodgeEnd in one authoritative tick. The former owns the
+    // contact; the lifecycle end must not layer an ordinary foot-plant on top of it.
+    const dodgeHitWall = events.some(ev => ev.type === 'dodgeWall')
+    let hitGroups: Map<number, { count: number; killed: number; allGuarded: boolean }> | null = null
     for (const ev of events) {
       if (ev.type !== 'hit') continue
       hitGroups ??= new Map()
-      const g = hitGroups.get(ev.actionId) ?? { count: 0, killed: 0 }
+      const g = hitGroups.get(ev.actionId) ?? { count: 0, killed: 0, allGuarded: true }
       g.count++
       if (ev.killed) g.killed++
+      g.allGuarded = g.allGuarded && ev.guarded
       hitGroups.set(ev.actionId, g)
     }
     for (const ev of events) {
@@ -147,62 +163,55 @@ export class Presenter {
         case 'hit': {
           const H = J.hit
           const v = this.enemyViews.get(ev.targetId)
-          const blessed = hasBoon(this.world, 'cleave')
-          const target = this.world.enemies.find(e => e.id === ev.targetId)
-          const crate = target?.kind === 'dummy'
+          const crate = ev.kind === 'dummy'
           if (v) {
-            v.squash = J.squashTicks
+            v.squash = ev.guarded ? H.guarded.squashTicks : J.squashTicks
             // a crate sprite under a wash reads as a UI badge, not a body. Real silhouettes can wear it.
-            if (!crate) v.redFlash = blessed ? J.hit.blessedRedFlash : J.hit.redFlash
+            if (!crate && !ev.guarded) v.redFlash = ev.cleave ? J.hit.blessedRedFlash : J.hit.redFlash
           }
-          if (!crate) this.hitFlash.set(ev.targetId, blessed ? J.hit.blessedHitFlashSec : J.hitFlashSec)
-          // The contact shape: an arc on the floor plane that passes the target, snapped to one of a
-          // fixed set of directions so the still reads as an authored sprite and not a free rotation.
-          // The crescent stays under both fighters; the wound cut sits on the body.
+          if (!crate) this.hitFlash.set(ev.targetId, ev.guarded ? H.guarded.hitFlashSec : ev.cleave ? J.hit.blessedHitFlashSec : J.hitFlashSec)
+          // Source, origin, direction, sweep and blessing all come from the event. A delayed echo or
+          // reflection can land after the player has crossed the room and drawn another weapon; its
+          // contact still belongs to the projectile that actually arrived.
           const C = H.contact
-          const p = this.world.player
-          const fx = ev.x - p.x, fy = (ev.y - p.y) / 0.9
-          const stepA = (Math.PI * 2) / C.snapSteps
-          const impactA = Math.atan2(fy, fx)
-          const impact: ImpactStamp = {
-            t: 0,
-            a: impactA,
-            snap: Math.round(impactA / stepA) * stepA,
-            r: Math.hypot(fx, fy) + (ev.heavy ? C.heavyOut : C.out),
-            sweep: tuning.player.attack.swings[p.swingIndex].sweep,
-            // on the near edge of the body, where the blade went in — not past it
-            wx: ev.x - Math.cos(impactA) * 2,
-            wy: ev.y - Math.sin(impactA) * 2 * 0.9,
-            heavy: ev.heavy || blessed,
-            pierce: armOf(this.world) === ARM.bow,
-          }
+          const impact = impactStampForHit(ev)
           // The body reaction outlives the drawable contact stamp (especially through heavy
           // hit-stop), so its direction belongs to the target view rather than the short FX queue.
-          if (v) v.hitAngle = impactA
+          if (v) v.hitAngle = ev.direction
           this.impacts.push(impact)
           if (this.impacts.length > 8) this.impacts.shift()
-          if (blessed) this.particles.ring(impact.wx, impact.wy, 0xffe090)
-          if (!crate) this.particles.wound(impact.wx, impact.wy, ev.angle, C.blood)
+          if (ev.guarded) this.particles.hitSparks(impact.wx, impact.wy, ev.direction, H.guarded.sparks, H.guarded.spark)
+          else {
+            if (ev.cleave) this.particles.ring(impact.wx, impact.wy, 0xffe090)
+            if (ev.source === 'mirror') this.particles.hitSparks(impact.wx, impact.wy, ev.direction, 5, 0x62eaff)
+            else if (ev.source === 'echo') this.particles.hitSparks(impact.wx, impact.wy, ev.direction, 4, 0xb78cff)
+            else if (ev.source === 'backlash') this.particles.hitSparks(impact.wx, impact.wy, ev.direction, 6, 0xd070ff)
+          }
+          if (!crate && !ev.guarded) this.particles.wound(impact.wx, impact.wy, ev.direction, C.blood)
 
           // One action gets one screen sentence. More bodies add a restrained square-root accent;
           // their wounds, flinches, shards and damage remain fully local and fully individual.
           if (this.actionFeedback.takeHit(ev.actionId)) {
-            const group = hitGroups?.get(ev.actionId) ?? { count: 1, killed: ev.killed ? 1 : 0 }
+            const group = hitGroups?.get(ev.actionId) ?? { count: 1, killed: ev.killed ? 1 : 0, allGuarded: ev.guarded }
             const S = H.screen
             const mult = crowdScreenMultiplier(group.count)
-            this.camera.addTrauma((ev.heavy ? J.traumaHeavy : J.traumaLight) * mult + (group.killed ? J.traumaKill : 0), S.traumaCap)
-            this.camera.kick(ev.angle, (ev.heavy ? H.heavyKick : H.lightKick) * mult, S.kickCap)
-            this.camera.punchZoom(ev.heavy ? J.zoom.heavyHit : H.lightZoom)
-            this.flash(ev.heavy ? H.heavyFlash : H.lightFlash, H.flashTint)
-            this.addRecoil(ev.angle, H.recoil * (ev.heavy ? 1.8 : 1) * mult)
+            const guardedScale = guardedHitScreenScale(group.allGuarded, group.killed > 0)
+            this.camera.addTrauma(((ev.heavy ? J.traumaHeavy : J.traumaLight) * mult + (group.killed ? J.traumaKill : 0)) * guardedScale, S.traumaCap)
+            this.camera.kick(ev.direction, (ev.heavy ? H.heavyKick : H.lightKick) * mult * guardedScale, S.kickCap)
+            const zoom = ev.heavy ? J.zoom.heavyHit : H.lightZoom
+            this.camera.punchZoom(1 + (zoom - 1) * guardedScale)
+            this.flash((ev.heavy ? H.heavyFlash : H.lightFlash) * guardedScale, H.flashTint)
+            // Projectile and burst impacts are remote confirmation. The launch already moved the
+            // player; jolting their current body when the delayed hit lands invents a second cause.
+            if (ev.source === 'blade') this.addRecoil(ev.direction, H.recoil * (ev.heavy ? 1.8 : 1) * mult * guardedScale)
           }
           // juice hooks. Only the greatsword throws grit: the soft smoke in that wave is what turned a
           // light contact into a pale smudge, and the light hit now says it with hard shapes instead.
-          if (ev.heavy) {
+          if (ev.heavy && ev.source === 'blade' && !ev.guarded) {
             this.postfx.pulse()
-            this.particles.slashWave(impact.wx, impact.wy, ev.angle, 0.7, J.swing.waveParticles)
+            this.particles.slashWave(impact.wx, impact.wy, ev.direction, 0.7, J.swing.waveParticles)
           }
-          if (J.damageNumbers) this.damageNumbers.show(ev.x, ev.y, ev.damage, ev.heavy)
+          if (J.damageNumbers) this.damageNumbers.show(ev.x, ev.y, ev.damage, ev.heavy && !ev.guarded)
           break
         }
         case 'kill': {
@@ -270,8 +279,20 @@ export class Presenter {
         }
         // launch: grit kicked backwards out of the push-off foot
         case 'dodge': this.particles.dust(ev.x, ev.y + 4, ev.angle + Math.PI, J.roll.launchDust); this.rollX0 = ev.x; this.rollY0 = ev.y + 1; break
+        // blocked travel: chips and grit come back off the contacted face; the camera answers
+        // opposite the requested travel so a stationary tumble cannot look like successful motion.
+        case 'dodgeWall': {
+          const x = ev.x + Math.cos(ev.angle) * (this.world.player.radius + 1)
+          const y = ev.y + Math.sin(ev.angle) * (this.world.player.radius + 1)
+          this.particles.dust(x, y + 3, ev.angle + Math.PI, J.roll.wallDust)
+          this.particles.hitSparks(x, y, ev.angle + Math.PI, J.roll.wallSparks, 0xc9a76a)
+          this.camera.addTrauma(J.roll.wallTrauma)
+          this.camera.kick(ev.angle + Math.PI, J.roll.wallKick)
+          break
+        }
         // landing: the feet catch, so the grit is thrown FORWARD, and the floor takes the weight
         case 'dodgeEnd': {
+          if (dodgeHitWall) break
           const q = this.world.player
           this.particles.dust(ev.x, ev.y + 4, Math.atan2(q.dodgeDirY, q.dodgeDirX), J.roll.landDust)
           this.camera.addTrauma(J.roll.landTrauma)
@@ -289,12 +310,14 @@ export class Presenter {
           if (ev.kind === 'brute') this.particles.dust(ev.x, ev.y + 6, ev.angle + Math.PI, 5)
           else if (ev.kind === 'charger') this.particles.dust(ev.x, ev.y + 6, ev.angle + Math.PI, 3)
           else if (ev.kind === 'warden') {
-            const Wj = J.warden
-            this.particles.dust(ev.x, ev.y + 8, 0, Wj.slamDust)
-            this.camera.addTrauma(Wj.slamTrauma)
-            this.camera.punchZoom(Wj.slamZoom)
-            this.flash(Wj.slamFlash, 0xfff0c0)
-            this.postfx.pulse()
+            const F = wardenAttackFeedback(ev.pattern)
+            if (F.dust) this.particles.dust(ev.x, ev.y + 8, ev.pattern === 'fan' ? ev.angle + Math.PI : 0, F.dust)
+            if (ev.pattern === 'ring') this.particles.ring(ev.x, ev.y + 2, 0xc878ff)
+            this.camera.addTrauma(F.trauma)
+            if (F.kick) this.camera.kick(ev.angle, F.kick)
+            if (F.zoom > 1) this.camera.punchZoom(F.zoom)
+            if (F.flash) this.flash(F.flash, 0xfff0c0)
+            if (F.pulse) this.postfx.pulse()
           }
           break
         case 'enemyPhase': {
@@ -443,23 +466,32 @@ export class Presenter {
     const dist = Math.hypot(dx, dy)
     if (dist < 3) return
     const ux = dx / dist, uy = dy / dist
+    const nx = -uy, ny = ux
     const tail = Math.min(dist, R.streakLen)
     const fade = over > 0 ? 1 - over / R.streakFadeTicks : 1
     const hot = p.dodgeTick >= d.iStart && p.dodgeTick <= d.iEnd
     // rim first, one pixel proud of the core on both sides: without it a pale streak dies on a pale
     // floor, exactly as the blade's crescent does
-    for (let i = 3; i < tail; i++) {
+    for (let i = 2; i < tail; i++) {
       const t = 1 - i / tail
-      const px = Math.round(x - ux * i), py = Math.round(y - uy * i * 0.9)
-      const h = 1 + Math.round(4 * Math.sqrt(t))     // a wedge: as deep as the body at the near
-      g.rect(px, py - (h >> 1) - 1, 1, h + 2)             // end, running out to a point at the tail
+      const half = 1 + Math.round(2 * Math.sqrt(t))
+      // Cross-sections lie perpendicular to travel. The old always-vertical rectangle happened to
+      // work east/west but collapsed a north/south roll into a foot ring with no heading.
+      for (let j = -half - 1; j <= half + 1; j++) {
+        const px = Math.round(x - ux * i + nx * j)
+        const py = Math.round(y - uy * i * 0.9 + ny * j)
+        g.rect(px, py, 1, 1)
+      }
     }
     g.fill({ color: R.streakRim, alpha: 0.5 * fade })
-    for (let i = 3; i < tail; i++) {
+    for (let i = 2; i < tail; i++) {
       const t = 1 - i / tail
-      const px = Math.round(x - ux * i), py = Math.round(y - uy * i * 0.9)
-      const h = 1 + Math.round(4 * Math.sqrt(t))
-      g.rect(px, py - (h >> 1), 1, h)
+      const half = Math.round(2 * Math.sqrt(t))
+      for (let j = -half; j <= half; j++) {
+        const px = Math.round(x - ux * i + nx * j)
+        const py = Math.round(y - uy * i * 0.9 + ny * j)
+        g.rect(px, py, 1, 1)
+      }
     }
     g.fill({ color: hot ? R.streakCore : R.streakRim, alpha: (hot ? R.streakAlpha : 0.35) * fade })
   }
@@ -477,6 +509,67 @@ export class Presenter {
       g.rect(x + side * (r + 1), y - 2, 1, 2)
     }
     g.fill({ color: 0xc9a76a, alpha: 0.72 })
+  }
+
+  // Q lock is an identity, so its floor mark encloses the whole target: four cold compass brackets,
+  // deliberately unlike the two small brass ticks used for soft aim assist. On acquisition they
+  // contract and flash once; on loss only four outward pixels remain for a tenth of a second.
+  private drawHardLockTarget(g: Graphics, alpha: number, dtSec: number) {
+    this.hardLock.update(dtSec)
+    let { phase, targetId } = this.hardLock
+    if (targetId !== null) {
+      const e = this.world.enemies.find(x => x.id === targetId && x.active && x.state !== 'dead')
+      if (!e) {
+        this.hardLock.setTarget(null)
+        phase = this.hardLock.phase
+        targetId = null
+      } else {
+        this.hardLockLast = {
+          x: lerp(e.px, e.x, alpha),
+          y: lerp(e.py, e.y, alpha),
+          radius: e.radius,
+        }
+      }
+    }
+    if (phase === 'none') return
+
+    const x = Math.round(this.hardLockLast.x)
+    const y = Math.round(this.hardLockLast.y + 2)
+    const r = Math.round(this.hardLockLast.radius + 5)
+    const ry = Math.max(4, Math.round(r * 0.42))
+    const progress = this.hardLock.progress
+
+    if (phase === 'broken') {
+      const spread = 1 + Math.round(progress * 4)
+      const fade = 1 - progress
+      g.rect(x - r - spread, y, 2, 1)
+      g.rect(x + r + spread - 1, y, 2, 1)
+      g.rect(x, y - ry - spread, 1, 2)
+      g.rect(x, y + ry + spread - 1, 1, 2)
+      g.fill({ color: 0x718997, alpha: 0.72 * fade })
+      return
+    }
+
+    const acquire = phase === 'acquired'
+    const inset = acquire ? Math.round((1 - progress) * 3) : 0
+    const rx = r + inset, top = ry + inset
+    // One-pixel dark keyline keeps the cold brackets legible over the pale floor without becoming a
+    // filled ring or covering the silhouette.
+    g.rect(x - rx - 1, y - 1, 3, 3)
+    g.rect(x + rx - 1, y - 1, 3, 3)
+    g.rect(x - 1, y - top - 1, 3, 3)
+    g.rect(x - 1, y + top - 1, 3, 3)
+    g.fill({ color: 0x121820, alpha: 0.88 })
+    g.rect(x - rx, y, 2, 1)
+    g.rect(x + rx - 1, y, 2, 1)
+    g.rect(x, y - top, 1, 2)
+    g.rect(x, y + top - 1, 1, 2)
+    g.fill({ color: acquire ? 0xe8fbff : 0x83c8d5, alpha: acquire ? 0.95 : 0.82 })
+
+    // The top chevron is the persistent lock identity; soft assist has no mark above the target.
+    g.rect(x - 2, y - top - 3, 5, 1)
+    g.rect(x - 1, y - top - 2, 3, 1)
+    g.fill({ color: acquire ? 0xffffff : 0x9bd7df, alpha: acquire ? 0.9 : 0.72 })
   }
 
   // Three stepped cyan scratches at the edge of the silhouette. Perfect dodge owns the ring and
@@ -586,9 +679,7 @@ export class Presenter {
   private drawContact(ground: Graphics, air: Graphics, dtSec: number) {
     if (!this.impacts.length) return
     const C = tuning.juice.hit.contact
-    // anchored to the player's DRAWN body, so the arc rides the contact recoil with him
-    const b = this.playerView.body
-    const cx = b.position.x, cy = b.position.y - tuning.player.radius - 1
+    const G = tuning.juice.hit.guarded
     let write = 0
     for (const impact of this.impacts) {
       const tiers = impact.heavy ? C.heavyTiers : C.tiers
@@ -599,12 +690,22 @@ export class Presenter {
       const u = step / tiers
       const thick = (impact.heavy ? C.heavyThick : C.thick) * (1 - u * 0.45)
       const span = (impact.heavy ? C.heavySpanDeg : C.spanDeg) * Math.PI / 180
-      if (impact.pierce) pierceStamp(ground, impact.wx, impact.wy, impact.snap, step, C)
-      else crescent(ground, cx, cy, impact.r, thick, impact.snap, span, impact.sweep, u * 0.5, step === 0, C)
-      woundPool(ground, impact.wx, impact.wy, impact.a, step, C)
-      const n = Math.max(2, (impact.heavy ? C.heavySparks : C.sparks) - step)
-      sparkCluster(air, impact.wx, impact.wy, impact.a, step, n, impact.heavy ? C.heavyDrops : C.drops, C)
-      woundCut(air, impact.wx, impact.wy, impact.a, step, impact.heavy, C)
+      if (impact.source === 'blade') {
+        crescent(ground, impact.cx, impact.cy, impact.r, thick, impact.snap, span, impact.sweep, u * 0.5, step === 0, C)
+      } else if (impact.source === 'arrow') {
+        pierceStamp(ground, impact.wx, impact.wy, impact.snap, step, C)
+      } else {
+        sourceImpactStamp(ground, impact.wx, impact.wy, impact.snap, step, impact.source)
+      }
+      if (!impact.guarded) woundPool(ground, impact.wx, impact.wy, impact.a, step, C)
+      const n = impact.guarded ? Math.max(1, G.sparks - step) : Math.max(2, (impact.heavy ? C.heavySparks : C.sparks) - step)
+      sparkCluster(
+        air, impact.wx, impact.wy, impact.a, step, n,
+        impact.guarded ? 0 : impact.heavy ? C.heavyDrops : C.drops,
+        C,
+        impact.guarded ? { hot: G.sparkHot, spark: G.spark } : undefined,
+      )
+      if (!impact.guarded) woundCut(air, impact.wx, impact.wy, impact.a, step, impact.heavy, C)
       this.impacts[write++] = impact
     }
     this.impacts.length = write
@@ -755,6 +856,7 @@ export class Presenter {
     }
     this.drawRollStreak(this.groundFx, p, alpha)
     this.drawAssistTarget(this.groundFx, p, slowAlpha)
+    this.drawHardLockTarget(this.groundFx, slowAlpha, dtSec)
     this.drawContact(this.groundFx, this.fxGraphics, dtSec)
     this.drawGraze(this.fxGraphics, dtSec)
     this.drawDodgeMark(this.groundFx, dtSec)
@@ -859,14 +961,69 @@ function pierceStamp(g: Graphics, x: number, y: number, a: number, step: number,
   if (step === 0) ray(g, x, y, a, 6, 11, 1, C.core)
 }
 
-function sparkCluster(g: Graphics, x: number, y: number, a: number, step: number, n: number, drops: number, C: typeof tuning.juice.hit.contact): void {
+const SOURCE_CONTACT_COLORS = {
+  mirror: { dark: 0x10222c, mid: 0x36a9bf, hot: 0xbdf8ff },
+  echo: { dark: 0x1b142d, mid: 0x7651ad, hot: 0xddc8ff },
+  judgment: { dark: 0x2b160a, mid: 0xd06a20, hot: 0xffed9a },
+  backlash: { dark: 0x21102c, mid: 0x9a42cc, hot: 0xf0b8ff },
+} as const
+
+// Delayed magic resolves at the body it actually reached. Each source owns a small local glyph,
+// never a crescent whose centre could be mistaken for the player's current sword position.
+function sourceImpactStamp(
+  g: Graphics,
+  x: number,
+  y: number,
+  a: number,
+  step: number,
+  source: Exclude<HitSource, 'blade' | 'arrow'>,
+): void {
+  const color = SOURCE_CONTACT_COLORS[source]
+  if (source === 'judgment') {
+    const r = 4 + step * 3
+    ringMark(g, Math.round(x), Math.round(y + 2), r, step === 0 ? 2 : 1, a, color.dark, step === 0 ? color.hot : color.mid)
+    if (step === 0) for (let i = 0; i < 4; i++) ray(g, x, y, a + i * Math.PI / 2, 4, 9, 2, color.hot)
+    return
+  }
+
+  const width = Math.max(1, 3 - step)
+  if (source === 'mirror') {
+    // Reflection: a two-headed cold spear with a perpendicular glint at the returned point.
+    ray(g, x, y, a, -8 + step, 10 - step, width + 1, color.dark)
+    ray(g, x, y, a, -6 + step, 8 - step, width, color.mid)
+    if (step === 0) ray(g, x, y, a + Math.PI / 2, -3, 4, 1, color.hot)
+  } else if (source === 'echo') {
+    // Afterimage: two short remembered edges, offset enough to read as a repeat rather than an arrow.
+    ray(g, x, y, a + 0.48, -5 + step, 7 - step, width + 1, color.dark)
+    ray(g, x, y, a + 0.48, -4 + step, 6 - step, width, color.mid)
+    if (step === 0) ray(g, x, y, a - 0.38, -2, 5, 1, color.hot)
+  } else {
+    // Backlash: the severed tether arrives jagged and violet at its owner.
+    ray(g, x, y, a - 0.24, -7 + step, 1, width + 1, color.dark)
+    ray(g, x, y, a + 0.24, 0, 8 - step, width + 1, color.dark)
+    ray(g, x, y, a - 0.24, -5 + step, 1, width, color.mid)
+    ray(g, x, y, a + 0.24, 0, 6 - step, width, step === 0 ? color.hot : color.mid)
+  }
+}
+
+function sparkCluster(
+  g: Graphics,
+  x: number,
+  y: number,
+  a: number,
+  step: number,
+  n: number,
+  drops: number,
+  C: typeof tuning.juice.hit.contact,
+  palette?: { hot: number; spark: number },
+): void {
   const spread = C.sparkSpreadDeg * Math.PI / 180
   const base = 2 + step * C.sparkStepPx
   for (let i = 0; i < n; i++) {
     const f = n === 1 ? 0.5 : i / (n - 1)
     const ang = a + (f - 0.5) * spread
     const d0 = base + (i & 1 ? 2 : 0)
-    ray(g, x, y, ang, d0, d0 + 3, i & 1 ? 1 : 2, i & 1 ? C.spark : C.sparkHot)
+    ray(g, x, y, ang, d0, d0 + 3, i & 1 ? 1 : 2, i & 1 ? (palette?.spark ?? C.spark) : (palette?.hot ?? C.sparkHot))
   }
   for (let i = 0; i < drops; i++) {
     const f = drops === 1 ? 0.5 : i / (drops - 1)

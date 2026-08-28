@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { createWorld } from '@/sim/scenarios'
 import { stepWorld } from '@/sim/step'
 import { emptyInput } from '@/sim/input'
-import { moveWithWalls, overlapsSolid, separate } from '@/sim/collision'
+import { hasLineOfSight, moveWithWalls, overlapsSolid, raycastSolidDistance, separate } from '@/sim/collision'
 import { makeBot } from '@/sim/bots'
 
 // Walk the player left until it is flush against a solid.
@@ -90,5 +90,71 @@ describe('collision invariants', () => {
         }
       }
     }
+  })
+})
+
+describe('authoritative terrain rays', () => {
+  it('returns exact point and body-clearance reach to an internal solid', () => {
+    const w = createWorld(1, 'empty')
+    w.arena.solid.fill(0)
+    w.arena.solid[5 * w.arena.cols + 6] = 1 // x 96..112, y 80..96
+
+    expect(raycastSolidDistance(w.arena, 80, 88, 0, 80)).toBeCloseTo(16, 8)
+    expect(raycastSolidDistance(w.arena, 80, 88, 0, 80, 5)).toBeCloseTo(11, 8)
+    expect(raycastSolidDistance(w.arena, 80, 88, 0, 10)).toBe(10)
+    expect(hasLineOfSight(w.arena, 80, 88, 128, 88)).toBe(false)
+
+    w.arena.solid.fill(0)
+    expect(raycastSolidDistance(w.arena, 80, 88, 0, 80)).toBe(80)
+    expect(hasLineOfSight(w.arena, 80, 88, 128, 88)).toBe(true)
+  })
+
+  it('finds a rounded-corner body contact without conservative box clipping', () => {
+    const w = createWorld(2, 'empty')
+    w.arena.solid.fill(0)
+    w.arena.solid[5 * w.arena.cols + 6] = 1
+    const pointToCorner = Math.hypot(16, 16)
+    const reach = raycastSolidDistance(w.arena, 80, 64, Math.PI / 4, 80, 5)
+    expect(reach).toBeCloseTo(pointToCorner - 5, 7)
+  })
+
+  it('derives the outer limit from this arena rather than a mirrored render constant', () => {
+    const w = createWorld(3, 'empty')
+    w.arena.solid.fill(0)
+    const x = 80, radius = 5
+    expect(raycastSolidDistance(w.arena, x, 88, 0, 500, radius))
+      .toBeCloseTo(w.arena.cols * 16 - radius - x, 8)
+  })
+
+  it('treats strict tangency as open until motion enters the solid', () => {
+    const w = createWorld(4, 'empty')
+    w.arena.solid.fill(0)
+    w.arena.solid[5 * w.arena.cols + 6] = 1
+
+    // Radius-five body tangent to the tile's left face at x=96.
+    expect(raycastSolidDistance(w.arena, 91, 88, 0, 20, 5)).toBe(0)
+    expect(raycastSolidDistance(w.arena, 91, 88, Math.PI, 20, 5)).toBe(20)
+
+    // A 3-4-5 tangent at the top-left corner is legal; nudging it inward is an overlap.
+    expect(overlapsSolid(w.arena, 92, 77, 5)).toBe(false)
+    expect(raycastSolidDistance(w.arena, 92, 77, Math.atan2(-3, -4), 20, 5)).toBe(20)
+    expect(raycastSolidDistance(w.arena, 92.001, 77, Math.atan2(-3, -4), 20, 5)).toBe(0)
+  })
+
+  it('keeps diagonal line-of-sight symmetric around a solid corner', () => {
+    const w = createWorld(5, 'empty')
+    w.arena.solid.fill(0)
+    w.arena.solid[5 * w.arena.cols + 6] = 1
+
+    const pairs = [
+      [80, 88, 128, 72], // crosses the tile
+      [80, 96, 112, 64], // touches only its top-left corner
+    ] as const
+    for (const [x0, y0, x1, y1] of pairs) {
+      expect(hasLineOfSight(w.arena, x0, y0, x1, y1))
+        .toBe(hasLineOfSight(w.arena, x1, y1, x0, y0))
+    }
+    expect(hasLineOfSight(w.arena, ...pairs[0])).toBe(false)
+    expect(hasLineOfSight(w.arena, ...pairs[1])).toBe(true)
   })
 })

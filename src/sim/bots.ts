@@ -2,8 +2,8 @@
 import type { World, Enemy } from './world'
 import { emptyInput, type InputFrame } from './input'
 import { tuning } from '@/tuning'
-import { hasLineOfSight } from './arena'
-import { overlapsSolid } from './collision'
+import { hasLineOfSight, overlapsSolid } from './collision'
+import { WARDEN_PATTERN, wardenWindup } from './enemies/warden'
 
 export type Bot = (world: World) => InputFrame
 export type BotName = 'idle' | 'naive-melee' | 'kite' | 'slice-naive' | 'slice-kite'
@@ -106,8 +106,8 @@ function naiveMelee(world: World): InputFrame {
   if (d > 18) { inp.moveX = inp.aimX; inp.moveY = inp.aimY }
   if (d <= tuning.player.attack.swings[0].radius) inp.attack = world.tick % 4 === 0
   if (e.kind === 'brute' && e.state === 'windup' && e.stateTick > 12 && d < 40) { inp.dodge = true; inp.moveX = -inp.aimX; inp.moveY = -inp.aimY }
-  const wardenDodgeTick = (e.phase ? tuning.warden.windup2 : tuning.warden.windup) - 10
-  if (e.kind === 'warden' && e.state === 'windup' && e.stateTick > wardenDodgeTick && d < tuning.warden.slamRadius + 6) {
+  const wardenDodgeTick = e.kind === 'warden' ? wardenWindup(e) - 10 : 0
+  if (e.kind === 'warden' && e.pattern === WARDEN_PATTERN.slam && e.state === 'windup' && e.stateTick > wardenDodgeTick && d < tuning.warden.slamRadius + 6) {
     inp.dodge = true; inp.moveX = -inp.aimX; inp.moveY = -inp.aimY
   }
   return inp
@@ -123,11 +123,12 @@ function kite(world: World): InputFrame {
   const threat = world.enemies.some(x => {
     if (!x.active || x.state === 'dead') return false
     if (x.state !== 'windup' && x.state !== 'freeze') return false
+    if (x.kind === 'warden' && x.pattern !== WARDEN_PATTERN.slam) return false
     const reach = x.kind === 'warden' ? tuning.warden.slamRadius + 8 : 48
     if (Math.hypot(x.x - p.x, x.y - p.y) >= reach) return false
     // Land the Warden roll inside the newly authored full-travel i-frame window. The old fixed
     // tick 20 launched too early for the 36-tick tell and was already in landing when the slam hit.
-    const late = x.kind === 'brute' ? 12 : x.kind === 'warden' ? (x.phase ? tuning.warden.windup2 : tuning.warden.windup) - 10 : 10
+    const late = x.kind === 'brute' ? 12 : x.kind === 'warden' ? wardenWindup(x) - 10 : 10
     return x.stateTick > late
   })
   const incomingBolt = world.projectiles.some(b => b.active && Math.hypot(b.x - p.x, b.y - p.y) < 22)

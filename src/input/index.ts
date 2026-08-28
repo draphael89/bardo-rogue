@@ -3,7 +3,7 @@ import { emptyInput, type InputFrame } from '@/sim/input'
 import { aimLockTarget, resolveAim } from './aim'
 import { tuning } from '@/tuning'
 import type { World } from '@/sim/world'
-import { hasLineOfSight } from '@/sim/arena'
+import { hasLineOfSight } from '@/sim/collision'
 import type { RenderApp } from '@/render/app'
 
 // Gamepad buttons read as edges. Every index here must be sampled through edge() every tick or its padPrev
@@ -21,8 +21,7 @@ export class InputSystem {
   private pressed = new Set<string>()
   private mouseX = 0; private mouseY = 0
   private mouseSeen = false          // (0,0) is the window corner, not "no cursor" — see resolveAim
-  private mouseOwnsAim = false       // arrows/right stick retain ownership until real pointer activity
-  private explicitAimOwns = false    // released arrows/stick hold last aim instead of falling through to WASD
+  private mouseOwnsAim = false       // explicit aim suppresses a stale cursor until real pointer activity
   private mousePressed = false
   private mouseHeld = false
   private padPrev: boolean[] = []
@@ -46,14 +45,14 @@ export class InputSystem {
       this.mousePressed = false; this.mouseHeld = false
     })
     const c = ra.app.canvas
-    c.addEventListener('mousemove', e => { this.mouseX = e.clientX; this.mouseY = e.clientY; this.mouseSeen = true; this.mouseOwnsAim = true; this.explicitAimOwns = false })
-    c.addEventListener('mousedown', e => { if (e.button === 0) { this.mousePressed = true; this.mouseHeld = true; this.mouseOwnsAim = true; this.explicitAimOwns = false } })
+    c.addEventListener('mousemove', e => { this.mouseX = e.clientX; this.mouseY = e.clientY; this.mouseSeen = true; this.mouseOwnsAim = true })
+    c.addEventListener('mousedown', e => { if (e.button === 0) { this.mousePressed = true; this.mouseHeld = true; this.mouseOwnsAim = true } })
     window.addEventListener('mouseup', e => { if (e.button === 0) this.mouseHeld = false })
     c.addEventListener('contextmenu', e => e.preventDefault())
   }
 
   sample(world: World): InputFrame {
-    if (this.override) { const f = { ...this.override }; this.override = { ...this.override, attack: false, dodge: false, restart: false, choiceDelta: 0, confirm: false }; this.pressed.clear(); this.mousePressed = false; return f }
+    if (this.override) { const f = { ...this.override }; this.override = { ...this.override, attack: false, dodge: false, restart: false, choiceDelta: 0, confirm: false }; this.pressed.clear(); this.mousePressed = false; this.lockedTargetId = null; return f }
     const f = emptyInput()
     const d = this.down
     // A complete keydown/keyup pair can occur between two 60 Hz samples. `pressed` latches that
@@ -66,7 +65,7 @@ export class InputSystem {
     // pins the facing so you can circle a target instead of orbiting it face-first
     const arrowX = (keyActive('ArrowRight') ? 1 : 0) - (keyActive('ArrowLeft') ? 1 : 0)
     const arrowY = (keyActive('ArrowDown') ? 1 : 0) - (keyActive('ArrowUp') ? 1 : 0)
-    if (arrowX || arrowY) { this.mouseOwnsAim = false; this.explicitAimOwns = true }
+    if (arrowX || arrowY) this.mouseOwnsAim = false
 
     // mouse aim in world space. Canvas -> the 480x270 render target, then through the INVERSE of the live world
     // container transform, so shake / punch-zoom / camera roll cannot split the ray you see from the ray the sim uses.
@@ -108,7 +107,7 @@ export class InputSystem {
       const [rx, ry] = dz(pad.axes[2] ?? 0, pad.axes[3] ?? 0, 0.3)
       if (lx || ly) { mx = lx; my = ly }
       padAimX = rx; padAimY = ry
-      if (rx || ry) { this.mouseOwnsAim = false; this.explicitAimOwns = true; mouseAimX = 0; mouseAimY = 0 }
+      if (rx || ry) { this.mouseOwnsAim = false; mouseAimX = 0; mouseAimY = 0 }
       const b = (i: number) => !!pad.buttons[i]?.pressed
       const edge = (i: number) => { const now = b(i); const was = this.padPrev[i] ?? false; this.padPrev[i] = now; return now && !was }
       // no short-circuit: every listed button must be sampled or padPrev goes stale and it double-fires next tick
@@ -148,7 +147,7 @@ export class InputSystem {
       padAimX, padAimY, arrowX, arrowY,
       mouseX: mouseAimX, mouseY: mouseAimY,
       lockX, lockY,
-      moveX: this.explicitAimOwns ? 0 : mx, moveY: this.explicitAimOwns ? 0 : my,
+      moveX: mx, moveY: my,
       lastAimX: this.lastAim.x, lastAimY: this.lastAim.y,
     })
     f.aimX = aim.x; f.aimY = aim.y; f.aimSoft = aim.soft
@@ -166,5 +165,9 @@ export class InputSystem {
     this.pressed.clear(); this.mousePressed = false
     return f
   }
+
+  // Presentation may read the live hold-to-lock target, but cannot write it or leak it into the
+  // deterministic world. A null target means Q is up or the retained target is no longer valid.
+  get hardLockTargetId(): number | null { return this.lockedTargetId }
 
 }

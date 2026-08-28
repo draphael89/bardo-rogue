@@ -31,6 +31,10 @@ export const tuning = {
     maxSpeed: 95, accelTicks: 4, decelTicks: 3, turnTicks: 2,
     hp: 5,
     hurtIFrames: 40, hurtKnockback: 12, hurtHitstop: 4,
+    // Damage gets one short, authored punctuation after hit-stop. Seven ticks are long enough for
+    // the recoil silhouette to read, but still fit inside the existing 200 ms input buffers. A
+    // little locomotion remains so the reaction feels like lost initiative, not a confiscated pad.
+    hurtReactionTicks: 7, hurtMoveScale: 0.2, hurtVelocityRetain: 0.15,
     // Launch, invulnerable traversal, landing — three readable phases in one state, and a price.
     // Travel is the escape; landing is the cooldown. i-frames cover the whole travel so the roll
     // you asked for is the roll you got. Landing keeps a steer floor so the feet come back under
@@ -45,6 +49,7 @@ export const tuning = {
       iStart: 0, iEnd: 12,  // i-frames: the whole travel, including the launch and the brake
       landMoveExp: 1.2,     // steering eases in across the landing
       landMoveMin: 0.28,    // first landing tick still has ~27 px/s — a step, not a plant
+      wallSlideMinForwardRatio: 0.25, // a 30°+ glance slides; less forward progress meets the wall and lands
       attackCancelFrom: 8,  // late travel: the swing's own startup covers the rest of the roll
       buffer: 12,           // maximum age of a discrete request on the player's unfrozen control clock (200 ms)
     },
@@ -107,7 +112,13 @@ export const tuning = {
     grazeRate: 500, grazeTicks: 6, grazePx: 8,
   },
   spawnTelegraphTicks: 40,
-  waveGapTicks: 60,
+  // One short breath between curriculum beats. A 1.5 s reset lets the kill release, clears visual
+  // residue, and gives the next formation a clean first read. It also keeps the fastest seeded route
+  // above the 55-second control-proof floor without padding enemy health or weakening mastery.
+  waveGapTicks: 90,
+  // Enemies of one family may overlap attacks, but their tells should not begin on the same beat.
+  // Eight ticks keeps a charger pack dangerous while making each release individually readable.
+  enemyTellStartGap: 8,
   roomClearSlowmo: 0.2, roomClearSlowmoTicks: 12,
   run: {
     doorHalfW: 22,        // px: the open door is three tiles wide
@@ -145,19 +156,28 @@ export const tuning = {
   },
   charger: {
     hp: 2, radius: 4, hoverMin: 50, hoverMax: 70, hoverSpeed: 60, orbitSpeed: 1.6,
-    freezeTicks: 16, dashSpeed: 160, dashDist: 80, recovery: 30, damage: 1, staggerTicks: 8, knockbackScale: 1.2,
+    freezeTicks: 16, commitLead: 9, dashSpeed: 160, dashDist: 80, recovery: 30, damage: 1, staggerTicks: 8, knockbackScale: 1.2,
     hoverMinTicks: 40, hoverMaxTicks: 90,
   },
-  // First judge. A long plant, a radial slam you can walk out of, a long punish. At half life the
-  // veil breaks and the slam throws a ring of bolts. Poise: lights bounce; heavies stagger only
-  // while he is not committed.
+  // First judge. Three deterministic sentences rotate: leave the judgment circle, read the gaps in
+  // an outward veil burst, then cross an aimed fan. At half life the veil breaks in its own safe
+  // beat before faster tells, a denser ring, and a second fan volley arrive. Poise: lights bounce;
+  // heavies stagger only while he is not committed.
   warden: {
-    hp: 36, radius: 10, speed: 28, orbitMin: 52, orbitMax: 76, orbitSpeed: 0.9,
+    hp: 80, radius: 10, speed: 28, orbitMin: 52, orbitMax: 76, orbitSpeed: 0.9,
+    phaseThreshold: 0.5, phaseTransitionTicks: 45, phaseShards: 12,
+    guardDamageScale: 0.5, guardHitstop: 2,
     windup: 36, windup2: 24, commitLead: 8,
     slamRadius: 42, slamTicks: 4, slamDamage: 2,
     recover: 48, recover2: 32, cooldown: 18,
     staggerTicks: 10, knockbackScale: 0.22,
-    boltCount: 8, boltSpeed: 96, boltRadius: 3, boltLife: 84, boltDamage: 1, boltDelay: 6,
+    ringWindup: 32, ringWindup2: 25, ringRecover: 42, ringRecover2: 29,
+    ringAttackTicks: 4, boltCount: 8, boltCount2: 10,
+    boltSpeed: 96, boltSpeed2: 108, boltRadius: 3, boltLife: 84, boltDamage: 1,
+    fanWindup: 30, fanWindup2: 24, fanRecover: 40, fanRecover2: 28,
+    fanCount: 3, fanCount2: 5, fanSpreadDeg: 44,
+    fanSpeed: 118, fanSpeed2: 128, fanLife: 96,
+    fanAttackTicks: 4, fanVolleyGap: 8, fanVolleys2: 2,
     idleTicks: 20,
   },
 
@@ -196,6 +216,10 @@ export const tuning = {
       blessedRedFlash: 8,
       blessedHitFlashSec: 0.08,
       heavySparks: 16,
+      guarded: {
+        screenScale: 0.38, squashTicks: 2, hitFlashSec: 0.017,
+        sparks: 3, sparkHot: 0xe8edf0, spark: 0x8798a3,
+      },
       // The contact stamp. Two authored shapes, no soft sprites: a crescent of whole pixels UNDER both
       // fighters (so neither silhouette is ever touched) and a chromatic spark cluster ON the wound.
       // Six tones in total — an alpha-blended bloom adds forty and reads as a smear, not a shape.
@@ -250,11 +274,14 @@ export const tuning = {
       // The smear is an authored whole-pixel streak on the floor, like the contact crescent, not a
       // stack of ghost sprites: at 16 px a ghost of the body reads as a second body. Its hot core
       // burns only while the i-frames are live, so the frame you become touchable again is visible.
-      streakLen: 8,           // px of smear kept behind the body — long enough to read speed, short enough the tuck still shows
+      streakLen: 12,          // half the 24 px trip: enough to name depth-axis travel without becoming a ghost body
       streakCore: 0x9a8ad8, streakRim: 0x241a38,
       streakAlpha: 0.48, streakFadeTicks: 3,
       lean: 1.8,              // px the camera drifts along the roll while the body is committed
       landTrauma: 0.05, landDust: 7, launchDust: 8,
+      // A head-on wall ends travel immediately. It needs a firmer, local answer than the normal
+      // foot plant, but stays far below taking damage so collision never impersonates a hit.
+      wallTrauma: 0.09, wallKick: 1.15, wallDust: 5, wallSparks: 3,
       // The roll's own animation table. Each row owns dodge-state ticks from `tick` up to the next
       // row: an authored 16 px pose (drawn in src/render/views/player.ts, not a transform of the
       // standing sprite), how far that pose leans into the travel, and how close to the floor it
@@ -289,6 +316,8 @@ export const tuning = {
     },
     warden: {
       slamTrauma: 0.44, slamKick: 3.4, slamZoom: 1.045, slamFlash: 0.20, slamDust: 12,
+      ringTrauma: 0.035,
+      fanTrauma: 0.055, fanKick: 0.8, fanDust: 3,
       phaseTrauma: 0.38, phaseZoom: 1.055, phaseFlash: 0.30,
     },
     // the crescent: build on it, do not replace it
@@ -300,6 +329,9 @@ export const tuning = {
       ghostAlpha: 0.48,      // warm inner glow the greatsword adds under its crescent
       rimColor: 0x150f1e, rimAlpha: 0.62,   // dark rim behind the crescent, so steel reads on any floor
       hole: 13,              // px left clear around the fighter so body and hilt occupy the frame
+      // A circular slash is tangent to its aim at north/south and can look lateral in a still. Once
+      // the live sweep has crossed its centre ray, this small tapered keel names that tested axis.
+      axisMinVertical: 0.62, axisAlpha: 0.88, axisWidth: 1.5,
     },
     damageNumbers: false,
     light: {

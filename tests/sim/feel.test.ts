@@ -3,8 +3,9 @@ import { createWorld } from '@/sim/scenarios'
 import { stepWorld } from '@/sim/step'
 import { emptyInput } from '@/sim/input'
 import { tuning, DT } from '@/tuning'
-import { isPlayerInvulnerable } from '@/sim/combat'
+import { hurtPlayer, isPlayerDodgeInvulnerable, isPlayerInvulnerable } from '@/sim/combat'
 import { ARM } from '@/sim/weapons'
+import { TILE } from '@/sim/arena'
 
 const ms = (t: number) => Math.round(t * 1000 / 60)
 
@@ -84,6 +85,206 @@ describe('dodge feel', () => {
     }
     expect(w.player.state).toBe('attack')
     expect(w.player.stateTick).toBeLessThan(3)
+  })
+
+  it('does not mistake residual hurt immunity during landing for a perfect dodge', () => {
+    const w = createWorld(1, 'empty')
+    const p = w.player
+    const d = tuning.player.dodge
+    p.iframes = tuning.player.hurtIFrames
+    stepWorld(w, { ...emptyInput(), dodge: true, moveX: 1 })
+    while (p.dodgeTick < d.travel) { w.events.length = 0; stepWorld(w, emptyInput()) }
+
+    expect(p.state).toBe('dodge')
+    expect(p.iframes).toBeGreaterThan(0)
+    expect(isPlayerInvulnerable(w)).toBe(true)
+    expect(isPlayerDodgeInvulnerable(w)).toBe(false)
+
+    // A normal hurt-immune projectile contact is spent. It neither passes through nor earns the
+    // roll's jackpot once the authored travel window is over.
+    p.vx = p.vy = 0
+    const bolt = w.fireProjectile(p.x, p.y, 0, 0, 3, 30)!
+    const hp = p.hp
+    w.events.length = 0
+    stepWorld(w, emptyInput())
+    expect(bolt.active).toBe(false)
+    expect(p.hp).toBe(hp)
+    expect(p.dodgeProcTick).toBe(-1)
+    expect(w.events.some(e => e.type === 'dodged')).toBe(false)
+  })
+})
+
+describe('roll wall policy', () => {
+  function putAtVerticalWall(w: ReturnType<typeof createWorld>): void {
+    const col = 10
+    w.arena.solid.fill(0)
+    for (let row = 0; row < w.arena.rows; row++) w.arena.solid[row * w.arena.cols + col] = 1
+    const p = w.player
+    p.x = p.px = col * TILE - p.radius
+    p.y = p.py = 7.5 * TILE
+  }
+
+  it('still covers the authored distance in open space', () => {
+    const w = createWorld(1, 'empty')
+    const p = w.player
+    const d = tuning.player.dodge
+    w.arena.solid.fill(0)
+    p.x = p.px = 120; p.y = p.py = 120
+    const x0 = p.x
+    const safe: number[] = []
+    let wallEvents = 0
+    for (let t = 0; t < d.travel; t++) {
+      stepWorld(w, { ...emptyInput(), dodge: t === 0, moveX: 1 })
+      if (isPlayerDodgeInvulnerable(w)) safe.push(p.dodgeTick)
+      wallEvents += w.events.filter(e => e.type === 'dodgeWall').length
+      w.events.length = 0
+    }
+    expect(p.x - x0).toBeCloseTo(d.distance, 6)
+    expect(safe).toEqual(Array.from({ length: d.travel }, (_, i) => i))
+    expect(wallEvents).toBe(0)
+  })
+
+  it('preserves a committed oblique slide along a wall', () => {
+    const w = createWorld(1, 'empty')
+    const p = w.player
+    const d = tuning.player.dodge
+    putAtVerticalWall(w)
+    const x0 = p.x, y0 = p.y
+    let wallEvents = 0
+    const safe: number[] = []
+    for (let t = 0; t < d.travel; t++) {
+      stepWorld(w, { ...emptyInput(), dodge: t === 0, moveX: 1, moveY: 1 })
+      if (isPlayerDodgeInvulnerable(w)) safe.push(p.dodgeTick)
+      wallEvents += w.events.filter(e => e.type === 'dodgeWall').length
+      w.events.length = 0
+    }
+    expect(p.x).toBeCloseTo(x0, 6)
+    expect(p.y - y0).toBeCloseTo(d.distance / Math.SQRT2, 5)
+    expect(safe).toEqual(Array.from({ length: d.travel }, (_, i) => i))
+    expect(wallEvents).toBe(0)
+  })
+
+  it('turns a head-on block into the normal landing and ends safety immediately', () => {
+    const w = createWorld(1, 'empty')
+    const p = w.player
+    const d = tuning.player.dodge
+    putAtVerticalWall(w)
+    const x0 = p.x
+    stepWorld(w, { ...emptyInput(), dodge: true, moveX: 1 })
+
+    expect(p.x).toBeCloseTo(x0, 6)
+    expect(p.vx).toBeCloseTo(0, 6)
+    expect(p.state).toBe('dodge')
+    expect(p.stateTick).toBe(d.travel)
+    expect(p.dodgeTick).toBe(d.travel)
+    expect(isPlayerDodgeInvulnerable(w)).toBe(false)
+    expect(w.events.filter(e => e.type === 'dodgeWall')).toHaveLength(1)
+    expect(w.events.filter(e => e.type === 'dodgeEnd')).toHaveLength(1)
+
+    let landingTicks = 0
+    while (p.state === 'dodge') {
+      w.events.length = 0
+      stepWorld(w, emptyInput())
+      landingTicks++
+    }
+    expect(landingTicks).toBe(d.total - d.travel)
+    expect(w.events.some(e => e.type === 'dodgeEnd')).toBe(false)
+  })
+})
+
+describe('player hurt action truth', () => {
+  function releaseHitstop(w: ReturnType<typeof createWorld>): void {
+    while (w.freeze > 0) {
+      stepWorld(w, emptyInput())
+      w.events.length = 0
+    }
+  }
+
+  it('cancels an interrupted blade before its next live active tick', () => {
+    const w = createWorld(1, 'empty')
+    const p = w.player
+    const s = tuning.player.attack.swings[0]
+    const dummy = w.spawnEnemy('dummy', p.x + 14, p.y)!
+    const hp0 = dummy.hp
+
+    stepWorld(w, { ...emptyInput(), attack: true, aimX: 1 })
+    p.stateTick = s.startup - 1 // without interruption, the next live tick owns a hitbox
+    expect(hurtPlayer(w, Math.PI, 1)).toBe(true)
+    expect(p.state).toBe('hurt')
+    expect(p.stateTick).toBe(0) // the real recoil state owns the held impact frame immediately
+    w.events.length = 0
+    releaseHitstop(w)
+    stepWorld(w, emptyInput())
+
+    expect(p.state).toBe('hurt')
+    expect(p.stateTick).toBe(1)
+    expect(p.bladeActionConnected).toBe(false)
+    expect(dummy.hp).toBe(hp0)
+    expect(w.events.some(e => e.type === 'hit')).toBe(false)
+  })
+
+  it('keeps a hit-stop dodge request and returns control on the tuned crisp clock', () => {
+    const w = createWorld(2, 'empty')
+    const p = w.player
+    stepWorld(w, { ...emptyInput(), attack: true, aimX: 1 })
+    expect(hurtPlayer(w, 0, 1)).toBe(true)
+
+    // The edge is captured even though this tick is frozen. Direction belongs to the request, not
+    // the eventual recovery tick.
+    stepWorld(w, { ...emptyInput(), dodge: true, moveX: -1 })
+    releaseHitstop(w)
+    const hurtTicks: number[] = [p.stateTick]
+    for (let i = 0; i < 32 && p.state !== 'dodge'; i++) {
+      stepWorld(w, emptyInput())
+      if (p.state === 'hurt') hurtTicks.push(p.stateTick)
+      w.events.length = 0
+    }
+
+    expect(hurtTicks).toEqual(Array.from({ length: tuning.player.hurtReactionTicks }, (_, i) => i))
+    expect(p.state).toBe('dodge')
+    expect(p.stateTick).toBe(0)
+    expect(p.dodgeDirX).toBe(-1)
+    expect(p.dodgeDirY).toBe(0)
+  })
+
+  it('cancels landing without duplicating dodgeEnd or awarding a false read', () => {
+    const w = createWorld(3, 'empty')
+    const p = w.player
+    const d = tuning.player.dodge
+    let dodgeEnds = 0
+
+    stepWorld(w, { ...emptyInput(), dodge: true, moveX: 1 })
+    while (p.dodgeTick < d.travel) {
+      dodgeEnds += w.events.filter(e => e.type === 'dodgeEnd').length
+      w.events.length = 0
+      stepWorld(w, emptyInput())
+    }
+    dodgeEnds += w.events.filter(e => e.type === 'dodgeEnd').length
+    expect(isPlayerDodgeInvulnerable(w)).toBe(false)
+    expect(hurtPlayer(w, 0, 1)).toBe(true)
+    expect(p.state).toBe('hurt')
+    expect(p.dodgeTick).toBe(-1)
+    releaseHitstop(w)
+    dodgeEnds += w.events.filter(e => e.type === 'dodgeEnd').length
+
+    expect(p.state).toBe('hurt')
+    expect(p.dodgeTick).toBe(-1)
+    expect(dodgeEnds).toBe(1)
+    expect(p.dodgeProcTick).toBe(-1)
+    expect(w.events.some(e => e.type === 'dodged')).toBe(false)
+  })
+
+  it('still reacts to an accepted god-mode hit without losing health', () => {
+    const w = createWorld(4, 'empty')
+    const p = w.player
+    p.god = true
+    const hp0 = p.hp
+
+    expect(hurtPlayer(w, 0, 2)).toBe(true)
+    expect(p.hp).toBe(hp0)
+    expect(p.state).toBe('hurt')
+    expect(p.stateTick).toBe(0)
+    expect(p.iframes).toBe(tuning.player.hurtIFrames)
   })
 })
 
@@ -239,6 +440,41 @@ describe('bolt-cut bullet time', () => {
     expect(bolt.active).toBe(false)
     expect(rateAtCut).toBe(tuning.bullet.cutRate)
     expect(ticksAtCut).toBeGreaterThan(0)
+  })
+
+  it('treats a bolt-only cut as a hit-confirm while a truly empty swing pays the whiff', () => {
+    const s = tuning.player.attack.swings[0]
+    const run = (boltOnly: boolean, chain: boolean) => {
+      const w = createWorld(1, 'empty')
+      const p = w.player
+      if (boltOnly) w.fireProjectile(p.x + 16, p.y - 8, 0, 0, 3, 200, 0, 1)
+      let cut = false, connectedAtCut = false
+      for (let t = 0; t < 120; t++) {
+        stepWorld(w, { ...emptyInput(), attack: t === 0, attackHeld: chain, aimX: 0.8, aimY: -0.6 })
+        if (w.events.some(e => e.type === 'boltCut')) {
+          cut = true
+          connectedAtCut = p.bladeActionConnected
+        }
+        if (chain && w.events.some(e => e.type === 'swing' && e.swing === 1)) {
+          return { controlTick: p.controlTick, cut, connectedAtCut }
+        }
+        if (!chain && t > 0 && p.state === 'free') {
+          return { controlTick: p.controlTick, cut, connectedAtCut }
+        }
+        w.events.length = 0
+      }
+      throw new Error('the light action did not resolve')
+    }
+
+    const cutRecovery = run(true, false), whiffRecovery = run(false, false)
+    expect(cutRecovery.cut).toBe(true)
+    expect(cutRecovery.connectedAtCut).toBe(true)
+    expect(whiffRecovery.controlTick - cutRecovery.controlTick).toBe(s.whiffPenalty)
+
+    const cutChain = run(true, true), whiffChain = run(false, true)
+    expect(cutChain.cut).toBe(true)
+    expect(cutChain.connectedAtCut).toBe(true)
+    expect(whiffChain.controlTick - cutChain.controlTick).toBe(s.whiffPenalty)
   })
 })
 

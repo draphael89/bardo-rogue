@@ -57,6 +57,7 @@ export function offerReward(world: World, family: RewardFamily): void {
   world.player.dodgeTick = -1
   world.player.dodgeRead = 0
   world.player.dodgeProcTick = -1
+  world.player.bladeActionConnected = false
   world.player.vx = world.player.vy = 0
   world.doorOpen = false
   setDoorWalkable(world.arena, false)

@@ -1,6 +1,6 @@
 import { DT, tuning } from '@/tuning'
 import type { World, Enemy } from '../world'
-import { moveWithWalls, overlapsSolid } from '../collision'
+import { hasLineOfSight, moveWithWalls, overlapsSolid } from '../collision'
 import { hurtPlayer, noteNearMiss } from '../combat'
 import { arcHits } from '../combat'
 import { TILE } from '../arena'
@@ -99,26 +99,45 @@ export function facePlayer(world: World, e: Enemy): void {
   e.facing = world.player.x >= e.x ? 1 : -1
 }
 
+export function hasPlayerLineOfSight(world: World, e: Enemy): boolean {
+  return hasLineOfSight(world.arena, e.x, e.y, world.player.x, world.player.y)
+}
+
+// Deterministic crowd direction: one family can overlap pressure, but not begin several identical
+// tells on the same beat. Update order is stable by pooled id, so the first eligible enemy claims
+// the beat and the next may claim one after `enemyTellStartGap` ticks. No global scheduler, RNG, or
+// passive cooldown is introduced.
+export function familyTellSlotOpen(world: World, e: Enemy): boolean {
+  for (const other of world.enemies) {
+    if (!other.active || other === e || other.kind !== e.kind) continue
+    const telling = other.state === 'windup' || other.state === 'aim' || other.state === 'freeze'
+    if (telling && other.stateTick < tuning.enemyTellStartGap) return false
+  }
+  return true
+}
+
 // Full circle around the enemy. Returns true when the player was in range (damage or i-frames).
 export function enemyRadialAttack(world: World, e: Enemy, radius: number, damage: number): boolean {
   const p = world.player
   const d = Math.hypot(p.x - e.x, p.y - e.y)
-  if (d <= radius + p.radius) {
+  const clear = hasLineOfSight(world.arena, e.x, e.y, p.x, p.y)
+  if (clear && d <= radius + p.radius) {
     hurtPlayer(world, Math.atan2(p.y - e.y, p.x - e.x), damage)
     return true
   }
-  if (d <= radius + p.radius + tuning.bullet.grazePx) noteNearMiss(world, Math.atan2(p.y - e.y, p.x - e.x))
+  if (clear && d <= radius + p.radius + tuning.bullet.grazePx) noteNearMiss(world, Math.atan2(p.y - e.y, p.x - e.x))
   return false
 }
 
 // Enemy melee arc against the player. Returns true when damage was applied (or absorbed by i-frames).
 export function enemyArcAttack(world: World, e: Enemy, radius: number, arcDeg: number, damage: number): boolean {
   const p = world.player
-  if (arcHits(e.x, e.y, e.aimAngle, radius, arcDeg, p.x, p.y, p.radius)) {
+  const clear = hasLineOfSight(world.arena, e.x, e.y, p.x, p.y)
+  if (clear && arcHits(e.x, e.y, e.aimAngle, radius, arcDeg, p.x, p.y, p.radius)) {
     hurtPlayer(world, e.aimAngle, damage)
     return true
   }
-  if (arcHits(e.x, e.y, e.aimAngle, radius, arcDeg, p.x, p.y, p.radius + tuning.bullet.grazePx)) {
+  if (clear && arcHits(e.x, e.y, e.aimAngle, radius, arcDeg, p.x, p.y, p.radius + tuning.bullet.grazePx)) {
     noteNearMiss(world, e.aimAngle)
   }
   return false

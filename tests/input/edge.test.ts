@@ -5,6 +5,7 @@ import { InputSystem } from '@/input'
 import { createWorld } from '@/sim/scenarios'
 import { stepWorld } from '@/sim/step'
 import type { World } from '@/sim/world'
+import { tuning } from '@/tuning'
 
 // The input layer is browser-side, so this stands a minimal window / canvas / gamepad in front of it and
 // drives the real InputSystem, the real sim, and a real pixi world container.
@@ -275,7 +276,7 @@ describe('keyboard aim', () => {
     expect(aimDeg(h.input.sample(w))).toBe(0)
   })
 
-  it('keeps keyboard aim ownership until the pointer actually moves again', () => {
+  it('returns arrow aim to movement on release, retains it while idle, then yields to real pointer motion', () => {
     const h = harness()
     const w = createWorld(1, 'empty')
     const p = w.player
@@ -284,7 +285,32 @@ describe('keyboard aim', () => {
     expect(aimDeg(h.input.sample(w))).toBe(180)
     h.win.fire('keyup', key('ArrowLeft'))
     h.win.fire('keydown', key('KeyD'))
+    const moving = h.input.sample(w)
+    expect(aimDeg(moving)).toBe(0)
+    expect(moving.aimSoft).toBe(true)
+    h.win.fire('keyup', key('KeyD'))
+    expect(aimDeg(h.input.sample(w))).toBe(0) // idle preserves the last intentional direction
+    h.canvas.fire('mousemove', { clientX: p.x, clientY: p.y + 40 })
+    const mouse = h.input.sample(w)
+    expect(aimDeg(mouse)).toBe(90)
+    expect(mouse.aimSoft).toBe(false)
+  })
+
+  it('returns right-stick aim to left-stick movement on release without reviving a stale cursor', () => {
+    const pad: FakePad = { axes: [0, 0, 0, 0], buttons: Array.from({ length: 16 }, () => ({ pressed: false })) }
+    const h = harness(pad)
+    const w = createWorld(1, 'empty')
+    const p = w.player
+    h.canvas.fire('mousemove', { clientX: p.x, clientY: p.y - 40 })
+    pad.axes[2] = -1
     expect(aimDeg(h.input.sample(w))).toBe(180)
+    pad.axes[2] = 0
+    pad.axes[0] = 1
+    const moving = h.input.sample(w)
+    expect(aimDeg(moving)).toBe(0)
+    expect(moving.aimSoft).toBe(true)
+    pad.axes[0] = 0
+    expect(aimDeg(h.input.sample(w))).toBe(0)
     h.canvas.fire('mousemove', { clientX: p.x, clientY: p.y + 40 })
     expect(aimDeg(h.input.sample(w))).toBe(90)
   })
@@ -298,6 +324,54 @@ describe('keyboard aim', () => {
     const f = h.input.sample(w)
     expect(aimDeg(f)).toBe(-90)
     expect(f.aimSoft).toBe(false)      // the mouse is precise; leave it alone
+  })
+
+  it('exposes Q target identity read-only and clears it on release or invalidation', () => {
+    const h = harness()
+    const w = createWorld(1, 'dummy')
+    w.arena.solid.fill(0)
+    const target = w.enemies.find(e => e.active)!
+    Object.assign(w.player, { x: target.x - 40, y: target.y })
+    h.win.fire('keydown', key('KeyQ'))
+    h.input.sample(w)
+    expect(h.input.hardLockTargetId).toBe(target.id)
+
+    // Retention uses the wider break range even after the body leaves the acquisition cone/range.
+    target.x = w.player.x + tuning.player.aimLockRange + 10
+    h.input.sample(w)
+    expect(h.input.hardLockTargetId).toBe(target.id)
+
+    h.win.fire('keyup', key('KeyQ'))
+    h.input.sample(w)
+    expect(h.input.hardLockTargetId).toBeNull()
+
+    target.x = w.player.x + 40
+    h.win.fire('keydown', key('KeyQ'))
+    h.input.sample(w)
+    expect(h.input.hardLockTargetId).toBe(target.id)
+    for (const e of w.enemies) e.active = false
+    h.input.sample(w)
+    expect(h.input.hardLockTargetId).toBeNull()
+  })
+
+  it('retains Q identity through mouse and temporary right-stick overrides', () => {
+    const pad: FakePad = { axes: [0, 0, 0, 0], buttons: Array.from({ length: 16 }, () => ({ pressed: false })) }
+    const h = harness(pad)
+    const w = createWorld(1, 'dummy')
+    w.arena.solid.fill(0)
+    const target = w.enemies.find(e => e.active)!
+    Object.assign(w.player, { x: target.x - 40, y: target.y })
+    h.canvas.fire('mousemove', { clientX: w.player.x, clientY: w.player.y - 40 })
+    h.win.fire('keydown', key('KeyQ'))
+    expect(aimDeg(h.input.sample(w))).toBe(0)
+    expect(h.input.hardLockTargetId).toBe(target.id)
+
+    pad.axes[3] = -1
+    expect(aimDeg(h.input.sample(w))).toBe(-90)
+    expect(h.input.hardLockTargetId).toBe(target.id)
+    pad.axes[3] = 0
+    expect(aimDeg(h.input.sample(w))).toBe(0)
+    expect(h.input.hardLockTargetId).toBe(target.id)
   })
 })
 

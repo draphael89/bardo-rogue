@@ -2,6 +2,7 @@ import { tuning, type SwingDef } from '@/tuning'
 import type { Enemy, World } from './world'
 import type { RewardFamily } from './session'
 import { damageEnemy } from './combat'
+import { hasLineOfSight } from './collision'
 
 // Append-only integer flags keep replay hashes compact. The original `cleave` id remains the
 // canonical code name; its authored player-facing name is Cleaving Grace.
@@ -95,7 +96,14 @@ export function applyBrand(world: World, enemy: Enemy, stacks: number): void {
 
 // Called by any friendly weapon result: blade, reflected bolt, or afterimage. Keeping one hook is
 // what makes the interactions discoverable instead of a list of exceptions.
-export function resolveWeaponOnHit(world: World, enemy: Enemy, heavy: boolean, brandBefore: number, angle: number): void {
+export function resolveWeaponOnHit(
+  world: World,
+  enemy: Enemy,
+  heavy: boolean,
+  brandBefore: number,
+  angle: number,
+  sourceActionId = world.player.swingId,
+): void {
   // Trigger priority is part of the combo contract: Between-Step marks first, then a heavy may cash
   // that mark through Final Judgment on the very same hit. The prime is spent by any weapon hit.
   const run = world.session.run
@@ -112,15 +120,30 @@ export function resolveWeaponOnHit(world: World, enemy: Enemy, heavy: boolean, b
     enemy.brandTicks = 0
     const damage = resolvedBrand * tuning.boons.judgmentDamage
     const radius = tuning.boons.judgmentRadius
-    const targets = world.enemies.filter(e => e.active && e.state !== 'dead' && Math.hypot(e.x - enemy.x, e.y - enemy.y) <= radius + e.radius)
+    const originX = enemy.x, originY = enemy.y
     world.emit({ type: 'brandConsumed', id: enemy.id, stacks: resolvedBrand, x: enemy.x, y: enemy.y })
-    for (const target of targets) {
+    for (const target of world.enemies) {
+      if (!target.active || target.state === 'dead' || Math.hypot(target.x - originX, target.y - originY) > radius + target.radius) continue
+      if (!hasLineOfSight(world.arena, originX, originY, target.x, target.y)) continue
       const hitAngle = target.id === enemy.id ? angle : Math.atan2(target.y - enemy.y, target.x - enemy.x)
-      damageEnemy(world, target, damage, hitAngle, tuning.boons.judgmentKnockback, true, tuning.boons.judgmentHitstop)
+      damageEnemy(world, target, damage, hitAngle, tuning.boons.judgmentKnockback, true, tuning.boons.judgmentHitstop, sourceActionId, {
+        source: 'judgment',
+        originX, originY,
+        direction: hitAngle,
+        sweep: 0,
+        cleave: false,
+      })
     }
   }
 
   if (!heavy && !primed && hasBoon(world, 'ashenEdge')) applyBrand(world, enemy, 1)
+}
+
+// Swing ids are non-negative and the feedback gate reserves -1 as its empty sentinel. The world
+// tick is unique for each real perfect-dodge trigger, so this namespace cannot collide with either
+// blade/draw actions or another dodge during the same Presenter lifecycle.
+export function afterimageActionId(triggerTick: number): number {
+  return -triggerTick - 2
 }
 
 export function triggerPerfectDodge(world: World): void {
@@ -137,7 +160,7 @@ export function triggerPerfectDodge(world: World): void {
     tuning.boons.echoLife,
     1,
     tuning.boons.echoDamage,
-    world.player.swingId,
+    afterimageActionId(world.tick),
     'echo',
   )
 }

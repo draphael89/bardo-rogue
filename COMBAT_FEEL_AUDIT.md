@@ -1,5 +1,83 @@
 # Combat, Controls & Game-Feel Deep Audit
 
+## Implementation closeout — 2026-08-28
+
+**Final implementation score:** **93/100**
+
+**Release judgment:** Every audited combat dimension is at or above 90. The remaining work is
+human sensory and device certification, not a known implementation blocker.
+
+This closeout evaluates the combat overhaul in the current working tree against
+`origin/main` (`4d443115fc89`). The 76/100 report below is retained intact as the historical baseline
+that motivated the work; its findings should not be read as the state of the current implementation.
+A fresh independent critic traced input through simulation, collision, presentation, and audio,
+reviewed current motion strips and browser evidence, and reproduced the automated gates before
+scoring the result.
+
+| Dimension | Final score | Decisive change |
+|---|---:|---|
+| Movement | 92 | Vector-normalized acceleration, quick reversal, reliable wall slide |
+| Responsiveness | 93 | Edge-latched input, freeze-aware buffers, single next-tick action contract |
+| Player control / agency | 94 | Independent aim, explicit hard lock, cover play, blade/bolt interaction |
+| Dodge / roll feel | 92 | Exact travel promise, real iframe truth, wall interruption, authored vertical tumble |
+| Attack feel | 94 | Distinct combo commitments, truthful swept arcs, hit-confirm and whiff pricing |
+| Input handling | 96 | Tap/blur safety, mouse/world transform truth, controller deadzones and ownership |
+| Physics / collision | 95 | Deterministic rounded-tile rays and shared terrain authority for hits and tells |
+| Animation timing | 94 | Latched viewpoints, fixed-tick poses, shared mechanical/visual sweep timing |
+| Enemy attack readability | 95 | Distinct Brute, Caster, Charger, and Warden shapes, beats, and releases |
+| Hit feedback | 95 | Immutable contact provenance and once-per-action feedback hierarchy |
+| Camera | 92 | Capped directional kick, trauma hierarchy, anticipation, reduced-effects path |
+| Audio feedback | 92 | Authoritative listener, pattern-specific cues, buses, ducking, caps, limiter |
+| Visual feedback | 95 | Separate guard, graze, perfect-dodge, hit, kill, wall, and lock languages |
+| Overall combat juice | 94 | Freeze, time dilation, recoil, camera, particles, and sound reinforce one event |
+| Overall polish | 91 | Deterministic evidence, authored state coverage, clean runtime and replay parity |
+| **Overall combat** | **93** | Cohesive, skill-sensitive, implementation-ready combat loop |
+
+### Design resolution
+
+The pass followed five rules. First, every action makes a promise: a roll is safe only during its
+authored iframe window, a wall can end travel, and cover blocks the tell and the damage alike.
+Second, commitment creates decisions rather than dropped inputs: buffers survive freezes, but
+startup, recovery, and whiff costs remain meaningful. Third, enemies speak different visual
+languages instead of sharing louder circles; the Warden deliberately rotates slam, ring, and fan,
+then changes cadence in phase two. Fourth, contact feedback describes what actually happened:
+guarded damage cannot impersonate an exposed heavy hit, and a delayed arrow, echo, judgment, or
+backlash cannot borrow the player's current sword pose. Fifth, intensity is earned once per action;
+cleaving three bodies adds local wounds without multiplying camera trauma three times.
+
+The result is a coherent first pass rather than a collection of stronger effects. North/south hero
+views keep direction through attacks, hurt, and dodge. The depth-axis roll uses four body-only keys
+plus a separately held weapon, with a diagonal boots-over-head apex that reads as rotation at native
+scale. Enemy telegraphs terminate at exact collision cover and actual hurt reach. The Warden's guard,
+poise break, phase transition, patterns, and punish windows now form a learnable fight instead of a
+large-health version of an ordinary enemy.
+
+### Acceptance evidence
+
+- `pnpm test`: 21/21 files, 252/252 tests.
+- `pnpm typecheck` and `pnpm build`: pass.
+- Pinned Node and browser replays agree for all three fixtures; no console or page errors.
+- Skilled full-encounter bot: 8/8 clears across seeds 1–8, 57.2–66.1 seconds; naive melee: 0/8.
+- Skilled Warden bot: 8/8 clears, 21.2–24.1 seconds. Pool overflow: 0 across 32 balance runs.
+- Isolated deterministic simulation: worst sampled tick 1.35 ms against a 2 ms gate.
+- Browser play probe: 1.7 ms p50, 8.3 ms p95 across 126 frames, with zero catch-up drops.
+- Two independent directional release gates pass every melee/roll sub-score at 91–94; the final
+  north/south roll strips preserve monotonic 22.5 px travel and visible weapon continuity.
+- Terrain audit: 13,500 randomized circle rays and 200,000 reverse line-of-sight pairs without a
+  mismatch or asymmetry; four simultaneous exact Charger tells rendered in about 0.91 ms under
+  headless SwiftShader.
+- Audio mix evidence covers 91 manifested assets; peak remained below -7 dBFS with zero clipped
+  samples in both combat and hurt mixes.
+
+The 92 audio and camera scores are structural implementation judgments. A final headphone/speaker
+audition, several human keyboard/controller sessions, high-DPR/low-end hardware coverage, and a
+maximum-density phase-two fight remain release QA. Those checks may tune comfort or mix values, but
+no unresolved correctness defect is being hidden behind the score.
+
+---
+
+## Historical baseline audit
+
 **Audit date:** 2026-08-28
 
 **Audited revision:** `1ef5b18a7280b34b93b0ed23528bc95b3948139c` (`origin/main`)

@@ -31,6 +31,7 @@ export function returnToHub(world: World): void {
   p.dodgeQueuedAt = -1
   p.dodgeTick = -1
   p.swingIndex = 0
+  p.bladeActionConnected = false
   p.assistTargetId = 0
   world.timeScale = 1
   world.slowmoTicks = 0

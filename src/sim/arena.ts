@@ -510,17 +510,3 @@ export function isSolid(a: Arena, px: number, py: number): boolean {
   if (c < 0 || r < 0 || c >= a.cols || r >= a.rows) return true
   return a.solid[r * a.cols + c] === 1
 }
-
-// Deterministic tile ray used by aim systems. The first/last four pixels are skipped so an actor
-// standing flush to a wall, or a target whose centre is close to one, does not occlude itself.
-export function hasLineOfSight(a: Arena, x0: number, y0: number, x1: number, y1: number): boolean {
-  const dx = x1 - x0, dy = y1 - y0
-  const d = Math.hypot(dx, dy)
-  if (d <= 8) return true
-  const steps = Math.max(1, Math.ceil((d - 8) / 4))
-  for (let i = 1; i <= steps; i++) {
-    const along = 4 + (d - 8) * (i / steps)
-    if (isSolid(a, x0 + dx * along / d, y0 + dy * along / d)) return false
-  }
-  return true
-}

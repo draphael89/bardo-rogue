@@ -19,7 +19,7 @@ mkdirSync(out, { recursive: true })
 const manifest = JSON.parse(readFileSync('public/assets/manifest.json', 'utf8'))
 const replays = {
   wave1: JSON.parse(readFileSync('replays/naive-wave1-s3.json', 'utf8')),
-  full: JSON.parse(readFileSync('replays/kite-full-s1.json', 'utf8')),
+  full: JSON.parse(readFileSync('replays/kite-full-s2.json', 'utf8')),
 }
 
 const browser = await chromium.launch()
@@ -308,7 +308,7 @@ const map = await page.evaluate(async () => {
 writeFileSync(`${out}/event-timeline.json`, JSON.stringify({
   note: 'Pure-sim event streams. mix.wav is fed the wave1 rows below; mix-hurt.wav the worst-case rows (the 10 s from the wave-3 bell of the full run, times rebased to 0).',
   wave1: { replay: 'replays/naive-wave1-s3.json', ticks: timelines.wave1.ticks, count: w1.length, hist: hist(w1), rows: w1 },
-  worstCase: { replay: 'replays/kite-full-s1.json', window: [T0, T0 + SECONDS], count: worst.length, hist: hist(worst), rows: worst },
+  worstCase: { replay: 'replays/kite-full-s2.json', window: [T0, T0 + SECONDS], count: worst.length, hist: hist(worst), rows: worst },
 }, null, 1))
 writeFileSync(`${out}/event-map.json`, JSON.stringify({
   note: 'Observed, not transcribed: every call src/audio/sfxMap.ts makes for one synthetic event of each type and variant, recorded through the real AudioSystem.',

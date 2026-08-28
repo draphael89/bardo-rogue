@@ -8,6 +8,7 @@ export function startDraw(world: World): void {
   p.stateTick = 0
   p.attackQueuedAt = -1
   p.swingIndex = 0
+  p.bladeActionConnected = false
   p.swingAngle = p.aimAngle
   p.swingId = ++world.swingCounter
   p.facing = Math.cos(p.swingAngle) >= 0 ? 1 : -1

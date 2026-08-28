@@ -2,6 +2,7 @@ import { tuning, type SwingDef } from '@/tuning'
 import { angleDiff, deg } from './math'
 import { SLOW_FULL } from './world'
 import type { World, Enemy } from './world'
+import type { HitSource } from './events'
 import { finishRun } from './session'
 
 // --- swing curves -------------------------------------------------------------------------------
@@ -70,11 +71,38 @@ export function clearBulletTime(world: World): void {
   world.slowTicks = 0
 }
 
-export function damageEnemy(world: World, e: Enemy, damage: number, angle: number, knockback: number, heavy: boolean, hitstop: number, sourceActionId = world.player.swingId): void {
+export interface HitProvenance {
+  source: HitSource
+  originX: number; originY: number
+  direction: number
+  sweep: number
+  cleave: boolean
+}
+
+export function damageEnemy(
+  world: World,
+  e: Enemy,
+  damage: number,
+  angle: number,
+  knockback: number,
+  heavy: boolean,
+  hitstop: number,
+  sourceActionId = world.player.swingId,
+  provenance?: HitProvenance,
+): void {
   if (!e.active || e.state === 'dead') return
+  const kind = e.kind
+  const attemptedDamage = damage
+  // The Warden's lesson is punish timing, not raw health. His veil halves (and integer-clamps)
+  // damage while composed; recover and stagger are the authored full-damage openings. The hit event
+  // carries the resolved value, so every feedback channel tells the same truth as the health bar.
+  const guarded = kind === 'warden' && e.state !== 'recover' && e.state !== 'stagger'
+  if (guarded) {
+    damage = Math.max(1, Math.floor(damage * tuning.warden.guardDamageScale))
+  }
+  const mitigatedDamage = Math.max(0, attemptedDamage - damage)
   e.hp -= damage
   e.flash = tuning.juice.flashTicks
-  const kind = e.kind
   const killed = e.hp <= 0
   const actionId = sourceActionId
   const scale = kind === 'dummy' ? 0 : tuning[kind].knockbackScale
@@ -83,26 +111,46 @@ export function damageEnemy(world: World, e: Enemy, damage: number, angle: numbe
   e.kby += Math.sin(angle) * kb
   e.facing = Math.cos(angle) > 0 ? -1 : 1 // face the attacker
 
+  // Copy the complete contact sentence before any later action can change the player or projectile.
+  // The fallback keeps low-level tests and debug damage useful; every production call site supplies
+  // an explicit source snapshot.
+  const source = provenance?.source ?? 'blade'
+  const originX = provenance?.originX ?? world.player.x
+  const originY = provenance?.originY ?? world.player.y
+  const direction = provenance?.direction ?? angle
+  const sweep = provenance?.sweep ?? (source === 'blade' ? tuning.player.attack.swings[world.player.swingIndex].sweep : 0)
+  const cleave = provenance?.cleave ?? false
+  const hit = {
+    type: 'hit' as const,
+    x: e.x, y: e.y, angle, damage, heavy, targetId: e.id, kind, killed,
+    actionId, attemptedDamage, mitigatedDamage, guarded,
+    source, originX, originY, direction, sweep, cleave,
+  }
+  const resolvedHitstop = guarded ? tuning.warden.guardHitstop : hitstop
+
   // A heavy is the committed swing. The world takes a short breath; the player does not.
-  // Dummies are a training bag — they must not put the room in slow motion.
-  if (heavy && kind !== 'dummy') addBulletTime(world, tuning.bullet.heavyTicks, tuning.bullet.heavyRate)
+  // Dummies are a training bag, and the Warden's intact veil is a refusal rather than an opening:
+  // neither may borrow the full heavy-connect slow-motion sentence.
+  if (heavy && kind !== 'dummy' && !guarded) addBulletTime(world, tuning.bullet.heavyTicks, tuning.bullet.heavyRate)
 
   if (killed) {
     e.state = 'dead'
     e.stateTick = 0
-    addFreeze(world, hitstop + tuning.hitstop.killBonus)
-    world.emit({ type: 'hit', x: e.x, y: e.y, angle, damage, heavy, targetId: e.id, kind, killed: true, actionId })
+    addFreeze(world, resolvedHitstop + tuning.hitstop.killBonus)
+    world.emit(hit)
     world.emit({ type: 'kill', x: e.x, y: e.y, angle, kind, id: e.id, actionId })
     e.active = false
     return
   }
-  addFreeze(world, hitstop)
-  world.emit({ type: 'hit', x: e.x, y: e.y, angle, damage, heavy, targetId: e.id, kind, killed: false, actionId })
+  addFreeze(world, resolvedHitstop)
+  world.emit(hit)
 
   // poise: brutes only stagger from the heavy; the warden only from a heavy while not committed;
   // dummies never; everyone else staggers on any hit
   if (kind === 'warden') {
-    const armored = e.state === 'windup' || e.state === 'attack'
+    // The veil break is also a committed authored beat. Damage still lands, but a heavy cannot erase
+    // the only non-damaging announcement of phase two.
+    const armored = e.state === 'windup' || e.state === 'attack' || e.state === 'phase'
     if (heavy && !armored) {
       e.state = 'stagger'
       e.stateTick = 0
@@ -131,8 +179,12 @@ export function damageEnemy(world: World, e: Enemy, damage: number, angle: numbe
 export function hurtPlayer(world: World, angle: number, damage: number): boolean {
   const p = world.player
   if (p.state === 'dead') return false
-  if (isPlayerInvulnerable(world)) {
-    if (p.dodgeTick >= 0 && p.dodgeRead < 2) {
+  const dodgeInvulnerable = isPlayerDodgeInvulnerable(world)
+  if (p.iframes > 0 || dodgeInvulnerable) {
+    // Hurt immunity prevents damage, but only this roll's authored safety window earns a read.
+    // Otherwise a player landing inside old hurt i-frames can be rewarded for an attack they did
+    // not dodge.
+    if (dodgeInvulnerable && p.dodgeRead < 2) {
       p.dodgeRead = 2
       p.dodgeProcTick = world.tick
       // the read is the reward: the world drops to a crawl and the player's clock does not
@@ -150,23 +202,50 @@ export function hurtPlayer(world: World, angle: number, damage: number): boolean
   p.kbx += Math.cos(angle) * tuning.player.hurtKnockback * 6
   p.kby += Math.sin(angle) * tuning.player.hurtKnockback * 6
   addFreeze(world, tuning.player.hurtHitstop)
-  world.emit({ type: 'playerHurt', x: p.x, y: p.y, angle, hp: p.hp })
+  world.emit({ type: 'playerHurt', x: p.x, y: p.y, angle, hp: p.hp, maxHp: p.maxHp })
   if (p.hp <= 0) {
     p.state = 'dead'
     p.stateTick = 0
+    p.bladeActionConnected = false
     p.deathTick = world.tick
     world.timeScale = tuning.player.deathSlowmo
     world.slowmoTicks = tuning.player.deathSlowmoTicks
     clearBulletTime(world)   // death owns the clock; composing the two would crawl at 1/16 speed
     world.emit({ type: 'playerDeath', x: p.x, y: p.y })
     finishRun(world, 'lost')
+  } else {
+    beginPlayerHurtReaction(world)
   }
   return true
 }
 
+function beginPlayerHurtReaction(world: World): void {
+  const p = world.player
+  const d = tuning.player.dodge
+  // Damage and authored dodge travel are mutually exclusive today, but close the lifecycle
+  // defensively for any future piercing hit. Landing already emitted dodgeEnd at `travel`, so it is
+  // cancelled silently and the bookkeeping edge can never fire twice.
+  if (p.dodgeTick >= 0 && p.dodgeTick < d.travel) world.emit({ type: 'dodgeEnd', x: p.x, y: p.y })
+  p.dodgeTick = -1
+  p.dodgeRead = 0
+  p.dodgeProcTick = -1
+  p.state = 'hurt'
+  p.stateTick = 0
+  p.bladeActionConnected = false
+  // Kill the interrupted lunge without erasing hostile knockback, which has its own velocity lane.
+  p.vx *= tuning.player.hurtVelocityRetain
+  p.vy *= tuning.player.hurtVelocityRetain
+}
+
 export function isPlayerInvulnerable(world: World): boolean {
   const p = world.player
-  if (p.iframes > 0) return true
+  return p.iframes > 0 || isPlayerDodgeInvulnerable(world)
+}
+
+// The roll's own promise, deliberately separate from general damage immunity. Reward systems and
+// projectile pass-through use this narrower answer; damage rejection uses isPlayerInvulnerable.
+export function isPlayerDodgeInvulnerable(world: World): boolean {
+  const p = world.player
   const d = tuning.player.dodge
   return p.dodgeTick >= d.iStart && p.dodgeTick <= d.iEnd
 }

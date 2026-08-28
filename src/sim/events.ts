@@ -22,6 +22,7 @@ export type SimEvent =
   | { type: 'waveClear'; wave: number }
   | { type: 'roomClear'; hasNext: boolean }
   | { type: 'roomEnter'; name: string; index: number; total: number }
+  | { type: 'offeringTaken'; kind: 'life'; x: number; y: number }
   | { type: 'dodged'; x: number; y: number }
   | { type: 'restart' }
   // a pooled slot was unavailable and the spawn/shot was dropped; the sim never fails silently

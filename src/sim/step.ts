@@ -5,6 +5,7 @@ import { updateEnemies } from './enemies'
 import { updateProjectiles } from './projectiles'
 import { updateSpawnQueue, updateWaves } from './waves'
 import { tryEnterDoor } from './rooms'
+import { tryCollectOffering } from './offering'
 import { separate } from './collision'
 import { isPlayerInvulnerable } from './combat'
 
@@ -28,6 +29,7 @@ export function stepWorld(world: World, input: InputFrame): void {
 
   updatePlayer(world, input)
   tryEnterDoor(world)
+  tryCollectOffering(world)
   updateEnemies(world)
   updateProjectiles(world)
   updateSpawnQueue(world)

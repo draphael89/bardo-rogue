@@ -30,7 +30,7 @@ deaths, wavesCleared, clearSeconds, deathSeconds, avgTickUs, maxTickUs. A run st
 
 `http://localhost:5173/?scenario=wave2&seed=7&debug=1&mute=1&god=1&bot=kite`
 
-- `scenario`: `empty`, `dummy` (3 static targets), `brute-only`, `caster-only`, `charger-swarm`, `wave1`, `wave2`, `wave3`, `full` (default), `run` (Threshold fight → door opens → Crossing fight).
+- `scenario`: `empty`, `dummy` (3 static targets), `blessed` (dummy room with the cleave blessing on), `brute-only`, `caster-only`, `charger-swarm`, `wave1`, `wave2`, `wave3`, `full` (default), `run` (Threshold fight → two marked doors → Crossing fight north, or The Far Shore east), `shore` (quiet gift room, a life vessel to walk into).
 - `seed`: integer, default 1. Same seed + same inputs = same run.
 - `debug=1`: F1 overlay on. `mute=1`: no audio. `god=1`: player cannot take damage.
 - `bot=idle|naive-melee|kite`: a scripted player drives the sim instead of the keyboard.
@@ -52,7 +52,7 @@ Available once the page has booted (`await page.waitForFunction(() => !!window._
 - `bot(name | null)`: swap in or remove a bot.
 - `pause(p?)`: pause/unpause the loop, returns the new state.
 - `hash()`: FNV hash of the sim state. Equal hashes = identical worlds.
-- `state()`: compact JSON snapshot: tick, freeze, wave, player, enemies (id, kind, x, y, hp, state, stateTick), bolts, metrics.
+- `state()`: compact JSON snapshot: tick, freeze, wave, player, offering, boons, enemies (id, kind, x, y, hp, state, stateTick), bolts, metrics.
 - `frameStats()`: `{ frames, p50, p95, max }` render frame time in ms over the last 240 frames.
 - `mute(m?)`, `debug(v?)`: toggle audio / overlay, return the new state.
 - `record(on?)`: start (resets to a fresh run of the current seed/scenario) or stop recording. Returns whether recording.

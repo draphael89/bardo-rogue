@@ -1,6 +1,7 @@
 import { Container, Graphics, Text } from 'pixi.js'
 import type { Atlas } from './atlas'
 import type { World } from '@/sim/world'
+import { hasBoon } from '@/sim/boons'
 import { tuning } from '@/tuning'
 
 // Presentation clock in SIM TICKS. Every HUD timer (and the world-space damage pop-ups) ages against this instead
@@ -15,6 +16,9 @@ const V = tuning.view
 // ember ramp, spent life = the iron ramp, text = bone. Gold is the threshold colour and carries every accent.
 const C = {
   void: 0x08070e, mortar: 0x0a0c12, seal0: 0x12141c, slate0: 0x1c2434,
+  // the canon stone ramp (ART_DIRECTION.md 1.2). The death card's face is painted out of this and nothing
+  // else: it is the one HUD surface that has to read as a slab of the room's own material.
+  slate1: 0x2e3a4e, slate2: 0x425066, slate3: 0x58667c, slateHi: 0x76849a,
   // panel face. Deliberately mid-value (L~56, the scene's own mean): a survival readout that is the darkest
   // object in the frame is a readout nobody can find. Every plate() shares it, so the HUD stays one hand.
   scrim: 0x32384a,
@@ -31,36 +35,86 @@ const C = {
 // hard 1px drop shadow straight down: the only offset that stays on the pixel grid
 const drop = { color: C.void, alpha: 0.9, blur: 0, angle: Math.PI / 2, distance: 1 }
 
-type Tone = 'wave' | 'clear' | 'death'
+type Tone = 'wave' | 'clear' | 'death' | 'gift'
 interface ToneDef { text: number; rule: number; edge: number }
 const TONES: Record<Tone, ToneDef> = {
   wave: { text: C.bone, rule: C.goldDim, edge: C.gold },
   clear: { text: C.goldHot, rule: C.gold, edge: C.goldHot },
   death: { text: C.bone, rule: C.purple3, edge: C.purple2 },
+  gift: { text: C.goldHot, rule: C.ember, edge: C.goldHot },
 }
 
 const BANNER_Y = 44, BAND_H = 28, OPEN = 8, CLOSE = 10   // the card sits clear of the corner panels
+
+// --- the death card -------------------------------------------------------------------------------------------
+// VISION.md §2: "You are already dead. Losing a run is not a game over; it is being pulled back to the bardo."
+// So this card is not a fail state. It is the threshold itself, and it is built out of the motif in
+// ART_DIRECTION.md §8.2 rather than out of developer UX:
+//   §8.2.1 an opening onto the star-sky — one arch, `sky` + sparse `star` / `goldStar`, never a solid fill.
+//   §8.2.2 gold marks a crossing and nothing else — the arch frame and the line cut under it, nowhere else.
+//   §8.2.3 a named floor — the room's own name still stands at the bottom of the frame, so the card never
+//          repeats it; the card says what happened to you, not where you are.
+//   §8.2.4 something unfinished — the stele's top-right corner is chipped and the right jamb is cracked.
+//   §8.2.5 one of what the dead use — a single arch, never a pair.
+// §7.1 (HUD in the outer band) is deliberately not applied: at the moment of death there is no fight left to
+// occlude, and the card is the frame's subject.
+const CARD = { w: 224, h: 190, top: 42 }
+const CARD_X = Math.round((V.width - CARD.w) / 2)
+const CARD_CX = CARD_X + Math.round(CARD.w / 2)
+const ARCH_TOP = CARD.top + 14
+const ARCH_ROWS = 46, SILL_ROWS = 4, CROWN_ROWS = 4
+// The opening, as whole-pixel spans per row. A stepped arch, never a stroked curve (§2.1 Law 5).
+const archIn = (r: number) => (r < 3 ? 11 : r < 6 ? 15 : r < 9 ? 18 : r < 12 ? 20 : 21)
+// The frame's own silhouette: a heavy stepped crown that thins into straight jambs (§4.3.5 one large non-grid form).
+const archOut = (r: number) => (r < -2 ? 15 : r < 0 ? 19 : r < 3 ? 21 : r < 6 ? 23 : 25)
+const SILL_HALF = 28
+// Reveal beats, in SIM ticks after the killing blow. The sim runs at 0.25 time scale for the first 30 ticks
+// (tuning.player.deathSlowmoTicks), so a tick here is 67 ms of real time until tick 30 and 17 ms after it:
+// CT.stele = 12 is 800 ms, CT.sub = 30 is 2.0 s and lands exactly as normal time returns.
+//
+// THE HOLD IS THE POINT. The run's most important half-second is the one where the player sees what killed him,
+// and until CT.dim nothing at all is drawn over the room: no veil, no card. Then the room stills — a veil
+// centred on the corpse, never a full-frame scrim — and only then does the stele open. The old schedule put the
+// card's border on screen 3 ticks after the killing blow and had the arena at a flat (8,7,14) by tick 15, so the
+// death showed the player neither his corpse, nor his killer, nor the room.
+const CT = { hold: 4, dim: 12, stele: 12, steleOpen: 8, sky: 20, title: 22, cross: 26, sub: 30, rows: [34, 37, 40], act: 46 }
+// The veil: five nested ellipses centred on the corpse, each contributing one hard step. Composited they reach
+// ~0.33 at the frame corner and exactly 0 on the body, so the world stays the card's ground (§3.2.3 — light
+// pools, it does not wash) instead of a blackout. Radii are in view px, x and y, at the settled step.
+const VEIL: [number, number, number][] = [[180, 120, 0.05], [240, 158, 0.07], [300, 196, 0.08], [360, 234, 0.09], [420, 272, 0.10]]
+// The card's own light. The opening is an accent source (§3.2.4), so the stone is lit around the arch and falls
+// to B1 in the bottom corners; `LIT.ryDn` is far shorter than `LIT.ryUp` on purpose, so the summary half of the
+// card stays dark and bone type on it is still the eye's second stop (§7.3). Steps are whole values off the canon
+// stone ramp and the boundary is quantized to 4 px — a smooth falloff here is a CSS gradient wearing a tileset.
+const LIT = { cx: CARD_CX, cy: CARD.top + 42, rx: 152, ryUp: 62, ryDn: 60 }
+const FACE_RAMP = [C.slate3, C.slate2, C.slate1, C.slate0]
+const FACE_D = [0.45, 0.70, 0.95, 1.25]
+// The air the slab stands in, as offsets from its edge and the alpha of the `slate0` lift at each one.
+const SPILL: [number, number][] = [[3, 0.34], [8, 0.20], [14, 0.11], [21, 0.05]]
+const VEIL_STEPS = 8                                 // the aperture closes in whole steps (§6.6), never a ramp
+const VEIL_BAND = 5                                  // row quantum: the veil's edge is stepped, like everything else
+const STARS = 34                                    // ~2 % of the opening's area: a deep sky, not a starfield poster
 const FEET = 6                                       // player.radius + 1: the row the sprite's feet stand on
 const CROWN_UP = 20                                  // rows above the player pixel: the crown clears the sprite's head by ~4
 const HEART_X = 8, HEART_Y = 6, STEP = 9            // flame pitch in unscaled px; the rig is drawn at 2x
 const HURT_SHAKE = [1, -1, 1, 0, -1, 1, 0, 0]       // authored 8-tick rig shake, never a random jitter
 
-// One vessel of life: a guttering flame, 7x9, three bands of the ember ramp. Rows are the silhouette; the outer
-// ring of the silhouette takes emberLo so the shape holds its edge against the panel.
+// One vessel of life: a heart, 7x9, same stamp the floor gift uses. Ember ramp; the outer ring takes emberLo
+// so the shape holds its edge against the panel. Two lobes and a cleft, not a flame.
 const FLAME = [
-  '...X...',
-  '..XX...',
-  '..XXX..',
-  '..XXX..',
-  '.XXXX..',
-  '.XXXXX.',
-  '.XXXXX.',
+  '.XX.XX.',
+  'XXXXXXX',
   'XXXXXXX',
   '.XXXXX.',
+  '..XXX..',
+  '...X...',
+  '.......',
+  '.......',
+  '.......',
 ]
 const CORE = [
-  '.......', '.......', '.......', '.......', '.......',
-  '...C...', '..CCC..', '..CCC..', '...C...',
+  '.......', '..C.C..', '..CCC..', '...C...', '.......',
+  '.......', '.......', '.......', '.......',
 ]
 const FW = 7, FH = 9
 const inFlame = (x: number, y: number) => x >= 0 && y >= 0 && x < FW && y < FH && FLAME[y][x] === 'X'
@@ -92,6 +146,16 @@ function ring(g: Graphics, cx: number, cy: number, r: number, col: number, alpha
   }
 }
 
+// A stable 1D hash in [0,1). Authored scatter (the card's star-sky, its pitting) needs to be identical on every
+// capture of the same tick, so nothing here may reach for Math.random.
+function hash01(n: number): number {
+  let x = Math.imul(n ^ 0x9e3779b9, 0x85ebca6b)
+  x ^= x >>> 13
+  x = Math.imul(x, 0xc2b2ae35)
+  x ^= x >>> 16
+  return (x >>> 0) / 4294967296
+}
+
 // Every rule on this HUD ends in the same 3px diamond. That repeat is what makes the frame read as one hand.
 function diamond(g: Graphics, cx: number, cy: number, col: number, alpha = 1) {
   g.rect(cx, cy - 1, 1, 3).fill({ color: col, alpha })
@@ -114,6 +178,16 @@ export class Hud {
   private hintG = new Graphics()      // key caps / pad buttons
   private hintRow = new Container()
   private hintLabels: Text[] = []
+  private scrimG = new Graphics()     // the room stills: a stepped veil centred on the corpse, under the card
+  private cardG = new Graphics()      // the death card: stele, arch, star-sky, rules
+  private cardTitle: Text
+  private cardSub: Text
+  private cardRows: { label: Text; value: Text }[] = []
+  private cardKey: Text               // the key cap's letter: R, or START on a pad
+  private cardAct: Text
+  private cardKeyStr = 'boot'         // last drawn card geometry; the card is redrawn only when its pose changes
+  private veilKey = ''                // last drawn veil step; ~540 whole-pixel rects, so it redraws 8 times, not 60/s
+  private deathAt: { x: number; y: number } | null = null   // the corpse's screen pixel, latched on the killing frame
   waveText: Text
   banner: Text
   sub: Text
@@ -161,9 +235,38 @@ export class Hud {
     this.hintRow.addChild(this.hintG)
     this.hintRow.position.set(0, V.height - 34)
 
+    // The death card is authored in the same panel grammar as the rest of the HUD, but its own type: a display
+    // face for the one line that carries the fiction, the 8 px face for everything you read after it.
+    this.cardTitle = new Text({
+      text: 'NOT YET REBORN',
+      style: { fontFamily: 'Kenney Blocks', fontSize: 16, fill: 0xffffff, letterSpacing: 1, stroke: { color: C.void, width: 2 } },
+      resolution: 1,
+    })
+    this.cardTitle.anchor.set(0.5); this.cardTitle.position.set(CARD_CX, CARD.top + 92)
+    this.cardSub = new Text({
+      text: 'THE THRESHOLD PULLS YOU BACK',
+      style: { fontFamily: 'Kenney Mini', fontSize: 8, fill: C.boneDim, letterSpacing: 1, dropShadow: drop },
+      resolution: 1,
+    })
+    this.cardSub.anchor.set(0.5); this.cardSub.position.set(CARD_CX, CARD.top + 108)
+    for (let i = 0; i < 3; i++) {
+      const label = new Text({ text: '', style: { fontFamily: 'Kenney Mini', fontSize: 8, fill: C.boneDim, letterSpacing: 1 }, resolution: 1 })
+      label.anchor.set(0, 0); label.position.set(CARD_X + 26, CARD.top + 128 + i * 10)
+      const value = new Text({ text: '', style: { fontFamily: 'Kenney Mini', fontSize: 8, fill: C.bone, letterSpacing: 1 }, resolution: 1 })
+      value.anchor.set(1, 0); value.position.set(CARD_X + CARD.w - 26, CARD.top + 128 + i * 10)
+      this.cardRows.push({ label, value })
+    }
+    this.cardKey = new Text({ text: 'R', style: { fontFamily: 'Kenney Mini', fontSize: 8, fill: C.bone }, resolution: 1 })
+    this.cardKey.anchor.set(0.5, 0)
+    this.cardAct = new Text({ text: 'BEGIN AGAIN', style: { fontFamily: 'Kenney Mini', fontSize: 8, fill: C.bone, letterSpacing: 1, dropShadow: drop }, resolution: 1 })
+    this.cardAct.anchor.set(0, 0)
+
     layer.addChild(this.markG, this.crownG, this.hurtG, this.bandG, this.banner, this.sub,
       this.plateG, this.rig, this.waveG, this.waveText,
-      this.footG, this.place, this.hintRow, this.hint)
+      this.footG, this.place, this.hintRow, this.hint,
+      this.scrimG, this.cardG, this.cardTitle, this.cardSub, this.cardKey, this.cardAct)
+    for (const r of this.cardRows) layer.addChild(r.label, r.value)
+    this.hideDeathCard()
 
     // a pad already plugged in only announces itself on its first button press; either way the row rebuilds and
     // shows again, so a controller player never reads "click / space".
@@ -178,7 +281,7 @@ export class Hud {
     this.bannerTicks = Math.round(seconds * 60)
     // callers outside this file pass only text, so the tone is read off the words: a death or a clear never
     // wears the wave colours.
-    this.bannerTone = /DIED/.test(text) ? 'death' : /CLEAR/.test(text) ? 'clear' : 'wave'
+    this.bannerTone = /DIED/.test(text) ? 'death' : /CLEAR/.test(text) ? 'clear' : /LIFE/.test(text) ? 'gift' : 'wave'
     this.bannerStart = this.prevTick < 0 ? 0 : this.prevTick
   }
 
@@ -204,7 +307,7 @@ export class Hud {
     this.updateMark(p, now)
     this.updateCrown(p, at, hurtAge)
     this.updateHurtLight(p, at, hurtAge)
-    this.updateLife(p, now, hurtAge)
+    this.updateLife(world, now, hurtAge)
     this.updateWave(world)
     this.updateBanner(world, now)
     this.updateFooter(world, now)
@@ -285,8 +388,8 @@ export class Hud {
     g.clear()
     if (!at || p.state === 'dead') { g.visible = false; return }
     g.visible = true
-    const n = tuning.player.hp
-    const PITCH = 4, ARC = [1, 0, -1, 0, 1]
+    const n = p.maxHp
+    const PITCH = 4, ARC = [1, 0, -1, 0, 1, 0, 1, 0]
     const x0 = at.x - Math.round((n * PITCH - 1) / 2)
     const baseY = at.y - CROWN_UP
     const slot = (i: number) => ({ x: x0 + i * PITCH, y: baseY + (ARC[i] ?? 0) })
@@ -327,9 +430,10 @@ export class Hud {
   // the flame: white tip, hot core, warm body. Mean L ~180 against the cup's empty interior at L~10 — a 5x
   // value step and a hue step, so full and empty can never be confused.
   private pipFlame(g: Graphics, x: number, y: number) {
-    g.rect(x + 1, y, 1, 1).fill(C.wickWhite)
-    g.rect(x, y + 1, 3, 2).fill(C.wick)
-    g.rect(x + 1, y + 1, 1, 2).fill(C.wickHot)
+    g.rect(x, y, 1, 1).fill(C.wick)
+    g.rect(x + 2, y, 1, 1).fill(C.wick)
+    g.rect(x, y + 1, 3, 1).fill(C.wickHot)
+    g.rect(x + 1, y + 2, 1, 1).fill(C.ember)
   }
 
   // --- the damage event: light, at the body ----------------------------------------------------------------------
@@ -375,17 +479,25 @@ export class Hud {
     }
   }
 
-  private updateLife(p: World['player'], now: number, hurtAge: number) {
+  private updateLife(world: World, now: number, hurtAge: number) {
+    const p = world.player
     const shake = hurtAge >= 0 && hurtAge < HURT_SHAKE.length ? HURT_SHAKE[hurtAge] : 0
-    const n = tuning.player.hp
+    const n = p.maxHp
     const low = p.hp === 1 && p.state !== 'dead'
-    const panelW = (n - 1) * STEP * 2 + FW * 2 + 8
+    const blessed = hasBoon(world, 'cleave')
+    const panelW = (n - 1) * STEP * 2 + FW * 2 + 8 + (blessed ? 18 : 0)
 
     // panel: five sockets on a rail, and the crown's redundant copy. NOTHING on it moves unless the sim says
     // you were hit: the old ambient flame flicker moved ~150 px per frame at idle, which is more pixels than
     // losing a life moved, so the event was quieter than the noise and no player could ever see it.
     const pg = this.plateG
     pg.clear()
+    // Once the card opens, the corner readouts step back. A survival readout is for a fight, and there is no
+    // fight left; leaving it at full value made the empty life plate the brightest object in the frame beside
+    // the card's own gold, which is a §3.2.5 and a §7.6 violation on the one frame that matters most.
+    const cardAge = p.state === 'dead' && p.deathTick >= 0 ? now - p.deathTick : -1
+    const back = cardAge < CT.stele ? 1 : cardAge < CT.stele + 6 ? 0.7 : 0.4
+    pg.alpha = this.rig.alpha = back
     // the panel edge takes the wine of the death card once you are out, and embers when you are one hit from it
     const edge = p.state === 'dead' ? C.purple2 : low && Math.floor(now / 12) % 2 ? C.emberLo : C.goldDim
     plate(pg, HEART_X - 4 + shake, 2, panelW, 26, edge)
@@ -404,9 +516,10 @@ export class Hud {
       pg.rect(gx, 25, w, 1).fill(C.gold)
       pg.rect(gx, 26, w, 1).fill(C.goldDim)
     }
+    if (blessed) this.drawCleaveMark(pg, HEART_X + n * STEP * 2 + shake, 6)
 
     this.rig.position.set(HEART_X + shake, HEART_Y - 2)
-    const key = `${p.hp}|${Math.min(hurtAge, 40)}|${p.state}`
+    const key = `${p.hp}|${p.maxHp}|${Math.min(hurtAge, 40)}|${p.state}|${world.boonBits}`
     if (key === this.rigKey) return
     this.rigKey = key
 
@@ -458,16 +571,34 @@ export class Hud {
     }
   }
 
+  // A wide slash, not a heart: the blessing that changes the blade, in the HUD band, ember not gold.
+  private drawCleaveMark(g: Graphics, ox: number, oy: number) {
+    const M = [
+      '..XXXXX',
+      '.XXXXX.',
+      'XXXX...',
+      '.XXX...',
+      '..XX...',
+      '...X...',
+    ]
+    for (let y = 0; y < M.length; y++) {
+      for (let x = 0; x < 7; x++) {
+        if (M[y][x] !== 'X') continue
+        const edge = (M[y][x - 1] !== 'X') || (M[y][x + 1] !== 'X') || (M[y - 1]?.[x] !== 'X') || (M[y + 1]?.[x] !== 'X')
+        const tip = x >= 5 && y <= 1
+        g.rect(ox + x * 2, oy + y * 2, 2, 2).fill(tip ? C.emberHi : edge ? C.emberLo : C.ember)
+      }
+    }
+  }
+
   // variant shifts the tip a pixel, so the row of flames never breathes in unison
-  private drawFlame(g: Graphics, ox: number, oy: number, edge: number, body: number, core: number, variant: number, fromRow = 0) {
-    const tipShift = variant === 1 ? 1 : variant === 2 ? -1 : 0
+  private drawFlame(g: Graphics, ox: number, oy: number, edge: number, body: number, core: number, _variant: number, fromRow = 0) {
     for (let y = fromRow; y < FH; y++) {
       for (let x = 0; x < FW; x++) {
         if (FLAME[y][x] !== 'X') continue
         const isEdge = !inFlame(x - 1, y) || !inFlame(x + 1, y) || !inFlame(x, y - 1) || !inFlame(x, y + 1)
         const isCore = core !== 0 && CORE[y][x] === 'C'
-        const dx = y < 2 ? tipShift : 0
-        g.rect(ox + x + dx, oy + y, 1, 1).fill(isEdge ? edge : isCore ? core : body)
+        g.rect(ox + x, oy + y, 1, 1).fill(isEdge ? edge : isCore ? core : body)
       }
     }
   }
@@ -476,10 +607,14 @@ export class Hud {
   private updateWave(world: World) {
     const w = world.wave
     const live = w.state === 'active' || w.state === 'pending'
-    const dead = world.player.state === 'dead'
+    const dp = world.player
+    // the same step-back the life plate takes: the readouts hold at full through the hold, then hand the frame
+    // to the card. Ages are sim ticks off deathTick, so a stepwise capture shows exactly what the tick implies.
+    const cardAge = dp.state === 'dead' && dp.deathTick >= 0 ? world.tick - dp.deathTick : -1
+    const back = cardAge < 0 ? 1 : cardAge < CT.stele ? 1 : cardAge < CT.stele + 6 ? 0.7 : 0.4
     this.waveText.visible = live
-    this.waveText.alpha = dead ? 0.5 : 1
-    this.waveG.alpha = dead ? 0.5 : 1
+    this.waveText.alpha = back
+    this.waveG.alpha = back
     const g = this.waveG
     g.clear()
     if (!live) return
@@ -512,15 +647,22 @@ export class Hud {
     const w = world.wave
     // Persistent states anchor to the tick the SIM recorded, so a batch-stepped capture lands mid-hold, fully
     // open. They also outrank a timed wave banner: dying under 'WAVE 3' must read YOU DIED, not WAVE 3.
-    let text = '', sub = '', tone: Tone = 'wave', age = 0, ttl = Infinity
+    // Death is not a banner. It gets its own card (see updateDeathCard) and it outranks everything.
     if (p.state === 'dead' && p.deathTick >= 0) {
-      text = 'YOU DIED'; sub = this.padMode ? 'PRESS START' : 'PRESS R'; tone = 'death'; age = now - p.deathTick
-    } else if (w.state === 'done' && world.roomClearTick >= 0) {
+      this.hideBanner()
+      this.updateDeathCard(world, now - p.deathTick)
+      return
+    }
+    this.hideDeathCard()
+    let text = '', sub = '', tone: Tone = 'wave', age = 0, ttl = Infinity
+    if (w.state === 'done' && world.roomClearTick >= 0) {
       text = 'ROOM CLEARED'
       sub = world.hasNextRoom()
-        ? 'WALK NORTH'
+        ? ((world.rooms[world.roomIndex].exits?.length ?? 0) > 1 ? 'CHOOSE A DOOR' : 'WALK NORTH')
         : (this.padMode ? 'PRESS START TO RUN IT AGAIN' : 'PRESS R TO RUN IT AGAIN')
       tone = 'clear'; age = now - world.roomClearTick
+      // Two marked doors must speak for themselves. The slab is a brief toast, then it leaves.
+      if ((world.rooms[world.roomIndex].exits?.length ?? 0) > 1) ttl = Math.max(0, 36 - age)
     } else if (this.bannerTicks > 0 && this.bannerStart >= 0 && now - this.bannerStart < this.bannerTicks) {
       text = this.bannerText; sub = this.bannerSub; tone = this.bannerTone
       age = now - this.bannerStart; ttl = this.bannerTicks - age
@@ -544,10 +686,14 @@ export class Hud {
     this.sub.visible = this.banner.visible && !!sub && age >= OPEN
     this.sub.alpha = fade * 0.9
 
+    // Clear sits mid-room so the north door — the thing the line is about — is not under the plate.
+    const by = tone === 'clear' ? 118 : BANNER_Y
+    this.banner.position.set(V.width / 2, by)
+
     const g = this.bandG
     g.clear()
     if (h <= 0) return
-    const top = BANNER_Y - Math.round(h / 2)
+    const top = by - Math.round(h / 2)
     g.rect(0, top, V.width, h).fill({ color: C.seal0, alpha: 0.9 * fade })
     g.rect(0, top + 1, V.width, 1).fill({ color: C.void, alpha: 0.6 * fade })
     g.rect(0, top + h - 2, V.width, 1).fill({ color: C.void, alpha: 0.5 * fade })
@@ -575,12 +721,373 @@ export class Hud {
     this.bandG.clear()
   }
 
+  // --- the death card -------------------------------------------------------------------------------------------
+  private hideDeathCard() {
+    if (this.cardKeyStr === '') return
+    this.cardKeyStr = ''; this.veilKey = ''; this.deathAt = null
+    this.scrimG.clear(); this.cardG.clear()
+    this.cardTitle.visible = this.cardSub.visible = this.cardKey.visible = this.cardAct.visible = false
+    for (const r of this.cardRows) r.label.visible = r.value.visible = false
+  }
+
+  // The whole moment, staged in sim ticks off `player.deathTick` — never off wall clock, so a stepwise capture at
+  // tick T shows exactly the pose tick T implies. Reads sim state only; writes nothing.
+  private updateDeathCard(world: World, age: number) {
+    const p = world.player
+    const now = world.tick
+
+    // 1. The room does not go out. It stills.
+    //
+    //    The corpse's screen pixel is latched on the killing frame and every later beat is anchored to it, so the
+    //    veil never slides when the camera's death trauma shakes the world under it.
+    if (!this.deathAt || age <= 1) this.deathAt = this.playerPx() ?? this.deathAt
+    const at = this.deathAt
+    // The veil: an aperture closing on the corpse in eight whole steps, not a scrim dropped over the frame. It is
+    // 0 on the body and ~0.33 at the far corner, so the room keeps its texture and its hierarchy and becomes the
+    // ground the card stands on. Nothing at all is drawn over the room before CT.hold — the contact frame and the
+    // three after it belong to the fight.
+    const step = age < CT.hold ? -1 : Math.min(VEIL_STEPS, Math.floor(((age - CT.hold) * VEIL_STEPS) / (CT.dim - CT.hold)))
+    const vk = at ? `${step}|${at.x}|${at.y}` : `${step}|-`
+    if (vk !== this.veilKey) {
+      this.veilKey = vk
+      const sg = this.scrimG
+      sg.clear()
+      if (step >= 0) {
+        // the aperture starts wide open and closes: radii shrink from 2.2x to 1x, the alphas never move
+        const grow = 2.2 - 1.2 * (step / VEIL_STEPS)
+        const cx = at ? at.x : Math.round(V.width / 2), cy = at ? at.y : Math.round(V.height / 2)
+        for (const [rx0, ry0, a] of VEIL) {
+          const rx = rx0 * grow, ry = ry0 * grow
+          for (let y = 0; y < V.height; y += VEIL_BAND) {
+            const dy = (y + VEIL_BAND / 2 - cy) / ry
+            const hw = Math.abs(dy) >= 1 ? -1 : Math.round(rx * Math.sqrt(1 - dy * dy))
+            const h = Math.min(VEIL_BAND, V.height - y)
+            if (hw < 0) { sg.rect(0, y, V.width, h).fill({ color: C.void, alpha: a }); continue }
+            const l = cx - hw, r = cx + hw + 1
+            if (l > 0) sg.rect(0, y, Math.min(l, V.width), h).fill({ color: C.void, alpha: a })
+            if (r < V.width) sg.rect(Math.max(0, r), y, V.width - Math.max(0, r), h).fill({ color: C.void, alpha: a })
+          }
+        }
+      }
+    }
+
+    // 2. Type and numbers. The run summary is derived from sim state and nothing else: `nextEnemyId` counts every
+    //    body the pool ever handed out and combat.ts deactivates an enemy on the tick it dies, so spawned minus
+    //    standing IS the tally of the dead you sent on.
+    let standing = 0
+    for (const e of world.enemies) if (e.active) standing++
+    const felled = Math.max(0, world.nextEnemyId - 1 - standing)
+    const secs = Math.max(0, Math.floor(p.deathTick / 60))
+    const rows: [string, string][] = [
+      ['WAVE', `${Math.max(1, world.wave.index + 1)} / ${Math.max(1, world.wave.total)}`],
+      ['SENT ONWARD', `${felled}`],
+      ['HELD', `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`],
+    ]
+    for (let i = 0; i < rows.length; i++) {
+      const r = this.cardRows[i]
+      if (r.label.text !== rows[i][0]) r.label.text = rows[i][0]
+      if (r.value.text !== rows[i][1]) r.value.text = rows[i][1]
+      r.label.visible = r.value.visible = age >= CT.rows[i]
+      // the value lands hard: one tick bleached to bone-white, then it settles into bone
+      r.value.tint = age === CT.rows[i] ? C.wickWhite : C.bone
+    }
+    // The pop is a VALUE ramp plus a one-pixel settle: whole poses, integer positions, no resampled glyphs.
+    const t = age - CT.title
+    this.cardTitle.visible = age >= CT.title
+    this.cardTitle.tint = t < 1 ? C.wickWhite : t < 3 ? C.goldHot : C.gold
+    this.cardTitle.position.set(CARD_CX, CARD.top + 92 - (t < 1 ? 2 : t < 3 ? 1 : 0))
+    this.cardSub.visible = age >= CT.sub
+    const keyWord = this.padMode ? 'START' : 'R'
+    if (this.cardKey.text !== keyWord) this.cardKey.text = keyWord
+    const capW = Math.round(this.cardKey.width) + 9
+    const actW = capW + 5 + Math.round(this.cardAct.width)
+    const ax = CARD_CX - Math.round(actW / 2)
+    const ay = CARD.top + 166
+    this.cardKey.position.set(ax + Math.round(capW / 2), ay + 2)
+    this.cardAct.position.set(ax + capW + 5, ay + 2)
+    this.cardKey.visible = this.cardAct.visible = age >= CT.act
+
+    // 3. The art. Redrawn only when the pose changes: every staging tick, then once per twinkle step.
+    const pose = age <= CT.act + 4 ? `a${age}` : `s${Math.floor(now / 11)}`
+    if (pose === this.cardKeyStr) return
+    this.cardKeyStr = pose
+    const g = this.cardG
+    g.clear()
+
+    // The stele opens from a single gold seam on the card's own centre line, in whole even steps.
+    const open = Math.min(1, Math.max(0, (age - CT.stele + 1) / CT.steleOpen))
+    if (open <= 0) return
+    const h = Math.max(4, Math.round((CARD.h * open) / 2) * 2)
+    const w = Math.round((CARD.w * (0.34 + 0.66 * open)) / 2) * 2
+    const top = CARD.top + Math.round((CARD.h - h) / 2)
+    const left = CARD_X + Math.round((CARD.w - w) / 2)
+    if (open < 1) {
+      // What opens is the VOID, not a panel. The growing plate is `sky` and it is TRANSLUCENT until it has
+      // finished opening, so the lit room reads straight through the aperture instead of being replaced by a
+      // black rectangle sliding open — a slab that slides in is a div; this is a door. Stars come up inside it
+      // as it grows, and the gold crossing rides the two lips it is opening from (§8.2.1, §8.2.2).
+      this.stele(g, left, top, w, h, 0x0e122c, 0.30 + 0.62 * open)
+      const my = top + Math.round(h / 2)
+      const bw = w - 16
+      const n = Math.max(4, Math.round(open * 26))
+      for (let i = 0; i < n; i++) {
+        const sx = left + 6 + Math.floor(hash01(i * 5 + 3) * (w - 12))
+        const sy = top + 4 + Math.floor(hash01(i * 5 + 4) * Math.max(1, h - 8))
+        g.rect(sx, sy, 1, 1).fill({ color: i % 3 === 0 ? 0xffe2a0 : 0xb0c4ff, alpha: 0.45 + 0.55 * open })
+      }
+      g.rect(left + 8, my - 2, bw, 1).fill(C.gold)
+      g.rect(left + 8, my + 2, bw, 1).fill({ color: C.goldDim, alpha: 0.9 })
+      return
+    }
+    this.stele(g, left, top, w, h)
+
+    this.arch(g, age, now)
+
+    // The crossing: gold cut in stone, ending in the HUD's own diamond, wiping out from the centre (§8.2.2).
+    const cw = Math.round(Math.min(1, Math.max(0, (age - CT.cross) / 6)) * 66)
+    if (cw > 2) {
+      g.rect(CARD_CX - cw, CARD.top + 74, cw * 2, 1).fill(C.gold)
+      g.rect(CARD_CX - cw, CARD.top + 75, cw * 2, 1).fill({ color: C.goldDim, alpha: 0.8 })
+      diamond(g, CARD_CX - cw - 2, CARD.top + 74, C.gold)
+      diamond(g, CARD_CX + cw + 1, CARD.top + 74, C.gold)
+    }
+
+    // The summary sits under its own hairline, so the fiction and the tally never read as one paragraph.
+    if (age >= CT.rows[0]) {
+      g.rect(CARD_X + 26, CARD.top + 120, CARD.w - 52, 1).fill({ color: C.iron })
+      diamond(g, CARD_X + 23, CARD.top + 120, C.goldDim, 0.9)
+      diamond(g, CARD_X + CARD.w - 24, CARD.top + 120, C.goldDim, 0.9)
+    }
+    // leader dots between each label and its number: the row reads as a line, not two floating words
+    for (let i = 0; i < rows.length; i++) {
+      if (age < CT.rows[i]) continue
+      const r = this.cardRows[i]
+      const y = CARD.top + 133 + i * 10
+      const x0 = CARD_X + 27 + Math.round(r.label.width), x1 = CARD_X + CARD.w - 28 - Math.round(r.value.width)
+      for (let x = x0 + 2; x < x1 - 1; x += 4) g.rect(x, y, 1, 1).fill({ color: C.boneLo, alpha: 0.7 })
+    }
+
+    // The way back. A key cap in the hint row's grammar, on its own inset shelf, and the ONLY thing on this card
+    // that moves once the card has settled — so the eye finds the affordance without a word of instruction.
+    if (age >= CT.act) {
+      const lit = Math.floor(now / 24) % 2 === 0
+      g.rect(ax - 8, ay - 3, actW + 16, 1).fill({ color: C.void, alpha: 0.6 })
+      g.rect(ax - 8, ay + 14, actW + 16, 1).fill({ color: C.void, alpha: 0.4 })
+      const cx = ax, cy = ay
+      g.rect(cx + 1, cy + 12, capW - 2, 1).fill({ color: C.void, alpha: 0.9 })
+      g.rect(cx + 1, cy, capW - 2, 12).fill(C.iron)
+      g.rect(cx, cy + 1, capW, 10).fill(C.iron)
+      const edge = lit ? C.gold : C.goldDim
+      g.rect(cx + 1, cy, capW - 2, 1).fill(edge)
+      g.rect(cx + 1, cy + 11, capW - 2, 1).fill({ color: C.goldDim, alpha: 0.9 })
+      g.rect(cx, cy + 1, 1, 10).fill(edge)
+      g.rect(cx + capW - 1, cy + 1, 1, 10).fill({ color: C.goldDim, alpha: 0.9 })
+    }
+  }
+
+  // The card's own panel — and it is an OBJECT, not an overlay.
+  //
+  // Every framed thing in the reference is stacked the same way, and the previous card had none of it: a cast
+  // shadow separating it from the ground, a heavy metal frame, an inner bevel lit on its north lip, and a painted
+  // face that owns the top of the frame's value range. Reading outward from the stone:
+  //
+  //   face   opaque painted stone. Never translucent: a card you can read the room's shelf edges through is a div.
+  //   bevel  1 px, `cope` on the north and west lips, `slate2` on the south and east (§2.1 Law 2).
+  //   rail   2 px gold — `gold` + broken `goldHot` specular on the lit faces, `goldDim` over `mortar` on the two
+  //          faces turned away, so the frame is a value RANGE and not a trim line (§2.4).
+  //   ring   2 px `void`, 4 px on the south and east and offset 2 px: the slab's own cast shadow (§3.2.8).
+  //   spill  the opening's light on the air around the slab. The grade clamps every pixel to 7.7/255 at the low
+  //          end (src/render/postfx.ts) and the room under the veil is already sitting on that floor, so a cast
+  //          shadow out there has nothing left to darken. The spill lifts the air first; the ring then cuts it.
+  //
+  // The face is lit BY THE OPENING (§3.2.4 — an open door is a licensed accent source), so the stone is bright
+  // around the arch and falls to B1 in the bottom corners. That is also why the card can be the brightest object
+  // in this one frame without breaking §7.6: at the death beat there is no fight to occlude and no telegraph to
+  // outrank, so the card is the focal object (§5.1) and §3.2.5 puts the focal object's specular at the top.
+  private stele(g: Graphics, x: number, y: number, w: number, h: number, face = C.slate1, faceA = 1) {
+    if (h < CARD.h) {
+      // still opening: what grows is the VOID, and it stays translucent on purpose (see the caller).
+      g.rect(x + 2, y + h, w - 4, 1).fill({ color: C.void, alpha: 0.9 })
+      g.rect(x + 1, y, w - 2, h).fill({ color: face, alpha: faceA })
+      g.rect(x, y + 1, w, h - 2).fill({ color: face, alpha: faceA })
+      g.rect(x + 1, y, w - 2, 1).fill(C.goldDim)
+      g.rect(x + 1, y + h - 1, w - 2, 1).fill({ color: C.goldDim, alpha: 0.75 })
+      g.rect(x, y + 1, 1, h - 2).fill(C.goldDim)
+      g.rect(x + w - 1, y + 1, 1, h - 2).fill({ color: C.goldDim, alpha: 0.85 })
+      return
+    }
+
+    // 1. the spill: four stepped rings of `slate0`, brightest against the stone
+    let prev = 0
+    for (const [pad, a] of SPILL) {
+      const d = pad - prev
+      g.rect(x - pad, y - pad, w + pad * 2, d).fill({ color: C.slate0, alpha: a })
+      g.rect(x - pad, y + h + prev, w + pad * 2, d).fill({ color: C.slate0, alpha: a })
+      g.rect(x - pad, y - prev, d, h + prev * 2).fill({ color: C.slate0, alpha: a })
+      g.rect(x + w + prev, y - prev, d, h + prev * 2).fill({ color: C.slate0, alpha: a })
+      prev = pad
+    }
+    // 2. the cast shadow: hard-edged, south and 15° right, no blur
+    g.rect(x - 2, y - 2, w + 4, 2).fill({ color: C.void, alpha: 0.95 })
+    g.rect(x - 2, y - 2, 2, h + 4).fill({ color: C.void, alpha: 0.95 })
+    g.rect(x + 2, y + h, w + 4, 4).fill({ color: C.void, alpha: 0.95 })
+    g.rect(x + w, y + 2, 4, h + 4).fill({ color: C.void, alpha: 0.95 })
+
+    // 3. the face. Opaque, and zoned in whole 4 px steps down the canon stone ramp — never a gradient fill, which
+    //    is what makes a plate read as UI. The pool is an ellipse on the opening, biased hard downward so the
+    //    summary half of the card falls into shadow and the bone type on it stays the second stop for the eye.
+    g.rect(x, y, w, h).fill(C.seal0)
+    const fx0 = x + 3, fx1 = x + w - 3
+    for (let py = y + 3; py < y + h - 3; py++) {
+      const v = (py - LIT.cy) / (py < LIT.cy ? LIT.ryUp : LIT.ryDn)
+      for (let k = FACE_D.length - 1; k >= 0; k--) {
+        const dd = FACE_D[k] * FACE_D[k] - v * v
+        if (dd <= 0) continue
+        const hw = Math.round((LIT.rx * Math.sqrt(dd)) / 4) * 4 + (hash01(py * 7 + k) > 0.5 ? 2 : 0)
+        const l = Math.max(fx0, LIT.cx - hw), r = Math.min(fx1, LIT.cx + hw)
+        if (r > l) g.rect(l, py, r - l, 1).fill(FACE_RAMP[k])
+      }
+    }
+
+    // 4. §2.1 Law 1, three scales of variation. Macro = cut courses, short, staggered, never aligned with each
+    //    other, each with a lit north lip so it reads as a joint in stone and not as a UI rule. Micro = pitting
+    //    clustered at the low edge. Meso is the arch itself.
+    for (let c = 1; c * 19 < h - 14; c++) {
+      const cy = y + 12 + c * 19
+      const dx = 6 + Math.round(hash01(c * 7) * (w * 0.4))
+      const wide = Math.round((w - dx - 10) * (0.3 + hash01(c * 13) * 0.4))
+      g.rect(x + dx, cy, wide, 1).fill({ color: C.void, alpha: 0.9 })
+      g.rect(x + dx, cy - 1, wide, 1).fill({ color: cy - y < 70 ? C.slate3 : C.slate1, alpha: 0.85 })
+    }
+    for (let i = 0; i < 40; i++) {
+      const px = x + 4 + Math.round(hash01(i * 3 + 1) * (w - 9))
+      const py = y + h - 4 - Math.round(hash01(i * 3 + 2) ** 2 * (h - 12))
+      g.rect(px, py, 1, 1).fill(i % 3 === 0 ? { color: C.slate1, alpha: 0.7 } : { color: C.void, alpha: 0.7 })
+    }
+    // chips, in the lit half only: `slateHi` is a wet-stone specular and it belongs where the light is (§1.2)
+    for (let i = 0; i < 7; i++) {
+      const px = x + 12 + Math.round(hash01(i * 9 + 4) * (w - 30))
+      const py = y + 8 + Math.round(hash01(i * 9 + 5) * 54)
+      g.rect(px, py, 2, 1).fill(C.slateHi)
+      g.rect(px, py + 1, 1, 1).fill({ color: C.void, alpha: 0.7 })
+    }
+    // §8.2.4, something unfinished: a crack running down from the last course
+    let ckx = x + w - 10
+    for (let k = 0; k < 42; k++) {
+      g.rect(ckx, y + 2 + k, 1, 1).fill({ color: C.void, alpha: 0.85 })
+      if (k % 3 === 1) g.rect(ckx - 1, y + 2 + k, 1, 1).fill({ color: C.slate3, alpha: 0.5 })
+      if (hash01(k * 11 + 5) > 0.45) ckx--
+    }
+
+    // 5. the bevel: the lip of the recess the face sits in. North and west catch the opening, south and east
+    //    fall away — a bevel identical on all four sides is a border, not lighting (§2.1 Law 2).
+    g.rect(x + 2, y + 2, w - 4, 1).fill(C.cope)
+    g.rect(x + 2, y + 3, 1, h - 6).fill(C.cope)
+    g.rect(x + 2, y + h - 3, w - 4, 1).fill(C.slate2)
+    g.rect(x + w - 3, y + 3, 1, h - 6).fill(C.slate2)
+
+    // 6. the rail
+    g.rect(x, y, w, 2).fill(C.gold)
+    g.rect(x, y, 2, h).fill(C.gold)
+    g.rect(x, y + h - 2, w, 2).fill(C.goldDim)
+    g.rect(x + w - 2, y, 2, h).fill(C.goldDim)
+    g.rect(x + 1, y + h - 1, w - 2, 1).fill({ color: C.mortar, alpha: 0.9 })
+    g.rect(x + w - 1, y + 1, 1, h - 2).fill({ color: C.mortar, alpha: 0.9 })
+    // worn metal breaks its highlight into segments; a continuous one down a whole edge reads as plastic (§2.4)
+    for (const [o, len] of [[9, 33], [56, 17], [90, 45], [150, 21], [186, 27]] as const) g.rect(x + o, y, len, 1).fill(C.goldHot)
+    for (const [o, len] of [[7, 25], [45, 13], [73, 37], [128, 19]] as const) g.rect(x, y + o, 1, len).fill(C.goldHot)
+    for (const [px, py] of [[x, y], [x + w - 1, y], [x, y + h - 1], [x + w - 1, y + h - 1]] as const) {
+      g.rect(px, py, 1, 1).fill({ color: C.void, alpha: 0.9 })
+    }
+    // §8.2.4 at the scale of the object: the top-right corner is chipped away and the stone under it shows.
+    g.rect(x + w - 9, y, 8, 2).fill({ color: C.void, alpha: 0.9 })
+    g.rect(x + w - 2, y + 1, 2, 5).fill({ color: C.void, alpha: 0.9 })
+    g.rect(x + w - 5, y + 2, 3, 1).fill({ color: C.slate1, alpha: 0.95 })
+    g.rect(x + w - 4, y + 3, 2, 3).fill({ color: C.slate1, alpha: 0.95 })
+  }
+
+  // One arch, opening onto the star-sky (§8.2.1, §8.2.5). Metal is a value RANGE (§2.4): the key comes from the
+  // north, 15° left, so the left jamb takes `gold`, the crown takes a broken goldHot specular, and the right jamb
+  // falls to goldDim over mortar. The interior is never shaded and never a solid fill (§2.8).
+  private arch(g: Graphics, age: number, now: number) {
+    const cx = CARD_CX
+    // Frame body, row by row, whole pixels only, and shaded as metal rather than filled as a border: the key is
+    // north 15° left, so one jamb carries the whole ramp `goldHot`>`gold`>`goldDim`>`mortar` with the two extremes
+    // touching (§2.4), and the other falls away to `mortar`. That is what stops it reading as a plastic outline.
+    for (let r = -CROWN_ROWS; r < ARCH_ROWS + SILL_ROWS; r++) {
+      const y = ARCH_TOP + r
+      const sill = r >= ARCH_ROWS
+      const outer = sill ? SILL_HALF : archOut(r)
+      const inn = sill ? -1 : r < 0 ? -1 : archIn(r)
+      g.rect(cx - outer, y, outer * 2 + 1, 1).fill(C.goldDim)
+      g.rect(cx - outer, y, 1, 1).fill(C.gold)                                    // the lit face
+      g.rect(cx - outer - 1, y, 1, 1).fill({ color: C.void, alpha: 0.8 })         // §2.1 Law 3: the joint occludes
+      g.rect(cx + outer, y, 1, 1).fill({ color: C.mortar, alpha: 0.95 })          // the face turned away
+      if (inn >= 0) {
+        g.rect(cx - inn - 1, y, 1, 1).fill({ color: C.mortar, alpha: 0.9 })       // the reveal, both sides, dark
+        g.rect(cx + inn + 1, y, 1, 1).fill({ color: C.mortar, alpha: 0.75 })
+        if (outer - inn > 3) g.rect(cx - outer + 1, y, 1, 1).fill(C.gold)
+      }
+      // the moulding: one dark bead 3 px in from the outer face, tracing the whole profile. Without it the crown
+      // is a single 30x7 mass of B4 gold, which reads as a picture frame rather than a door (§2.4).
+      if (r >= -CROWN_ROWS + 2 && outer > 6) {
+        g.rect(cx - outer + 3, y, 1, 1).fill({ color: C.mortar, alpha: 0.6 })
+        g.rect(cx + outer - 3, y, 1, 1).fill({ color: C.mortar, alpha: 0.6 })
+      }
+    }
+    // and the same bead across the cap's underside, where the profile steps out
+    g.rect(cx - 16, ARCH_TOP - CROWN_ROWS + 2, 33, 1).fill({ color: C.mortar, alpha: 0.6 })
+    // worn metal breaks its highlight into segments; a continuous highlight down a whole edge reads as plastic
+    for (const [r0, len] of [[6, 9], [19, 6], [30, 11]] as const) {
+      for (let k = 0; k < len; k++) g.rect(cx - archOut(r0 + k), ARCH_TOP + r0 + k, 1, 1).fill(C.goldHot)
+    }
+    // the crown's specular, broken into two segments: a continuous highlight reads as plastic (§2.4)
+    g.rect(cx - 13, ARCH_TOP - CROWN_ROWS, 9, 1).fill(C.goldHot)
+    g.rect(cx - 2, ARCH_TOP - CROWN_ROWS, 6, 1).fill(C.goldHot)
+    g.rect(cx - 9, ARCH_TOP - CROWN_ROWS + 1, 5, 1).fill(C.gold)
+    // the sill: a stone step, lit on top, dark where it meets the card
+    g.rect(cx - SILL_HALF, ARCH_TOP + ARCH_ROWS, SILL_HALF * 2 + 1, 1).fill(C.gold)
+    g.rect(cx - SILL_HALF, ARCH_TOP + ARCH_ROWS + SILL_ROWS - 1, SILL_HALF * 2 + 1, 1).fill({ color: C.void, alpha: 0.85 })
+    // §3.2.8: the arch is massed, so it casts. Hard-edged, south and 15° right, no blur.
+    for (let k = 1; k <= 3; k++) {
+      g.rect(cx - SILL_HALF + k, ARCH_TOP + ARCH_ROWS + SILL_ROWS - 1 + k, SILL_HALF * 2 + 1, 1)
+        .fill({ color: C.void, alpha: 0.5 - k * 0.12 })
+    }
+
+    // the opening
+    const skyOn = age >= CT.sky
+    for (let r = 0; r < ARCH_ROWS; r++) {
+      const inn = archIn(r)
+      const y = ARCH_TOP + r
+      if (!skyOn) { g.rect(cx - inn, y, inn * 2 + 1, 1).fill({ color: C.void, alpha: 0.95 }); continue }
+      g.rect(cx - inn, y, inn * 2 + 1, 1).fill(0x0e122c)                          // `sky`, flat, never shaded
+      g.rect(cx - inn, y, 1, 1).fill({ color: C.goldDim, alpha: 0.55 })           // 1 px bounce off the jamb (§2.8)
+      g.rect(cx + inn, y, 1, 1).fill({ color: C.goldDim, alpha: 0.35 })
+    }
+    if (!skyOn) return
+    // Stars come up over eight ticks. Positions are a fixed authored scatter — a hash of the index, never a
+    // Math.random — so two runs of the same capture are byte-identical.
+    const shown = Math.min(STARS, Math.max(0, (age - CT.sky + 1) * 4))
+    for (let i = 0; i < shown; i++) {
+      const r = Math.floor(hash01(i * 2 + 1) * ARCH_ROWS)
+      const inn = archIn(r)
+      const sx = cx - inn + 1 + Math.floor(hash01(i * 2 + 2) * (inn * 2 - 1))
+      const twinkle = (Math.floor(now / 11) + i) % 7 === 0
+      const col = i % 3 === 0 ? 0xffe2a0 : 0xb0c4ff                               // one in three warm (§2.8)
+      g.rect(sx, ARCH_TOP + r, 1, 1).fill({ color: col, alpha: twinkle ? 1 : 0.55 })
+    }
+    // §8.2.4 again, at the scale of the object: a crack running down the right jamb.
+    for (let k = 0; k < 9; k++) g.rect(cx + 22 + (k % 2), ARCH_TOP + 24 + k, 1, 1).fill({ color: C.mortar, alpha: 0.9 })
+  }
+
   // --- place plate + control hint --------------------------------------------------------------------------------
   private updateFooter(world: World, now: number) {
     const p = world.player
     const dead = p.state === 'dead'
     const intro = this.bannerTicks > 0 && this.bannerStart >= 0 && now - this.bannerStart < this.bannerTicks && this.bannerTone === 'wave'
-    const a = dead ? 0.25 : world.wave.state === 'done' ? 0.85 : intro ? 0.9 : 0.5
+    // dead: the room keeps naming itself under the card. §8.2.3 wants the place readable with the HUD off, and
+    // the death card deliberately never repeats the name — so this line is the only place it stands.
+    const a = dead ? 0.6 : world.wave.state === 'done' ? 0.85 : intro ? 0.9 : 0.5
     if (world.roomName && this.place.text !== world.roomName) this.place.text = world.roomName
     this.place.alpha = a
 

@@ -8,6 +8,7 @@ import { Metrics } from '@/sim/metrics'
 import { tuning } from '@/tuning'
 import { isPlayerInvulnerable } from '@/sim/combat'
 import { arcHits } from '@/sim/combat'
+import { grantBoon, hasBoon, swingReach } from '@/sim/boons'
 
 function run(world: ReturnType<typeof createWorld>, ticks: number, bot = makeBot('idle'), metrics?: Metrics) {
   for (let i = 0; i < ticks; i++) {
@@ -138,6 +139,34 @@ describe('enemies', () => {
   })
 })
 
+function walkIntoEastDoor(w: ReturnType<typeof createWorld>, max = 700): boolean {
+  const east = w.arena.doors.find(d => d.dir === 'east')
+  if (!east) return false
+  const tx = east.col * 16
+  const ty = (east.row + 0.5) * 16
+  w.events.length = 0
+  for (let i = 0; i < max && w.roomIndex === 0; i++) {
+    const p = w.player
+    let moveX = 0, moveY = 0
+    if (p.x < 20 * 16) {
+      if (p.y < 12.5 * 16) moveY = 1
+      else moveX = 1
+    } else if (Math.abs(p.y - ty) > 6) {
+      moveY = p.y > ty ? -1 : 1
+      if (p.x < tx - 8) moveX = 1
+    } else {
+      moveX = 1
+    }
+    stepWorld(w, { ...emptyInput(), moveX, moveY, aimX: moveX || 1, aimY: moveY })
+    if (w.events.some(e => e.type === 'roomEnter')) {
+      w.events.length = 0
+      return true
+    }
+    w.events.length = 0
+  }
+  return false
+}
+
 function forceRoomClear(w: ReturnType<typeof createWorld>): void {
   for (const e of w.enemies) e.active = false
   w.spawnQueue.length = 0
@@ -195,5 +224,153 @@ describe('run rooms', () => {
     play(a); play(b)
     expect(a.roomIndex).toBe(1)
     expect(hashWorld(a)).toBe(hashWorld(b))
+  })
+  it('east cells stay sealed until clear, then walking east enters the quiet room', () => {
+    const w = createWorld(1, 'run')
+    const east = w.arena.doors.find(d => d.dir === 'east')
+    expect(east).toBeTruthy()
+    const cell = east!.row * w.arena.cols + east!.col
+    expect(w.arena.solid[cell]).toBe(1)
+    forceRoomClear(w)
+    expect(w.doorOpen).toBe(true)
+    expect(w.arena.solid[cell]).toBe(0)
+    expect(walkIntoEastDoor(w)).toBe(true)
+    expect(w.arena.kind).toBe('shore')
+    expect(w.roomName).toBe('THE FAR SHORE')
+    expect(w.doorOpen).toBe(false)
+    expect(w.hasNextRoom()).toBe(false)
+    expect(w.wave.state).toBe('idle')
+    expect(w.waveDefs).toBeNull()
+  })
+  it('the quiet room does not start a fight', () => {
+    const w = createWorld(1, 'run')
+    forceRoomClear(w)
+    expect(walkIntoEastDoor(w)).toBe(true)
+    expect(w.arena.kind).toBe('shore')
+    for (let i = 0; i < 180; i++) stepWorld(w, emptyInput())
+    expect(w.aliveEnemies()).toBe(0)
+    expect(w.spawnQueue.length).toBe(0)
+    expect(w.doorOpen).toBe(false)
+  })
+})
+
+function walkToOffering(w: ReturnType<typeof createWorld>, max = 400): boolean {
+  const o = w.arena.offering
+  if (!o) return false
+  for (let i = 0; i < max && !w.arena.offeringTaken; i++) {
+    const p = w.player
+    const moveX = p.x < o.x - 2 ? 1 : p.x > o.x + 2 ? -1 : 0
+    const moveY = p.y < o.y - 2 ? 1 : p.y > o.y + 2 ? -1 : 0
+    stepWorld(w, { ...emptyInput(), moveX, moveY, aimX: moveX || 1, aimY: moveY })
+  }
+  return !!w.arena.offeringTaken
+}
+
+describe('offering', () => {
+  it('the quiet room holds a life vessel; walking into it adds a heart', () => {
+    const w = createWorld(1, 'shore')
+    expect(w.arena.kind).toBe('shore')
+    expect(w.arena.offering?.kind).toBe('life')
+    expect(w.arena.offeringTaken).toBe(false)
+    expect(w.player.hp).toBe(tuning.player.hp)
+    expect(w.player.maxHp).toBe(tuning.player.hp)
+    expect(walkToOffering(w)).toBe(true)
+    expect(w.player.maxHp).toBe(tuning.player.hp + tuning.run.offeringHp)
+    expect(w.player.hp).toBe(tuning.player.hp + tuning.run.offeringHp)
+    expect(w.events.some(e => e.type === 'offeringTaken' && e.kind === 'life')).toBe(true)
+  })
+  it('the vessel is taken once', () => {
+    const w = createWorld(1, 'shore')
+    expect(walkToOffering(w)).toBe(true)
+    w.events.length = 0
+    for (let i = 0; i < 30; i++) stepWorld(w, emptyInput())
+    expect(w.events.some(e => e.type === 'offeringTaken')).toBe(false)
+    expect(w.player.maxHp).toBe(tuning.player.hp + tuning.run.offeringHp)
+  })
+  it('the east gift path pays; the north fight path does not', () => {
+    const gift = createWorld(1, 'run')
+    forceRoomClear(gift)
+    expect(walkIntoEastDoor(gift)).toBe(true)
+    expect(walkToOffering(gift)).toBe(true)
+    expect(gift.player.maxHp).toBe(tuning.player.hp + tuning.run.offeringHp)
+
+    const fight = createWorld(1, 'run')
+    forceRoomClear(fight)
+    for (let i = 0; i < 400 && fight.roomIndex === 0; i++) {
+      stepWorld(fight, { ...emptyInput(), moveY: -1, aimY: -1 })
+      fight.events.length = 0
+    }
+    expect(fight.arena.kind).toBe('crossing')
+    expect(fight.arena.offering).toBeUndefined()
+    expect(fight.player.maxHp).toBe(tuning.player.hp)
+  })
+  it('same seed + walk-in is deterministic', () => {
+    const play = (w: ReturnType<typeof createWorld>) => { walkToOffering(w) }
+    const a = createWorld(4, 'shore'), b = createWorld(4, 'shore')
+    play(a); play(b)
+    expect(a.arena.offeringTaken).toBe(true)
+    expect(hashWorld(a)).toBe(hashWorld(b))
+  })
+  it('one-room fights have no vessel', () => {
+    const w = createWorld(1, 'empty')
+    expect(w.arena.offering).toBeUndefined()
+    for (let i = 0; i < 60; i++) stepWorld(w, emptyInput())
+    expect(w.player.maxHp).toBe(tuning.player.hp)
+  })
+})
+
+function swingAtGap(w: ReturnType<typeof createWorld>, gap: number): { hits: number; dmg: number } {
+  const p = w.player
+  const dummy = w.spawnEnemy('dummy', p.x + gap, p.y)!
+  const hp0 = dummy.hp
+  let hits = 0
+  for (let i = 0; i < 40; i++) {
+    stepWorld(w, { ...emptyInput(), attack: i === 0, aimX: 1, aimY: 0 })
+    hits += w.events.filter(e => e.type === 'hit').length
+    w.events.length = 0
+  }
+  return { hits, dmg: hp0 - dummy.hp }
+}
+
+describe('boons', () => {
+  it('stock rooms start unblessed; the blessed room starts with cleave', () => {
+    const plain = createWorld(1, 'dummy')
+    const gifted = createWorld(1, 'blessed')
+    expect(hasBoon(plain, 'cleave')).toBe(false)
+    expect(hasBoon(gifted, 'cleave')).toBe(true)
+    expect(hashWorld(plain)).not.toBe(hashWorld(gifted))
+  })
+  it('grant is idempotent', () => {
+    const w = createWorld(1, 'empty')
+    grantBoon(w, 'cleave')
+    const bits = w.boonBits
+    grantBoon(w, 'cleave')
+    expect(w.boonBits).toBe(bits)
+    expect(hasBoon(w, 'cleave')).toBe(true)
+  })
+  it('cleave adds reach, arc, and damage', () => {
+    const w = createWorld(1, 'empty')
+    const s = tuning.player.attack.swings[0]
+    const before = swingReach(w, s)
+    const radius = before.radius, arcDeg = before.arcDeg, damage = before.damage
+    grantBoon(w, 'cleave')
+    const after = swingReach(w, s)
+    expect(after.radius).toBe(radius + tuning.boons.cleave.radiusAdd)
+    expect(after.arcDeg).toBe(arcDeg + tuning.boons.cleave.arcAdd)
+    expect(after.damage).toBe(damage + tuning.boons.cleave.damageAdd)
+  })
+  it('a dummy just past vanilla reach is missed, then cut once blessed', () => {
+    const miss = swingAtGap(createWorld(1, 'empty'), 48)
+    expect(miss.hits).toBe(0)
+    const w = createWorld(1, 'empty')
+    grantBoon(w, 'cleave')
+    const hit = swingAtGap(w, 48)
+    expect(hit.hits).toBe(1)
+    expect(hit.dmg).toBe(tuning.player.attack.swings[0].damage + tuning.boons.cleave.damageAdd)
+  })
+  it('vanilla still connects at close range', () => {
+    const close = swingAtGap(createWorld(1, 'empty'), 14)
+    expect(close.hits).toBe(1)
+    expect(close.dmg).toBe(tuning.player.attack.swings[0].damage)
   })
 })

@@ -4,3 +4,13 @@ dist
 /shots/
 test-results/
 *.log
+
+# Gauntlet per-round captures: regenerable from `pnpm shot`/`strip`/`poses` at a fixed
+# seed and tick, ~52MB and growing every round. The reference set stays tracked - it is
+# the bar the blind critics judge against and cannot be regenerated from this repo.
+gauntlet/evidence/*/w*r*/
+gauntlet/evidence/*/r[0-9]*/
+gauntlet/evidence/.thumbs/
+
+# one-off measurement scratch dropped by builders mid-round
+tools/.*.mjs

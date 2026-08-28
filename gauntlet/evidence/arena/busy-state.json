@@ -1,0 +1,110 @@
+{
+  "out": "gauntlet/evidence/arena/busy.png",
+  "stats": {
+    "frames": 142,
+    "p50": 1.3,
+    "p95": 3.5,
+    "max": 11.4
+  },
+  "extra": null,
+  "state": {
+    "tick": 510,
+    "freeze": 0,
+    "wave": {
+      "index": 0,
+      "state": "active",
+      "groupIndex": 2,
+      "timer": 0,
+      "total": 1
+    },
+    "room": {
+      "index": 0,
+      "id": "threshold",
+      "name": "THE THRESHOLD",
+      "doorOpen": false,
+      "kind": "threshold",
+      "hasNext": false,
+      "exits": []
+    },
+    "player": {
+      "x": 108.5,
+      "y": 200.5,
+      "hp": 3,
+      "maxHp": 5,
+      "state": "attack",
+      "stateTick": 6,
+      "iframes": 0
+    },
+    "offering": null,
+    "enemies": [
+      {
+        "id": 1,
+        "kind": "caster",
+        "x": 251.2,
+        "y": 136.6,
+        "hp": 3,
+        "state": "position",
+        "stateTick": 37
+      },
+      {
+        "id": 2,
+        "kind": "caster",
+        "x": 65.6,
+        "y": 128.4,
+        "hp": 2,
+        "state": "aim",
+        "stateTick": 4
+      },
+      {
+        "id": 3,
+        "kind": "brute",
+        "x": 109,
+        "y": 215.5,
+        "hp": 4,
+        "state": "windup",
+        "stateTick": 8
+      },
+      {
+        "id": 5,
+        "kind": "charger",
+        "x": 158.9,
+        "y": 152.1,
+        "hp": 2,
+        "state": "dash",
+        "stateTick": 6
+      },
+      {
+        "id": 7,
+        "kind": "charger",
+        "x": 201.1,
+        "y": 187.8,
+        "hp": 2,
+        "state": "freeze",
+        "stateTick": 9
+      }
+    ],
+    "bolts": 1,
+    "metrics": {
+      "ticks": 510,
+      "seconds": 8.5,
+      "swings": 6,
+      "hitsLanded": 9,
+      "whiffSwings": 0,
+      "kills": 3,
+      "dodges": 4,
+      "successfulDodges": 1,
+      "boltsFired": 6,
+      "boltsCut": 1,
+      "enemyAttacks": 12,
+      "damageTaken": 2,
+      "deaths": 0,
+      "wavesCleared": 0,
+      "clearSeconds": null,
+      "deathSeconds": null
+    }
+  },
+  "errors": [
+    "warning: [.WebGL-0x11400529000]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
+    "warning: [.WebGL-0x11400533800]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)"
+  ]
+}

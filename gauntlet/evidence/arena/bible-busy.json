@@ -1,0 +1,82 @@
+{
+  "frame": "gauntlet/evidence/arena/busy.png",
+  "space": "480x270 render space; PNG is a 4x nearest upscale",
+  "hudExcluded": [
+    [
+      0,
+      0,
+      101,
+      31
+    ],
+    [
+      408,
+      0,
+      480,
+      32
+    ],
+    [
+      20,
+      28,
+      460,
+      62
+    ],
+    [
+      110,
+      232,
+      372,
+      254
+    ],
+    [
+      150,
+      252,
+      330,
+      270
+    ]
+  ],
+  "focal": {
+    "x": 312,
+    "y": 184.6,
+    "tile": "col 17.5, row 10.6"
+  },
+  "gates": {
+    "floorMeanLuminance": {
+      "value": 0.222,
+      "max": 0.3,
+      "pass": true
+    },
+    "highlightBudget": {
+      "value": 0.0082,
+      "max": 0.08,
+      "pass": true
+    },
+    "centreLift": {
+      "centre60": 0.266,
+      "outer20Ring": 0.156,
+      "centreBand": 2,
+      "outerBand": 1,
+      "deltaBands": 1,
+      "deltaLuminance": 0.11,
+      "pass": true
+    },
+    "topOnePercentLocation": {
+      "count": 783,
+      "minLuminance": 0.662,
+      "fractionWithin64px": 0.964,
+      "centroid": {
+        "x": 188,
+        "y": 179
+      },
+      "worstDistancePx": 139,
+      "pass": true
+    },
+    "mirrorAsymmetry": {
+      "meanAbsL": 0.1024,
+      "meanAbsL_x255": 26.1,
+      "note": "reported, not gated; near zero is the defect (§5.2)"
+    }
+  },
+  "hud": {
+    "pixels": 21505,
+    "fractionAbove72": 0.0045
+  }
+}

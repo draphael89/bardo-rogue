@@ -1,4 +1,4 @@
-import { Graphics } from 'pixi.js'
+import { Graphics, type Container } from 'pixi.js'
 import type { Enemy } from '@/sim/world'
 import { tuning } from '@/tuning'
 import { TILE, ARENA_COLS, ARENA_ROWS } from '@/sim/arena'
@@ -6,66 +6,96 @@ import { lerp, clamp01, easeOutCubic, lerpAngle } from '../anim'
 import { BRUTE_COMMIT_LEAD as COMMIT_LEAD } from '@/sim/enemies/brute'
 import { EntityView, HALF_PI, type EnemyFrame, type Pose } from './shared'
 
-// The brute reads as GEOMETRY, not as a colour.
-//   - a ground CONE, drawn where the lunge will land him: two straight edges out of the landing spot
-//     and a hard far arc, so the silhouette alone says which way the hammer is going;
-//   - dashed rim while he is still tracking you, solid rim the tick his aim locks;
-//   - a fill that grows from the middle out and is full on the tick he releases.
-// Swap the sprite for a different one and every read above survives. The body pose carries the same
-// sentence in silhouette: rear up (tracking) -> coil down (committed) -> stretch (lunge) -> hunch (open).
+// ONE CLOCK.
+// From the tick the brute plants (enemyWindup) to the tick the hammer touches you (playerHurt) is
+// windup + lungeTicks + 1 = 27 ticks. Every channel below is a continuous function of that single
+// 0 -> 1 value, and every one of them reaches its loudest state ON the damage tick, not before it:
+//
+//   body   — rears up and leans back for the whole wind-up (one direction, no oscillation), then
+//            extends through the release into the hit, so the silhouette itself counts down;
+//   ground — a mark that DRAWS ITSELF across the spot the lunge lands on: a dark plate says WHERE from
+//            the first tick, and a ladder of rungs marches out over it at a fixed 0.93 px a tick saying
+//            WHEN. The lit front reaches the true rim on the frame that hurts, and not before;
+//   light  — an emissive charge on the hammer head that arrives at contact and hands the frame to the
+//            impact flash. Nothing in the telegraph is allowed past amber, so the flash is the only
+//            white in the cycle and there is no earlier peak for it to lose to.
+//
+// None of it is a hue. Greyscale the frame and the value ramp, the growing geometry and the marching
+// rungs all still say when: swap the 16px sprite for any other and the sentence survives.
 const SCORCH_TICKS = 16    // ground mark left after the swing lands
 const TAU = Math.PI * 2
+const CONTACT_LEAD = 1     // attack stateTick on which the sim's arc first tests (stateTick > lungeTicks)
+const WINDUP_RISE = 4.5    // px the body climbs across the wind-up — monotone, and the shadow shrinks with it
+const RUNG_GAP = 7         // px between the marching rungs: three of them span 14px of "time to arrival"
+
+function tellSpan(): number { return tuning.brute.windup + tuning.brute.lungeTicks + CONTACT_LEAD }
+function tellProgress(e: Enemy, tk: number): number {
+  const B = tuning.brute
+  if (e.state === 'windup') return clamp01(tk / tellSpan())
+  if (e.state === 'attack') return clamp01((B.windup + tk) / tellSpan())
+  return 1
+}
 
 export function updateBruteView(v: EntityView, e: Enemy, f: EnemyFrame, out: Pose): void {
   const { time, tk, speed } = f
-  let sx = 1, sy = 1, rot = 0, hop = 0, tint = 0xffffff
+  let sx = 1, sy = 1, rot = 0, hop = 0
   const B = tuning.brute
   if (e.state === 'chase' && speed > 5) { hop = Math.abs(Math.sin(time * 9)) * 2; rot = (e.vx / B.speed) * 0.1 }
   else if (e.state === 'windup') {
-    // two shapes, not one ramp: he rears up while he can still turn, then coils down once he cannot.
-    const track = easeOutCubic(clamp01(tk / (B.windup - COMMIT_LEAD)))
-    const lock = clamp01((tk - (B.windup - COMMIT_LEAD)) / COMMIT_LEAD) ** 2
-    hop = track * 3 * (1 - lock)
-    sx = lerp(1 - 0.14 * track, 1.20, lock)
-    sy = lerp(1 + 0.26 * track, 0.86, lock)
-    rot = lerp(-e.facing * 0.30 * track, e.facing * 0.06, lock)
-    if (lock > 0) tint = tk < B.windup - COMMIT_LEAD + 2 ? 0xfff6e8 : 0xffc08a  // value pop, then warm: geometry carries the read
+    // ONE shape, one direction, linear in ticks so no two frames are the same: he rises onto the balls
+    // of his feet, stretches, and leans away from you. The commit is not a reversal here — it is the
+    // ground rim going from broken to solid, which costs the body nothing.
+    const u = clamp01(tk / B.windup)
+    hop = WINDUP_RISE * u
+    sy = 1 + 0.28 * u
+    sx = 1 - 0.16 * u
+    rot = -e.facing * 0.40 * u
   } else if (e.state === 'attack') {
-    if (tk <= B.lungeTicks) { sx = 1.30; sy = 0.76; rot = e.facing * 0.34 }
-    else {
-      const q = clamp01((tk - B.lungeTicks) / B.active)   // the one contact frame is the widest
-      sx = lerp(1.36, 1.06, q); sy = lerp(0.70, 0.92, q); rot = e.facing * lerp(0.42, 0.22, q)
+    // the release picks the body up exactly where the wind-up left it and keeps going the other way:
+    // the widest, lowest, most extended frame of the whole cycle IS the damage frame.
+    const r = clamp01(tk / (B.lungeTicks + CONTACT_LEAD))
+    hop = WINDUP_RISE * (1 - r) * (1 - r)
+    sx = lerp(0.84, 1.42, r); sy = lerp(1.28, 0.66, r); rot = e.facing * lerp(-0.40, 0.48, r)
+    const after = tk - (B.lungeTicks + CONTACT_LEAD)
+    if (after > 0) {                                   // the active tail: settle, never re-extend
+      const s2 = clamp01(after / Math.max(1, B.active - 1))
+      sx = lerp(1.42, 1.10, s2); sy = lerp(0.66, 0.90, s2); rot = e.facing * lerp(0.48, 0.26, s2)
     }
   } else if (e.state === 'recover') {
     // slam through, overshoot, then stay hunched for the whole punish window and only rise at the end.
     const q = tk / B.recovery
-    if (q < 0.22) { const u = easeOutCubic(q / 0.22); sy = lerp(0.70, 0.96, u); sx = lerp(1.34, 1.06, u); rot = e.facing * lerp(0.44, 0.30, u) }
+    if (q < 0.22) { const u = easeOutCubic(q / 0.22); sy = lerp(0.90, 0.96, u); sx = lerp(1.10, 1.06, u); rot = e.facing * lerp(0.26, 0.30, u) }
     else if (q < 0.74) { const heave = Math.sin(time * 7) * 0.03; sy = 0.93 + heave; sx = 1.07 - heave; rot = e.facing * 0.30 }
     else { const u = easeOutCubic((q - 0.74) / 0.26); sy = lerp(0.93, 1, u) + Math.sin(u * Math.PI) * 0.06; sx = lerp(1.07, 1, u); rot = e.facing * lerp(0.30, 0, u) }
   } else if (e.state === 'stagger') {
     rot = -e.facing * 0.5 + Math.sin(time * 55) * 0.05; sx = 0.9; sy = 1.1
   } else sy = 1 + Math.sin(time * 3) * 0.03
-  updateBruteWeapon(v, e, f.x, f.y, f.alpha)
+  updateBruteWeapon(v, e, f.x, f.y, f.alpha, hop)
   updateBruteTell(v, e, f.x, f.y, tk)
   updateBruteImpact(v, e, f)
-  out.sx = sx; out.sy = sy; out.rot = rot; out.hop = hop; out.tint = tint
+  // no tint channel at all: the brute never announces himself with a colour.
+  out.sx = sx; out.sy = sy; out.rot = rot; out.hop = hop; out.tint = 0xffffff
 }
 
-function updateBruteWeapon(v: EntityView, e: Enemy, x: number, y: number, alpha: number): void {
+// where the hammer head is this frame, so the emissive charge can sit on it
+const head = { x: 0, y: 0 }
+
+function updateBruteWeapon(v: EntityView, e: Enemy, x: number, y: number, alpha: number, hop: number): void {
   const w = v.weapon
   if (!w) return
   const f = e.facing
   const tk = e.stateTick + alpha
-  let angle = -HALF_PI - f * 0.5, wx = x - f * 5, wy = y - 2, front = f === 1
+  let angle = -HALF_PI + f * 1.35, wx = x + f * 4, wy = y - 2 - hop, front = true
   const B = tuning.brute
   if (e.state === 'windup') {
-    // up over the shoulder while tracking, then dropped back a notch on the commit tick: the hammer
-    // stops climbing at the same moment the fan's rim goes solid.
-    const track = easeOutCubic(clamp01(tk / (B.windup - COMMIT_LEAD)))
-    const lock = clamp01((tk - (B.windup - COMMIT_LEAD)) / COMMIT_LEAD) ** 2
-    angle = lerpAngle(lerpAngle(-HALF_PI - f * 0.5, -HALF_PI + f * 0.9, track), -HALF_PI + f * 1.15, lock)
-    wx = x + f * (2 + lock * 2); wy = y - 6 - track * 4 + lock * 3; front = true
-  } else if (e.state === 'attack') { const u = easeOutCubic(Math.min(1, tk / (B.lungeTicks + B.active))); angle = lerpAngle(-HALF_PI + f * 0.9, e.aimAngle + f * 0.4, u); wx = x + Math.cos(angle) * 9; wy = y + Math.sin(angle) * 7; front = true }
+    // The hammer starts hanging at his side and climbs to over the shoulder, arriving at the top on the
+    // release tick. It stays on ONE side of vertical the whole way, so the head — the topmost pixel of
+    // the whole silhouette — only ever goes up. Sweeping it through vertical mid-windup, as this did
+    // before, made the tallest frame of the tell land 10 ticks early and then sink.
+    const u = clamp01(tk / B.windup)
+    angle = lerpAngle(-HALF_PI + f * 1.35, -HALF_PI - f * 0.35, u)
+    wx = x + f * (4 - 5 * u); wy = y - 2 - hop - 6 * u; front = true
+  } else if (e.state === 'attack') { const u = easeOutCubic(Math.min(1, tk / (B.lungeTicks + B.active))); angle = lerpAngle(-HALF_PI - f * 0.35, e.aimAngle + f * 0.4, u); wx = x + Math.cos(angle) * 9; wy = y - hop + Math.sin(angle) * 7; front = true }
   else if (e.state === 'recover') {
     // the head stays planted on the ground through the punish window, then drags back up.
     const q = tk / B.recovery
@@ -73,241 +103,271 @@ function updateBruteWeapon(v: EntityView, e: Enemy, x: number, y: number, alpha:
     angle = lerpAngle(e.aimAngle + f * 0.4, -HALF_PI - f * 0.5, u)
     wx = lerp(x + Math.cos(e.aimAngle) * 10, x - f * 5, u); wy = lerp(y + 7, y - 2, u); front = u < 0.5 || f === 1
   }
+  head.x = Math.round(wx); head.y = Math.round(wy)
   w.position.set(Math.round(wx), Math.round(wy))
   w.rotation = angle + HALF_PI
   w.zIndex = y + e.radius + 1 + (front ? 0.5 : -0.5)
 }
 
 // --- ground telegraph -----------------------------------------------------------------------------
-// One Graphics per brute, parked in the shadows layer so it is painted on the floor, under every
-// body. It is destroyed with the view (pixi fires 'destroyed' on the body sprite), so a brute killed
-// mid-windup takes its fan with it.
+// Two Graphics per brute. `tells` lives in the shadows layer, so the mark is floor paint under every
+// body — that is what makes it a place and not an aura. `tellHi` is parented straight to the world
+// container, above the light multiply: it re-draws ONLY the leading rung and the rim, so a player
+// standing inside the mark cannot hide the two lines they most need to see, and so the mark's own
+// value is not capped by the floor's lighting.
+// Both are destroyed with the view (pixi fires 'destroyed' on the body sprite), so a brute killed
+// mid-windup takes its mark with it.
 const tells = new WeakMap<EntityView, Graphics>()
+const tellHis = new WeakMap<EntityView, Graphics>()
 
-function tellFor(v: EntityView): Graphics | null {
-  const existing = tells.get(v)
+function attach(v: EntityView, map: WeakMap<EntityView, Graphics>, parent: Container | null | undefined): Graphics | null {
+  const existing = map.get(v)
   if (existing) return existing.destroyed ? null : existing
-  const parent = v.shadow.parent
   if (!parent) return null
   const g = new Graphics()
   parent.addChild(g)
   v.body.once('destroyed', () => g.destroy())
-  tells.set(v, g)
+  map.set(v, g)
   return g
 }
+const tellFor = (v: EntityView): Graphics | null => attach(v, tells, v.shadow.parent)
+const tellHiFor = (v: EntityView): Graphics | null => attach(v, tellHis, v.shadow.parent?.parent)
+
+// Rasteriser scratch. Classified once per frame into a byte grid, then emitted as horizontal runs so
+// the whole mark costs ~200 draw ops instead of ~1600. Allocated once: no per-frame garbage.
+const GRID = 96
+const cells = new Uint8Array(GRID * GRID)
+const G_LANE = 1, G_PLATE = 2, G_HOT = 3, G_RUNGD = 4, G_RUNG2 = 5, G_RUNG1 = 6, G_RUNG0 = 7, G_RIM = 8, G_UNDER = 9
+const NG = 10
+const runs: number[][] = Array.from({ length: NG }, () => [])   // x, y, w triples per group
 
 function updateBruteTell(v: EntityView, e: Enemy, x: number, y: number, tk: number): void {
   const g = tellFor(v)
   if (!g) return
+  const hi = tellHiFor(v)
   const B = tuning.brute
   const s = e.state
-  if (s !== 'windup' && s !== 'attack' && !(s === 'recover' && tk < SCORCH_TICKS)) { g.visible = false; return }
-  g.visible = true
-  g.clear()
+  const live = s === 'windup' || s === 'attack'
+  const scorching = s === 'recover' && tk < SCORCH_TICKS
+  if (!live && !scorching) { g.visible = false; if (hi) hi.visible = false; return }
+  g.visible = true; g.clear()
+  if (hi) { hi.visible = true; hi.clear() }
 
-  // Where the danger will be: the spot the committed lunge lands him, held still in world space for
-  // the whole sentence, so the shape never chases the body.
-  const travelled = s === 'windup' ? 0 : Math.min(1, tk / B.lungeTicks) * B.lungeDist
-  const ahead = s === 'recover' ? 0 : B.lungeDist - travelled
-  // Painted on the floor plane at the player's own foot offset, so the rim is literally the line the
-  // player's feet must stay outside of: sprite feet sit at centre + radius + 1, and the sim tests centres.
-  const foot = tuning.player.radius + 1
-  const cx = Math.round(x + Math.cos(e.aimAngle) * ahead)
-  const cy = Math.round(y + foot + Math.sin(e.aimAngle) * ahead)
-
-  // Four dials, one per phase. Density is the clock: an ordered dither that thickens tick by tick and
-  // is solid on the frame the hammer lands. It is a value ramp, so it still counts down in greyscale.
-  let density = 1, dashed = false, blowout = 0
-  let washAlpha = 0.34, stipple = 0xff5a26, hot = 0xffb257, stippleAlpha = 0.55, rim = 0xffe6c2, rimAlpha = 0.9
-  if (s === 'windup') {
-    const u = clamp01(tk / B.windup)
-    const bloom = clamp01(tk / 3)          // 3 ticks to strike the mark on, so it arrives rather than pops
-    dashed = tk < B.windup - COMMIT_LEAD
-    density = (0.12 + 0.88 * u) * bloom
-    washAlpha = (0.34 + 0.16 * u) * bloom
-    stippleAlpha = 0.52 + 0.28 * u
-    rim = dashed ? 0xffa864 : 0xfff2e0
-    rimAlpha = (dashed ? 0.65 : 1) * bloom
-  } else if (s === 'attack') {
-    blowout = clamp01(1 - (tk - B.lungeTicks) / 3) * (tk > B.lungeTicks ? 1 : 0)   // the contact frame
-    stipple = 0xff8a3a; hot = 0xffe7bd; rim = 0xffffff
-    washAlpha = 0.52 + 0.24 * blowout
-    stippleAlpha = 0.75 + 0.25 * blowout
-    rimAlpha = 1
-  } else {
-    const fade = 1 - tk / SCORCH_TICKS
-    density = fade
-    stipple = 0x50200f; hot = 0x7a3a1c; rim = 0x8a3a18
-    washAlpha = 0.36 * fade; stippleAlpha = 0.6 * fade; rimAlpha = 0.5 * fade
-  }
-
+  const q = tellProgress(e, tk)                       // 0 on the first wind-up tick, 1 on the damage tick
+  // Strike the plate on over two ticks rather than popping it; then, the moment the hammer has landed,
+  // pull the whole mark down in four ticks. The danger is spent, and the flash needs the frame.
+  const past = s === 'attack' ? tk - (B.lungeTicks + CONTACT_LEAD) : 0
+  const bloom = s === 'windup' ? clamp01((tk + 1) / 2.5) : past > 0 ? clamp01(1 - past / 4) : 1
+  const fade = scorching ? 1 - tk / SCORCH_TICKS : 1
+  const travelled = s === 'attack' ? Math.min(1, tk / B.lungeTicks) * B.lungeDist : 0
+  const ahead = scorching ? 0 : B.lungeDist - travelled          // how far the committed lunge still has to run
+  const foot = tuning.player.radius + 1                          // paint on the player's own foot plane
+  const aim = e.aimAngle, cos = Math.cos(aim), sin = Math.sin(aim)
+  const fx = Math.round(x), fy = Math.round(y + foot)            // his feet, now
+  const cx = Math.round(x + cos * ahead), cy = Math.round(y + foot + sin * ahead)   // where the lunge lands him
   const R = B.hitRadius, tr = tuning.player.radius, half = (B.hitArcDeg * Math.PI) / 360
-  // The hammer's own arc, as a pie slice: radius inside the arc, nothing outside it. Straight edges
-  // out of the landing spot are what give the mark a direction.
-  const rHit = (dTheta: number, dirX: number, dirY: number): number =>
-    dTheta > half ? 0 : Math.min(R, wallLimit(cx, cy, dirX, dirY))
-  // The graze boundary: the same arc grown by the player's own radius, which is exactly what arcHits
-  // tests. Filling to here rounds the cone into a featureless dome, so it is drawn as a thin dotted
-  // line outside the cone instead: still honest about the last pixel that hurts, silent about shape.
-  const rGraze = (dTheta: number, dirX: number, dirY: number): number => {
-    let r: number
-    if (dTheta <= half) r = R + tr
-    else {
-      const ex = dTheta - half
-      r = ex >= HALF_PI ? tr : Math.min(R + tr, tr / Math.sin(ex))
+  const cosHalf = Math.cos(half), reach = R + tr
+  const ex0 = Math.cos(aim - half), ey0 = Math.sin(aim - half)
+  const ex1 = Math.cos(aim + half), ey1 = Math.sin(aim + half)
+  // The front: how far OUT FROM THE LANDING SPOT the mark has drawn itself. It is measured from the
+  // spot, not from his feet, because the 24px of lane between the two is hidden behind his own body —
+  // a clock the player cannot see is not a clock. It reaches the true rim exactly on the damage tick.
+  const front = q * reach
+  // Broken rim = he can still turn. The sim tracks your position while stateTick <= windup - COMMIT_LEAD,
+  // so the last tick the aim can move is stateTick 14; the rim goes solid on 15, the first tick it cannot.
+  const dashed = s === 'windup' && tk < B.windup - COMMIT_LEAD + 1
+  const density = scorching ? fade : lerp(0.22, 1, q)            // how solid the burn behind the front is
+
+  // ---- classify -----------------------------------------------------------------------------------
+  const x0 = Math.min(fx, cx) - reach - 2, y0 = Math.min(fy, cy) - reach - 2
+  const w = Math.min(GRID, Math.max(fx, cx) + reach + 3 - x0), h = Math.min(GRID, Math.max(fy, cy) + reach + 3 - y0)
+  cells.fill(0, 0, w * h)
+  const laneLen = Math.max(0, ahead)
+  for (let iy = 0; iy < h; iy++) {
+    const py = y0 + iy
+    if (py < INNER.y0 || py > INNER.y1) continue
+    for (let ix = 0; ix < w; ix++) {
+      const px = x0 + ix
+      if (px < INNER.x0 || px > INNER.x1) continue
+      // the true danger set: the hammer's pie slice grown by the player's own radius, which is exactly
+      // what arcHits() tests. The rim is therefore the line your feet must stay outside of.
+      const dx = px - cx, dy = py - cy
+      const r2 = dx * dx + dy * dy
+      let cell = 0
+      if (r2 <= reach * reach) {
+        const r = Math.sqrt(r2)
+        if (r <= reach && dx * cos + dy * sin >= r * cosHalf) cell = G_PLATE
+        else if (segD2(dx, dy, ex0, ey0, R) <= tr * tr || segD2(dx, dy, ex1, ey1, R) <= tr * tr) cell = G_PLATE
+      }
+      if (cell === 0 && laneLen > 2) {                 // the run-up lane: he passes through here first
+        const lx = px - fx, ly = py - fy
+        const t = lx * cos + ly * sin
+        if (t >= -2 && t <= laneLen) {
+          const n = Math.abs(cos * ly - sin * lx)
+          if (n <= lerp(5, 8.5, clamp01(t / Math.max(1, laneLen)))) cell = G_LANE
+        }
+      }
+      if (cell === G_PLATE) {
+        // The ladder. Rungs are born at the landing spot and march out to the rim at a fixed 0.93 px a
+        // tick, so the floor is never still and the player reads TIME TO ARRIVAL off how far the bright
+        // side has got. A rung lands exactly on the rim on the damage tick.
+        const ld = Math.sqrt(r2)
+        const k = front - ld
+        const rung = Math.floor(k / RUNG_GAP)
+        const onRung = k - rung * RUNG_GAP <= 1.7
+        if (k >= 0) {
+          // behind the front the floor is burning: an ordered dither that thickens every tick and is
+          // solid on the frame the hammer lands. It is a value ramp, so it counts down in greyscale.
+          if (density > (BAYER[((py & 3) << 2) + (px & 3)] + 0.5) / 16) cell = G_HOT
+          if (onRung && !scorching) cell = rung === 0 ? G_RUNG0 : rung === 1 ? G_RUNG1 : G_RUNG2
+        } else if (onRung && !scorching) cell = G_RUNGD   // not arrived yet: the same ruler, unlit
+      }
+      cells[iy * w + ix] = cell
     }
-    return Math.min(r, wallLimit(cx, cy, dirX, dirY))
   }
 
-  cone(g, cx, cy, e.aimAngle, half, rHit, 'path')
-  g.fill({ color: 0x160a14, alpha: washAlpha })
-  stippleFan(g, cx, cy, e.aimAngle, rHit, density, 0)
-  g.fill({ color: stipple, alpha: stippleAlpha })
-  stippleFan(g, cx, cy, e.aimAngle, rHit, density, 1)
-  g.fill({ color: hot, alpha: stippleAlpha })
-  ring(g, cx, cy, e.aimAngle, rGraze, 'dashed')
-  g.fill({ color: rim, alpha: rimAlpha * 0.4 })
-  // Hard dark outline OUTSIDE the light rim. The mark is floor paint under the light multiply, so its
-  // top value is capped near the floor's own; the black edge is where the contrast actually comes from
-  // and it is the half of the read that survives greyscale.
-  cone(g, cx, cy, e.aimAngle, half, rHit, 'under')
-  g.fill({ color: 0x0b0409, alpha: 0.85 * rimAlpha })
-  cone(g, cx, cy, e.aimAngle, half, rHit, dashed ? 'dashed' : 'solid')
-  g.fill({ color: rim, alpha: rimAlpha })
-  // contact: the rim itself kicks 2px outward for two frames, so the landing has a shape and not
-  // only a brightness.
-  if (blowout > 0.4) { cone(g, cx, cy, e.aimAngle, half, rHit, 'kick'); g.fill({ color: 0xffffff, alpha: 0.8 * blowout }) }
+  // ---- edges: a 1px light rim on the boundary, a 1px dark line just outside it ---------------------
+  for (let iy = 0; iy < h; iy++) {
+    for (let ix = 0; ix < w; ix++) {
+      const i = iy * w + ix
+      const c = cells[i]
+      const l = ix > 0 ? cells[i - 1] : 0, r = ix < w - 1 ? cells[i + 1] : 0
+      const u = iy > 0 ? cells[i - w] : 0, d = iy < h - 1 ? cells[i + w] : 0
+      if (c !== 0) {
+        if (l === 0 || r === 0 || u === 0 || d === 0) {
+          const px = x0 + ix, py = y0 + iy
+          if (!dashed || (((px - py) >> 1) & 3) < 2) cells[i] = G_RIM
+        }
+      } else if (l !== 0 || r !== 0 || u !== 0 || d !== 0) {
+        const px = x0 + ix, py = y0 + iy
+        if (px >= INNER.x0 && px <= INNER.x1 && py >= INNER.y0 && py <= INNER.y1) cells[i] = G_UNDER
+      }
+    }
+  }
 
-  // Footprint: the spot the lunge puts him on, so the cone reads as "he arrives here and swings
-  // across that", not as a glow leaking out of whoever happens to stand in it.
-  if (s !== 'recover') {
+  // ---- emit ---------------------------------------------------------------------------------------
+  for (const a of runs) a.length = 0
+  for (let iy = 0; iy < h; iy++) {
+    let open = 0, start = 0
+    for (let ix = 0; ix <= w; ix++) {
+      const c = ix < w ? cells[iy * w + ix] : 0
+      if (c !== open) {
+        if (open !== 0) { const a = runs[open]; a.push(x0 + start, y0 + iy, ix - start) }
+        open = c; start = ix
+      }
+    }
+  }
+
+  // Value, not hue. The plate starts BLACKER than the floor — that is where the headroom for the hit
+  // comes from — and heats continuously to an ember. The ramp is ~5 lum/tick, so every frame of the
+  // sentence differs from the one before it even where nothing moved.
+  // The ceiling matters as much as the ramp. NOTHING in the telegraph is allowed to reach white: the
+  // whole mark tops out at amber (lum ~176) however close the hammer is, so the only white pixels in
+  // the cycle belong to the contact flash below. That is what puts the loudest frame ON the damage
+  // tick instead of two ticks before it.
+  const qb = q * q                                   // brightness lags the geometry, then arrives
+  const wash = scorching ? 0x2a1208 : mixCol(0x07030c, 0x3a1206, q)
+  const washA = (scorching ? 0.42 * fade : lerp(0.62, 0.42, q)) * bloom
+  const hotCol = scorching ? 0x50200f : mixCol(0x8a3010, 0xd9762c, qb)
+  const hotA = (scorching ? 0.5 * fade : lerp(0.68, 1, q)) * bloom
+  const rimCol = scorching ? 0x8a3a18 : mixCol(0xd4763c, 0xff9c4a, qb)
+  const rimA = (scorching ? 0.45 * fade : lerp(0.74, 1, q)) * bloom
+  const rung0 = mixCol(0xd08a44, 0xffa855, qb), rung1 = mixCol(0xa85c22, 0xe07f34, qb), rung2 = mixCol(0x83441a, 0xb96326, qb)
+
+  emit(g, G_LANE, wash, washA * 0.5)
+  emit(g, G_PLATE, wash, washA)
+  emit(g, G_HOT, hotCol, hotA)
+  emit(g, G_UNDER, 0x0b0409, 0.85 * rimA)
+  emit(g, G_RUNGD, mixCol(0x4e2413, 0x7d4019, qb), (0.55 + 0.25 * q) * bloom)
+  emit(g, G_RUNG2, rung2, (0.5 + 0.4 * q) * bloom)
+  emit(g, G_RUNG1, rung1, (0.6 + 0.4 * q) * bloom)
+  emit(g, G_RUNG0, rung0, bloom)
+  emit(g, G_RIM, rimCol, rimA)
+
+  // Above the light multiply: the leading rung and the rim again, so neither can be stood on top of,
+  // and so the brightest pixel of the frame arrives on the tick the hammer lands.
+  if (hi && !scorching) {
+    emit(hi, G_RIM, rimCol, (0.26 + 0.4 * qb) * bloom)
+    emit(hi, G_RUNG0, rung0, (0.3 + 0.5 * qb) * bloom)
+    // the charge on the hammer head: one emissive value ramp that arrives at contact and hands the
+    // frame straight to the impact flash. It stops at amber; the flash is the only white.
+    const cr = 1 + 3 * q
+    blob(hi, head.x, head.y, cr + 2, cr + 2)
+    hi.fill({ color: mixCol(0xff7a1e, 0xffa040, qb), alpha: (0.14 + 0.3 * qb) * bloom })
+    blob(hi, head.x, head.y, cr, cr)
+    hi.fill({ color: mixCol(0xff9a3a, 0xffc070, qb), alpha: (0.4 + 0.5 * qb) * bloom })
+  }
+
+  // Footprint: the spot the lunge puts him on, so the mark reads as "he arrives here and swings across
+  // that", not as a glow leaking out of whoever happens to be standing in it.
+  if (!scorching && ahead > 2) {
     for (let i = 0; i < 16; i++) {
       if ((i & 3) === 3) continue
       const a = (i / 16) * TAU
       g.rect(Math.round(cx + Math.cos(a) * e.radius), Math.round(cy + Math.sin(a) * e.radius * 0.7), 1, 1)
     }
-    g.fill({ color: rim, alpha: rimAlpha * 0.8 })
-  }
-
-  // The lunge corridor: two dashed rails from his feet, converging on the footprint. Without them the
-  // cone is a puddle 20px in front of nobody. With them the whole mark is one sentence -- he stands
-  // here, he lands there, he swings across that -- and every clause of it is geometry.
-  if (s !== 'recover' && ahead > 3) {
-    const cos = Math.cos(e.aimAngle), sin = Math.sin(e.aimAngle), nx = -sin, ny = cos
-    const fx = x, fy = y + foot
-    for (const side of [-1, 1]) {
-      for (let d = 2; d < ahead - 1; d += 4) {
-        const w = 6 * (1 - d / ahead) + 1
-        for (let k = 0; k < 2; k++) {
-          g.rect(Math.round(fx + cos * (d + k) + nx * side * w), Math.round(fy + sin * (d + k) + ny * side * w), 1, 1)
-        }
-      }
-    }
-    g.fill({ color: rim, alpha: rimAlpha * 0.85 })
+    g.fill({ color: rimCol, alpha: rimA * 0.8 })
   }
 }
 
-// Distance from (cx,cy) along (dx,dy) to the walkable rect's edge. Arena.inner is not reachable from
-// a view (EnemyFrame carries no world), so this mirrors it from the two arena constants.
+function emit(g: Graphics, group: number, color: number, alpha: number): void {
+  const a = runs[group]
+  if (a.length === 0 || alpha <= 0.02) return
+  for (let i = 0; i < a.length; i += 3) g.rect(a[i], a[i + 1], a[i + 2], 1)
+  g.fill({ color, alpha: Math.min(1, alpha) })
+}
+
+// squared distance from (dx,dy) to the segment (0,0)->(ex,ey)*len — the two straight edges of the slice
+function segD2(dx: number, dy: number, ex: number, ey: number, len: number): number {
+  const t = Math.max(0, Math.min(len, dx * ex + dy * ey))
+  const ax = dx - ex * t, ay = dy - ey * t
+  return ax * ax + ay * ay
+}
+
+function mixCol(a: number, b: number, t: number): number {
+  const u = clamp01(t)
+  const r = Math.round(((a >> 16) & 255) + ((((b >> 16) & 255) - ((a >> 16) & 255)) * u))
+  const gg = Math.round(((a >> 8) & 255) + ((((b >> 8) & 255) - ((a >> 8) & 255)) * u))
+  const bb = Math.round((a & 255) + (((b & 255) - (a & 255)) * u))
+  return (r << 16) | (gg << 8) | bb
+}
+
+// The walkable rect. Arena.inner is not reachable from a view (EnemyFrame carries no world), so this
+// mirrors it from the two arena constants; the mark is clipped to it pixel by pixel.
 const INNER = { x0: TILE, y0: 2 * TILE, x1: (ARENA_COLS - 1) * TILE, y1: (ARENA_ROWS - 1) * TILE }
-function wallLimit(cx: number, cy: number, dx: number, dy: number): number {
-  const tx = dx > 0.0001 ? (INNER.x1 - cx) / dx : dx < -0.0001 ? (INNER.x0 - cx) / dx : 1e9
-  const ty = dy > 0.0001 ? (INNER.y1 - cy) / dy : dy < -0.0001 ? (INNER.y0 - cy) / dy : 1e9
-  return Math.max(0, Math.min(tx, ty))
-}
 
-// 4x4 ordered dither, sampled on a 2px world lattice so the texture is pinned to the floor and does
-// not crawl when the brute walks.
+// 4x4 ordered dither, used by the impact's dark ramp below.
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5]
-function stippleFan(g: Graphics, cx: number, cy: number, aim: number, rAt: (d: number, dx: number, dy: number) => number, density: number, phase: 0 | 1): void {
-  if (density <= 0.02) return
-  const reach = tuning.brute.hitRadius + tuning.player.radius
-  const x0 = (cx - reach) & ~1, x1 = cx + reach, y0 = (cy - reach) & ~1, y1 = cy + reach
-  for (let py = y0; py <= y1; py += 2) {
-    const dy = py - cy
-    for (let px = x0; px <= x1; px += 2) {
-      const dx = px - cx
-      const d2 = dx * dx + dy * dy
-      if (d2 > reach * reach) continue
-      const d = Math.sqrt(d2) || 0.001
-      const a = Math.atan2(dy, dx) - aim
-      if (d > rAt(Math.abs(Math.atan2(Math.sin(a), Math.cos(a))), dx / d, dy / d)) continue
-      const b = BAYER[(((py >> 1) & 3) << 2) + ((px >> 1) & 3)]
-      const t = (b + 0.5) / 16
-      if (density > t && (b & 1) === phase) g.rect(px, py, 1, 1)   // two tones: the ember and its heat
-    }
-  }
-}
-
-// The danger boundary as a pie slice: the far arc plus the two straight edges back to the apex.
-// Same emit modes as ring(), same reason for pixels over a 1px vector stroke.
-function cone(g: Graphics, cx: number, cy: number, aim: number, half: number, rAt: (d: number, dx: number, dy: number) => number, mode: 'path' | 'solid' | 'dashed' | 'under' | 'kick'): void {
-  const out = mode === 'under' ? 1 : mode === 'kick' ? 3 : 0
-  const a0 = aim - half, a1 = aim + half
-  const rOf = (th: number): number => {
-    const c = Math.cos(th), s = Math.sin(th)
-    return Math.max(1, rAt(Math.abs(Math.atan2(Math.sin(th - aim), Math.cos(th - aim))), c, s)) + out
-  }
-  if (mode === 'path') {
-    g.moveTo(cx, cy)
-    const steps = Math.max(8, Math.round((a1 - a0) / 0.06))
-    for (let i = 0; i <= steps; i++) { const th = a0 + (a1 - a0) * (i / steps), r = rOf(th); g.lineTo(cx + Math.cos(th) * r, cy + Math.sin(th) * r) }
-    g.closePath()
-    return
-  }
-  let px = -999, py = -999, n = 0
-  const put = (x: number, y: number): void => {
-    const nx = Math.round(x), ny = Math.round(y)
-    if (nx === px && ny === py) return
-    if (mode !== 'dashed' || (n & 7) < 4) g.rect(nx, ny, 1, 1)
-    px = nx; py = ny; n++
-  }
-  const arcSteps = Math.max(8, Math.round((a1 - a0) * rOf(aim)))
-  for (let i = 0; i <= arcSteps; i++) { const th = a0 + (a1 - a0) * (i / arcSteps), r = rOf(th); put(cx + Math.cos(th) * r, cy + Math.sin(th) * r) }
-  for (const th of [a0, a1]) {                      // edges drawn apex-outward so the corners close
-    const c = Math.cos(th), s = Math.sin(th), r = rOf(th)
-    px = -999; py = -999
-    for (let d = 0; d <= r; d++) put(cx + c * d, cy + s * d)
-  }
-}
-
-// The boundary, emitted either as a closed path (for the wash) or as single pixels (for the rim).
-// Pixels, not a 1px vector stroke: a stroke lands on half-pixels at 480x270 and smears across two rows.
-// Dashes mean "he can still turn"; solid means "his aim is locked".
-function ring(g: Graphics, cx: number, cy: number, aim: number, rAt: (d: number, dx: number, dy: number) => number, mode: 'path' | 'solid' | 'dashed' | 'under' | 'kick'): void {
-  const out = mode === 'under' ? 1 : mode === 'kick' ? 3 : 0
-  let px = -999, py = -999, arc = 0, first = true
-  for (let th = 0; th < TAU; ) {
-    const cos = Math.cos(th), sin = Math.sin(th)
-    const r = Math.max(1, rAt(Math.abs(Math.atan2(Math.sin(th - aim), Math.cos(th - aim))), cos, sin))
-    if (mode === 'path') {
-      const ax = cx + cos * r, ay = cy + sin * r
-      if (first) { g.moveTo(ax, ay); first = false } else g.lineTo(ax, ay)
-      th += 0.05
-      continue
-    }
-    const nx = Math.round(cx + cos * (r + out)), ny = Math.round(cy + sin * (r + out))
-    if ((nx !== px || ny !== py) && (mode !== 'dashed' || (arc & 7) < 4)) g.rect(nx, ny, 1, 1)
-    px = nx; py = ny
-    th += 1 / r; arc += 1
-  }
-  if (mode === 'path') g.closePath()
-}
 
 // --- contact flash --------------------------------------------------------------------------------
-// The one bright thing in the cycle. Everything above this line is floor paint: it lives in the
-// shadows layer, so the lighting multiply caps it around lum 197 and the hit reads no brighter than
-// the windup. The flash is EMISSIVE — it is parented straight to the world container, above the
-// lightmap, so it is the only pixel in the sentence that can reach full white.
+// A hot POINT plus DIRECTION. Everything above this line is floor paint: it lives in the shadows
+// layer, so the lighting multiply caps it and the hit could never read brighter than the wind-up.
+// The flash is EMISSIVE — parented straight to the world container, above the lightmap — so it is
+// the only thing in the sentence that can reach the top of the scale.
 //
-// It is keyed to the contact tick (the first active tick, stateTick > lungeTicks — the same tick the
-// sim emits playerHurt), never to the release, and it steps down on REAL time in four hard values so
-// the hit-stop freeze holds the peak instead of eating it. Around it goes a dithered dark ramp: the
-// frame cannot be dark everywhere from here, but it can be dark exactly where the flash needs
-// headroom, which is what buys the contrast ratio.
-const AS = 0.72              // floor-plane squash, same read as the shadows
-const FLASH_STEP_SEC = 0.02  // one value step; four of them ~ 4.8 ticks at 60 Hz
+// It used to be a 46x36 cream pancake centred on the brute's feet: 687 px, three tones inside a
+// 14-lum range, and on the one tick damage lands you could not see who hit whom. Two faults, both
+// fixed here:
+//
+//   MASS  — the opaque part is a ~9x5 white core ON THE CONTACT POINT (the gap between the hammer
+//           head and the player, not his feet), inside a rotated ellipse whose long axis lies ACROSS
+//           the swing, so it spreads along the line of the blow and leaves both silhouettes standing.
+//           Everything the disc used to cost is spent OUTWARD: ten 1px spark streaks and five
+//           detached embers thrown along the swing. Direction carries the size now, not area.
+//   RAMP  — four hard authored steps, white -> yellow -> orange -> dithered ember: ~165 lum from
+//           centre to edge instead of 14. No interpolation; a pixel-art flash is a value ramp.
+//
+// The ceiling, measured rather than assumed: on the damage tick presenter.ts paints a full-screen
+// 25% 0xff2020 wash for playerHurt, which caps EVERY pixel in the frame — pure white included — at
+// (236,203,202), L210. That wash decays in three render frames, so the core is held at full for the
+// whole 4-tick hit-stop instead of 1.2 ticks: the same white core then renders clean at (236,240,246),
+// L240, the top of the art bible's scale. The peak never leads the damage; it starts on it and rides
+// the freeze out.
+const AS = 0.72              // floor-plane squash, same read as the shadows (scorch and sparks only)
 const TIER_CONNECT = 1, TIER_WHIFF = 0.62
+// Seconds each tier holds, on real time. The first is the hit-stop itself (4 ticks at 60 Hz), so the
+// loudest frame is the damage frame and every frozen frame after it.
+const TIER_SEC = [0.068, 0.035, 0.035, 0.03]
 
 interface Impact { g: Graphics; t0: number; x: number; y: number; aim: number; power: number; fired: boolean }
 const impacts = new WeakMap<EntityView, Impact>()
@@ -334,43 +394,119 @@ function updateBruteImpact(v: EntityView, e: Enemy, f: EnemyFrame): void {
     rec.fired = true
     rec.t0 = f.time
     rec.aim = e.aimAngle
-    // the hammer head, where the swing actually lands, not the body centre
-    rec.x = Math.round(f.x + Math.cos(rec.aim) * 9)
-    rec.y = Math.round(f.y + Math.sin(rec.aim) * 7)
+    // The contact point. He finishes the lunge ~10px from the player, so this lands in the gap
+    // between them at chest height — where hammer meets body — instead of on his own feet.
+    rec.x = Math.round(f.x + Math.cos(rec.aim) * 6)
+    rec.y = Math.round(f.y + Math.sin(rec.aim) * 6 - 4)
     rec.power = e.hitDone ? TIER_CONNECT : TIER_WHIFF   // flesh blows out; stone only sparks
   }
   if (e.state !== 'attack') rec.fired = false
   const dt = f.time - rec.t0
-  const step = rec.t0 < 0 || dt < 0 ? 99 : Math.floor(dt / FLASH_STEP_SEC)
-  if (step >= FLASH_TIERS.length) { rec.g.visible = false; return }
+  let step = TIER_SEC.length
+  if (rec.t0 >= 0 && dt >= 0) { let acc = 0; for (step = 0; step < TIER_SEC.length; step++) { acc += TIER_SEC[step]; if (dt < acc) break } }
+  if (step >= TIERS.length) { rec.g.visible = false; return }
   rec.g.visible = true
   rec.g.clear()
   drawImpact(rec.g, rec.x, rec.y, rec.aim, step, rec.power)
 }
 
-// Four hard values. No interpolation between them: a pixel-art flash is a value ramp, not a fade.
-const FLASH_TIERS = [
-  { core: 6, coreCol: 0xffffff, hot: 12, hotCol: 0xfff6e0, spike: 26, spikeCol: 0xffeab4, ring: 19, ringCol: 0xffc878, halo: 16, haloCol: 0xff8a3a, haloA: 0.85, dark: 0.85 },
-  { core: 3, coreCol: 0xfff6e0, hot: 8, hotCol: 0xffd88c, spike: 19, spikeCol: 0xffc878, ring: 24, ringCol: 0xff8a3a, halo: 13, haloCol: 0xff6f28, haloA: 0.7, dark: 0.55 },
-  { core: 0, coreCol: 0, hot: 5, hotCol: 0xff8a3a, spike: 13, spikeCol: 0xc05a20, ring: 28, ringCol: 0x8a3a18, halo: 10, haloCol: 0x7a3a1c, haloA: 0.5, dark: 0.3 },
-  { core: 0, coreCol: 0, hot: 0, hotCol: 0, spike: 0, spikeCol: 0, ring: 0, ringCol: 0, halo: 7, haloCol: 0x50200f, haloA: 0.35, dark: 0.14 },
+// Four hard states. `a` is the core's half-extent ALONG the blow, `b` ACROSS it — the impact spreads
+// on the line of the swing, which is why it can be this small and still read as a hammer landing.
+const TIERS = [
+  { a: 2.6, b: 4.6, cols: [0xffffff, 0xffd24a, 0xff6a12], spark: 1.00, sparkCols: [0xfff0c0, 0xffa832, 0xc0521a], dark: 0.55 },
+  { a: 2.1, b: 3.8, cols: [0xffd24a, 0xff8a2a, 0xb0480e], spark: 0.74, sparkCols: [0xffd07a, 0xe07a22, 0x8a3a10], dark: 0.40 },
+  { a: 1.4, b: 2.6, cols: [0xff9a2a, 0xc0521a, 0x6a2408], spark: 0.44, sparkCols: [0xc86a20, 0x8a3a10, 0x5a2208], dark: 0.22 },
+  { a: 0.0, b: 0.0, cols: [0, 0, 0], spark: 0.20, sparkCols: [0x8a3a10, 0x5a2208, 0x40180a], dark: 0.09 },
 ] as const
 
 function drawImpact(g: Graphics, cx: number, cy: number, aim: number, step: number, power: number): void {
-  const T = FLASH_TIERS[step]
-  const k = (r: number) => Math.round(r * power)
-  // 1. the ramp down. Dithered black outside the burst so the burst has somewhere to fall to.
-  darkRamp(g, cx, cy, k(T.halo) + 4, k(T.halo) + 22, T.dark * power)
+  const T = TIERS[step]
+  // 1. headroom. A dithered dark annulus on the floor plane, opening OUTSIDE both bodies so the ring
+  //    never checkerboards a silhouette: the burst has somewhere to fall to.
+  darkRamp(g, cx, cy, Math.round(13 * power), Math.round(27 * power), T.dark * power)
   g.fill({ color: 0x08040a, alpha: 0.9 })
-  // 2. warm halo: the palette the flash lands back into
-  if (T.halo > 0) { blob(g, cx, cy, k(T.halo), Math.max(1, k(T.halo) * AS), k(T.hot), Math.max(0, k(T.hot) * AS)); g.fill({ color: T.haloCol, alpha: T.haloA }) }
-  // 3. broken shock ring: a shape, so the landing is not only a brightness
-  if (T.ring > 0) { dashRing(g, cx, cy, k(T.ring), aim); g.fill({ color: T.ringCol, alpha: 1 }) }
-  // 4. asymmetric spikes, longest along the swing: authored, not a radial gradient
-  if (T.spike > 0) { spikes(g, cx, cy, aim, k(T.hot) - 1, k(T.spike)); g.fill({ color: T.spikeCol, alpha: 1 }) }
-  // 5. hot shell + 6. white core
-  if (T.hot > 0) { blob(g, cx, cy, k(T.hot), Math.max(1, k(T.hot) * AS), k(T.core), k(T.core) * AS); g.fill({ color: T.hotCol, alpha: 1 }) }
-  if (T.core > 0) { blob(g, cx, cy, k(T.core), Math.max(1, k(T.core) * AS)); g.fill({ color: T.coreCol, alpha: 1 }) }
+  // 2. the spray. This is where the energy lives: it points away from contact instead of sitting on it.
+  sparks(g, cx, cy, aim, T.spark * power, T.sparkCols)
+  // 3. the core, drawn last so nothing dilutes the white.
+  bands(g, cx, cy, aim, T.a * power, T.b * power, T.cols)
+}
+
+// --- the core: three hard bands of a rotated ellipse ----------------------------------------------
+const BAND_EDGE = [1, 1.55, 2.15]
+const bandRuns: number[][] = [[], [], []]   // x, y, w triples per band; allocated once
+
+function bands(g: Graphics, cx: number, cy: number, aim: number, a: number, b: number, cols: readonly number[]): void {
+  if (a < 1 || b < 1) return
+  const ca = Math.cos(aim), sa = Math.sin(aim)
+  const ext = Math.ceil(BAND_EDGE[2] * Math.max(a, b)) + 1
+  for (const r of bandRuns) r.length = 0
+  for (let py = cy - ext; py <= cy + ext; py++) {
+    let open = -1, start = 0
+    for (let px = cx - ext; px <= cx + ext + 1; px++) {
+      let band = -1
+      if (px <= cx + ext) {
+        const dx = px - cx, dy = py - cy
+        const u = dx * ca + dy * sa, v = dy * ca - dx * sa      // along the blow, across it
+        const d = Math.sqrt((u * u) / (a * a) + (v * v) / (b * b))
+        if (d <= BAND_EDGE[0]) band = 0
+        else if (d <= BAND_EDGE[1]) band = 1
+        else if (d <= BAND_EDGE[2]) {
+          // the last step breaks into an ordered dither, so the edge is soft without adding a fourth
+          // near-identical tone to the frame
+          const fall = (BAND_EDGE[2] - d) / (BAND_EDGE[2] - BAND_EDGE[1])
+          if (fall > (BAYER[((py & 3) << 2) + (px & 3)] + 0.5) / 16) band = 2
+        }
+      }
+      if (band !== open) {
+        if (open >= 0) bandRuns[open].push(start, py, px - start)
+        open = band; start = px
+      }
+    }
+  }
+  for (let i = 2; i >= 0; i--) {
+    const arr = bandRuns[i]
+    if (arr.length === 0) continue
+    for (let j = 0; j < arr.length; j += 3) g.rect(arr[j], arr[j + 1], arr[j + 2], 1)
+    g.fill({ color: cols[i], alpha: 1 })
+  }
+}
+
+// --- the spray: authored, never random, so it is identical every run ------------------------------
+// Angle offset from the swing vector, then length in px. The long ones run forward-and-sideways where
+// they clear both bodies; the two straight down the blow are short, so the spray does not repaint the
+// player it just hit. Every streak ramps white -> orange -> ember along its own length and breaks into
+// dashes at the tail, which is what makes it read as thrown debris and not a drawn line.
+const SPARK: readonly (readonly [number, number])[] = [
+  [-2.45, 6], [-1.70, 12], [-1.10, 19], [-0.62, 22], [-0.24, 13],
+  [0.24, 14], [0.62, 21], [1.10, 17], [1.70, 11], [2.45, 7],
+]
+const SPARK_R0 = 3
+
+function sparks(g: Graphics, cx: number, cy: number, aim: number, scale: number, cols: readonly number[]): void {
+  if (scale <= 0.05) return
+  for (let seg = 2; seg >= 0; seg--) {
+    let any = false
+    for (let i = 0; i < SPARK.length; i++) {
+      const len = SPARK[i][1] * scale
+      if (len < 2) continue
+      const a = aim + SPARK[i][0]
+      const c = Math.cos(a), s = Math.sin(a) * AS
+      for (let d = SPARK_R0; d <= SPARK_R0 + len; d++) {
+        const t = (d - SPARK_R0) / len
+        if ((t < 0.28 ? 0 : t < 0.62 ? 1 : 2) !== seg) continue
+        if (seg === 2 && ((d + i) & 1) === 0) continue      // the tail dashes out
+        g.rect(Math.round(cx + c * d), Math.round(cy + s * d), 1, 1)
+        any = true
+      }
+      // one ember thrown clear of the streak, so the burst has debris past its own edge
+      if (seg === 2 && (i & 1) === 0 && len > 6) {
+        const d = SPARK_R0 + len + 3
+        g.rect(Math.round(cx + c * d), Math.round(cy + s * d), 1, 1)
+        any = true
+      }
+    }
+    if (any) g.fill({ color: cols[seg], alpha: 1 })
+  }
 }
 
 // Integer-row ellipse (optionally an annulus). Rows, not g.ellipse(): a vector ellipse at 480x270
@@ -390,35 +526,6 @@ function blob(g: Graphics, cx: number, cy: number, rx: number, ry: number, irx =
     const y = cy + dy
     if (ihw > 0) { g.rect(cx - hw, y, hw - ihw, 1); g.rect(cx + ihw + 1, y, hw - ihw, 1) }
     else g.rect(cx - hw, y, hw * 2 + 1, 1)
-  }
-}
-
-// Eight spokes with fixed, uneven lengths. The two along the swing axis are the long ones.
-const SPIKE_LEN = [1, 0.5, 0.82, 0.44, 0.95, 0.58, 0.76, 0.48]
-function spikes(g: Graphics, cx: number, cy: number, aim: number, r0: number, r1: number): void {
-  if (r1 <= r0) return
-  for (let i = 0; i < 8; i++) {
-    const a = aim + (i / 8) * TAU
-    const c = Math.cos(a), s = Math.sin(a) * AS
-    const end = r0 + (r1 - r0) * SPIKE_LEN[i]
-    for (let d = r0; d <= end; d++) {
-      const hw = Math.round((1 - (d - r0) / (end - r0)) * 1.5)
-      g.rect(Math.round(cx + c * d) - hw, Math.round(cy + s * d) - hw, hw * 2 + 1, hw * 2 + 1)
-    }
-  }
-}
-
-// Two-pixel ring, broken into arcs, gapped on the swing axis so the spikes read through it.
-function dashRing(g: Graphics, cx: number, cy: number, r: number, aim: number): void {
-  if (r < 3) return
-  let px = -999, py = -999
-  for (let th = 0; th < TAU; th += 1 / r) {
-    const rel = Math.abs(Math.atan2(Math.sin(th - aim), Math.cos(th - aim)))
-    if ((Math.round(th * r) & 7) >= 5 || rel % (Math.PI / 4) < 0.16) continue
-    const nx = Math.round(cx + Math.cos(th) * r), ny = Math.round(cy + Math.sin(th) * r * AS)
-    if (nx === px && ny === py) continue
-    g.rect(nx, ny, 2, 1)
-    px = nx; py = ny
   }
 }
 

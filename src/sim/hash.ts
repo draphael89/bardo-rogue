@@ -24,6 +24,7 @@ export function hashWorld(world: World): number {
   int(world.tick); int(world.freeze); num(world.timeScale); int(world.slowmoTicks)
   int(world.swingCounter); int(world.nextEnemyId); int(world.nextProjectileId)
   int(world.roomClearTick); flag(world.doorOpen); flag(world.wantsRestart)
+  if (world.boonBits) int(world.boonBits)
   int(world.rng.state)
 
   const p = world.player

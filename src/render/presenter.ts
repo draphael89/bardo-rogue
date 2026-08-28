@@ -5,6 +5,7 @@ import type { World, Enemy } from '@/sim/world'
 import type { SimEvent } from '@/sim/events'
 import { tuning } from '@/tuning'
 import { EntityView, createPlayerView, createEnemyView, updatePlayerView, updateEnemyView, makePropSprite, SpawnMarkerView, BoltView, drawAimLine, drawSwingArc } from './views'
+import { updatePlayerRim } from './views/player'
 import { buildTilemap, type TilemapView } from './tilemap'
 import { Camera } from './camera'
 import { Hud } from './hud'
@@ -42,7 +43,10 @@ export class Presenter {
   private emberAcc = 0
   // contact reaction on real time, so it plays out *inside* the hit-stop instead of waiting for it
   private recoilX = 0; private recoilY = 0
-  private dodgedGlow = 0; private dodgedLit = false
+  // the dodge-through mark: where the read happened, which way the roll was going, and how far
+  // through its four ticks it is. Stepped on real time, one tier per tick.
+  private dodgedT = -1; private dodgedStep = -1
+  private dodgedX = 0; private dodgedY = 0; private dodgedA = 0
   // the contact stamp: an arc radius/orientation about the player, plus the wound it was struck on
   private impactT = -1; private impactR = 0; private impactA = 0; private impactSnap = 0
   private impactSweep = 1; private impactWX = 0; private impactWY = 0; private impactHeavy = false
@@ -92,7 +96,7 @@ export class Presenter {
     if (this.playerView.weapon) this.playerView.weapon.visible = true
     this.damageNumbers.clear()
     this.recoilX = this.recoilY = 0
-    this.dodgedGlow = 0; this.dodgedLit = false
+    this.dodgedT = -1; this.dodgedStep = -1
     this.impactT = -1
   }
 
@@ -168,16 +172,18 @@ export class Presenter {
           break
         }
         case 'dodged': {
-          // An attack passed through the i-frames. This is the hardest input in the game and the sim
-          // has always reported it; until now nothing on screen said so.
+          // An attack passed through the i-frames — the hardest input in the game. The reward is a
+          // mark on the FLOOR under both fighters plus a rim on the player's own outline, and that is
+          // all: no ghost sprite stamped on the body, no filled disk, no screen-wide lift. Both
+          // fighters keep every pixel of their silhouette on the three ticks that decide the fight.
           const D = J.dodged
-          this.particles.afterimage(this.playerView.body, D.tint, D.ghostAlpha, 0.26)
-          this.particles.dodgeSlip(ev.x, ev.y, D.sparks, D.tint)
+          const q = this.world.player
+          this.dodgedT = 0; this.dodgedStep = 0
+          this.dodgedX = ev.x; this.dodgedY = ev.y + 1
+          this.dodgedA = Math.atan2(q.dodgeDirY, q.dodgeDirX)
           this.camera.punchZoom(D.zoom)
           this.camera.addTrauma(D.trauma)
-          this.flash(D.flash, D.tint)
           this.postfx.pulse()
-          this.dodgedGlow = D.glowSec
           break
         }
         case 'enemyStagger': {
@@ -189,8 +195,15 @@ export class Presenter {
           if (big) { this.camera.punchZoom(S.bruteZoom); this.flash(S.bruteFlash, 0xffffff); this.postfx.pulse() }
           break
         }
-        case 'dodge': this.particles.dust(ev.x, ev.y + 4, ev.angle + Math.PI, 6); break
-        case 'dodgeEnd': this.particles.dust(ev.x, ev.y + 4, 0, 3); break
+        // launch: grit kicked backwards out of the push-off foot
+        case 'dodge': this.particles.dust(ev.x, ev.y + 4, ev.angle + Math.PI, J.roll.launchDust); this.rollX0 = ev.x; this.rollY0 = ev.y + 1; break
+        // landing: the feet catch, so the grit is thrown FORWARD, and the floor takes the weight
+        case 'dodgeEnd': {
+          const q = this.world.player
+          this.particles.dust(ev.x, ev.y + 4, Math.atan2(q.dodgeDirY, q.dodgeDirX), J.roll.landDust)
+          this.camera.addTrauma(J.roll.landTrauma)
+          break
+        }
         case 'footstep': this.particles.dust(ev.x, ev.y + 5, 0, 1); break
         case 'swing':
           // the greatsword's wind-up plants the feet and drags the camera back off the swing line
@@ -216,10 +229,61 @@ export class Presenter {
           this.hud.showBanner(ev.name, ev.index + 1 < ev.total ? '' : 'the last chamber', 1.8)
           this.hud.place.text = ev.name
           break
+        case 'offeringTaken':
+          this.flash(0.5, 0xfff0c0)
+          this.camera.addTrauma(0.16)
+          this.camera.punchZoom(J.zoom.roomClear)
+          this.particles.ring(ev.x, ev.y, 0xffc040)
+          this.particles.puff(ev.x, ev.y, 5, 0xffe090)
+          this.postfx.pulse()
+          this.tilemap.setDoorOpen(this.world.doorOpen)
+          break
         case 'restart': break
       }
       this.onEvent?.(ev)
     }
+  }
+
+  // The roll, while the body is committed: the camera drifts along with it.
+  private rollX0 = 0; private rollY0 = 0
+  private rollMotion(p: World['player']) {
+    const d = tuning.player.dodge
+    if (p.state !== 'dodge' || p.stateTick >= d.travel) return
+    this.camera.lean(Math.atan2(p.dodgeDirY, p.dodgeDirX), tuning.juice.roll.lean)
+  }
+
+  // The roll's smear: one tapered streak of whole pixels on the floor behind the body, in the same
+  // authored language as the contact crescent. Its hot core is drawn ONLY while the i-frames are
+  // live — the tick the core drops out is the tick the player can be hit again, which is the one
+  // thing about a dodge a player has to be able to see.
+  private drawRollStreak(g: Graphics, p: World['player'], alpha: number) {
+    const d = tuning.player.dodge, R = tuning.juice.roll
+    const over = p.stateTick - d.travel
+    if (p.state !== 'dodge' || over > R.streakFadeTicks) return
+    const x = lerp(p.px, p.x, alpha), y = lerp(p.py, p.y, alpha) + 1
+    const dx = x - this.rollX0, dy = y - this.rollY0
+    const dist = Math.hypot(dx, dy)
+    if (dist < 3) return
+    const ux = dx / dist, uy = dy / dist
+    const tail = Math.min(dist, R.streakLen)
+    const fade = over > 0 ? 1 - over / R.streakFadeTicks : 1
+    const hot = p.stateTick >= d.iStart && p.stateTick <= d.iEnd
+    // rim first, one pixel proud of the core on both sides: without it a pale streak dies on a pale
+    // floor, exactly as the blade's crescent does
+    for (let i = 3; i < tail; i++) {
+      const t = 1 - i / tail
+      const px = Math.round(x - ux * i), py = Math.round(y - uy * i * 0.9)
+      const h = 1 + Math.round(4 * Math.sqrt(t))     // a wedge: as deep as the body at the near
+      g.rect(px, py - (h >> 1) - 1, 1, h + 2)             // end, running out to a point at the tail
+    }
+    g.fill({ color: R.streakRim, alpha: 0.5 * fade })
+    for (let i = 3; i < tail; i++) {
+      const t = 1 - i / tail
+      const px = Math.round(x - ux * i), py = Math.round(y - uy * i * 0.9)
+      const h = 1 + Math.round(4 * Math.sqrt(t))
+      g.rect(px, py - (h >> 1), 1, h)
+    }
+    g.fill({ color: hot ? R.streakCore : R.streakRim, alpha: (hot ? R.streakAlpha : 0.35) * fade })
   }
 
   // While the greatsword is up: the camera leans off the swing line and embers gather at the blade.
@@ -240,7 +304,7 @@ export class Presenter {
 
   // What the player's own body does about the hit: a whole-pixel jolt back off the blade, and — after a
   // dodge-through — a cold ghost frame. Both run on real time, so they play inside the hit-stop.
-  private contactReaction(p: World['player'], dtSec: number) {
+  private contactReaction(dtSec: number) {
     const H = tuning.juice.hit
     const d = Math.pow(0.001, dtSec * H.recoilDecay)
     this.recoilX *= d; this.recoilY *= d
@@ -251,18 +315,34 @@ export class Presenter {
       v.body.position.set(v.body.position.x + rx, v.body.position.y + ry)
       if (v.weapon) v.weapon.position.set(v.weapon.position.x + rx, v.weapon.position.y + ry)
     }
-    if (p.state === 'dead') return
+  }
+
+  // The dodge-through mark, stepped on REAL time, one tier per tick, so no two frames of it are the
+  // same image. Everything it draws goes into the ground layer, UNDER both fighters: an open ring
+  // that expands and thins (never a filled disk), a bar smeared along the roll axis so the still says
+  // which way the read went, and a handful of hard cold ticks thrown clear of both bodies. Four ticks
+  // and it is gone. The one bright thing left on the actor is the rim, applied by the caller.
+  private drawDodgeMark(ground: Graphics, dtSec: number): void {
+    if (this.dodgedT < 0) { this.dodgedStep = -1; return }
     const D = tuning.juice.dodged
-    if (this.dodgedGlow > 0) {
-      this.dodgedGlow = Math.max(0, this.dodgedGlow - dtSec)
-      const u = this.dodgedGlow / D.glowSec
-      this.playerView.setFlash(u > 0.5 || p.flash > 0)    // first frames a cold silhouette, then a cold tint
-      this.playerView.body.tint = D.tint
-      this.dodgedLit = true
-    } else if (this.dodgedLit) {
-      this.dodgedLit = false
-      this.playerView.setFlash(p.flash > 0)
-      this.playerView.body.tint = 0xffffff
+    const step = Math.floor(this.dodgedT / D.stepSec)
+    this.dodgedT += dtSec
+    this.dodgedStep = step
+    if (step >= D.tiers) { this.dodgedT = -1; this.dodgedStep = -1; return }
+    const cx = Math.round(this.dodgedX), cy = Math.round(this.dodgedY)
+    const core = step === 0 ? D.ringCore : step === 1 ? D.ringMid : D.ringFar
+    // stretched along the roll axis and pinched across it, so the SHAPE carries the heading: a plain
+    // circle expanding is a geometry primitive, an elongated one is a body going somewhere
+    ringMark(ground, cx, cy, D.r0 + step * D.rStep, step === 0 ? 2 : 1, this.dodgedA, D.ringDark, core)
+    if (step < 2) {
+      smearBar(ground, cx, cy, this.dodgedA, D.smearBack + step * 5, Math.max(1, D.smearFront - step * 4), Math.max(1, D.smearThick - step), D.ringDark, core)
+    }
+    if (step < 3) {
+      const r = D.sparkR + step * D.rStep
+      for (let i = 0; i < D.sparks; i++) {
+        const a = this.dodgedA + (i + 0.5) * (Math.PI * 2 / D.sparks)
+        ray(ground, cx, cy, a, r, r + Math.max(1, D.sparkLen - step), 1, core)
+      }
     }
   }
 
@@ -349,7 +429,8 @@ export class Presenter {
 
     if (this.playerView.squash > 0) this.playerView.squash -= dtSec * 60
     updatePlayerView(this.playerView, p, w, alpha, this.time)
-    this.contactReaction(p, dtSec)
+    this.contactReaction(dtSec)
+    this.rollMotion(p)
     this.heavyWindup(p, dtSec)
     if (p.state === 'dead' && this.playerView.weapon) this.playerView.weapon.visible = false // juice hook: shattered, not lying down
 
@@ -358,7 +439,13 @@ export class Presenter {
     this.groundFx.clear()
     for (const e of w.enemies) if (e.active && e.kind === 'caster' && e.state === 'aim') drawAimLine(this.fxGraphics, e, alpha)
     drawSwingArc(this.fxGraphics, p, alpha, w)
+    this.drawRollStreak(this.groundFx, p, alpha)
     this.drawContact(this.groundFx, this.fxGraphics, dtSec)
+    this.drawDodgeMark(this.groundFx, dtSec)
+    // and the one bright thing that is allowed on a body: the player's own outline, white for a
+    // single tick and cold for two more. Last, so it rides the contact recoil with the body.
+    const DG = tuning.juice.dodged
+    updatePlayerRim(this.playerView, this.dodgedStep >= 0 && this.dodgedStep < DG.rimTicks, this.dodgedStep === 0 ? DG.rim : DG.rimTint)
 
     this.particles.update(dtSec)
     this.atmosphere.update(w, dtSec)
@@ -459,4 +546,45 @@ function ray(g: Graphics, cx: number, cy: number, a: number, r0: number, r1: num
     g.rect(Math.round(cx + dx * r), Math.round(cy + dy * r) - (w >> 1), 1, w)
   }
   g.fill({ color, alpha: 1 })
+}
+
+// One open ring of whole pixels on the floor plane: a dark stroke with a bright stroke inside it, and
+// nothing at all in the middle. A filled disk is what eats a silhouette; a ring reads as a shockwave
+// and lets both bodies through it.
+function ringMark(g: Graphics, cx: number, cy: number, r: number, thick: number, a: number, dark: number, core: number): void {
+  ringBand(g, cx, cy, r, thick / 2 + 1, a, dark)
+  ringBand(g, cx, cy, r, thick / 2, a, core)
+}
+
+const RING_ALONG = 1.35, RING_ACROSS = 0.82   // the ring's own aspect, measured along the roll axis
+function ringBand(g: Graphics, cx: number, cy: number, r: number, half: number, a: number, color: number): void {
+  const ux = Math.cos(a), uy = Math.sin(a)
+  const R = Math.ceil((r + half) * RING_ALONG), RY = Math.ceil((r + half) * RING_ALONG * 0.9)
+  for (let dy = -RY; dy <= RY; dy++) {
+    const fy = dy / 0.9
+    for (let dx = -R; dx <= R; dx++) {
+      const along = (dx * ux + fy * uy) / RING_ALONG, across = (fy * ux - dx * uy) / RING_ACROSS
+      if (Math.abs(Math.hypot(along, across) - r) <= half) g.rect(cx + dx, cy + dy, 1, 1)
+    }
+  }
+  g.fill({ color, alpha: 1 })
+}
+
+// The direction the read went, as one tapered bar along the roll axis: long behind, short ahead, so a
+// single frame says which way the body left. Plotted per pixel about the axis rather than drawn as a
+// rotated rectangle, because at 480x270 a rotated vector edge lands on half pixels and the NEAREST
+// upscale doubles the smear.
+function smearBar(g: Graphics, cx: number, cy: number, a: number, back: number, front: number, thick: number, dark: number, core: number): void {
+  const ux = Math.cos(a), uy = Math.sin(a) * 0.9
+  const nx = -Math.sin(a), ny = Math.cos(a) * 0.9
+  for (let pass = 0; pass < 2; pass++) {
+    const t = thick + (pass === 0 ? 2 : 0)
+    for (let i = -Math.round(back); i <= Math.round(front); i++) {
+      const taper = i >= 0 ? 1 - i / (front + 1) : 1 - (-i) / (back + 1)
+      const w = Math.max(pass === 0 ? 1 : 0, Math.round(t * taper))
+      const h = w >> 1
+      for (let k = -h; k <= h; k++) g.rect(Math.round(cx + ux * i + nx * k), Math.round(cy + uy * i + ny * k), 1, 1)
+    }
+    g.fill({ color: pass === 0 ? dark : core, alpha: 1 })
+  }
 }

@@ -3,12 +3,29 @@ import type { World } from './world'
 import type { InputFrame } from './input'
 import { moveWithWalls } from './collision'
 import { arcHits, damageEnemy, addFreeze, sweepEase, swingStep } from './combat'
+import { swingReach } from './boons'
 import { angleDiff, deg, len } from './math'
 
 export function capturePlayerInput(world: World, input: InputFrame): void {
   const p = world.player
   if (input.attack) p.attackBuffer = tuning.player.attack.buffer
-  if (input.dodge) p.dodgeBuffer = tuning.player.dodge.buffer
+  if (input.dodge) {
+    p.dodgeBuffer = tuning.player.dodge.buffer
+    // The roll direction is latched on the frame the button went down, not on the frame the roll
+    // finally gets to start. A dodge buffered out of a swing goes where the stick was pointing when
+    // the player asked for it. A roll already in flight owns the latch, so it can never be steered.
+    if (p.state !== 'dodge') latchDodgeDir(world, input)
+  }
+}
+
+function latchDodgeDir(world: World, input: InputFrame): void {
+  const p = world.player
+  const m = len(input.moveX, input.moveY)
+  if (m > 0.01) { p.dodgeDirX = input.moveX / m; p.dodgeDirY = input.moveY / m }
+  else {
+    const a = Math.atan2(input.aimY, input.aimX)  // a standing roll goes where you are looking
+    p.dodgeDirX = Math.cos(a); p.dodgeDirY = Math.sin(a)
+  }
 }
 
 export function updatePlayer(world: World, input: InputFrame): void {
@@ -27,7 +44,8 @@ export function updatePlayer(world: World, input: InputFrame): void {
   let aim = Math.atan2(input.aimY, input.aimX)
   if (input.aimSoft) aim = aimAssist(world, mlen > 0.01 ? p.moveAngle : p.aimAngle)
   p.aimAngle = aim // intent always tracks the stick, so a chained swing can be redirected
-  if (p.state === 'free' || p.state === 'dodge') p.facing = Math.cos(p.aimAngle) >= 0 ? 1 : -1
+  // a roll is committed: its facing is latched at launch, so the sprite can never flip mid-tuck
+  if (p.state === 'free') p.facing = Math.cos(p.aimAngle) >= 0 ? 1 : -1
   // steering: the swing angle follows the aim for the first few startup ticks, then it is committed
   if (p.state === 'attack') {
     const s = P.attack.swings[p.swingIndex]
@@ -46,7 +64,14 @@ export function updatePlayer(world: World, input: InputFrame): void {
     if (p.dodgeBuffer > 0) startDodge(world)
     else if (p.attackBuffer > 0) startSwing(world, 0)
   } else if (p.state === 'dodge') {
-    if (p.stateTick >= P.dodge.total) { p.state = 'free'; p.stateTick = 0; world.emit({ type: 'dodgeEnd', x: p.x, y: p.y }) }
+    // `dodgeEnd` is the landing, not the end of the state: the feet touch down when the roll's own
+    // momentum runs out, and the recovery the player has to pay for starts there.
+    if (p.stateTick === P.dodge.travel) world.emit({ type: 'dodgeEnd', x: p.x, y: p.y })
+    if (p.stateTick >= P.dodge.total) {
+      p.state = 'free'; p.stateTick = 0
+      // a press made mid-roll could not latch a direction, so it takes the stick as it stands now
+      if (p.dodgeBuffer > 0) latchDodgeDir(world, input)
+    }
     else if (p.attackBuffer > 0 && p.stateTick >= P.dodge.attackCancelFrom) startSwing(world, 0)
   } else if (p.state === 'attack') {
     const s = P.attack.swings[p.swingIndex]
@@ -76,10 +101,26 @@ export function updatePlayer(world: World, input: InputFrame): void {
     }
   } else if (p.state === 'dodge') {
     const d = P.dodge
-    const t = (p.stateTick + 0.5) / d.total
-    const speed = (2 * d.distance / d.total) * (1 - t) // linear ease-out; midpoint rule sums exactly to `distance`
-    dx = p.dodgeDirX * speed; dy = p.dodgeDirY * speed
-    p.vx = dx / DT; p.vy = dy / DT
+    if (p.stateTick < d.travel) {
+      // Three authored beats, not one easing curve: a shove off the back foot, a flat committed
+      // slide, then a hard brake so the landing has weight. `norm` is the exact sum of the weights,
+      // so the roll covers `distance` to the pixel however the beats are retuned.
+      const norm = d.push + (d.travel - d.brake - 1) + d.brake / 2
+      const peak = d.distance / norm
+      const k = p.stateTick - (d.travel - d.brake)
+      const w = p.stateTick === 0 ? d.push : k < 0 ? 1 : 1 - (k + 0.5) / d.brake
+      dx = p.dodgeDirX * peak * w; dy = p.dodgeDirY * peak * w
+      p.vx = dx / DT; p.vy = dy / DT
+    } else {
+      // Landing. The feet are planted and steering bleeds back in — this is the price of the roll,
+      // and it is why rolling everywhere is slower than running everywhere.
+      const rec = p.stateTick - d.travel
+      const scale = Math.pow((rec + 1) / (d.total - d.travel), d.landMoveExp)
+      const tx = mlen > 0.01 ? input.moveX / mlen * P.maxSpeed * scale : 0
+      const ty = mlen > 0.01 ? input.moveY / mlen * P.maxSpeed * scale : 0
+      p.vx = approach(p.vx, tx, P.maxSpeed / P.accelTicks); p.vy = approach(p.vy, ty, P.maxSpeed / P.accelTicks)
+      dx = p.vx * DT; dy = p.vy * DT
+    }
   } else if (p.state === 'attack') {
     const s = P.attack.swings[p.swingIndex]
     // committed through startup + active, then control bleeds back in across recovery
@@ -102,19 +143,20 @@ export function updatePlayer(world: World, input: InputFrame): void {
     const k = p.stateTick - s.startup
     if (k >= 0 && k < s.active) {
       // the live sector runs from the swing's start edge to wherever the blade has reached this tick
-      const spanDeg = s.arcDeg * sweepEase((k + 1) / s.active, s.heavy)
-      const mid = p.swingAngle + s.sweep * (deg(spanDeg) - deg(s.arcDeg)) / 2
+      const reach = swingReach(world, s)
+      const spanDeg = reach.arcDeg * sweepEase((k + 1) / s.active, s.heavy)
+      const mid = p.swingAngle + s.sweep * (deg(spanDeg) - deg(reach.arcDeg)) / 2
       for (const e of world.enemies) {
         if (!e.active || e.state === 'dead' || e.lastHitSwingId === p.swingId) continue
-        if (arcHits(p.x, p.y, mid, s.radius, spanDeg, e.x, e.y, e.radius)) {
+        if (arcHits(p.x, p.y, mid, reach.radius, spanDeg, e.x, e.y, e.radius)) {
           e.lastHitSwingId = p.swingId
           const toward = Math.atan2(e.y - p.y, e.x - p.x)
-          damageEnemy(world, e, s.damage, toward, s.knockback, s.heavy, s.hitstop)
+          damageEnemy(world, e, reach.damage, toward, s.knockback, s.heavy, s.hitstop)
         }
       }
       for (const b of world.projectiles) {
         if (!b.active) continue
-        if (arcHits(p.x, p.y, mid, s.radius, spanDeg, b.x, b.y, b.radius)) {
+        if (arcHits(p.x, p.y, mid, reach.radius, spanDeg, b.x, b.y, b.radius)) {
           b.active = false
           addFreeze(world, tuning.hitstop.boltCut)
           world.emit({ type: 'boltCut', x: b.x, y: b.y })
@@ -135,9 +177,8 @@ function swingConnected(world: World): boolean {
 function startDodge(world: World): void {
   const p = world.player
   p.state = 'dodge'; p.stateTick = 0; p.dodgeBuffer = 0
-  const m = len(p.moveX, p.moveY)
-  if (m > 0.01) { p.dodgeDirX = p.moveX / m; p.dodgeDirY = p.moveY / m }
-  else { p.dodgeDirX = Math.cos(p.aimAngle); p.dodgeDirY = Math.sin(p.aimAngle) }
+  if (Math.abs(p.dodgeDirX) > 0.2) p.facing = p.dodgeDirX >= 0 ? 1 : -1   // head-first along the roll
+  // the direction was latched at the press (capturePlayerInput) and is never re-read here
   world.emit({ type: 'dodge', x: p.x, y: p.y, angle: Math.atan2(p.dodgeDirY, p.dodgeDirX) })
 }
 

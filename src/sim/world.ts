@@ -81,6 +81,7 @@ export class World {
   rooms: RoomDef[]
   roomIndex = 0
   roomName = 'THE THRESHOLD'
+  boonBits = 0
 
   constructor(seed: number, scenario: string) {
     this.seed = seed
@@ -100,7 +101,7 @@ export class World {
     for (let i = 0; i < MAX_PROJECTILES; i++) this.projectiles.push(makeProjectile())
   }
 
-  hasNextRoom(): boolean { return this.roomIndex + 1 < this.rooms.length }
+  hasNextRoom(): boolean { return (this.rooms[this.roomIndex]?.exits?.length ?? 0) > 0 }
 
   emit(e: SimEvent): void { this.events.push(e) }
 

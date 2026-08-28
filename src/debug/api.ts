@@ -7,6 +7,7 @@ import { makeBot, type BotName } from '@/sim/bots'
 import type { Replay, EncodedReplay } from '@/sim/replay'
 import type { Loop } from '@/loop'
 import { seedFx } from '@/render/fxRng'
+import { activeBoons } from '@/sim/boons'
 
 // window.__game: what an agent (or Playwright) uses to drive and inspect the live game.
 export interface GameApi {
@@ -65,8 +66,20 @@ export function installApi(host: {
       const w = host.getWorld()
       return {
         tick: w.tick, freeze: w.freeze, wave: { ...w.wave },
-        room: { index: w.roomIndex, name: w.roomName, doorOpen: w.doorOpen, kind: w.arena.kind },
-        player: { x: +w.player.x.toFixed(1), y: +w.player.y.toFixed(1), hp: w.player.hp, state: w.player.state, stateTick: w.player.stateTick, iframes: w.player.iframes },
+        room: {
+          index: w.roomIndex,
+          id: w.rooms[w.roomIndex]?.id,
+          name: w.roomName,
+          doorOpen: w.doorOpen,
+          kind: w.arena.kind,
+          hasNext: w.hasNextRoom(),
+          exits: w.rooms[w.roomIndex]?.exits ?? [],
+        },
+        player: { x: +w.player.x.toFixed(1), y: +w.player.y.toFixed(1), hp: w.player.hp, maxHp: w.player.maxHp, state: w.player.state, stateTick: w.player.stateTick, iframes: w.player.iframes },
+        offering: w.arena.offering
+          ? { kind: w.arena.offering.kind, x: +w.arena.offering.x.toFixed(1), y: +w.arena.offering.y.toFixed(1), taken: !!w.arena.offeringTaken }
+          : null,
+        boons: activeBoons(w),
         enemies: w.enemies.filter(e => e.active).map(e => ({ id: e.id, kind: e.kind, x: +e.x.toFixed(1), y: +e.y.toFixed(1), hp: e.hp, state: e.state, stateTick: e.stateTick })),
         bolts: w.projectiles.filter(b => b.active).length,
         metrics: host.metrics.summary(),

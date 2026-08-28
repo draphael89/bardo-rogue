@@ -1,9 +1,9 @@
 {
   "title": "Bardo Rogue",
-  "subtitle": "Gauntlet against Enter the Gungeon & Hades \u2014 the door, then the rest",
-  "updated": "2026-08-27T22:16:00-04:00",
-  "now": "run",
-  "round": 2,
+  "subtitle": "Gauntlet against Enter the Gungeon & Hades \u2014 two marked doors, then the rest",
+  "updated": "2026-08-28T00:00:00-04:00",
+  "now": "boons",
+  "round": 1,
   "timeline": [
     {
       "t": "16:54",
@@ -172,6 +172,86 @@
     {
       "t": "22:16",
       "text": "R2 critics (both orders) picked the sequence. Lit north hole, player in it, Crossing already in a fight. Not a room-beauty contest."
+    },
+    {
+      "t": "22:20",
+      "text": "Next piece: two marked doors. Clear Threshold, choose north (fight) or east (quiet shore)."
+    },
+    {
+      "t": "22:24",
+      "text": "R1 both-order critics picked the bar. Gap: the choice lived in ROOM CLEARED / CHOOSE A DOOR and two matching floods, not in the doors."
+    },
+    {
+      "t": "22:28",
+      "text": "R2: fat blade vs coin seals on the floor, ember vs gold light, toast then gone. Re-judge the settled frame."
+    },
+    {
+      "t": "22:32",
+      "text": "R2 both-order critics still on the bar. Gap: path-promise icons — north tree reads, east is a lamp blob, HUD still owns the frame."
+    },
+    {
+      "t": "22:36",
+      "text": "R3 both-order critics still on the bar. Gap moved to architecture: carved gates with living destination emblems, not neon slats plus stickers. PARK the look."
+    },
+    {
+      "t": "22:48",
+      "text": "Door look parked. Next piece: the gift must pay. East door promised a gift; The Far Shore now holds a life vessel you walk into."
+    },
+    {
+      "t": "22:51",
+      "text": "R1 critic BA picked the walk-to sequence (sixth flame, A LIFE RETURNS) but was not wowed. The bar pair was a combat still plus a heart icon — no take in frame. Swapped-order critic still out. No commit."
+    },
+    {
+      "t": "22:53",
+      "text": "R1 critic AB picked the heart. Gap: token identity — the pedestal cone reads as a candle the banner has to name. R2: HUD life-cup at room scale; spent cup goes dark."
+    },
+    {
+      "t": "23:00",
+      "text": "R2: one stamped HUD flame on a dark plate — the same silhouette as the life row, not a candle on furniture. Back to both-order critics."
+    },
+    {
+      "t": "23:01",
+      "text": "R2 both orders picked the bar. Gap: life-token silhouette — the floor gift is a flame-on-black square the banner has to name. No commit."
+    },
+    {
+      "t": "23:05",
+      "text": "R3: one ember heart on the floor, spent stamp goes cold iron. Same walk-in, HUD maxHp, banner. Back to both-order critics."
+    },
+    {
+      "t": "23:10",
+      "text": "R3 both orders picked the bar. Gap: floor is a heart, readout is flames, banner still names the gift. No commit."
+    },
+    {
+      "t": "23:12",
+      "text": "R4: one heart stamp for floor and life row. Dark well, no caption. Take is the pip count."
+    },
+    {
+      "t": "23:18",
+      "text": "R4 both orders picked the walk-to heart (5 then 6). Wow: no. Gap: the floor mark is a HUD pip on a tile, not a sealed gift object. No commit."
+    },
+    {
+      "t": "23:24",
+      "text": "R5: stone tablet, iron rim, recessed well, crimson inlay. Same heart as the life row. Sits; no bob, no caption."
+    },
+    {
+      "t": "23:28",
+      "text": "R5 split. AB picked the bar (sealed vessel — ours still reads as a HUD pip). BA picked the walk-to. Wow: no. No commit."
+    },
+    {
+      "t": "23:36",
+      "text": "R6: metal heart vessel — bone/iron rim, charcoal well, crimson stamp in the well. Same silhouette as the life row."
+    },
+    {
+      "t": "23:40",
+      "text": "R6 both orders picked the bar. Gap: the well mark is a maroon V, not the orange HUD heart. No commit."
+    },
+    {
+      "t": "23:41",
+      "text": "R7: HUD 7-wide heart stamped into the well, same cleft as the life row."
+    },
+    {
+      "t": "23:45",
+      "text": "R7 split. AB: still a HUD pip. BA: beat lands, wow no. PARK the look — same family as the door seals. Mechanics stay; re-enter behind an authored token."
     }
   ],
   "pieces": [
@@ -286,6 +366,36 @@
       "before": "shots/run-r2-fight.png",
       "after": "shots/run-r2-approach.png",
       "ref": "ref/gungeon-2.jpg"
+    },
+    {
+      "id": "door-choice",
+      "take": "17",
+      "name": "Two doors",
+      "title": "Clear the room, two marked exits, commit to a fight or a quiet shore",
+      "blurb": "A run is a choice. After the last kill, two doors light: one marked for combat, one for a gift. You walk one.",
+      "bar": "Hades door choice",
+      "status": "parked",
+      "rounds": 3,
+      "verdict": "theirs",
+      "gap": "Carved exit gates with living destination emblems. Three rounds of TypeScript seals lost; same family as The Threshold. Re-enter only behind authored door art.",
+      "before": "shots/choice-r1-clear.png",
+      "after": "shots/choice-r3-settled.png",
+      "ref": "ref/choice-0.jpg"
+    },
+    {
+      "id": "offering",
+      "take": "18",
+      "name": "A life returns",
+      "title": "Walk the gift door, take a vessel, gain a life",
+      "blurb": "The east door promised a gift. The Far Shore pays: a heart on the floor you walk into, and a sixth life.",
+      "bar": "Hades room-reward pickup",
+      "status": "parked",
+      "rounds": 7,
+      "verdict": "theirs",
+      "gap": "Authored sealed life token (rim, well, stamp with mass). Seven rounds of TypeScript hearts lost or split; same family as The Threshold and the door seals. Re-enter only behind authored token art.",
+      "before": "shots/offering-r1-approach.png",
+      "after": "shots/offering-r7-approach.png",
+      "ref": "ref/gift-0.jpg"
     }
   ]
 }

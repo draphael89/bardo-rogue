@@ -136,6 +136,8 @@ async function boot() {
   loop.start()
   if (scenario === 'run') presenter.hud.showBanner(world.roomName, 'clear the room', 1.8)
   else if (scenario === 'full' || scenario === 'empty') presenter.hud.showBanner('THE THRESHOLD', '', 1.5)
+  else if (scenario === 'shore') presenter.hud.showBanner('THE FAR SHORE', 'a life waits', 1.8)
+  else if (scenario === 'blessed') presenter.hud.showBanner('THE THRESHOLD', 'the blade reaches farther', 1.8)
   else presenter.hud.showBanner(scenario.toUpperCase(), '', 1.2)
 }
 

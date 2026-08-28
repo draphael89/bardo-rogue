@@ -22,6 +22,8 @@ export interface PlayOpts {
   y?: number
   fadeIn?: number      // seconds to reach `gain`; 0 (default) starts at full level
   startSilent?: boolean // start at silence and wait for a fade; used by the combat layers
+  ducked?: boolean     // route through the bus's duck stage: the bed and the ambience, never a stinger
+  flat?: boolean       // place it in the stereo image but do not attenuate it with distance
 }
 
 /** A started sound. Buffer sources free themselves on end; only hold a Voice for loops. */
@@ -41,6 +43,17 @@ export function sliderToGain(slider01: number, floorDb = -60): number {
   return dbToGain(floorDb * (1 - slider01))
 }
 
+/**
+ * Files that ship in the asset manifest and are deliberately never heard: the fighting-game
+ * announcer and its round voice-overs. The bardo does not have a ring announcer, so the game's
+ * punctuation is struck bowls (see `bell`). Listed here rather than merely left unmapped, so
+ * `load()` does not spend boot time decoding them or hold them in memory for the whole run.
+ */
+export const ANNOUNCER = new Set([
+  'round_1', 'round_2', 'round_3', 'fight', 'final_round',
+  'flawless_victory', 'you_lose', 'gameover1',
+])
+
 // ---------------------------------------------------------------------------
 // The mix. Every level and time constant lives here so the whole graph can be
 // read (and printed) as one table. Gameplay numbers live in src/tuning.ts;
@@ -48,13 +61,61 @@ export function sliderToGain(slider01: number, floorDb = -60): number {
 // ---------------------------------------------------------------------------
 export const MIX = {
   masterDb: -1,
-  busDb: { music: -7, ambience: -13, sfx: -8.5, ui: -9 } as Record<BusName, number>,
+  // Measured, not guessed. With Music at -7 and SFX at -8.5 a hit cleared the bed by only 2.3 dB
+  // of 50 ms RMS in a three-enemy fight, so the swarm sat inside the music instead of over it.
+  // Music then went to -10, and the bed still won a second argument: rendered alone over the bed,
+  // half the one-shots in the game (a bolt fired across the room, a footstep, a stagger) moved the
+  // master RMS by less than 0.1 dB. The bed is continuous and the cues are 30 ms long, so the bed
+  // wins any tie. Music -12 with SFX -14 leaves the bed clearly present at p50 (-24 dBFS in the
+  // 108-event render) while the loudest 1% of the SFX bus sits 14 dB over it, and no bus reaches
+  // 0 dBFS in a wave-3 spawn burst, so the limiter stays the safety net it is meant to be.
+  busDb: { music: -12, ambience: -14, sfx: -14, ui: -11 } as Record<BusName, number>,
   // Safety net on Master, not a mixing tool. It should be nearly idle in a normal fight.
+  // The out trim owns the ceiling: it is what keeps a wave-3 spawn burst under -1 dBFS.
   // Chrome's DynamicsCompressor adds its own make-up gain, so a fixed trim after it owns the ceiling.
   limiter: { thresholdDb: -3, knee: 0, ratio: 20, attack: 0.003, release: 0.10 },
-  outTrimDb: -0.8,
-  // Ducks Music + Ambience only. The SFX that triggered the duck keeps its level.
-  duck: { depthDb: -11, attack: 0.012, release: 0.42 },
+  outTrimDb: -1.6,
+  // Ducks the BED only: its own gain stage in front of the Music and Ambience faders, fed by
+  // the looping bed voices and nothing else. So a duck cannot overwrite a volume slider, cannot
+  // recover to a stale level, does not touch the SFX that triggered it, and — the reason the
+  // stage sits in front of the fader rather than behind it — does not duck the struck bowls that
+  // ARE the wave-start stinger, which share the Music bus with the bed.
+  // Four callers, three depths (see `by`): -13 dB when the player is hit, -9 dB under a
+  // wave-start bowl, -6 dB for the length of an enemy wind-up or a spawn telegraph, so the tell
+  // is heard rather than shouted.
+  // `hold` is the time at full depth before the release starts. It is longer than the fastest
+  // re-trigger the game can produce, so a second duck arriving mid-gesture deepens it instead of
+  // catching the release halfway back up and pumping.
+  duck: {
+    depthDb: -11, attack: 0.012, hold: 0.12, release: 0.42,
+    // Who is allowed to make room, how much, and how long AFTER the event the room opens.
+    // Spread into duck() at the call site, so the printed table and the running game cannot
+    // drift apart. The wind-up duck is the shallow, short one: the tell has its own band
+    // (bedNotch) and only needs the bed to lean back, not to leave. Arbitration below means a
+    // wind-up arriving under a player-hurt duck is ignored rather than cutting the deeper
+    // gesture short.
+    //
+    // The third number is the delay, and it exists because a duck under a transient measured as
+    // a HOLE: the player-hurt duck used to start at the same instant as the hurt sound, so the
+    // 30 ms window that contains the blow contained the bed falling away too, and the damage
+    // moment came out 2.9 dB QUIETER than the bed it played over. Emphasis is the sound's job.
+    // The duck now opens 80 ms later — after the transient — so it lengthens the hit's tail
+    // instead of eating its front.
+    // [depthDb, release, delay]
+    by: {
+      playerHurt: [-13, 0.5, 0.08],
+      waveStart: [-9, 0.6, 0],
+      enemyWindup: [-6, 0.15, 0],
+      spawnTelegraph: [-6, 0.2, 0],
+    } as Record<string, readonly [number, number, number]>,
+  },
+  // Buses with a duck stage in front of the fader. The rest have no stage at all.
+  ducked: ['music', 'ambience'] as readonly BusName[],
+  // The danger tells own 2-4 kHz. A static peaking cut on the bed and the ambience legs -- behind
+  // the duck stage, in front of the fader, so it never touches a stinger or an SFX -- keeps that
+  // band free instead of making every wind-up fight for it. A permanent hole in one band the bed
+  // does not need costs the bed far less than a duck deep enough to be heard through it.
+  bedNotch: { hz: 2828, q: 1.4, db: -10 },
   // At most `max` starts of one sound group inside `window` seconds; the rest are dropped.
   voiceCap: { window: 0.07, max: 4 },
   // Space. Every sim event already carries (x, y); this is what turns it into a stereo image.
@@ -91,12 +152,67 @@ export const MIX = {
   },
 } as const
 
+/**
+ * Timbres for `bell`, as [frequency ratio, amplitude, decay scale]. `bowl` is the struck singing
+ * bowl that punctuates a wave. `plate` is denser and more metallic: a heavy blade being raised.
+ * `tone` is nearly pure, so a glide on it reads as one pitch rising rather than as a clang.
+ */
+const PARTIALS = {
+  bowl: [[1, 0.5, 1], [2.76, 0.28, 0.55], [5.40, 0.14, 0.3], [8.93, 0.08, 0.17]],
+  plate: [[1, 0.46, 1], [1.41, 0.30, 0.72], [2.09, 0.22, 0.46], [3.17, 0.13, 0.30], [4.51, 0.07, 0.20]],
+  tone: [[1, 0.62, 1], [1.50, 0.16, 0.75], [2.00, 0.09, 0.5], [3.01, 0.04, 0.35]],
+} as const satisfies Record<string, readonly (readonly [number, number, number])[]>
+
+export type BellTimbre = keyof typeof PARTIALS
+
+export interface BellOpts {
+  glideTo?: number       // bend the ring to this frequency by its end; omitted = a fixed pitch
+  partials?: BellTimbre
+  strike?: number        // 0..1 on the 8 ms strike noise; 0 for a pure tell, 1 for a struck bowl
+  x?: number             // place it in the room, like any one-shot
+  y?: number
+  cap?: string           // voice-cap group: four brutes winding up together is one tell, not four
+}
+
+/**
+ * The duck stage's scheduled gain over time, as numbers: `delay` seconds flat, then
+ * setTargetAtTime to `depth` with a one-third time constant, hold, then setTargetAtTime back to
+ * 1. `t` is measured from the EVENT, so a delayed duck shows its flat head — the window the
+ * transient gets to itself. This is the schedule the code writes, printed; duck-curves.json
+ * measures the same thing off a rendered signal.
+ */
+function duckCurve(depthDb: number, release: number, delay = 0): { t: number; gainMul: number; db: number }[] {
+  const d = dbToGain(depthDb), a = MIX.duck.attack / 3, r = release / 3
+  const holdEnd = MIX.duck.attack + MIX.duck.hold
+  const atHold = 1 + (d - 1) * (1 - Math.exp(-holdEnd / a))
+  return [0, 0.005, 0.012, 0.03, 0.06, 0.08, 0.085, 0.1, 0.132, 0.2, 0.3, 0.45, 0.6, 0.9, 1.4].map(t => {
+    const u = t - delay
+    const v = u <= 0 ? 1
+      : u <= holdEnd ? 1 + (d - 1) * (1 - Math.exp(-u / a))
+      : 1 + (atHold - 1) * Math.exp(-(u - holdEnd) / r)
+    return { t, gainMul: +v.toFixed(4), db: +(20 * Math.log10(v)).toFixed(2) }
+  })
+}
+
+/** Magnitude of the RBJ peaking biquad, in dB. Used only to print the notch as numbers. */
+function peakingDb(hz: number, eq: { hz: number; q: number; db: number }, sr: number): number {
+  const A = Math.pow(10, eq.db / 40), w0 = 2 * Math.PI * eq.hz / sr, al = Math.sin(w0) / (2 * eq.q), c = Math.cos(w0)
+  const b = [1 + al * A, -2 * c, 1 - al * A], a = [1 + al / A, -2 * c, 1 - al / A]
+  const w = 2 * Math.PI * hz / sr
+  const mag = (k: number[]) => Math.hypot(k[0] + k[1] * Math.cos(w) + k[2] * Math.cos(2 * w), -(k[1] * Math.sin(w) + k[2] * Math.sin(2 * w)))
+  return 20 * Math.log10(mag(b) / mag(a))
+}
+
 export class AudioSystem {
   ctx: BaseAudioContext | null = null
   master: GainNode | null = null
   limiter: DynamicsCompressorNode | null = null
   outTrim: GainNode | null = null
   bus: Record<BusName, GainNode> | null = null
+  /** Pre-fader duck stage for the bed legs. 1.0 when nothing is making room. */
+  duckStage: Partial<Record<BusName, GainNode>> = {}
+  /** The static 2-4 kHz cut that reserves the tell band, one per ducked bus. */
+  bedNotch: Partial<Record<BusName, BiquadFilterNode>> = {}
   /** Offline rendering only: added to ctx.currentTime so a whole fight can be scheduled ahead. */
   timeOffset = 0
 
@@ -108,6 +224,7 @@ export class AudioSystem {
   private starts = new Map<string, number[]>()
   private slots = new Map<string, number>()
   private duckUntil = 0
+  private duckDepth = 1        // linear multiplier the stage is scheduled to at this instant
   private listener = { x: 0, y: 0 }
 
   private bedBuffers: { ambience?: AudioBuffer; bed?: AudioBuffer; drive?: AudioBuffer } = {}
@@ -144,6 +261,7 @@ export class AudioSystem {
     if (!ctx && typeof AudioContext === 'undefined') return
     this.ctx = ctx ?? new AudioContext()
     this.buildGraph()
+    files = files.filter(f => !ANNOUNCER.has(f.replace('.ogg', '')))
     await Promise.all(files.map(async f => {
       try {
         const res = await fetch(base + f)
@@ -177,11 +295,26 @@ export class AudioSystem {
     this.outTrim = ctx.createGain()
     this.outTrim.gain.value = dbToGain(MIX.outTrimDb)
     this.master.connect(this.limiter); this.limiter.connect(this.outTrim); this.outTrim.connect(ctx.destination)
+    this.duckStage = {}; this.bedNotch = {}
     const mk = (b: BusName) => {
       const g = ctx.createGain()
       this.busLevel[b] = dbToGain(MIX.busDb[b])
       g.gain.value = this.busLevel[b]
       g.connect(this.master!)
+      if (MIX.ducked.includes(b)) {
+        const d = ctx.createGain()
+        d.gain.value = 1
+        const notch = ctx.createBiquadFilter()
+        notch.type = 'peaking'
+        notch.frequency.value = MIX.bedNotch.hz
+        notch.Q.value = MIX.bedNotch.q
+        notch.gain.value = MIX.bedNotch.db
+        // bed -> duck -> tell-band notch -> fader -> Master; stingers join at the fader,
+        // so they are neither ducked nor notched.
+        d.connect(notch); notch.connect(g)
+        this.duckStage[b] = d
+        this.bedNotch[b] = notch
+      }
       return g
     }
     this.bus = { music: mk('music'), ambience: mk('ambience'), sfx: mk('sfx'), ui: mk('ui') }
@@ -224,13 +357,33 @@ export class AudioSystem {
     return { pan, dist, gain: 1 / (1 + dist / S.distanceRef), itd: Math.abs(pan) / S.panLimit * S.itdMs / 1000 }
   }
 
+  /** The node a bus leaves through on its way to Master — a tap here measures the whole bus. */
+  busOut(b: BusName): GainNode | null { return this.bus?.[b] ?? null }
+
   /** The whole graph as numbers, for the mix report. */
   graph(): unknown {
     return {
       master: { db: MIX.masterDb, gain: +this.masterLevel().toFixed(4) },
       limiter: { ...MIX.limiter, outTrimDb: MIX.outTrimDb, outTrimGain: +dbToGain(MIX.outTrimDb).toFixed(4) },
       buses: (Object.keys(MIX.busDb) as BusName[]).map(b => ({ bus: b, db: MIX.busDb[b], gain: +dbToGain(MIX.busDb[b]).toFixed(4) })),
-      duck: { ...MIX.duck, targetGainMultiplier: +dbToGain(MIX.duck.depthDb).toFixed(4), applies: ['music', 'ambience'] },
+      duck: {
+        ...MIX.duck,
+        callers: Object.entries(MIX.duck.by).map(([event, [depthDb, release, delay]]) => ({
+          event, depthDb, release, delay,
+          gesture: +(delay + MIX.duck.attack + MIX.duck.hold + release).toFixed(3),
+          curve: duckCurve(depthDb, release, delay),
+        })),
+        targetGainMultiplier: +dbToGain(MIX.duck.depthDb).toFixed(4),
+        applies: [...MIX.ducked],
+        stage: 'own GainNode in front of the bus fader, fed by the bed loops only: bed -> duck -> fader -> Master. Stingers (the struck bowls) join at the fader and are never ducked.',
+        arbitration: 'deeper wins, longer extends; a weaker+shorter duck is ignored',
+      },
+      bedNotch: {
+        ...MIX.bedNotch,
+        stage: 'peaking biquad between the duck stage and the bus fader: it shapes the bed and the ambience only, never a stinger and never an SFX',
+        reserves: 'the danger tells (enemyWindup, spawnTelegraph) and the dodge sweep live in this band',
+        response: [500, 1000, 1500, 2000, 2828, 4000, 6000, 9000].map(hz => ({ hz, db: +peakingDb(hz, MIX.bedNotch, 48000).toFixed(2) })),
+      },
       bed: MIX.bed,
       space: {
         ...MIX.space,
@@ -299,13 +452,16 @@ export class AudioSystem {
     src.loop = !!o.loop
     src.playbackRate.value = o.pitch ?? 1
     const pos = o.x !== undefined && o.y !== undefined ? this.spatial(o.x, o.y) : null
-    const level = (o.gain ?? 1) * (pos ? pos.gain : 1)
+    // `flat` keeps the pan and the inter-channel delay but drops the distance law. Struck metal is
+    // the game's warning system, and a caster stands at the far wall: a tell that loses 8 dB to
+    // the room is a tell you answer late. Incidental Foley still falls off normally.
+    const level = (o.gain ?? 1) * (pos && !o.flat ? pos.gain : 1)
     const g = ctx.createGain()
     const t = this.now() + (o.delay ?? 0)
     const silent = !!o.startSilent || !!(o.fadeIn && o.fadeIn > 0)
     g.gain.setValueAtTime(silent ? 0.0001 : level, t)
     if (o.fadeIn && o.fadeIn > 0 && !o.startSilent) g.gain.setTargetAtTime(level, t, o.fadeIn / 3)
-    src.connect(g); this.route(g, pos, o.bus ?? 'sfx')
+    src.connect(g); this.route(g, pos, o.bus ?? 'sfx', !!o.ducked)
     src.start(t)
     const voice: Voice = {
       src, gain: g, level,
@@ -328,8 +484,8 @@ export class AudioSystem {
    * splitter's up-mix is discrete, so the gain node is forced to stereo first — otherwise a
    * mono clip would arrive with one silent side.
    */
-  private route(g: GainNode, pos: { pan: number; itd: number } | null, bus: BusName): void {
-    const target = this.bus![bus]
+  private route(g: GainNode, pos: { pan: number; itd: number } | null, bus: BusName, ducked = false): void {
+    const target = (ducked ? this.duckStage[bus] : undefined) ?? this.bus![bus]
     if (!pos || Math.abs(pos.pan) < MIX.space.panDeadzone) { g.connect(target); return }
     const ctx = this.ctx!
     const panner = ctx.createStereoPanner()
@@ -387,47 +543,100 @@ export class AudioSystem {
   }
 
   /**
-   * Struck bowl: inharmonic partials with staggered decays. This is the game's punctuation
-   * (wave start, room clear) and it replaces the fighting-game announcer. Music bus, so the
-   * music slider owns it.
+   * Struck metal. One generator, two jobs:
+   *  - the game's punctuation (wave start, room clear): a bowl on the Music bus. This is what
+   *    replaces the fighting-game announcer.
+   *  - the danger tell (enemy wind-up, spawn telegraph): a bright ring on the SFX bus, pitched
+   *    into the 2-4 kHz band the bed is notched out of, so the cue that says "this is about to
+   *    hurt" never has to shout over the bed to be heard.
+   * `glideTo` bends the ring over its length (a caster charging reads as a rising tone),
+   * `partials` picks the timbre, `strike` scales the 8 ms noise transient, `cap` groups the tell
+   * under the voice cap, and x/y place it in the room like any other one-shot.
    */
-  bell(gain = 0.5, hz = 523.25, decay = 1.6, bus: BusName = 'music', delay = 0): void {
+  bell(gain = 0.5, hz = 523.25, decay = 1.6, bus: BusName = 'music', delay = 0, o: BellOpts = {}): void {
     if (this._muted || !this.ctx || !this.bus) return
+    if (o.cap && !this.allow(o.cap)) return
     const ctx = this.ctx
     const sr = ctx.sampleRate
     const n = Math.floor(sr * (decay + 0.05))
     const buf = ctx.createBuffer(1, n, sr)
     const d = buf.getChannelData(0)
-    const partials: [number, number, number][] = [[1, 0.5, 1], [2.76, 0.28, 0.55], [5.40, 0.14, 0.3], [8.93, 0.08, 0.17]]
-    for (const [ratio, amp, dk] of partials) {
-      const w = 2 * Math.PI * hz * ratio / sr
+    const bend = o.glideTo ? Math.pow(o.glideTo / hz, 1 / n) : 1   // per-sample ratio: an exponential glide
+    for (const [ratio, amp, dk] of PARTIALS[o.partials ?? 'bowl']) {
       const tau = decay * dk
-      for (let i = 0; i < n; i++) d[i] += amp * Math.sin(w * i) * Math.exp(-(i / sr) / tau)
+      let phase = 0, f = hz * ratio
+      for (let i = 0; i < n; i++) {
+        d[i] += amp * Math.sin(phase) * Math.exp(-(i / sr) / tau)
+        phase += 2 * Math.PI * f / sr
+        f *= bend
+      }
     }
     // strike noise, 8 ms
-    const nAtk = Math.floor(sr * 0.008)
-    for (let i = 0; i < nAtk; i++) d[i] += (Math.random() * 2 - 1) * 0.25 * (1 - i / nAtk)
+    const nAtk = Math.floor(sr * 0.008), strike = 0.25 * (o.strike ?? 1)
+    for (let i = 0; i < nAtk; i++) d[i] += (Math.random() * 2 - 1) * strike * (1 - i / nAtk)
     let peak = 0
     for (let i = 0; i < n; i++) peak = Math.max(peak, Math.abs(d[i]))
     if (peak > 0) for (let i = 0; i < n; i++) d[i] = d[i] / peak * 0.9
-    this.start(buf, { gain, bus, delay })
+    this.start(buf, { gain, bus, delay, x: o.x, y: o.y, flat: true })
+  }
+
+  /**
+   * The body of a blow. A sine that falls from `fromHz` to `toHz` inside about 45 ms and rings
+   * out, with a few ms of contact noise on the front.
+   *
+   * It exists to own 60-150 Hz. The danger tells live at 2-4 kHz, every impact and most of the
+   * bed's energy live at 200-600 Hz, and the bed's own low end is a steady 55 Hz drone — so a
+   * transient here is heard as weight rather than as one more voice in the busiest band in the
+   * mix. This is what carries the damage moment: the emphasis belongs to the sound, not to the
+   * duck that follows it.
+   */
+  thump(gain = 0.8, fromHz = 190, toHz = 58, decay = 0.22, o: { x?: number; y?: number; click?: number; bendMs?: number } = {}): void {
+    if (this._muted || !this.ctx || !this.bus) return
+    const ctx = this.ctx, sr = ctx.sampleRate
+    const n = Math.floor(sr * (decay + 0.05))
+    const buf = ctx.createBuffer(1, n, sr)
+    const d = buf.getChannelData(0)
+    const bend = (o.bendMs ?? 45) / 1000
+    let phase = 0
+    for (let i = 0; i < n; i++) {
+      const t = i / sr
+      phase += 2 * Math.PI * (toHz + (fromHz - toHz) * Math.exp(-t / bend)) / sr
+      // 2 ms of attack ramp: a sine started at full level from zero phase is a click, not a hit
+      d[i] = Math.sin(phase) * Math.exp(-t / decay) * (1 - Math.exp(-t / 0.002))
+    }
+    const nAtk = Math.floor(sr * 0.012), click = 0.3 * (o.click ?? 1)
+    for (let i = 0; i < nAtk; i++) d[i] += (Math.random() * 2 - 1) * click * (1 - i / nAtk) ** 2
+    let peak = 0
+    for (let i = 0; i < n; i++) peak = Math.max(peak, Math.abs(d[i]))
+    if (peak > 0) for (let i = 0; i < n; i++) d[i] = d[i] / peak * 0.9
+    this.start(buf, { gain, bus: 'sfx', x: o.x, y: o.y, flat: true })
   }
 
   // -------------------------------------------------------------------------
   // Ducking: Music + Ambience only, absolute targets, never restacked.
   // -------------------------------------------------------------------------
-  duck(depthDb: number = MIX.duck.depthDb, release: number = MIX.duck.release): void {
-    if (!this.ctx || !this.bus) return
-    const t = this.now()
-    const end = t + MIX.duck.attack + release
-    if (end <= this.duckUntil) return   // a longer duck is already in flight; do not stack
-    this.duckUntil = end
-    const depth = dbToGain(depthDb)
-    for (const b of ['music', 'ambience'] as const) {
-      const g = this.bus[b].gain, level = this.busLevel[b]
+  duck(depthDb: number = MIX.duck.depthDb, release: number = MIX.duck.release, delay = 0): void {
+    if (!this.ctx) return
+    // `delay` moves the whole gesture later, transient first. Everything below — arbitration,
+    // hold, release — is measured from where the ramp actually starts, so a delayed duck cannot
+    // be cut short by an earlier immediate one and vice versa.
+    const t = this.now() + delay
+    if (t >= this.duckUntil) this.duckDepth = 1        // the last duck has fully released
+    // A deeper duck always wins and a longer one extends the hold. Comparing end times alone
+    // dropped the -13 dB player-hit duck whenever a shallower wave-start duck was still in
+    // flight, which is exactly the moment the music has to get out of the way.
+    const depth = Math.min(this.duckDepth, dbToGain(depthDb))
+    const end = t + MIX.duck.attack + MIX.duck.hold + release
+    if (end <= this.duckUntil && depth >= this.duckDepth) return
+    this.duckDepth = depth
+    this.duckUntil = Math.max(this.duckUntil, end)
+    const holdEnd = this.duckUntil - release
+    for (const b of MIX.ducked) {
+      const g = this.duckStage[b]?.gain
+      if (!g) continue
       g.cancelScheduledValues(t)
-      g.setTargetAtTime(level * depth, t, MIX.duck.attack / 3)
-      g.setTargetAtTime(level, t + MIX.duck.attack + 0.06, release / 3)
+      g.setTargetAtTime(depth, t, MIX.duck.attack / 3)
+      g.setTargetAtTime(1, holdEnd, release / 3)
     }
   }
 
@@ -485,10 +694,10 @@ export class AudioSystem {
     const B = MIX.bed
     // one shared start time: bed and drive stay sample-aligned forever
     const at = 0.05
-    this.bedVoices.ambience = this.start(this.bedBuffers.ambience, { gain: dbToGain(B.ambienceDb), bus: 'ambience', loop: true, fadeIn: 2, delay: at })
+    this.bedVoices.ambience = this.start(this.bedBuffers.ambience, { gain: dbToGain(B.ambienceDb), bus: 'ambience', loop: true, fadeIn: 2, delay: at, ducked: true })
     // both combat layers share one start time, so they stay sample-aligned forever
-    this.bedVoices.bed = this.start(this.bedBuffers.bed, { gain: dbToGain(B.bedDb), bus: 'music', loop: true, delay: at, startSilent: true })
-    this.bedVoices.drive = this.start(this.bedBuffers.drive, { gain: dbToGain(B.driveDb), bus: 'music', loop: true, delay: at, startSilent: true })
+    this.bedVoices.bed = this.start(this.bedBuffers.bed, { gain: dbToGain(B.bedDb), bus: 'music', loop: true, delay: at, startSilent: true, ducked: true })
+    this.bedVoices.drive = this.start(this.bedBuffers.drive, { gain: dbToGain(B.driveDb), bus: 'music', loop: true, delay: at, startSilent: true, ducked: true })
     this.combatOn = false; this.driveOn = false; this.driveApplied = false
   }
 

@@ -1,8 +1,9 @@
 import { ROOM_WAVES, startWaves, type WaveDef, type SpawnDef } from './waves'
 import { World } from './world'
 import { TILE } from './arena'
+import { grantBoon, type BoonId } from './boons'
 
-export interface Scenario { waves?: WaveDef[]; spawns?: SpawnDef[]; god?: boolean }
+export interface Scenario { waves?: WaveDef[]; spawns?: SpawnDef[]; god?: boolean; boon?: BoonId }
 
 export const SCENARIOS: Record<string, Scenario> = {
   empty: {},
@@ -15,6 +16,8 @@ export const SCENARIOS: Record<string, Scenario> = {
   wave3: { waves: [ROOM_WAVES[2]] },
   full: { waves: ROOM_WAVES },
   run: {},
+  shore: {},
+  blessed: { spawns: [{ kind: 'dummy', x: 13, y: 7 }, { kind: 'dummy', x: 9, y: 8 }, { kind: 'dummy', x: 17, y: 8 }], boon: 'cleave' },
 }
 
 export function createWorld(seed: number, scenarioName = 'full', opts: { god?: boolean } = {}): World {
@@ -22,6 +25,7 @@ export function createWorld(seed: number, scenarioName = 'full', opts: { god?: b
   const world = new World(seed, scenarioName)
   world.player.god = !!(opts.god ?? sc.god)
   if (sc.spawns) for (const s of sc.spawns) world.spawnEnemy(s.kind, s.x * TILE, s.y * TILE)
+  if (sc.boon) grantBoon(world, sc.boon)
   const roomWaves = world.rooms[world.roomIndex]?.waves
   if (roomWaves?.length) startWaves(world, roomWaves)
   else if (sc.waves) startWaves(world, sc.waves)

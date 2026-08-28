@@ -29,7 +29,22 @@ export const tuning = {
     maxSpeed: 95, accelTicks: 5, decelTicks: 4,
     hp: 5,
     hurtIFrames: 40, hurtKnockback: 12, hurtHitstop: 4,
-    dodge: { total: 18, distance: 44, iStart: 2, iEnd: 12, attackCancelFrom: 14, buffer: 8 },
+    // Launch, invulnerable traversal, landing — three readable phases in one state, and a price.
+    // Measured: the burst peaks at 191 px/s against a 95 px/s run, but the whole 24-tick cycle
+    // averages 94.8 px/s, so the roll is an escape and no longer a faster way to travel. It is
+    // untouchable for 10 of the cycle's 25 ticks (was 11 of 19), and the brake plus the whole landing are open,
+    // so a player who only rolls gets hit.
+    dodge: {
+      total: 24,            // whole dodge state: travel + landing recovery
+      travel: 13,           // ticks the roll's own momentum owns the body
+      distance: 32,         // px covered across those travel ticks
+      push: 0.55,           // speed scale on the launch tick: the shove off the back foot
+      brake: 5,             // closing travel ticks, decelerating to a dead stop
+      iStart: 1, iEnd: 10,  // i-frames: one honest tick of commitment, then the pass-through window
+      landMoveExp: 2.4,     // steering returns across the landing on u^exp — planted, then back on the feet
+      attackCancelFrom: 11, // the roll can be cut into a swing from here: the aggressive exit
+      buffer: 8,
+    },
     attack: {
       buffer: 8,
       steerRateDeg: 9,      // max deg/tick the swing angle may still be steered, during steerTicks only
@@ -52,6 +67,12 @@ export const tuning = {
   run: {
     doorHalfW: 22,        // px: the open door is three tiles wide
     doorEnterMaxY: 32,    // px: north wall-face row; overlapping it while the door is open enters
+    offeringRadius: 16,   // px: walk into the vessel to take it
+    offeringHp: 1,        // extra max life, and a heal of the same
+  },
+
+  boons: {
+    cleave: { radiusAdd: 8, arcAdd: 40, damageAdd: 1, smearAdd: 2 },
   },
 
   brute: {
@@ -109,7 +130,52 @@ export const tuning = {
     },
     // A successful i-frame dodge-through is the hardest input in the game. It is the only cold-coloured
     // feedback in the fight, so it can never be mistaken for a hit or for damage taken.
-    dodged: { flash: 0.16, tint: 0x9fd8ff, zoom: 1.035, trauma: 0.10, glowSec: 0.09, ghostAlpha: 0.55, sparks: 12 },
+    // It is drawn the way the contact stamp is and for the same reason: an authored whole-pixel mark
+    // on the FLOOR, under both fighters, plus a one-pixel rim on the player's own outline. Nothing is
+    // ever painted over a body, there is no screen-wide lift, and the brightest pixel in the frame
+    // lands ON the actor — the reward for the read has to show you the thing that made it.
+    dodged: {
+      tint: 0x9fd8ff, zoom: 1.035, trauma: 0.10,
+      stepSec: 0.016,           // one tier per tick, and strictly under 1/60 so no tier is ever held for two: no two frames of the mark are ever the same image
+      tiers: 4,
+      r0: 7, rStep: 5,          // the open ring's radius per tier. It expands and thins; it never fills.
+      ringDark: 0x121a2c,       // the dark stroke that lets a cold ring read on a lit floor
+      ringCore: 0xdff2ff, ringMid: 0x8fc4e8, ringFar: 0x486d94,
+      smearBack: 17, smearFront: 8, smearThick: 3,   // the bar along the roll axis: which way the read went
+      sparks: 6, sparkR: 12, sparkLen: 4,            // hard cold ticks on the floor, thrown clear of both bodies
+      rim: 0xffffff,            // ONE tick of full brightness on the player's silhouette...
+      rimTint: 0xa8dcff,        // ...then the cold tone, for the two ticks the mark takes to die
+      rimTicks: 3,
+    },
+    // The roll itself, which is not a reward and must never wear the cold colour: a dim indigo smear
+    // while the body is untouchable, the camera drifting with the commitment, weight on the landing.
+    roll: {
+      // The smear is an authored whole-pixel streak on the floor, like the contact crescent, not a
+      // stack of ghost sprites: at 16 px a ghost of the body reads as a second body. Its hot core
+      // burns only while the i-frames are live, so the frame you become touchable again is visible.
+      streakLen: 18,          // px of smear kept behind the body
+      streakCore: 0x9a8ad8, streakRim: 0x241a38,
+      streakAlpha: 0.78, streakFadeTicks: 3,
+      lean: 1.8,              // px the camera drifts along the roll while the body is committed
+      landTrauma: 0.05, landDust: 5, launchDust: 6,
+      // The roll's own animation table. Each row owns dodge-state ticks from `tick` up to the next
+      // row: an authored 16 px pose (drawn in src/render/views/player.ts, not a transform of the
+      // standing sprite), how far that pose leans into the travel, and how close to the floor it
+      // sits. `key: ''` hands the body back to the standing sprite. Ticks are dodge-state ticks, so
+      // these move with `player.dodge.travel`/`total` — launch, dive, the two tuck halves that show
+      // the body actually turning over, the extend into the brake, the plant, and the rise.
+      pose: [
+        { tick: 0, key: 'launch', leanDeg: 9, hop: 0 },
+        { tick: 1, key: 'dive', leanDeg: 17, hop: 1 },
+        { tick: 2, key: 'tuckA', leanDeg: 6, hop: -1 },
+        { tick: 5, key: 'tuckB', leanDeg: -7, hop: -1 },
+        { tick: 8, key: 'extend', leanDeg: 10, hop: 0 },
+        { tick: 11, key: 'plant', leanDeg: 4, hop: 0 },
+        { tick: 14, key: 'absorb', leanDeg: 2, hop: 0 },
+        { tick: 17, key: 'rise', leanDeg: 1, hop: 0 },
+        { tick: 21, key: '', leanDeg: 0, hop: 0 },
+      ] as { tick: number; key: string; leanDeg: number; hop: number }[],
+    },
     // Poise break. Only the heavy breaks a brute, so only that one earns the camera.
     stagger: { trauma: 0.10, bruteTrauma: 0.26, bruteZoom: 1.02, bruteFlash: 0.10 },
     // the greatsword's own feedback chain: the wind-up pulls the camera back, contact shoves it through

@@ -18,8 +18,10 @@ import { decodeReplay, isEncodedReplay, quantizeFrame, replayToJson, type Replay
 import { Recorder } from '@/input/recorder'
 import { tuning } from '@/tuning'
 import { Text } from 'pixi.js'
-import { loadMeta, loadSettings, saveMeta, saveSettings } from '@/sim/storage'
 import { defaultMetaState, type MetaStateV1 } from '@/sim/session'
+import { bumpRevision, serializeSave, parseSave, type BardoSave } from '@/sim/save'
+import { detectPlatform, PROFILE_ID } from '@/platform'
+import { loadSave, saveFilename } from '@/platform/saveFile'
 
 async function boot() {
   const q = new URLSearchParams(location.search)
@@ -48,11 +50,17 @@ async function boot() {
   audio.muted = mute
   audio.load(manifest.audio) // not awaited: the game starts silent-then-sound rather than waiting
 
-  const browserStorage = typeof localStorage === 'undefined' ? undefined : localStorage
-  const preferredReducedEffects = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches
-  const storedSettings = loadSettings(browserStorage, preferredReducedEffects)
-  let reducedEffects = q.has('reduced') ? q.get('reduced') !== '0' : storedSettings.reducedEffects
-  let world: World = createWorld(seed, scenario, { god, ...(scenario === 'loop' ? { meta: loadMeta(browserStorage) } : {}) })
+  const platform = detectPlatform()
+  const loaded = await loadSave(platform.saves, PROFILE_ID, { preferredReducedEffects: platform.prefersReducedMotion() })
+  // The authoritative save document. Held here rather than read back out of the world at write time:
+  // the envelope carries meta AND settings, and a non-`loop` world's session.meta is the zeroed
+  // default, so composing a write from it would wipe real progress the moment V is pressed.
+  let savedSave: BardoSave = loaded.save
+  const savable = loaded.writable
+  if (loaded.source === 'backup') console.log('[save] the live save was unreadable; recovered from the backup copy')
+  if (!savable) console.log('[save] this save was written by a newer build; it will not be overwritten')
+  let reducedEffects = q.has('reduced') ? q.get('reduced') !== '0' : savedSave.settings.reducedEffects
+  let world: World = createWorld(seed, scenario, { god, ...(scenario === 'loop' ? { meta: savedSave.meta } : {}) })
   let userPaused = false
   let metrics = new Metrics()
   const presenter = new Presenter(ra, atlas, world)
@@ -83,6 +91,13 @@ async function boot() {
     presenter.handleEvents([{ type: 'restart' }])
   }
 
+  // One write path for the whole envelope. Refused outright for a save from a newer build.
+  const persist = () => {
+    if (!savable) return
+    savedSave = bumpRevision({ ...savedSave, settings: { version: 1, reducedEffects } })
+    void platform.saves.write(PROFILE_ID, serializeSave(savedSave))
+  }
+
   const tick = () => {
     // always sample live input, even when a bot or replay drives the sim, so latched presses do not pile up
     const live = input.sample(world)
@@ -96,7 +111,10 @@ async function boot() {
     metrics.consume(world, world.events)
     presenter.handleEvents(world.events)
     if (world.scenario === 'loop' && world.events.some(ev => ev.type === 'runStarted' || ev.type === 'runWon' || ev.type === 'returned')) {
-      saveMeta(world.session.meta, browserStorage)
+      // An explicit copy: reset() builds a NEW meta object, so holding the live one would leave this
+      // pointing at a dead object and persist stale counters.
+      savedSave = { ...savedSave, meta: { ...world.session.meta, unlockedWeapons: [...world.session.meta.unlockedWeapons] } }
+      persist()
     }
     world.events.length = 0
     if (world.wantsRestart) {
@@ -160,32 +178,51 @@ async function boot() {
     download: name => { if (recorder.recording) stopRecord(); recorder.download(name) },
   })
 
-  // Fullscreen is the only lever that actually enlarges the stage. The target is drawn at an INTEGER
-  // scale in physical pixels, so the room's size on screen steps rather than slides: a 713px-tall
-  // viewport caps it at 5, and 6 needs 810 (270 * 6 / dpr 2). Fullscreen buys exactly that, which is
-  // a 20% larger room, and it costs nothing in crispness because the scale stays a whole number.
-  // Re-running resize() after the change lets the view re-fit to the new aspect.
-  const toggleFullscreen = async () => {
-    try {
-      if (document.fullscreenElement) await document.exitFullscreen()
-      else await document.documentElement.requestFullscreen({ navigationUI: 'hide' })
-    } catch { /* the browser refused; nothing to recover, the game keeps running windowed */ }
-  }
+  // Re-running resize() after a fullscreen change lets the view re-fit to the new aspect. The
+  // fullscreen call itself lives in src/platform (it is the host's job); this is the renderer's.
   document.addEventListener('fullscreenchange', () => ra.resize())
+
+  const exportSave = () => {
+    void platform.exportFile(serializeSave(savedSave), saveFilename(new Date()))
+    presenter.hud.showBanner('SAVE EXPORTED', 'CHECK YOUR DOWNLOADS', 2.0)
+  }
+  const importSave = async () => {
+    const text = await platform.importFile()
+    if (text === null) return
+    const parsed = parseSave(text, { profileId: PROFILE_ID })
+    if (parsed.kind === 'corrupt') { presenter.hud.showBanner('SAVE NOT READ', 'that file is not a bardo save', 2.2); return }
+    if (parsed.kind === 'future') { presenter.hud.showBanner('SAVE NOT READ', 'it came from a newer build', 2.2); return }
+    // A live run holds sim state no import can reconcile; refuse rather than half-apply it.
+    if (world.session.run) { presenter.hud.showBanner('A RUN IS UNDERWAY', 'return to the bardo first', 2.2); return }
+    savedSave = parsed.save
+    reducedEffects = savedSave.settings.reducedEffects
+    presenter.setReducedEffects(reducedEffects)
+    persist()
+    userPaused = false; loop.paused = false
+    // reset() rebuilds the world with the imported meta and rebinds the presenter. Deliberately not a
+    // reload: that would drop ?bot=/?seed=, destroy window.__game mid-evaluate and break an attached
+    // Playwright page.
+    if (world.scenario === 'loop') reset(cur.seed, cur.scenario, { god: cur.god, meta: savedSave.meta })
+    presenter.hud.showBanner('SAVE IMPORTED', `${savedSave.meta.attempts} ATTEMPTS · ${savedSave.meta.victories} VICTORIES`, 2.2)
+  }
 
   window.addEventListener('keydown', e => {
     if ((e.code === 'Escape' || e.code === 'KeyP') && !e.repeat) { e.preventDefault(); userPaused = !userPaused; loop.paused = userPaused }
     if (e.code === 'KeyV' && !e.repeat) {
       reducedEffects = !reducedEffects
       presenter.setReducedEffects(reducedEffects)
-      saveSettings({ version: 1, reducedEffects }, browserStorage)
+      persist()
     }
     if (e.code === 'F1') { e.preventDefault(); overlay.toggle() }
     if (e.code === 'F2') { e.preventDefault(); record() }
     if (e.code === 'F3') { e.preventDefault(); if (recorder.recording) stopRecord(); recorder.download() }
-    if (e.code === 'KeyF' && !e.repeat) { e.preventDefault(); void toggleFullscreen() }
+    if (e.code === 'KeyF' && !e.repeat) { e.preventDefault(); void platform.fullscreen() }
+    // Save management is reachable only from the pause screen, so it can never fire mid-fight.
+    if (userPaused && e.code === 'KeyE' && !e.repeat) { e.preventDefault(); exportSave() }
+    if (userPaused && e.code === 'KeyI' && !e.repeat) { e.preventDefault(); void importSave() }
   })
   loop.start()
+  platform.persistHint()   // after first paint: a permission prompt must never land on a black screen
   if (scenario === 'run') presenter.hud.showBanner(world.roomName, 'clear the room', 1.8)
   else if (scenario === 'loop') presenter.hud.showBanner(world.roomName, '', 1.5)
   else if (scenario === 'full' || scenario === 'empty') presenter.hud.showBanner('THE THRESHOLD', '', 1.5)

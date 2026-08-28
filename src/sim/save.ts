@@ -8,7 +8,7 @@
 // Two rules that protect real players' progress:
 //   - a save from a NEWER build is readable but never writable (see parseSave -> kind 'future');
 //     overwriting it with the fields this build understands would silently destroy the rest.
-//   - the two pre-envelope localStorage keys are read (see migrateLegacySave) and never deleted, so
+//   - the two pre-envelope browser keys are read (see migrateLegacySave) and never deleted, so
 //     a rollback to an older build still finds a player's attempts and victories where it left them.
 import { defaultMetaState, type MetaStateV1 } from './session'
 import { ARM, type ArmId } from './weapons'

@@ -65,11 +65,17 @@ function callScales(world: World, e: Enemy): void {
 }
 
 // The verdict: a stream of bolts that rotates through an arc, so the lane it denies moves while it
-// fires. `targetX` counts the bolts already spoken.
-function speakVerdict(world: World, e: Enemy): void {
+// fires. The index is derived from the attack clock rather than counted into a field: `targetX`,
+// the obvious place to put a counter, is owned by the caster as "the id of the bolt I loosed" and is
+// scanned across EVERY enemy when a bolt is cut (player.ts punishBoltOwner). Borrowing it here would
+// have let a cut bolt whose id happened to match the counter drag Minos across the room.
+function verdictBolts(e: Enemy): number {
+  return e.phase ? tuning.warden.sweep.bolts2 : tuning.warden.sweep.bolts
+}
+
+function speakVerdict(world: World, e: Enemy, i: number): void {
   const V = tuning.warden.sweep
-  const total = e.phase ? V.bolts2 : V.bolts
-  const i = e.targetX
+  const total = verdictBolts(e)
   if (i >= total) return
   const span = (V.arcDeg * Math.PI) / 180
   // Sweeps from one edge to the other, and alternates its direction per cast so the same answer
@@ -81,7 +87,6 @@ function speakVerdict(world: World, e: Enemy): void {
   const oy = e.y + Math.sin(a) * (e.radius + 4)
   const bolt = world.fireProjectile(ox, oy, a, V.speed, tuning.warden.boltRadius, tuning.warden.boltLife, 0, tuning.warden.boltDamage, 0, 'bolt', e.kind)
   if (bolt) world.emit({ type: 'boltFired', x: ox, y: oy, angle: a })
-  e.targetX = i + 1
 }
 
 // Which case he hears next. Range decides first — the verdict is a lane and needs room to be one —
@@ -119,7 +124,6 @@ export function updateWarden(world: World, e: Enemy): void {
           e.aimAngle = angleToPlayer(world, e)
           e.hitDone = false
           e.dashTicks = 0
-          e.targetX = 0
           world.emit({ type: 'enemyWindup', id: e.id, kind: 'warden', x: e.x, y: e.y })
         }
       }
@@ -139,9 +143,11 @@ export function updateWarden(world: World, e: Enemy): void {
       e.vx = 0; e.vy = 0
       if (e.attackId === ATTACK.verdict) {
         const V = W.sweep
-        const total = e.phase ? V.bolts2 : V.bolts
-        if (e.stateTick % V.interval === 0) speakVerdict(world, e)
-        if (e.targetX >= total) {
+        const total = verdictBolts(e)
+        // Bolt n is spoken on tick n*interval, so the clock alone says how many have been spoken.
+        if (e.stateTick > 0 && e.stateTick % V.interval === 0) speakVerdict(world, e, e.stateTick / V.interval - 1)
+        const spoken = Math.floor(e.stateTick / V.interval)
+        if (spoken >= total) {
           // Phase two answers its own verdict with a ring: the lane you escaped into is the one that
           // closes. This is the recombination, not a faster sweep.
           if (e.phase && !e.dashTicks) { looseRing(world, e); e.dashTicks = 1 }

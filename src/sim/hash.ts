@@ -86,6 +86,7 @@ export function hashWorld(world: World): number {
     if (e.phase) byte(e.phase)
     if (e.attackId) byte(e.attackId)
     if (e.brand) { byte(e.brand); int(e.brandTicks) }
+    if (e.burn) { byte(e.burn); int(e.burnTicks); int(e.burnAcc) }
   }
 
   let bolts = 0

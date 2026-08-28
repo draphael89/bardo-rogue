@@ -1021,3 +1021,41 @@ describe('the Oath-Bound Hoplite', () => {
     expect(e.hp).toBe(hp0 - 1)
   })
 })
+
+// Two bugs an adversarial review caught in the boss and status work. Both were silent: one made a
+// replay able to diverge with nothing failing, the other cross-wired two enemies through a shared
+// scratch field. They get regression tests because neither would have announced itself.
+describe('regressions', () => {
+  it('hashes fire: two worlds that differ only in who is burning are not the same world', () => {
+    const a = createWorld(1, 'empty')
+    const b = createWorld(1, 'empty')
+    stepWorld(a, emptyInput()); stepWorld(b, emptyInput())
+    const ea = a.spawnEnemy('brute', 200, 120)!
+    const eb = b.spawnEnemy('brute', 200, 120)!
+    expect(hashWorld(a)).toBe(hashWorld(b))
+    applyBurn(a, ea, 2)
+    expect(hashWorld(a)).not.toBe(hashWorld(b))
+    applyBurn(b, eb, 2)
+    expect(hashWorld(a)).toBe(hashWorld(b))
+  })
+
+  it('does not let a cut bolt drag Minos across the room', () => {
+    // `targetX` means "the id of the bolt I loosed" and is scanned across EVERY enemy when a bolt is
+    // cut. A boss that stored a bolt COUNTER there could be matched by a caster's projectile id.
+    const w = createWorld(1, 'empty')
+    stepWorld(w, emptyInput())
+    const minos = w.spawnEnemy('warden', w.player.x, w.player.y - 150)!
+    minos.attackId = ATTACK.verdict
+    minos.state = 'windup'; minos.stateTick = 0
+    minos.aimAngle = Math.atan2(w.player.y - minos.y, w.player.x - minos.x)
+    for (let i = 0; i < 200; i++) {
+      stepWorld(w, emptyInput())
+      w.events.length = 0
+      if (w.projectiles.filter(b => b.active).length >= 3) break
+    }
+    // Whatever he is doing, he must not be carrying a value that looks like a projectile id.
+    const liveIds = w.projectiles.filter(b => b.active).map(b => b.id)
+    expect(liveIds.length).toBeGreaterThan(0)
+    expect(liveIds).not.toContain(minos.targetX)
+  })
+})

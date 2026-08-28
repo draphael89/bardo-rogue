@@ -11,10 +11,12 @@ The tiny indexed production sheets are deterministic derivatives:
 
 ```sh
 node tools/process-sprite-sheet.mjs art/source/bardo_hero_alpha_v1.png public/assets/sprites/bardo_hero.png --cols 4 --rows 4 --cell 32 --colors 16 --report art/source/bardo_hero.metrics.json
-node tools/process-sprite-sheet.mjs art/source/bardo_brute_alpha_v1.png public/assets/sprites/bardo_brute.png --cols 4 --rows 2 --cell 48 --colors 16 --midtone-floor 90 --report art/source/bardo_brute.metrics.json
+node tools/process-sprite-sheet.mjs art/source/bardo_brute_alpha_v1.png public/assets/sprites/bardo_brute.png --cols 4 --rows 2 --cell 48 --colors 16 --fit pose --margin 2 --midtone-floor 90 --report art/source/bardo_brute.metrics.json
 ```
 
-The processor independently downsamples every cell with nearest-neighbor sampling, removes residual
+The Brute uses pose fitting because its square generated sheet has tall 4x2 grid cells; cropping each
+silhouette before fitting preserves its aspect ratio. The processor otherwise downsamples every cell
+with nearest-neighbor sampling, removes residual
 green spill, forces binary alpha, and quantizes the entire atlas to a shared palette. The retained JSON
 reports are inspection metadata and are outside the shipped `public/` tree.
 

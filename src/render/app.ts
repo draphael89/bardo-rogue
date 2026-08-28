@@ -57,8 +57,8 @@ export async function createRenderApp(parent: HTMLElement, arenaPx: { w: number;
     projectiles: new Container(), entities: new Container(), fx: new Container(), light: new Container(), debug: new Container(), hud: new Container(),
   }
   layers.entities.sortableChildren = true
-  // Threat geometry stays visible but cannot erase the actor traversing it. Air/contact FX still
-  // live above entities; projectile bodies live on their own floor-adjacent plane.
+  // Physical arrows stay below actors so they cannot erase a traversal silhouette. Hostile caster
+  // bolts retain their calibrated above-light FX plane and fade locally during a dodge overlap.
   world.addChild(layers.floor, layers.decals, layers.shadows, layers.projectiles, layers.entities, layers.light, layers.fx, layers.debug)
   root.addChild(world, layers.hud)
 

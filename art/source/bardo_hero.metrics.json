@@ -14,7 +14,9 @@
     "colors": 15,
     "partialAlpha": 0,
     "shadowLift": 0,
-    "midtoneFloor": 0
+    "midtoneFloor": 0,
+    "fit": "grid",
+    "margin": 2
   },
   "pass": true,
   "frames": [

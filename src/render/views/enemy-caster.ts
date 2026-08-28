@@ -239,6 +239,12 @@ export class BoltView {
     for (let i = 0; i < ECHOES; i++) { this.hx.push(0); this.hy.push(0) }
     parent.addChild(this.glowG, this.g)
   }
+  setActorOccluded(on: boolean): void {
+    // Never delete the threat at the exact skill check; one flat alpha step lets the authored body
+    // win the overlap while the core, heading, and cut target remain visible above the lightmap.
+    this.g.alpha = on ? 0.28 : 1
+    this.glowG.alpha = on ? 0.18 : 1
+  }
   // one additive pixel, at most once per frame per pixel (see the stamp note above)
   private addPix(gg: Graphics, px: number, py: number, alpha: number, color = COL_BOLT_GLOW): void {
     const li = (py - this.scy + ST_CY) * ST_W + (px - this.scx + ST_CX)

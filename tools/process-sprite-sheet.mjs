@@ -1,7 +1,7 @@
 // Turn an image-generated chroma-key sheet into a deterministic logical pixel atlas.
 //
 // Usage:
-//   node tools/process-sprite-sheet.mjs input.png output.png [--cols 4 --rows 4 --cell 32 --colors 16 --shadow-lift 0 --midtone-floor 0]
+//   node tools/process-sprite-sheet.mjs input.png output.png [--cols 4 --rows 4 --cell 32 --colors 16 --fit grid|pose --margin 2]
 //
 // The source may be any resolution. Each grid cell is sampled independently with nearest-neighbor,
 // alpha is made binary, green spill is discarded, and the complete sheet is quantized once so every
@@ -22,11 +22,15 @@ const colors = +(pairs.colors ?? 16)
 const shadowLift = +(pairs['shadow-lift'] ?? 0)
 const midtoneFloor = +(pairs['midtone-floor'] ?? 0)
 const reportPath = pairs.report ?? `${output}.json`
+const fit = pairs.fit ?? 'grid'
+const margin = +(pairs.margin ?? 2)
 if (![cols, rows, cell, colors].every(Number.isInteger) || cols < 1 || rows < 1 || cell < 1 || colors < 2 || colors > 256) {
   throw new Error('cols, rows, cell, and colors must be positive integers; colors must be 2..256')
 }
 if (!Number.isFinite(shadowLift) || shadowLift < 0 || shadowLift > 1) throw new Error('shadow-lift must be in 0..1')
 if (!Number.isInteger(midtoneFloor) || midtoneFloor < 0 || midtoneFloor > 200) throw new Error('midtone-floor must be an integer in 0..200')
+if (fit !== 'grid' && fit !== 'pose') throw new Error('fit must be grid or pose')
+if (!Number.isInteger(margin) || margin < 0 || margin * 2 >= cell) throw new Error('margin must leave at least one output pixel')
 
 const source = sharp(input).ensureAlpha()
 const meta = await source.metadata()
@@ -42,12 +46,40 @@ for (let row = 0; row < rows; row++) {
     const right = Math.round((col + 1) * meta.width / cols)
     const top = Math.round(row * meta.height / rows)
     const bottom = Math.round((row + 1) * meta.height / rows)
-    const { data } = await sharp(input)
+    const extracted = await sharp(input)
       .ensureAlpha()
       .extract({ left, top, width: right - left, height: bottom - top })
-      .resize(cell, cell, { fit: 'fill', kernel: 'nearest' })
       .raw()
       .toBuffer({ resolveWithObject: true })
+    let data = extracted.data
+    if (fit === 'pose') {
+      // Generated sheets are often square regardless of grid shape: a 4x2 sheet therefore has
+      // cells twice as tall as they are wide. Find the actual alpha silhouette, crop it, then fit it
+      // into a square logical cell so a 48px Brute is not vertically compressed by `fit: fill`.
+      let minX = extracted.info.width, minY = extracted.info.height, maxX = -1, maxY = -1
+      for (let sy = 0; sy < extracted.info.height; sy++) for (let sx = 0; sx < extracted.info.width; sx++) {
+        const si = (sy * extracted.info.width + sx) * 4
+        const r = data[si], g = data[si + 1], b = data[si + 2], a = data[si + 3]
+        if (a < 128 || (g > r + 48 && g > b + 48)) continue
+        minX = Math.min(minX, sx); minY = Math.min(minY, sy); maxX = Math.max(maxX, sx); maxY = Math.max(maxY, sy)
+      }
+      if (maxX < minX || maxY < minY) throw new Error(`cell ${row * cols + col} has no opaque pose`)
+      const available = cell - margin * 2
+      const fitted = await sharp(data, { raw: { width: extracted.info.width, height: extracted.info.height, channels: 4 } })
+        .extract({ left: minX, top: minY, width: maxX - minX + 1, height: maxY - minY + 1 })
+        .resize(available, available, { fit: 'contain', position: 'south', background: { r: 0, g: 0, b: 0, alpha: 0 }, kernel: 'nearest' })
+        .raw()
+        .toBuffer()
+      data = Buffer.alloc(cell * cell * 4)
+      for (let y = 0; y < available; y++) {
+        fitted.copy(data, ((y + margin) * cell + margin) * 4, y * available * 4, (y + 1) * available * 4)
+      }
+    } else {
+      data = (await sharp(data, { raw: { width: extracted.info.width, height: extracted.info.height, channels: 4 } })
+        .resize(cell, cell, { fit: 'fill', kernel: 'nearest' })
+        .raw()
+        .toBuffer())
+    }
 
     for (let y = 0; y < cell; y++) for (let x = 0; x < cell; x++) {
       const si = (y * cell + x) * 4
@@ -113,7 +145,7 @@ for (let row = 0; row < rows; row++) for (let col = 0; col < cols; col++) {
 const report = {
   input, output,
   source: { width: meta.width, height: meta.height },
-  atlas: { cols, rows, cell, width, height, colors: palette.size, partialAlpha, shadowLift, midtoneFloor },
+  atlas: { cols, rows, cell, width, height, colors: palette.size, partialAlpha, shadowLift, midtoneFloor, fit, margin },
   pass: palette.size <= colors && partialAlpha === 0 && frames.every(f => f.opaque > 0 && f.colors <= colors),
   frames,
 }

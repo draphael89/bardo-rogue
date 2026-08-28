@@ -14,96 +14,98 @@
     "colors": 15,
     "partialAlpha": 0,
     "shadowLift": 0,
-    "midtoneFloor": 90
+    "midtoneFloor": 90,
+    "fit": "pose",
+    "margin": 2
   },
   "pass": true,
   "frames": [
     {
       "index": 0,
-      "opaque": 541,
+      "opaque": 1230,
       "colors": 15,
       "bounds": {
-        "x": 7,
-        "y": 22,
-        "w": 41,
-        "h": 20
+        "x": 2,
+        "y": 3,
+        "w": 44,
+        "h": 43
       }
     },
     {
       "index": 1,
-      "opaque": 488,
+      "opaque": 925,
       "colors": 15,
       "bounds": {
-        "x": 0,
-        "y": 22,
-        "w": 45,
-        "h": 20
+        "x": 2,
+        "y": 7,
+        "w": 44,
+        "h": 39
       }
     },
     {
       "index": 2,
-      "opaque": 562,
+      "opaque": 655,
       "colors": 15,
       "bounds": {
-        "x": 7,
-        "y": 13,
-        "w": 38,
-        "h": 29
+        "x": 9,
+        "y": 2,
+        "w": 29,
+        "h": 44
       }
     },
     {
       "index": 3,
-      "opaque": 612,
+      "opaque": 589,
       "colors": 15,
       "bounds": {
-        "x": 8,
-        "y": 10,
-        "w": 34,
-        "h": 32
+        "x": 12,
+        "y": 2,
+        "w": 24,
+        "h": 44
       }
     },
     {
       "index": 4,
-      "opaque": 485,
+      "opaque": 871,
       "colors": 15,
       "bounds": {
         "x": 2,
-        "y": 14,
-        "w": 46,
-        "h": 18
+        "y": 12,
+        "w": 44,
+        "h": 34
       }
     },
     {
       "index": 5,
-      "opaque": 440,
+      "opaque": 749,
       "colors": 15,
       "bounds": {
-        "x": 0,
+        "x": 2,
         "y": 17,
-        "w": 48,
-        "h": 16
+        "w": 44,
+        "h": 29
       }
     },
     {
       "index": 6,
-      "opaque": 445,
+      "opaque": 1061,
       "colors": 15,
       "bounds": {
-        "x": 0,
-        "y": 13,
-        "w": 41,
-        "h": 20
+        "x": 2,
+        "y": 4,
+        "w": 44,
+        "h": 42
       }
     },
     {
       "index": 7,
-      "opaque": 494,
+      "opaque": 885,
       "colors": 15,
       "bounds": {
-        "x": 1,
-        "y": 13,
-        "w": 47,
-        "h": 19
+        "x": 2,
+        "y": 11,
+        "w": 44,
+        "h": 35
       }
     }
   ]

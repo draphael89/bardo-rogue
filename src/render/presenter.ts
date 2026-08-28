@@ -679,7 +679,7 @@ export class Presenter {
       // The authored Brute hit frame carries the reaction in its body drawing. Whitening it here
       // would turn the victim into the impact core for most of hit-stop and erase attribution.
       v.setFlash(hf > 0 && e.kind !== 'brute')
-      if (id === this.impactId && (v.squash > 0 || v.redFlash > 0)) this.flinchBody(v)
+      if (v.squash > 0 || v.redFlash > 0) this.flinchBody(v)
     }
     for (const b of w.projectiles) {
       if (!b.active) continue
@@ -689,12 +689,20 @@ export class Presenter {
         if (!this.mirrorViews.has(b.id)) this.mirrorViews.set(b.id, new MirrorBoltView(L.fx))
       } else if (b.kind === 'echo') {
         if (!this.echoViews.has(b.id)) this.echoViews.set(b.id, new EchoView(L.fx))
-      } else if (!this.boltViews.has(b.id)) this.boltViews.set(b.id, new BoltView(this.atlas, L.projectiles))
+      } else if (!this.boltViews.has(b.id)) this.boltViews.set(b.id, new BoltView(this.atlas, L.fx))
     }
     for (const [id, v] of this.boltViews) {
       const b = w.projectiles.find(x => x.id === id && x.active && x.kind === 'bolt')
       if (!b) { v.destroy(); this.boltViews.delete(id); continue }
-      v.update(lerp(b.px, b.x, slowAlpha), lerp(b.py, b.y, slowAlpha), this.time)
+      const bx = lerp(b.px, b.x, slowAlpha), by = lerp(b.py, b.y, slowAlpha)
+      const px = lerp(p.px, p.x, slowAlpha), py = lerp(p.py, p.y, slowAlpha)
+      v.update(bx, by, this.time)
+      // The bolt remains emissive above the lightmap, but yields value locally while the player is
+      // actually traversing it. This preserves both the calibrated threat and the dodge silhouette.
+      // The authored roll reaches roughly 16px from its simulation centre, so use that visual bound
+      // instead of the smaller collision radius; otherwise the core brightens while it still covers
+      // the final tucked frames of a successful traversal.
+      v.setActorOccluded(p.state === 'dodge' && Math.hypot(bx - px, by - py) < p.radius + b.radius + 16)
       this.stampTrail(v, b, dtSec, tuning.juice.trail.boltPx, (x, y) => this.particles.boltTrail(x, y))
     }
     for (const [id, v] of this.arrowViews) {

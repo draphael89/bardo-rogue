@@ -19,7 +19,7 @@ const HERO = {
   idle: 0, runA: 1, runB: 2, hurt: 3,
   light1Start: 4, light1Contact: 5, light1Recover: 6,
   light2Start: 7, light2Contact: 8, light2Recover: 9,
-  heavyStart: 10, heavyContact: 11,
+  heavyStart: 10, heavyContact: 11, heavyRecover: 10,
   dodgeStart: 12, dodgeTravel: 13, dodgeLand: 14, dead: 15,
 } as const
 
@@ -29,6 +29,8 @@ const HERO = {
 const HERO_PIVOT_Y = [28, 28, 28, 28, 26, 26, 32, 26, 25, 25, 25, 25, 21, 14, 21, 23] as const
 type PlayerArt = { stock: Texture; stockWhite: Texture; hero: Texture[]; heroWhite: Texture[] }
 const playerArt = new WeakMap<EntityView, PlayerArt>()
+type ClipSelection = { key: string; authored: boolean; stateTick: number }
+const clipSelection = new WeakMap<EntityView, ClipSelection>()
 
 function heroFrame(p: Player, world: World, time: number): number {
   if (p.state === 'dead') return HERO.dead
@@ -39,7 +41,30 @@ function heroFrame(p: Player, world: World, time: number): number {
   const s = tuning.player.attack.swings[p.swingIndex]
   if (p.swingIndex === 0) return p.stateTick < s.startup ? HERO.light1Start : p.stateTick < s.startup + s.active ? HERO.light1Contact : HERO.light1Recover
   if (p.swingIndex === 1) return p.stateTick < s.startup ? HERO.light2Start : p.stateTick < s.startup + s.active ? HERO.light2Contact : HERO.light2Recover
-  return p.stateTick < s.startup ? HERO.heavyStart : p.stateTick < s.startup + s.active ? HERO.heavyContact : HERO.light2Recover
+  // The first sheet deliberately bookends the heavy with its planted frame: contact releases into
+  // the same heavy-specific stance rather than borrowing the second light attack's recovery.
+  return p.stateTick < s.startup ? HERO.heavyStart : p.stateTick < s.startup + s.active ? HERO.heavyContact : HERO.heavyRecover
+}
+
+function authoredBladeFor(v: EntityView, p: Player, bladeEquipped: boolean): boolean {
+  if (!bladeEquipped) { clipSelection.delete(v); return false }
+  if (p.state === 'free' || p.state === 'dead') { clipSelection.delete(v); return true }
+  if (p.state !== 'attack' && p.state !== 'dodge') return false
+
+  const key = p.state === 'attack' ? `attack:${p.swingId}` : 'dodge'
+  const previous = clipSelection.get(v)
+  // swingAngle may track the pointer during early startup. Choose the renderer once per action (or
+  // combo swing) and retain it until stateTick resets, so crossing the horizontal threshold cannot
+  // swap between a 32px authored body and the 16px puppet in the middle of a clip.
+  if (!previous || previous.key !== key || p.stateTick < previous.stateTick) {
+    const authored = p.state === 'attack'
+      ? Math.abs(Math.cos(p.swingAngle)) >= 0.92
+      : Math.abs(p.dodgeDirX) >= 0.92
+    clipSelection.set(v, { key, authored, stateTick: p.stateTick })
+    return authored
+  }
+  previous.stateTick = p.stateTick
+  return previous.authored
 }
 
 export function createPlayerView(atlas: Atlas, layers: { entities: Container; shadows: Container }): EntityView {
@@ -401,11 +426,7 @@ export function updatePlayerView(v: EntityView, p: Player, world: World, alpha: 
   // This first production sheet proves the horizontal combat sentence. Until matching diagonal and
   // vertical clips exist, preserve the legacy directional renderer rather than make an authored
   // right-facing sword lie about a northward attack or dodge.
-  const authoredBlade = bladeEquipped && (
-    p.state === 'free' || p.state === 'dead'
-    || (p.state === 'attack' && Math.abs(Math.cos(p.swingAngle)) >= 0.92)
-    || (p.state === 'dodge' && Math.abs(p.dodgeDirX) >= 0.92)
-  )
+  const authoredBlade = authoredBladeFor(v, p, bladeEquipped)
   const art = playerArt.get(v)
 
   b.tint = 0xffffff

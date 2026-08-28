@@ -38,9 +38,17 @@ const BRUTE = {
 // Generated cells preserve the drawing, not a uniform registration point. These pivots locate the
 // planted foot under the simulation body; without them the low contact/recovery poses jump upward.
 const BRUTE_PIVOT: readonly (readonly [number, number])[] = [
-  [18, 42], [28, 42], [23, 42], [25, 42],
-  [18, 32], [19, 33], [18, 33], [18, 32],
+  [18, 46], [28, 46], [23, 46], [25, 46],
+  [18, 46], [19, 46], [18, 46], [18, 46],
 ]
+// Authored texture coordinates of the square maul head. The tell uses this physical point for its
+// charge and falling motes; retaining the hidden legacy weapon's transform makes the glow float.
+const BRUTE_HEAD: Readonly<Partial<Record<number, readonly [number, number]>>> = {
+  [BRUTE.windupEarly]: [15, 8],
+  [BRUTE.windupCommit]: [19, 7],
+  [BRUTE.release]: [43, 40],
+  [BRUTE.contact]: [43, 42],
+}
 type BruteArt = { frames: Texture[]; whites: Texture[] }
 const bruteArt = new WeakMap<EntityView, BruteArt>()
 
@@ -102,19 +110,25 @@ export function updateBruteView(v: EntityView, e: Enemy, f: EnemyFrame, out: Pos
   } else if (e.state === 'stagger') {
     rot = -e.facing * 0.5 + Math.sin(time * 55) * 0.05; sx = 0.9; sy = 1.1
   } else sy = 1 + Math.sin(time * 3) * 0.03
-  updateBruteWeapon(v, e, f.x, f.y, f.alpha, hop)
-  updateBruteTell(v, e, f.x, f.y, tk)
-  updateBruteImpact(v, e, f)
   const art = bruteArt.get(v)
+  const frame = art ? bruteFrameIndex(e) : -1
+  updateBruteWeapon(v, e, f.x, f.y, f.alpha, hop)
   if (art) {
-    const frame = bruteFrameIndex(e)
     v.bindBody(art.frames[frame], art.whites[frame])
     v.body.anchor.set(BRUTE_PIVOT[frame][0] / 48, BRUTE_PIVOT[frame][1] / 48)
     if (v.weapon) v.weapon.visible = false
+    const authoredHead = BRUTE_HEAD[frame]
+    if (authoredHead) {
+      const feetY = f.y + e.radius + 1
+      head.x = Math.round(f.x + (authoredHead[0] - BRUTE_PIVOT[frame][0]) * e.facing)
+      head.y = Math.round(feetY + authoredHead[1] - BRUTE_PIVOT[frame][1])
+    }
     // Each semantic frame already contains body, hands, and maul. The old transforms would bend the
     // complete drawing back into a puppet and move the contact pose away from the real hit tick.
     sx = 1; sy = 1; rot = 0; hop = 0
   }
+  updateBruteTell(v, e, f.x, f.y, tk)
+  updateBruteImpact(v, e, f)
   // no tint channel at all: the brute never announces himself with a colour.
   out.sx = sx; out.sy = sy; out.rot = rot; out.hop = hop; out.tint = 0xffffff
 }

@@ -5,6 +5,7 @@ import { tuning } from '@/tuning'
 import { hasLineOfSight } from './arena'
 import { overlapsSolid } from './collision'
 import { pathWaypoint } from './nav'
+import { guardUp } from './enemies/oathbound'
 
 export type Bot = (world: World) => InputFrame
 export type BotName = 'idle' | 'naive-melee' | 'kite' | 'slice-naive' | 'slice-kite'
@@ -193,18 +194,22 @@ function kite(world: World): InputFrame {
   // open long enough to eat the plant, and against a brute the heavy is the only thing that breaks
   // poise — so the probe spends it there and nowhere else, which is the read a player has to make.
   const heavy = tuning.player.attack.swings[tuning.player.attack.swings.length - 1]
-  const openWide = (e.state === 'recover' || e.state === 'stagger') && e.stateTick < 14
+  // A raised shield is the other place the weight is the answer. A human learns this in one
+  // encounter — light blows visibly bounce off bronze — so the probe has to know it too, or it is
+  // measuring a policy no player would keep using.
+  const guarded = guardUp(e)
+  const openWide = (e.state === 'recover' || e.state === 'stagger') && e.stateTick < 14 || guarded
   if (punishable || e.kind === 'charger') {
     if (d > 20) { inp.moveX = inp.aimX; inp.moveY = inp.aimY }
     if (d <= heavy.radius && openWide) inp.heavy = true
-    else if (d <= 42) inp.attack = world.tick % 3 === 0
+    else if (d <= 42 && !guarded) inp.attack = world.tick % 3 === 0
   } else {
     // Close to a real punish distance. The old 34–44 px dead band could stare at a brute across a
     // pillar forever; a human routes around it, so the control probe must keep expressing intent too.
     if (d < 23) { inp.moveX = -inp.aimX; inp.moveY = -inp.aimY }
     else if (d > 25) { inp.moveX = inp.aimX; inp.moveY = inp.aimY }
     if (d <= heavy.radius && openWide) inp.heavy = true
-    else if (d <= 27 && e.state === 'chase') inp.attack = world.tick % 3 === 0
+    else if (d <= 27 && e.state === 'chase' && !guarded) inp.attack = world.tick % 3 === 0
   }
   return inp
 }

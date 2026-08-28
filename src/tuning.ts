@@ -164,6 +164,22 @@ export const tuning = {
     windup: 20, lungeDist: 24, lungeTicks: 6, active: 5, hitRadius: 20, hitArcDeg: 120,
     recovery: 34, staggerTicks: 20, lightNudge: 4, damage: 1, knockbackScale: 0.5,
   },
+  // The elite: a Fallen Hoplite that still remembers its oath, and its shield. Tougher and slower
+  // than the line shade, and its whole design is the guard - the numbers below are deliberately close
+  // to the brute's, because the difference is meant to be the RULE, not the statline.
+  oathbound: {
+    hp: 12, radius: 7, speed: 40, attackRange: 26,
+    windup: 24, lungeDist: 22, lungeTicks: 6, active: 5, hitRadius: 20, hitArcDeg: 110,
+    recovery: 32, staggerTicks: 26, damage: 1, knockbackScale: 0.35,
+    idleTicks: 20,
+    // Wide enough that walking around it is a real detour, narrow enough that it is not a full circle:
+    // there is always an answer behind them.
+    guardArcDeg: 170,
+    // A turned blow still lands on something: the shield shoves back and the frame catches, so a
+    // block reads as a physical event rather than as damage that failed to register.
+    blockKnockback: 26,
+    blockHitstop: 4,
+  },
   caster: {
     hp: 3, radius: 5, retreatRange: 70, prefMin: 90, prefMax: 130, speed: 40, strafeSpeed: 30,
     aimTicks: 24, cooldown: 70, boltSpeed: 110, boltRadius: 3, boltLifeTicks: 180, damage: 1, staggerTicks: 10, knockbackScale: 1,

@@ -224,6 +224,11 @@ export function playEventSfx(a: AudioSystem, ev: SimEvent): void {
     case 'burnTick':
     case 'burnEnded':
       break
+    // A blow turned by bronze: metal, high and short, and clearly not the sound of meat.
+    case 'guardBlocked':
+      a.play('swordStone2', { ...at, gain: 1.0, pitch: 1.35, pitchVar: 0.08 })
+      a.play('impactGeneric_light', { ...at, gain: 0.3, pitch: 1.5 })
+      break
     case 'verdictMarked':
       a.play('impactGeneric_light', { ...at, gain: 0.16, pitch: 0.7 })
       break

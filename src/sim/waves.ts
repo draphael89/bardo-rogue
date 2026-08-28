@@ -88,14 +88,19 @@ export const SLICE_ROOM_2_BLADE: WaveDef[] = [{ groups: [
   ] },
 ] }]
 
+// Charon's Landing is where the Oath-Bound is introduced, and it is introduced ALONE: the shield is
+// a rule to be read, and a rule taught inside a crowd is a rule learned by accident. The pressure
+// arrives afterwards, once the answer is known.
 export const SLICE_ROOM_3: WaveDef[] = [{ groups: [
   { delay: 0, spawns: [
-    { kind: 'brute', x: 8, y: 5 },
-    { kind: 'caster', x: 21, y: 4 },
+    { kind: 'oathbound', x: 13, y: 5 },
   ] },
-  { delay: 55, whenRemainingAtMost: 1, spawns: [
+  { delay: 40, whenRemainingAtMost: 0, spawns: [
+    { kind: 'caster', x: 21, y: 4 },
     { kind: 'charger', x: 4, y: 10 },
-    { kind: 'charger', x: 22, y: 10 },
+  ] },
+  { delay: 40, whenRemainingAtMost: 1, spawns: [
+    { kind: 'brute', x: 8, y: 5 },
   ] },
 ] }]
 

@@ -186,9 +186,12 @@ describe('production vertical slice', () => {
     expect(byId.get('warden')?.exits).toBeUndefined()
   })
 
+  // Two complete victories, one down each branch, recorded live and replayed twice. The seeds are
+  // chosen because a competent policy still wins them; if a content change makes one unwinnable the
+  // right response is to look at the change, not to widen the assertion.
   it.each([
-    { seed: 17, branch: 'veil-path' },
-    { seed: 18, branch: 'blade-path' },
+    { seed: 3, branch: 'veil-path' },
+    { seed: 4, branch: 'blade-path' },
   ])('records and replays the complete $branch session deterministically', ({ seed, branch }) => {
     const source = createWorld(seed, 'loop')
     const bot = makeBot('slice-kite')

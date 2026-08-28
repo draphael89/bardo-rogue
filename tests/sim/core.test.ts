@@ -14,6 +14,8 @@ import { damageEnemy, hurtPlayer } from '@/sim/combat'
 import { HUB_ID } from '@/sim/rooms'
 import { ATTACK } from '@/sim/enemies/warden'
 import { overlapsSolid } from '@/sim/collision'
+import { guardUp } from '@/sim/enemies/oathbound'
+import { applyBurn } from '@/sim/status'
 
 function run(world: ReturnType<typeof createWorld>, ticks: number, bot = makeBot('idle'), metrics?: Metrics) {
   for (let i = 0; i < ticks; i++) {
@@ -943,5 +945,79 @@ describe('Minos, judge of the first gate', () => {
     for (const m of w.projectiles.filter(b => b.active && b.kind === 'verdict')) {
       expect(overlapsSolid(w.arena, m.x, m.y, 4)).toBe(false)
     }
+  })
+})
+
+// The elite exists to make the heavy necessary rather than merely available. These pin the three
+// answers, because a rule with only one answer is a wall.
+describe('the Oath-Bound Hoplite', () => {
+  function armed(seed = 1) {
+    const w = createWorld(seed, 'empty')
+    stepWorld(w, emptyInput())
+    return w
+  }
+  function facing(w: ReturnType<typeof createWorld>, x: number, y: number) {
+    const e = w.spawnEnemy('oathbound', x, y)!
+    e.state = 'chase'
+    e.hp = 99
+    e.aimAngle = Math.atan2(w.player.y - e.y, w.player.x - e.x)   // shield toward the player
+    return e
+  }
+
+  it('turns a light blow that lands on the face of the shield', () => {
+    const w = armed()
+    const e = facing(w, w.player.x + 40, w.player.y)
+    const hp0 = e.hp
+    const toward = Math.atan2(e.y - w.player.y, e.x - w.player.x)
+    damageEnemy(w, e, 2, toward, 90, false, 3)
+    expect(e.hp).toBe(hp0)
+    expect(w.events.some(ev => ev.type === 'guardBlocked')).toBe(true)
+    expect(w.events.some(ev => ev.type === 'hit')).toBe(false)
+  })
+
+  it('opens to the committed swing', () => {
+    const w = armed()
+    const e = facing(w, w.player.x + 40, w.player.y)
+    const hp0 = e.hp
+    const toward = Math.atan2(e.y - w.player.y, e.x - w.player.x)
+    damageEnemy(w, e, 4, toward, 260, true, 8)
+    expect(e.hp).toBe(hp0 - 4)
+    expect(e.state).toBe('stagger')
+  })
+
+  it('covers only what it faces, so flanking lands', () => {
+    const w = armed()
+    const e = facing(w, w.player.x + 40, w.player.y)
+    const hp0 = e.hp
+    // struck from behind: the blow travels the same way the shade is looking
+    damageEnemy(w, e, 2, e.aimAngle, 90, false, 3)
+    expect(e.hp).toBe(hp0 - 2)
+  })
+
+  it('drops the guard while it is burning, and shows it', () => {
+    const w = armed()
+    const e = facing(w, w.player.x + 40, w.player.y)
+    const toward = Math.atan2(e.y - w.player.y, e.x - w.player.x)
+    expect(guardUp(e)).toBe(true)
+    applyBurn(w, e, 1)
+    expect(guardUp(e)).toBe(false)
+    const hp0 = e.hp
+    damageEnemy(w, e, 2, toward, 90, false, 3)
+    expect(e.hp).toBe(hp0 - 2)
+  })
+
+  it('cannot hide behind its own swing', () => {
+    const w = armed()
+    const e = facing(w, w.player.x + 40, w.player.y)
+    e.state = 'attack'
+    expect(guardUp(e)).toBe(false)
+  })
+
+  it('never turns a status tick, which has no blow behind it', () => {
+    const w = armed()
+    const e = facing(w, w.player.x + 40, w.player.y)
+    const hp0 = e.hp
+    damageEnemy(w, e, 1, Math.atan2(e.y - w.player.y, e.x - w.player.x), 0, false, 0, 0, { silent: true })
+    expect(e.hp).toBe(hp0 - 1)
   })
 })

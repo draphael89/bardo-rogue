@@ -21,6 +21,7 @@ import { Atmosphere } from './atmosphere'
 import { seedFx } from './fxRng'
 import { BOONS, hasBoon } from '@/sim/boons'
 import { ActionFeedbackGate, crowdScreenMultiplier } from './feedback'
+import { guardUp } from '@/sim/enemies/oathbound'
 import { RewardOverlay } from './reward'
 import { TitleOverlay } from './title'
 
@@ -407,6 +408,15 @@ export class Presenter {
             this.particles.ember(ev.fromX + (ev.toX - ev.fromX) * t, ev.fromY + (ev.toY - ev.fromY) * t)
           }
           this.particles.ring(ev.toX, ev.toY, 0xff9a30)
+          break
+        }
+        case 'guardBlocked': {
+          // Bronze, not blood: a turned blow must never wear the contact language of a landed one,
+          // or the player learns the wrong lesson from the loudest signal on screen.
+          this.particles.hitSparks(ev.x, ev.y, ev.angle + Math.PI, 6, 0xf0c070)
+          this.camera.addTrauma(0.08)
+          const v = this.enemyViews.get(ev.id)
+          if (v) v.squash = Math.round(J.squashTicks * 0.6)
           break
         }
         case 'interrupt':
@@ -798,6 +808,7 @@ export class Presenter {
       if (e.kind === 'caster' && e.state === 'aim') drawAimLine(this.fxGraphics, e, slowAlpha)
       if (e.brand > 0) drawBrandPips(this.fxGraphics, e, slowAlpha)
       if (e.burn > 0) drawBurn(this.fxGraphics, this.groundFx, e, slowAlpha, this.time)
+      if (guardUp(e)) drawGuard(this.fxGraphics, e, slowAlpha)
     }
     for (const b of w.projectiles) {
       if (b.active && b.kind === 'verdict') drawVerdict(this.groundFx, b, this.time)
@@ -888,6 +899,32 @@ function drawBurn(g: Graphics, ground: Graphics, e: Enemy, alpha: number, time: 
 // so the player can judge the edge exactly; the inner ring closes toward the centre as the delay
 // runs out, which is the countdown. It is drawn on the FLOOR layer only — a hazard that paints over
 // a body would hide the thing the player is dodging.
+// The shield, drawn as the arc it actually covers. This is the whole teaching surface for the elite:
+// the arc is present exactly when a light blow would be turned, and gone the instant it would land -
+// when the shade is burning, staggered, or committed to its own swing. A player never has to be told
+// the rule, only shown it twice.
+function drawGuard(g: Graphics, e: Enemy, alpha: number): void {
+  const x = Math.round(lerp(e.px, e.x, alpha))
+  const y = Math.round(lerp(e.py, e.y, alpha))
+  const span = (tuning.oathbound.guardArcDeg * Math.PI) / 360
+  // Held in front of the body and OUTSIDE it. This took three passes: at body radius and at chest
+  // height the 32px silhouette ate the arc, and on the floor plane it read as one more ground
+  // telegraph among several. A shield is a thing held up, so it is drawn above the body, one
+  // shield's distance out, where nothing else in the frame is competing for those pixels.
+  const r = e.radius + 14
+  const cy = y - 6
+  const steps = 30
+  for (let i = 0; i <= steps; i++) {
+    const a = e.aimAngle - span + (span * 2 * i) / steps
+    const px = Math.round(x + Math.cos(a) * r)
+    const py = Math.round(cy + Math.sin(a) * r * 0.85)
+    // A dark backing row under a bronze face, the same two-tone treatment every readable mark in
+    // this game uses, so it holds its edge on lit stone and on shadow alike.
+    g.rect(px, py + 1, 1, 2).fill({ color: 0x120d18, alpha: 0.85 })
+    g.rect(px, py, 1, 1).fill({ color: 0xd8a45c, alpha: 0.95 })
+  }
+}
+
 function drawVerdict(g: Graphics, b: World['projectiles'][number], time: number): void {
   const S = tuning.warden.scales
   const t = 1 - Math.max(0, Math.min(1, b.life / S.delay))   // 0 fresh, 1 about to fall

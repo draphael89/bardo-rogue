@@ -1,5 +1,5 @@
 // Sim -> presentation messages. The sim pushes; presenter/audio/metrics consume and clear each frame.
-export type EnemyKind = 'brute' | 'caster' | 'charger' | 'dummy' | 'warden'
+export type EnemyKind = 'brute' | 'caster' | 'charger' | 'dummy' | 'warden' | 'oathbound'
 
 // What landed the killing blow. 'none' covers the cases with no body behind them (a scripted hurt,
 // a debug kill), and keeps the death card honest instead of naming an innocent bystander.
@@ -48,6 +48,8 @@ export type SimEvent =
   | { type: 'brandConsumed'; id: number; stacks: number; x: number; y: number }
   | { type: 'brandPassed'; fromX: number; fromY: number; toX: number; toY: number; stacks: number }
   | { type: 'interrupt'; id: number; x: number; y: number }
+  // A light blow turned by a raised shield. It is not a hit and must never read as one.
+  | { type: 'guardBlocked'; id: number; x: number; y: number; angle: number }
   | { type: 'verdictMarked'; x: number; y: number; radius: number; ticks: number }
   | { type: 'verdictFell'; x: number; y: number; radius: number }
   | { type: 'runWon' | 'runLost'; depth: number; ticks: number; boons: BoonId[]; by: DeathKind; ranged: boolean }

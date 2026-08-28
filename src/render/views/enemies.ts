@@ -11,9 +11,9 @@ import { updateDummyView } from './enemy-dummy'
 import { updateWardenView } from './enemy-warden'
 
 export function createEnemyView(atlas: Atlas, e: Enemy, layers: { entities: Container; shadows: Container }): EntityView {
-  const w = e.kind === 'brute' ? WEAPON.brute : e.kind === 'caster' ? WEAPON.caster : null
+  const w = e.kind === 'brute' || e.kind === 'oathbound' ? WEAPON.brute : e.kind === 'caster' ? WEAPON.caster : null
   const v = new EntityView(atlas, SPRITE[e.kind], w, layers)
-  if (e.kind === 'brute') bindBruteArt(v, atlas)
+  if (e.kind === 'brute' || e.kind === 'oathbound') bindBruteArt(v, atlas)
   return v
 }
 
@@ -34,6 +34,12 @@ export function updateEnemyView(v: EntityView, e: Enemy, world: World, alpha: nu
 
   switch (e.kind) {
     case 'brute': updateBruteView(v, e, frame, pose); break
+    case 'oathbound':
+      updateBruteView(v, e, frame, pose)
+      // Cast in bronze so the elite is recognised across the room before it has done anything. The
+      // tint rides on top of the authored pose rather than replacing it.
+      if (pose.tint === 0xffffff) pose.tint = 0xd8a45c
+      break
     case 'caster': updateCasterView(v, e, frame, pose); break
     case 'charger': updateChargerView(v, e, frame, pose); break
     case 'dummy': updateDummyView(v, e, frame, pose); break
@@ -53,9 +59,9 @@ export function updateEnemyView(v: EntityView, e: Enemy, world: World, alpha: nu
   b.zIndex = feetY
   // The Brute owns an authored recoil frame; a full white replacement would delete that pose on
   // precisely the contact ticks it was drawn for. Puppet enemies retain their silhouette flash.
-  if (e.kind !== 'warden') v.setFlash(e.flash > 0 && e.kind !== 'dummy' && e.kind !== 'brute')
+  if (e.kind !== 'warden') v.setFlash(e.flash > 0 && e.kind !== 'dummy' && e.kind !== 'brute' && e.kind !== 'oathbound')
   if (e.kind === 'warden') v.setShadow(x, feetY - 1, 32 - hop * 0.35, 11 - hop * 0.15, 0.48 - hop * 0.02)
-  else if (e.kind === 'brute') v.setShadow(x, feetY - 1, 25, 8, 0.43)
+  else if (e.kind === 'brute' || e.kind === 'oathbound') v.setShadow(x, feetY - 1, 25, 8, 0.43)
   else v.setShadow(x, feetY - 1, 14 - hop * 0.5, 6 - hop * 0.2, 0.35 - hop * 0.02)
   void world
 }

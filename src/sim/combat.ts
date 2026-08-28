@@ -4,6 +4,7 @@ import { SLOW_FULL } from './world'
 import type { World, Enemy } from './world'
 import type { DeathKind } from './events'
 import { finishRun } from './session'
+import { guardBlocks } from './enemies/oathbound'
 // boons.ts imports damageEnemy from here, so this pair is circular. Both sides are hoisted function
 // declarations, so the cycle resolves before either is ever called; keep it that way (no top-level
 // work in either module) rather than adding a registration hook nothing else would use.
@@ -81,6 +82,15 @@ export function clearBulletTime(world: World): void {
 export function damageEnemy(world: World, e: Enemy, damage: number, angle: number, knockback: number, heavy: boolean, hitstop: number, sourceActionId = world.player.swingId, opts?: { silent?: boolean }): void {
   if (!e.active || e.state === 'dead') return
   const silent = !!opts?.silent
+  // The Oath-Bound's shield turns light blows that land on its face. Status damage passes: fire is
+  // not something you can hold a shield against, and it is also what makes it drop the shield.
+  if (!silent && guardBlocks(e, angle, heavy)) {
+    e.kbx += Math.cos(angle) * tuning.oathbound.blockKnockback
+    e.kby += Math.sin(angle) * tuning.oathbound.blockKnockback
+    addFreeze(world, tuning.oathbound.blockHitstop)
+    world.emit({ type: 'guardBlocked', id: e.id, x: e.x, y: e.y, angle })
+    return
+  }
   e.hp -= damage
   e.flash = tuning.juice.flashTicks
   const kind = e.kind

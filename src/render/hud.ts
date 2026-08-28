@@ -100,6 +100,7 @@ function fightChrome(cardAge: number): number {
 function takenBy(kind: EnemyKind | 'none'): string {
   switch (kind) {
     case 'brute': return 'A FALLEN HOPLITE'
+    case 'oathbound': return 'AN OATH-BOUND HOPLITE'
     case 'caster': return 'A LAMPAD'
     case 'charger': return 'AN EMPUSA'
     case 'warden': return 'MINOS'

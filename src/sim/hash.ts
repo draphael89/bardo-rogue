@@ -11,7 +11,7 @@ const ENEMY_STATE: Record<EnemyState, number> = {
   idle: 0, chase: 1, windup: 2, attack: 3, recover: 4, stagger: 5, dead: 6,
   position: 7, aim: 8, hover: 9, freeze: 10, dash: 11,
 }
-const ENEMY_KIND: Record<EnemyKind, number> = { brute: 0, caster: 1, charger: 2, dummy: 3, warden: 4 }
+const ENEMY_KIND: Record<EnemyKind, number> = { brute: 0, caster: 1, charger: 2, dummy: 3, warden: 4, oathbound: 5 }
 const WAVE_STATE: Record<WaveState, number> = { idle: 0, pending: 1, active: 2, done: 3 }
 const ROOM_PHASE: Record<RoomPhase, number> = { town: 0, entering: 1, fighting: 2, reward: 3, exits: 4, transitioning: 5, resolved: 6 }
 const PROJECTILE_KIND: Record<ProjectileKind, number> = { bolt: 0, arrow: 1, mirror: 2, echo: 3, verdict: 4 }

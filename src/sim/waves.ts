@@ -82,7 +82,7 @@ export function updateWaves(world: World): void {
       w.state = 'done'
       world.doorOpen = true
       world.roomClearTick = world.tick
-      world.timeScale = 0.2
+      world.timeScale = tuning.roomClearSlowmo
       world.slowmoTicks = tuning.roomClearSlowmoTicks
       clearBulletTime(world)   // the clear owns the clock from here
       // The fight is over the instant the last body drops. A bolt already in flight would otherwise

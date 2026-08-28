@@ -92,7 +92,7 @@ export const tuning = {
   bullet: { rate: 250, ticks: 24, maxTicks: 24 },
   spawnTelegraphTicks: 40,
   waveGapTicks: 60,
-  roomClearSlowmoTicks: 12,
+  roomClearSlowmo: 0.2, roomClearSlowmoTicks: 12,
   run: {
     doorHalfW: 22,        // px: the open door is three tiles wide
     doorEnterMaxY: 32,    // px: north wall-face row; overlapping it while the door is open enters
@@ -144,6 +144,9 @@ export const tuning = {
     // hurt (0.25), or the most routine event in the fight is also the loudest and the next telegraph
     // is washed out by the last thing you killed. The shatter and the punch-zoom carry the release.
     killFlash: 0.12,
+    // Projectile trails are stamped every N px the bolt travels, not every N frames: per-frame
+    // emission put 2.4x the trail on a 144 Hz display, and bunched it up under slow-motion.
+    trail: { boltPx: 7, arrowPx: 11 },
     zoom: { roomClear: 1.06, kill: 1.015, heavyHit: 1.035, decay: 6 }, // decay = per-second ease rate back to 1
     // Contact. The light hit is ~90% of all contact, so it gets the whole chain, only smaller: the
     // camera is shoved along the blade, the body is shoved back off it, the screen blinks once.

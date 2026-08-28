@@ -2,7 +2,8 @@ import { Container, Graphics, Sprite, Texture } from 'pixi.js'
 import type { RenderApp } from './app'
 import type { Atlas } from './atlas'
 import { slowAlphaFor } from './slowAlpha'
-import type { World, Enemy } from '@/sim/world'
+import { SLOW_FULL } from '@/sim/world'
+import type { World, Enemy, Projectile } from '@/sim/world'
 import type { SimEvent } from '@/sim/events'
 import { tuning } from '@/tuning'
 import { EntityView, createPlayerView, createEnemyView, updatePlayerView, updateEnemyView, makePropSprite, SpawnMarkerView, BoltView, ArrowView, drawAimLine, drawSwingArc, drawSwingTip, drawBowAim } from './views'
@@ -17,7 +18,7 @@ import { Lighting } from './light'
 import { PostFx } from './postfx'
 import { DamageNumbers } from './damageNumbers'
 import { Atmosphere } from './atmosphere'
-import { fxRng, seedFx } from './fxRng'
+import { seedFx } from './fxRng'
 import { hasBoon } from '@/sim/boons'
 
 // Reads sim state + events every frame and drives everything visible. Never mutates the sim.
@@ -490,6 +491,16 @@ export class Presenter {
     this.flashOverlay.tint = color
   }
 
+  // A trail belongs to the distance the bolt covered, not to the number of frames the display drew.
+  // The step is derived from velocity rather than a remembered position, so it stays exact when
+  // slow-motion drags the bolt: the trail thins with the bolt instead of piling up under it.
+  private stampTrail(v: { trailAcc: number }, b: Projectile, dtSec: number, spacing: number, emit: (x: number, y: number) => void): void {
+    v.trailAcc += Math.hypot(b.vx, b.vy) * dtSec * (this.world.slowRate / SLOW_FULL)
+    let n = 0
+    while (v.trailAcc >= spacing && n++ < 8) { v.trailAcc -= spacing; emit(b.x, b.y) }
+    if (n >= 8) v.trailAcc = 0   // a long hitch must not dump a frame's worth of pool in one go
+  }
+
   render(alpha: number, dtSec: number) {
     const w = this.world
     this.time += dtSec
@@ -530,13 +541,13 @@ export class Presenter {
       const b = w.projectiles.find(x => x.id === id && x.active)
       if (!b) { v.destroy(); this.boltViews.delete(id); continue }
       v.update(lerp(b.px, b.x, slowAlpha), lerp(b.py, b.y, slowAlpha), this.time)
-      if (fxRng.ui.next() < 0.5) this.particles.boltTrail(b.x, b.y)
+      this.stampTrail(v, b, dtSec, tuning.juice.trail.boltPx, (x, y) => this.particles.boltTrail(x, y))
     }
     for (const [id, v] of this.arrowViews) {
       const b = w.projectiles.find(x => x.id === id && x.active)
       if (!b) { v.destroy(); this.arrowViews.delete(id); continue }
       v.update(lerp(b.px, b.x, slowAlpha), lerp(b.py, b.y, slowAlpha), b.angle)
-      if (fxRng.ui.next() < 0.4) this.particles.arrowTrail(b.x, b.y)
+      this.stampTrail(v, b, dtSec, tuning.juice.trail.arrowPx, (x, y) => this.particles.arrowTrail(x, y))
     }
     while (this.spawnMarkers.length < w.spawnQueue.length) this.spawnMarkers.push(new SpawnMarkerView(this.atlas, L.fx))
     for (let i = 0; i < this.spawnMarkers.length; i++) {

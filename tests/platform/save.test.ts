@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { META_KEY, SETTINGS_KEY, type StorageLike } from '@/sim/storage'
 import { defaultSave, serializeSave, type BardoSave } from '@/sim/save'
-import { backupKey, createStorageSaveStore, migrateLegacyKeys, saveKey } from '@/platform/web'
+import { backupKey, createStorageSaveStore, createWebSaveStore, migrateLegacyKeys, saveKey } from '@/platform/web'
 import { createDesktopPlatform, type DesktopBridge } from '@/platform/desktop'
 import { loadSave, saveFilename } from '@/platform/saveFile'
 
@@ -56,17 +56,24 @@ describe('web save store', () => {
     expect(storage.getItem(backupKey(ID))).toBeNull()
   })
 
-  it('resolves rather than rejecting when storage refuses to write', async () => {
-    // A full quota or a locked-down private window must cost a save, never a run.
+  it('rejects when storage refuses the write, so the failure can reach the player', async () => {
+    // A full quota must not crash a run -- but it avoids that by rejecting into main.ts's write
+    // chain, whose catch shows PROGRESS NOT SAVING. Resolving here is how that warning stayed
+    // unreachable on the web while firing on the desktop.
     const store = createStorageSaveStore(new HostileStorage())
-    await expect(store.write(ID, 'anything')).resolves.toBeUndefined()
-    expect(await store.read(ID)).toBeNull()
+    await expect(store.write(ID, 'anything')).rejects.toThrow(/quota/)
   })
 
-  it('survives a storage that has been taken away entirely', async () => {
+  it('rejects rather than inventing an absent save when storage is gone entirely', async () => {
     const store = createStorageSaveStore(undefined)
-    await expect(store.write(ID, 'anything')).resolves.toBeUndefined()
-    expect(await store.read(ID)).toBeNull()
+    await expect(store.read(ID)).rejects.toThrow(/unavailable/)
+    await expect(store.write(ID, 'anything')).rejects.toThrow(/unavailable/)
+  })
+
+  it('treats a storage gone entirely as an unreadable profile, never a fresh one', async () => {
+    const loaded = await loadSave(createStorageSaveStore(undefined), ID)
+    expect(loaded.source).toBe('unreadable')
+    expect(loaded.writable).toBe(false)
   })
 })
 
@@ -156,6 +163,38 @@ describe('a read that failed is not a read that found nothing', () => {
   })
 })
 
+describe('legacy read fallback', () => {
+  const seed = (storage: MemoryStorage) => {
+    storage.data.set(META_KEY, JSON.stringify({ version: 1, attempts: 7, victories: 2, unlockedWeapons: ['blade'] }))
+  }
+
+  it('serves legacy progress in memory when the envelope write could never happen', async () => {
+    // The write-through upgrade is an optimisation; this is the guarantee. On a storage that can be
+    // read but not written, the envelope key stays absent forever -- and without the fallback the
+    // session would boot on zeroed defaults while the real counters sat readable in the legacy keys.
+    const hostile = new HostileStorage()
+    seed(hostile)
+    const loaded = await loadSave(createWebSaveStore(hostile, false), ID)
+    expect(loaded.source).toBe('save')
+    expect(loaded.save.meta.attempts).toBe(7)
+  })
+
+  it('prefers an existing envelope over the legacy keys', async () => {
+    const storage = new MemoryStorage()
+    seed(storage)
+    storage.setItem(saveKey(ID), serializeSave(withMeta(99)))
+    const loaded = await loadSave(createWebSaveStore(storage, false), ID)
+    expect(loaded.save.meta.attempts).toBe(99)
+  })
+
+  it('carries the OS reduced-motion preference into the fallback envelope', async () => {
+    const hostile = new HostileStorage()
+    seed(hostile)
+    const loaded = await loadSave(createWebSaveStore(hostile, true), ID)
+    expect(loaded.save.settings.reducedEffects).toBe(true)
+  })
+})
+
 describe('legacy key migration', () => {
   const seedLegacy = (storage: MemoryStorage) => {
     storage.setItem(META_KEY, JSON.stringify({ version: 1, attempts: 7, victories: 2, unlockedWeapons: ['blade'] }))
@@ -238,6 +277,7 @@ describe('desktop adapter', () => {
       ...overrides,
     },
     setRunActive: () => {},
+    setSaving: () => {},
     exportFile: async () => true,
     importFile: async () => null,
     setFullscreen: async () => false,

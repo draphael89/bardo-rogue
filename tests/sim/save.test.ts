@@ -72,29 +72,42 @@ describe('parseSave', () => {
     expect(r.save).toEqual(defaultSave())    // never a half-read save
   })
 
-  it('fills fields the document predates instead of failing', () => {
-    const r = parseSave('{"schemaVersion":2}')
+  it('refuses a sparse current-schema document rather than reading it as defaults', () => {
+    // Every v2 envelope this build ever wrote carries all seven fields, so `{"schemaVersion":2}` was
+    // never written by us. Parsing it as valid-with-defaults would skip the backup at boot, accept it
+    // on import, and let the next autosave rotate the last good generation away under zeroes.
+    const bare = parseSave('{"schemaVersion":2}')
+    expect(bare.kind).toBe('corrupt')
+    if (bare.kind === 'corrupt') expect(bare.reason).toBe('missing-meta')
+    const metaOnly = parseSave('{"schemaVersion":2,"meta":{"version":1,"attempts":3}}')
+    expect(metaOnly.kind).toBe('corrupt')
+    if (metaOnly.kind === 'corrupt') expect(metaOnly.reason).toBe('missing-settings')
+  })
+
+  it('still fills fields a MIGRATED document legitimately predates', () => {
+    // A v1 doc with no settings key is a real settings-less legacy player, not damage.
+    const r = migrateSave({ schemaVersion: 1, meta: { version: 1, attempts: 3, victories: 0, unlockedWeapons: ['blade'] } })
     expect(r.kind).toBe('ok')
-    expect(r.save).toEqual(defaultSave())
+    if (r.kind === 'ok') expect(r.save.settings).toEqual({ version: 1, reducedEffects: false })
   })
 
   it('clamps garbage counters the way loadMeta does', () => {
-    const r = parseSave('{"schemaVersion":2,"meta":{"version":1,"attempts":-5,"victories":1.9,"unlockedWeapons":"blade"}}')
+    const r = parseSave('{"schemaVersion":2,"settings":{"version":1,"reducedEffects":false},"meta":{"version":1,"attempts":-5,"victories":1.9,"unlockedWeapons":"blade"}}')
     expect(r.save.meta).toEqual({ version: 1, attempts: 0, victories: 1, unlockedWeapons: ['blade'] })
   })
 
   it('drops a counter that JSON parsed to Infinity, exactly as loadMeta does', () => {
     // 1e999 parses to Infinity, which is not a finite count: storage.ts has always fallen back to 0
     // for this rather than inventing a number, and the envelope keeps that behaviour.
-    expect(parseSave('{"schemaVersion":2,"meta":{"version":1,"attempts":1e999}}').save.meta.attempts).toBe(0)
+    expect(parseSave('{"schemaVersion":2,"settings":{"version":1,"reducedEffects":false},"meta":{"version":1,"attempts":1e999}}').save.meta.attempts).toBe(0)
   })
 
   it('clamps a finite but absurd counter to the ceiling', () => {
-    expect(parseSave('{"schemaVersion":2,"meta":{"version":1,"attempts":1e12}}').save.meta.attempts).toBe(1_000_000_000)
+    expect(parseSave('{"schemaVersion":2,"settings":{"version":1,"reducedEffects":false},"meta":{"version":1,"attempts":1e12}}').save.meta.attempts).toBe(1_000_000_000)
   })
 
   it('drops unknown weapon ids, keeps the blade first, and de-duplicates', () => {
-    const r = parseSave('{"schemaVersion":2,"meta":{"version":1,"unlockedWeapons":["bow","ghost","bow","blade"]}}')
+    const r = parseSave('{"schemaVersion":2,"settings":{"version":1,"reducedEffects":false},"meta":{"version":1,"unlockedWeapons":["bow","ghost","bow","blade"]}}')
     expect(r.save.meta.unlockedWeapons).toEqual(['blade', 'bow'])
   })
 
@@ -125,7 +138,7 @@ describe('parseSave', () => {
   })
 
   it('never lets an injected __proto__ key ride along into the document', () => {
-    const r = parseSave('{"schemaVersion":2,"__proto__":{"polluted":true},"meta":{"version":1,"attempts":3}}')
+    const r = parseSave('{"schemaVersion":2,"__proto__":{"polluted":true},"settings":{"version":1,"reducedEffects":false},"meta":{"version":1,"attempts":3}}')
     expect(Object.keys(r.save)).toEqual(['schemaVersion', 'contentRevision', 'profileId', 'revision', 'settings', 'meta', 'checkpoint'])
     expect(({} as Record<string, unknown>).polluted).toBeUndefined()
   })

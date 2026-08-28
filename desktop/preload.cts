@@ -23,6 +23,8 @@ const api = {
   saves,
   /** Fire-and-forget: "a run is live", so the quit guard can ask before throwing one away. */
   setRunActive(active: boolean): void { ipcRenderer.send('bardo:run-active', active === true) },
+  /** Fire-and-forget: "a save write is pending", so a quit waits for it instead of racing it. */
+  setSaving(saving: boolean): void { ipcRenderer.send('bardo:save-pending', saving === true) },
   /** Native save/open dialogs, so an exported file lands somewhere the player chose. */
   exportFile(text: string, filename: string): Promise<boolean> { return ipcRenderer.invoke('bardo:file:export', { text, filename }) },
   importFile(): Promise<string | null> { return ipcRenderer.invoke('bardo:file:import') },

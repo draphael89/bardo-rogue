@@ -8,10 +8,21 @@ export const backupKey = (profileId: string) => `${saveKey(profileId)}.bak`
 
 // Exported and parameterised on StorageLike on purpose: this is the half of the web adapter that can
 // be tested in node, with the same kind of in-memory storage the sim tests already use.
+//
+// Same contract as the desktop store: a read resolves null ONLY for definitely-absent, and every
+// other failure REJECTS. A quota that refuses the write must not crash a run -- but the way it
+// avoids that is by rejecting into main.ts's write chain, whose catch shows PROGRESS NOT SAVING,
+// not by reporting the write as done. Swallowing here was how the one warning the player gets
+// stayed unreachable on the web while firing on the desktop.
 export function createStorageSaveStore(storage: StorageLike | undefined): SaveStore {
-  const get = (k: string) => { try { return storage?.getItem(k) ?? null } catch { return null } }
-  // A full quota or a locked-down private window must cost a save, never a run.
-  const set = (k: string, v: string) => { try { storage?.setItem(k, v) } catch { /* nothing to recover here */ } }
+  const get = (k: string): string | null => {
+    if (!storage) throw new Error('storage unavailable')
+    return storage.getItem(k) ?? null      // a throwing getter propagates: unreadable is not absent
+  }
+  const set = (k: string, v: string): void => {
+    if (!storage) throw new Error('storage unavailable')
+    storage.setItem(k, v)                  // quota or blocked storage propagates into the write chain
+  }
   return {
     read: async id => get(saveKey(id)),
     readBackup: async id => get(backupKey(id)),
@@ -20,7 +31,26 @@ export function createStorageSaveStore(storage: StorageLike | undefined): SaveSt
       if (prev !== null && prev !== data) set(backupKey(id), prev)   // rotate, then replace
       set(saveKey(id), data)
     },
-    delete: async id => { try { storage?.removeItem(saveKey(id)); storage?.removeItem(backupKey(id)) } catch { /* already gone */ } },
+    delete: async id => { if (!storage) throw new Error('storage unavailable'); storage.removeItem(saveKey(id)); storage.removeItem(backupKey(id)) },
+  }
+}
+
+// The store the web platform actually uses: the raw storage store, plus an in-memory legacy
+// fallback on the read path. The write-through upgrade in migrateLegacyKeys is an optimisation;
+// this is the guarantee. If that one-time envelope write failed (quota), the envelope key stays
+// absent -- and without this fallback the session would boot on zeroed defaults while the player's
+// real attempts and victories sat readable in the two legacy keys, shadowed forever by the first
+// successful write of those defaults.
+export function createWebSaveStore(storage: StorageLike | undefined, preferredReducedEffects = false): SaveStore {
+  const raw = createStorageSaveStore(storage)
+  return {
+    ...raw,
+    read: async id => {
+      const envelope = await raw.read(id)
+      if (envelope !== null) return envelope
+      const legacy = migrateLegacySave(storage?.getItem(META_KEY), storage?.getItem(SETTINGS_KEY), { profileId: id, preferredReducedEffects })
+      return legacy ? serializeSave(legacy) : null
+    },
   }
 }
 
@@ -54,7 +84,7 @@ export function createWebPlatform(opts: DetectOptions = {}): Platform {
   let picker: HTMLInputElement | null = null
   return {
     kind: 'web',
-    saves: createStorageSaveStore(storage),
+    saves: createWebSaveStore(storage, prefersReducedMotion()),
     persistHint: () => {
       // Fire-and-forget and deliberately silent: some browsers prompt, some decide heuristically, some
       // have no such API. Never awaited (boot must not wait behind a permission dialog) and never

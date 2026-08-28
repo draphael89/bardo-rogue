@@ -183,6 +183,18 @@ const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object
 
 let win: BrowserWindow | null = null
 let runActive = false        // the last value the renderer pushed; main never asks the renderer anything
+let savingActive = false     // ditto: "a save write is queued or in flight" -- the quit path waits on it
+let saveIpc: { store: { flush(): Promise<void> } } | null = null
+
+// Everything persistence-related that is still moving, given a hard ceiling so a wedged renderer or a
+// hung disk can never hold the quit hostage: first wait for the renderer to hand its queued write to
+// IPC, then drain the filesystem store. ~2.5s worst case; the normal case is a few milliseconds.
+async function flushPendingSaves(): Promise<void> {
+  const deadline = Date.now() + 1500
+  while (savingActive && Date.now() < deadline) await new Promise(r => setTimeout(r, 25))
+  if (!saveIpc) return
+  await Promise.race([saveIpc.store.flush(), new Promise<void>(r => setTimeout(r, 1000))])
+}
 let quitConfirmed = false
 let promptOpen = false
 
@@ -198,6 +210,10 @@ function trusted(e: { sender: Electron.WebContents; senderFrame: Electron.WebFra
 ipcMain.on('bardo:run-active', (e, active: unknown) => {
   if (!trusted(e) || typeof active !== 'boolean') return
   runActive = active
+})
+ipcMain.on('bardo:save-pending', (e, saving: unknown) => {
+  if (!trusted(e) || typeof saving !== 'boolean') return
+  savingActive = saving
 })
 // Export and import go through NATIVE dialogs rather than the browser's blob-download path: in a
 // packaged app a silent write into the default downloads folder is not an answer a player can act on.
@@ -220,8 +236,9 @@ ipcMain.handle('bardo:file:import', async e => {
   const file = filePaths[0]
   if (canceled || !file) return null
   try {
-    const text = await readFile(file, 'utf8')
-    return Buffer.byteLength(text, 'utf8') > MAX_EXPORT_BYTES ? null : text
+    // Size before bytes: a multi-gigabyte pick must be refused without ever materialising it.
+    if ((await stat(file)).size > MAX_EXPORT_BYTES) return null
+    return await readFile(file, 'utf8')
   } catch { return null }
 })
 // macOS animates fullscreen over ~0.7s and isFullScreen() reads false throughout, so a toggle
@@ -260,7 +277,7 @@ function createWindow(): BrowserWindow {
   w.on('resize', persist); w.on('move', persist); w.on('maximize', persist); w.on('unmaximize', persist)
   const onFs = (): void => { fullscreenIntent = w.isFullScreen(); w.webContents.send('bardo:fullscreen-changed', fullscreenIntent) }
   w.on('enter-full-screen', onFs); w.on('leave-full-screen', onFs)
-  w.webContents.on('render-process-gone', () => { runActive = false })   // a dead renderer must not lock the quit
+  w.webContents.on('render-process-gone', () => { runActive = false; savingActive = false })   // a dead renderer must not lock the quit
   // Nothing in the game opens a window or an outbound link. Handing any URL to shell.openExternal
   // would therefore only ever serve a compromised renderer, which could use it to walk save data out
   // through the default browser -- past the CSP, which blocks fetch but not this.
@@ -268,10 +285,21 @@ function createWindow(): BrowserWindow {
   w.webContents.on('will-navigate', (e, url) => {
     if (!url.startsWith(isDev ? DEV_ORIGIN : `${APP_ORIGIN}/`)) e.preventDefault()
   })
+  let flushedForClose = false
   w.on('close', e => {
-    if (quitConfirmed || !runActive) { if (timer) clearTimeout(timer); saveWindowState(w); return }
+    if (!quitConfirmed && runActive) {
+      e.preventDefault()
+      void confirmQuit(w).then(ok => { if (ok) w.close() })
+      return
+    }
+    if (flushedForClose) { if (timer) clearTimeout(timer); saveWindowState(w); return }
+    // The quit is decided; the last write may not be. persist() is asynchronous, so a quick Cmd+Q
+    // after a settings change or a return to the Bardo can have its envelope still queued in the
+    // renderer or in flight on disk -- close now and that newest update is simply gone.
     e.preventDefault()
-    void confirmQuit(w).then(ok => { if (ok) w.close() })
+    if (timer) clearTimeout(timer)
+    saveWindowState(w)
+    void flushPendingSaves().then(() => { flushedForClose = true; if (!w.isDestroyed()) w.close() })
   })
   w.on('closed', () => { win = null })
 
@@ -374,11 +402,14 @@ if (!app.requestSingleInstanceLock()) {
     buildMenu()
     win = createWindow()
     const target = win
-    registerSaveIpc(path.join(app.getPath('userData'), 'saves'), {
+    saveIpc = registerSaveIpc(path.join(app.getPath('userData'), 'saves'), {
       // read back and compare in debug and test builds only; it doubles the I/O of every autosave
       verify: !app.isPackaged || process.env.BARDO_SAVE_VERIFY === '1',
       isAllowedSender: wc => wc === target.webContents,
       allowedOrigins: isDev ? [DEV_ORIGIN] : [`${APP_ORIGIN}/`],
+      allowedProfiles: ['default'],
+      // Test lever for the quit-race smoke; a packaged app ignores every devHook.
+      testWriteDelayMs: Number(devHook('BARDO_TEST_SLOW_WRITE_MS') ?? 0) || undefined,
     })
     app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) win = createWindow() })
   })

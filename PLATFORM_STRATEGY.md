@@ -512,6 +512,33 @@ to a green test suite:
   import matcher recognised only single quotes, and its comment stripper would have tripped on the
   repo's own inline "never Math.random" note. All four negative cases fail correctly now.
 
+A pre-merge external review (graded 80/100, HOLD) then found seven more, all verified real and all
+fixed — every one in persistence, which is where all four review rounds' genuine bugs have lived:
+
+- **The web store swallowed write failures**, so the PROGRESS NOT SAVING warning — added for the
+  desktop in the previous round — was unreachable on the web, and a failed legacy-envelope write
+  shadowed a returning player's readable progress forever. The store now rejects like the desktop
+  one, and the web read path falls back to the legacy keys in memory, so the upgrade write is an
+  optimisation rather than a requirement.
+- **A sparse `{"schemaVersion":2}` parsed as valid-with-defaults**, which is worse than corruption:
+  it skipped the backup at boot, passed import, and let the next autosave rotate the last good
+  generation away under zeroes. A document that arrives at the current schema must now carry its
+  required fields; migrated older documents keep their leniency.
+- **A quit could race the last pending save.** `persist()` is asynchronous and nothing on the close
+  path waited for it. The renderer now signals writes-pending, and the desktop close path drains
+  both queues (capped ~2.5s so a dead renderer cannot wedge the quit). The smoke proves the flush is
+  load-bearing with a slowed-write negative control: without it the pending revision is lost,
+  with it it survives.
+- **An unsavable or rescued profile was console-only**; the player now gets a boot banner and a
+  one-shot banner at the first suppressed write.
+- **Files were read before their size was checked** in the import dialog and in the save store's
+  probe; `stat` now comes first.
+- **The save IPC accepted any syntactically valid profile name**; it now accepts only the profiles
+  that exist.
+- **The build gate checked only that manifested files exist, not that shipped files are accounted
+  for** — and closing that hole surfaced two runtime sprites (`bardo_hero`, `bardo_props`' hero and
+  brute sheets) hardcoded in `atlas.ts` that no check protected; they are REQUIRED entries now.
+
 Deferred deliberately, with reasons: `RunCheckpoint` stays a reserved `null` slot until run structure
 settles (the envelope is ready for it); IndexedDB stays unbuilt while saves are kilobytes; and
 electron-builder is configured (`electron-builder.yml`, `build/entitlements.mac.plist`) but not

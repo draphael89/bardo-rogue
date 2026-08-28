@@ -46,6 +46,12 @@ function assertInside(dir: string, p: string): void {
 type Probe = { state: 'ok'; data: string } | { state: 'missing' } | { state: 'invalid' } | { state: 'unreadable' }
 
 async function probe(p: string): Promise<Probe> {
+  // Size first, bytes second: our own writes are capped at MAX_SAVE_BYTES, so anything larger was
+  // planted externally and must not be materialised in the main process just to find that out.
+  try {
+    const st = await stat(p)
+    if (st.size > MAX_SAVE_BYTES) return { state: 'invalid' }
+  } catch (e) { return code(e) === 'ENOENT' ? { state: 'missing' } : { state: 'unreadable' } }
   let raw: string
   try { raw = await readFile(p, 'utf8') } catch (e) { return code(e) === 'ENOENT' ? { state: 'missing' } : { state: 'unreadable' } }
   if (raw.trim().length === 0) return { state: 'invalid' }
@@ -81,7 +87,10 @@ async function preserveCorrupt(current: string, corrupt: (n: number) => string):
   return undefined   // ten damaged copies already kept: stop, and leave this one exactly where it is
 }
 
-export interface SaveStoreOptions { verify?: boolean }   // read back and compare; on in debug and test builds
+export interface SaveStoreOptions {
+  verify?: boolean            // read back and compare; on in debug and test builds
+  testWriteDelayMs?: number   // test lever: makes the quit-race smoke actually race the write
+}
 export interface ReadResult { data: string | null; preserved?: string }
 
 export function createSaveStore(dir: string, opts: SaveStoreOptions = {}) {
@@ -100,6 +109,7 @@ export function createSaveStore(dir: string, opts: SaveStoreOptions = {}) {
   }
 
   async function writeNow(id: string, data: string): Promise<number> {
+    if (opts.testWriteDelayMs) await new Promise(r => setTimeout(r, opts.testWriteDelayMs))
     const p = savePaths(dir, id); assertInside(dir, p.current)
     await mkdir(dir, { recursive: true })
     const tmp = p.temp(++seq)
@@ -156,6 +166,9 @@ export function createSaveStore(dir: string, opts: SaveStoreOptions = {}) {
 
   return {
     dir,
+    // Everything currently queued or in flight, settled. The quit path drains this so a write that
+    // reached the main process cannot be abandoned by the app exiting underneath it.
+    flush: (): Promise<void> => Promise.all([...queues.values()]).then(() => undefined),
     read: (id: string) => serial(id, () => readNow(id)),
     readBackup: (id: string) => serial(id, () => readBackupNow(id)),
     write: (id: string, data: string) => serial(id, () => writeNow(id, data)),

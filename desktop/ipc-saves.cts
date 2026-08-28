@@ -15,6 +15,10 @@ export const SAVE_CHANNELS = {
 export interface SaveIpcOptions extends SaveStoreOptions {
   isAllowedSender(wc: WebContents): boolean
   allowedOrigins: string[]
+  // Membership, not just syntax: the game has exactly one profile today, so a compromised renderer
+  // gets no way to mint unbounded 1 MiB files under fresh names. Widened deliberately when profiles
+  // become a feature.
+  allowedProfiles: string[]
 }
 
 type Obj = Record<string, unknown>
@@ -23,7 +27,7 @@ const keysAre = (v: Obj, want: string[]): boolean =>
   Object.keys(v).length === want.length && want.every(k => Object.prototype.hasOwnProperty.call(v, k))
 
 export function registerSaveIpc(dir: string, opts: SaveIpcOptions) {
-  const store = createSaveStore(dir, { verify: opts.verify })
+  const store = createSaveStore(dir, { verify: opts.verify, testWriteDelayMs: opts.testWriteDelayMs })
 
   const gate = (ev: IpcMainInvokeEvent, payload: unknown, want: string[]): Obj | string => {
     if (!opts.isAllowedSender(ev.sender)) return 'sender not allowed'
@@ -32,6 +36,7 @@ export function registerSaveIpc(dir: string, opts: SaveIpcOptions) {
     if (!opts.allowedOrigins.some(o => url.startsWith(o))) return 'sender origin not allowed'
     if (!isObj(payload) || !keysAre(payload, want)) return 'malformed payload'
     if (!isValidProfileId(payload.profileId)) return 'invalid profileId'
+    if (!opts.allowedProfiles.includes(payload.profileId)) return 'unknown profile'
     return payload
   }
 

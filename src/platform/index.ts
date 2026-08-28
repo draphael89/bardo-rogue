@@ -29,6 +29,9 @@ export interface Platform {
   prefersReducedMotion(): boolean
   fullscreen(on?: boolean): Promise<void>
   setRunActive(active: boolean): void                 // so a host can ask before a quit throws a run away
+  // "A write is in flight or queued." Only the desktop host consumes it -- its quit path holds the
+  // window open until the last write lands, instead of racing it. Optional: the web has no quit.
+  setSaving?(saving: boolean): void
   // Fires when something outside this session wrote the save. Only the browser needs it -- two tabs
   // of the same origin -- and the desktop host prevents the equivalent with a single-instance lock.
   watchForeignWrites?(cb: () => void): void

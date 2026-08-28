@@ -18,6 +18,7 @@ export interface DesktopBridge {
     delete(profileId: string): Promise<PlainReply>
   }
   setRunActive(active: boolean): void
+  setSaving(saving: boolean): void
   exportFile(text: string, filename: string): Promise<boolean>
   importFile(): Promise<string | null>
   setFullscreen(on: boolean | 'toggle'): Promise<boolean>
@@ -30,7 +31,7 @@ export interface DesktopBridge {
 export function isDesktopBridge(v: unknown): v is DesktopBridge {
   const b = v as Partial<DesktopBridge> | undefined
   if (!b || b.platform !== 'desktop') return false
-  const fns: Array<unknown> = [b.setRunActive, b.setFullscreen, b.isFullscreen, b.exportFile, b.importFile,
+  const fns: Array<unknown> = [b.setRunActive, b.setSaving, b.setFullscreen, b.isFullscreen, b.exportFile, b.importFile,
     b.saves?.read, b.saves?.readBackup, b.saves?.write, b.saves?.delete]
   return fns.every(f => typeof f === 'function')
 }
@@ -75,6 +76,7 @@ export function createDesktopPlatform(bridge: DesktopBridge): Platform {
     // inverting it here would swallow a second press during macOS's fullscreen animation.
     fullscreen: async on => { await bridge.setFullscreen(on ?? 'toggle') },
     setRunActive: active => bridge.setRunActive(active),
+    setSaving: saving => bridge.setSaving(saving),
     exportFile: (text, filename) => bridge.exportFile(text, filename),
     importFile: () => bridge.importFile(),
   }

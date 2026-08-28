@@ -12,7 +12,13 @@ const VIDEO = /\.(mp4|mov|webm|mkv|avi)$/i
 // A denylist alone would pass a build that shipped NOTHING: publicDir is off at build time, so a bad
 // `pnpm assets`/`pnpm tiles` run, or a new file dropped anywhere in public/ but assets/, fails
 // silently and the game boots to a black screen. These are the things a build must contain.
-const REQUIRED = ['index.html', 'assets/manifest.json']
+// Runtime files the game loads by HARDCODED path (src/render/atlas.ts), so the manifest check
+// cannot protect them: `pnpm assets` regenerating the manifest never mentions them, and without
+// this list their deletion would pass the gate and boot to a missing-texture failure.
+const HARDCODED_RUNTIME = ['assets/sprites/bardo_hero.png', 'assets/sprites/bardo_brute.png']
+const REQUIRED = ['index.html', 'assets/manifest.json', ...HARDCODED_RUNTIME]
+// The bundle's own artifacts live flat in assets/: hashed js chunks, css, and their maps.
+const BUNDLE_ARTIFACT = /^assets\/[^/]+\.(?:js|css)(?:\.map)?$/
 const FLOOR_BYTES = 1.5 * 1024 * 1024     // measured shipped payload is ~2.1MB across 202 files
 const BUDGET_BYTES = 4 * 1024 * 1024      // shipped payload, .map excluded (measured ~2.2MB: pixi + 174 assets)
 const MAP_BUDGET_BYTES = 8 * 1024 * 1024  // sourcemaps are not fetched by the game; budgeted apart so a
@@ -75,19 +81,30 @@ for (const f of files) {
 const present = new Set(files.map(f => f.path))
 for (const req of REQUIRED) if (!present.has(req)) flag('required file missing from the build', req)
 
-// The manifest is the game's own index of what it will fetch at runtime; every path it names has to
-// be on disk, or the build boots and then 404s.
+// The manifest is the game's own index of what it will fetch at runtime. The check runs BOTH ways:
+// every path it names must be on disk (or the build boots and then 404s), and every file on disk
+// must be accounted for -- manifest-named, a bundle artifact, or on the short hardcoded-runtime
+// list. Without the second direction the gate is a denylist, and a stray file dropped into
+// public/assets ships because no forbidden segment happens to match it.
 const manifestFile = files.find(f => f.path === 'assets/manifest.json')
 if (manifestFile) {
   try {
     const manifest = JSON.parse(readFileSync(join(DIST, 'assets/manifest.json'), 'utf8')) as Record<string, string[]>
+    const accounted = new Set<string>(['assets/manifest.json', ...HARDCODED_RUNTIME])
     let listed = 0
     for (const [group, names] of Object.entries(manifest)) {
       if (!Array.isArray(names)) continue
       for (const name of names) {
         listed++
-        if (!present.has(`assets/${group}/${name}`)) flag('asset named by manifest.json is not in the build', `assets/${group}/${name}`)
+        const path = `assets/${group}/${name}`
+        accounted.add(path)
+        if (!present.has(path)) flag('asset named by manifest.json is not in the build', path)
       }
+    }
+    for (const f of files) {
+      if (!f.path.startsWith('assets/')) continue
+      if (accounted.has(f.path) || BUNDLE_ARTIFACT.test(f.path)) continue
+      flag('file in the build that nothing accounts for', f.path)
     }
     console.log(`${''.padStart(11)}  manifest lists ${listed} runtime assets`)
   } catch (e) { flag(`manifest.json could not be read: ${String(e)}`, '') }

@@ -44,7 +44,7 @@ export interface BardoSave {
   checkpoint: RunCheckpoint | null
 }
 
-export type SaveCorruption = 'not-json' | 'not-object' | 'bad-schema-version' | 'no-migration' | 'bad-meta' | 'bad-settings'
+export type SaveCorruption = 'not-json' | 'not-object' | 'bad-schema-version' | 'no-migration' | 'bad-meta' | 'bad-settings' | 'missing-meta' | 'missing-settings'
 
 export interface ParseSaveOptions {
   profileId?: string                 // always wins over whatever the file claims
@@ -150,10 +150,21 @@ export function migrateSave(input: unknown, opts: ParseSaveOptions = {}): Migrat
     v = next
   }
 
-  // Present-but-wrong-typed is damage and must not be silently zeroed into a fresh save; absent is
-  // simply a field this document predates.
+  // Present-but-wrong-typed is damage and must not be silently zeroed into a fresh save; on a
+  // MIGRATED document, absent is simply a field that version predates.
   if (obj.meta !== undefined && (!isObj(obj.meta) || (obj.meta.version !== undefined && obj.meta.version !== 1))) return { kind: 'corrupt', reason: 'bad-meta' }
   if (obj.settings !== undefined && (!isObj(obj.settings) || (obj.settings.version !== undefined && obj.settings.version !== 1))) return { kind: 'corrupt', reason: 'bad-settings' }
+
+  // A document that ARRIVES at the current schema must carry its required fields: every envelope this
+  // build has ever written has all of them, so a sparse one was never written by us. Treating it as
+  // valid-with-defaults would be worse than corruption -- it would parse 'ok', skip the backup, and
+  // the next autosave would rotate the last good generation away under a document full of zeroes.
+  // (A doc migrated UP from an older version keeps the leniency above: a v1 with no settings key is a
+  // real settings-less legacy player, not damage.)
+  if (sv === SAVE_SCHEMA_VERSION) {
+    if (obj.meta === undefined) return { kind: 'corrupt', reason: 'missing-meta' }
+    if (obj.settings === undefined) return { kind: 'corrupt', reason: 'missing-settings' }
+  }
 
   const meta = isObj(obj.meta) ? validateMeta(obj.meta) : defaultMetaState()
   const settings = isObj(obj.settings)

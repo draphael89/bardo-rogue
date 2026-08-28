@@ -112,10 +112,12 @@ async function boot() {
   let writing: Promise<void> | null = null
   let queued: string | null = null
   let writeFailed = false
+  let suppressedPersistShown = false
   const drain = (): void => {
     if (writing || queued === null) return
     const payload = queued
     queued = null
+    platform.setSaving?.(true)             // so a desktop quit waits for this write instead of racing it
     writing = platform.saves.write(PROFILE_ID, payload)
       .catch(err => {
         console.log(`[save] write failed: ${String(err)}`)
@@ -124,10 +126,20 @@ async function boot() {
         // progress without a single hint that anything went wrong.
         if (!writeFailed) { writeFailed = true; presenter.hud.showBanner('PROGRESS NOT SAVING', 'this run will not be recorded', 3.0) }
       })
-      .then(() => { writing = null; drain() })
+      .then(() => {
+        writing = null
+        if (queued === null) platform.setSaving?.(false)
+        drain()
+      })
   }
   const persist = () => {
-    if (!savable) return
+    if (!savable) {
+      // The write is suppressed by design (a newer build's save, or a profile we could not read).
+      // The boot banner said why once; this says WHEN it starts costing something -- at the first
+      // moment the player earned a save that is not going to happen.
+      if (!noSave && !suppressedPersistShown) { suppressedPersistShown = true; presenter.hud.showBanner('PROGRESS NOT SAVING', 'this profile cannot be written', 3.0) }
+      return
+    }
     savedSave = bumpRevision({ ...savedSave, settings: { version: 1, reducedEffects: storedReducedEffects } })
     queued = serializeSave(savedSave)      // only the newest payload survives; older ones are stale by definition
     drain()
@@ -293,6 +305,15 @@ async function boot() {
   else if (scenario === 'bow') presenter.hud.showBanner('THE THRESHOLD', 'the string is taut', 1.8)
   else if (scenario === 'boss') presenter.hud.showBanner('THE WARDEN', 'the first judge', 1.8)
   else presenter.hud.showBanner(scenario.toUpperCase(), '', 1.2)
+
+  // A profile that will not be saved, or one that had to be rescued, is told to the PLAYER at boot,
+  // not just the console -- overriding the room banner in exactly the rare case where the warning
+  // matters more than the room name. save=off skips it, so evidence captures stay clean.
+  if (!noSave) {
+    if (loaded.source === 'unreadable') presenter.hud.showBanner('SAVE COULD NOT BE READ', 'playing without saving, nothing will be overwritten', 3.5)
+    else if (!savable) presenter.hud.showBanner('SAVE FROM A NEWER BUILD', 'playing without saving, nothing will be overwritten', 3.5)
+    else if (loaded.source === 'backup') presenter.hud.showBanner('SAVE RESTORED', 'recovered from the backup copy', 3.0)
+  }
 }
 
 boot().catch(err => { console.error(err); document.body.innerHTML = `<pre style="color:#f88;padding:16px">${String(err?.stack ?? err)}</pre>` })

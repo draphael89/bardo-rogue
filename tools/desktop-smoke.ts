@@ -85,6 +85,9 @@ async function launch(): Promise<{ app: ElectronApplication; page: Page }> {
       // Software GL only where there is no GPU. Forcing it on macOS would mean the smoke never
       // exercises the Metal-backed ANGLE path the product actually ships on.
       ...(process.platform === 'linux' ? { BARDO_SOFTWARE_GL: '1' } : {}),
+      // Every write takes 250ms, so the quit-race check genuinely races a write that is still in
+      // flight when the close begins -- without this, a fast disk makes that check pass vacuously.
+      BARDO_TEST_SLOW_WRITE_MS: '250',
     },
     timeout: 60_000,
   }), 60_000, 'electron.launch')
@@ -201,7 +204,7 @@ try {
       }
     })
     const s = surface as { top: string[] | null; saves: string[] | null; leaks: string[] }
-    const wantTop = ['exportFile', 'importFile', 'isFullscreen', 'platform', 'saves', 'setFullscreen', 'setRunActive', 'versions']
+    const wantTop = ['exportFile', 'importFile', 'isFullscreen', 'platform', 'saves', 'setFullscreen', 'setRunActive', 'setSaving', 'versions']
     assert(JSON.stringify(s.top) === JSON.stringify(wantTop), `unexpected bardoDesktop keys: ${JSON.stringify(s.top)}`)
     assert(JSON.stringify(s.saves) === JSON.stringify(['delete', 'read', 'readBackup', 'write']), `unexpected saves keys: ${JSON.stringify(s.saves)}`)
     assert(s.leaks.length === 0, `node globals leaked into the renderer: ${s.leaks.join(', ')}`)
@@ -299,7 +302,18 @@ try {
     return `envelope v${doc.schemaVersion} rev${doc.revision} written by the game`
   })
 
-  await close(l1.app)
+  await check('a quit does not race the last pending save', 30_000, async () => {
+    // Press V and close IMMEDIATELY: the write is still queued in the renderer or in flight on disk
+    // when the close begins. The host's close path must hold the window until it lands -- before
+    // that flush existed, this exact sequence lost the newest update.
+    const doc1 = JSON.parse(readFileSync(join(savesDir, 'default.json'), 'utf8')) as { revision: number; settings: { reducedEffects: boolean } }
+    await page.evaluate(() => { window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyV' })) })
+    await close(l1.app)                       // no wait for the file: the close itself must flush it
+    const doc2 = JSON.parse(readFileSync(join(savesDir, 'default.json'), 'utf8')) as { revision: number; settings: { reducedEffects: boolean } }
+    assert(doc2.revision === doc1.revision + 1, `the pending write was lost: revision ${doc1.revision} -> ${doc2.revision}`)
+    assert(doc2.settings.reducedEffects === !doc1.settings.reducedEffects, 'the pending write was lost: the setting did not flip')
+    return `revision ${doc1.revision} -> ${doc2.revision} survived the quit`
+  })
 
   // Put the known fixture bytes back, since the game's own write above replaced them.
   writeFileSync(join(savesDir, 'default.json'), saveA, 'utf8')

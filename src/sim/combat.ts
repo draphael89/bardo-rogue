@@ -16,10 +16,17 @@ export function sweepEase(u: number, heavy: boolean): number {
   return hangV + (1 - hangV) * (1 - (1 - k) ** 3)
 }
 
+// The authoritative swept fraction after active simulation tick `k` has resolved. Both collision
+// and presentation consume this sample: interpolation must never leave the blade behind a sector
+// that can already deal damage (or lead into a sector the simulation has not tested yet).
+export function swingProgress(s: SwingDef, k: number): number {
+  return sweepEase((k + 1) / s.active, s.heavy)
+}
+
 // The leading edge of swing `s` at the end of tick `k` of its active window.
 export function swingEdge(s: SwingDef, angle: number, k: number): number {
   const half = deg(s.arcDeg) / 2
-  return angle - s.sweep * half + s.sweep * half * 2 * sweepEase((k + 1) / s.active, s.heavy)
+  return angle - s.sweep * half + s.sweep * half * 2 * swingProgress(s, k)
 }
 
 // Authored body travel for one tick of the swing: a coil backwards across startup, then a forward
@@ -50,8 +57,10 @@ export function addFreeze(world: World, ticks: number): void {
 // deepen or extend the effect; they can never stack into a permanent slow.
 export function addBulletTime(world: World, ticks: number, rate: number): void {
   if (ticks <= 0) return   // or slowRate would be set with no countdown to ever restore it
+  const add = Math.min(tuning.bullet.maxTicks, ticks)
   world.slowRate = world.slowTicks > 0 ? Math.min(world.slowRate, rate) : rate
-  world.slowTicks = Math.min(tuning.bullet.maxTicks, Math.max(world.slowTicks, ticks))
+  // longest tail wins: cap the incoming window, never shrink a longer one already running
+  world.slowTicks = Math.max(world.slowTicks, add)
 }
 
 export function clearBulletTime(world: World): void {
@@ -60,29 +69,34 @@ export function clearBulletTime(world: World): void {
   world.slowTicks = 0
 }
 
-export function damageEnemy(world: World, e: Enemy, damage: number, angle: number, knockback: number, heavy: boolean, hitstop: number): void {
+export function damageEnemy(world: World, e: Enemy, damage: number, angle: number, knockback: number, heavy: boolean, hitstop: number, sourceActionId = world.player.swingId): void {
   if (!e.active || e.state === 'dead') return
   e.hp -= damage
   e.flash = tuning.juice.flashTicks
   const kind = e.kind
   const killed = e.hp <= 0
+  const actionId = sourceActionId
   const scale = kind === 'dummy' ? 0 : tuning[kind].knockbackScale
   const kb = killed ? knockback * 1.5 : knockback * scale
   e.kbx += Math.cos(angle) * kb
   e.kby += Math.sin(angle) * kb
   e.facing = Math.cos(angle) > 0 ? -1 : 1 // face the attacker
 
+  // A heavy is the committed swing. The world takes a short breath; the player does not.
+  // Dummies are a training bag — they must not put the room in slow motion.
+  if (heavy && kind !== 'dummy') addBulletTime(world, tuning.bullet.heavyTicks, tuning.bullet.heavyRate)
+
   if (killed) {
     e.state = 'dead'
     e.stateTick = 0
     addFreeze(world, hitstop + tuning.hitstop.killBonus)
-    world.emit({ type: 'hit', x: e.x, y: e.y, angle, damage, heavy, targetId: e.id, kind, killed: true })
-    world.emit({ type: 'kill', x: e.x, y: e.y, angle, kind, id: e.id })
+    world.emit({ type: 'hit', x: e.x, y: e.y, angle, damage, heavy, targetId: e.id, kind, killed: true, actionId })
+    world.emit({ type: 'kill', x: e.x, y: e.y, angle, kind, id: e.id, actionId })
     e.active = false
     return
   }
   addFreeze(world, hitstop)
-  world.emit({ type: 'hit', x: e.x, y: e.y, angle, damage, heavy, targetId: e.id, kind, killed: false })
+  world.emit({ type: 'hit', x: e.x, y: e.y, angle, damage, heavy, targetId: e.id, kind, killed: false, actionId })
 
   // poise: brutes only stagger from the heavy; the warden only from a heavy while not committed;
   // dummies never; everyone else staggers on any hit
@@ -117,8 +131,8 @@ export function hurtPlayer(world: World, angle: number, damage: number): boolean
   const p = world.player
   if (p.state === 'dead') return false
   if (isPlayerInvulnerable(world)) {
-    if (p.state === 'dodge' && !p.dodgeRead) {
-      p.dodgeRead = 1
+    if (p.dodgeTick >= 0 && p.dodgeRead < 2) {
+      p.dodgeRead = 2
       // the read is the reward: the world drops to a crawl and the player's clock does not
       addBulletTime(world, tuning.bullet.ticks, tuning.bullet.rate)
       world.emit({ type: 'dodged', x: p.x, y: p.y })
@@ -148,9 +162,23 @@ export function hurtPlayer(world: World, angle: number, damage: number): boolean
 export function isPlayerInvulnerable(world: World): boolean {
   const p = world.player
   if (p.iframes > 0) return true
-  if (p.state === 'dodge') {
-    const d = tuning.player.dodge
-    return p.stateTick >= d.iStart && p.stateTick <= d.iEnd
-  }
-  return false
+  const d = tuning.player.dodge
+  return p.dodgeTick >= d.iStart && p.dodgeTick <= d.iEnd
+}
+
+// A hostile hitbox passed close during the roll (or just as the i-frames ended) without overlapping.
+// Once per roll; a later overlap still upgrades to the jackpot. The graze emits only a short cyan
+// scratch and small breath; the cold ring and bright body rim stay reserved for a real pass-through.
+export function noteNearMiss(world: World, angle = 0, nearX?: number, nearY?: number): void {
+  const p = world.player
+  if (p.dodgeRead) return
+  const d = tuning.player.dodge
+  if (p.dodgeTick < d.iStart || p.dodgeTick > d.iEnd + 2) return
+  p.dodgeRead = 1
+  addBulletTime(world, tuning.bullet.grazeTicks, tuning.bullet.grazeRate)
+  world.emit({
+    type: 'graze', x: p.x, y: p.y, angle,
+    nearX: nearX ?? p.x - Math.cos(angle) * (p.radius + 3),
+    nearY: nearY ?? p.y - Math.sin(angle) * (p.radius + 3),
+  })
 }

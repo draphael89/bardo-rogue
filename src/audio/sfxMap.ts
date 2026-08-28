@@ -85,6 +85,11 @@ export function playEventSfx(a: AudioSystem, ev: SimEvent): void {
       // an attack passed through the i-frames: the near miss is the reward, never varied
       a.play('woosh4', { gain: 1.2, pitch: 0.55, pitchVar: 0, lead: true }); a.swish(1.2, 220, 0.6, undefined, true)
       break
+    case 'graze':
+      // A small high breath, intentionally below the low, long perfect-dodge confirmation.
+      a.play('woosh4', { gain: 0.34, pitch: 1.55, pitchVar: 0, lead: true })
+      a.bell(0.16, 1800, 0.11, 'sfx', 0, { partials: 'tone', glideTo: 2400, strike: 0.08, cap: 'strike' })
+      break
     case 'dodgeEnd':
       a.play('cloth2', { gain: 2.2, pitch: 1.15, pitchVar: 0.12 })   // the quiet take: a tail, not a cue
       break
@@ -204,7 +209,7 @@ export function playEventSfx(a: AudioSystem, ev: SimEvent): void {
  */
 function listen(a: AudioSystem, ev: SimEvent): void {
   switch (ev.type) {
-    case 'footstep': case 'swing': case 'dodge': case 'dodgeEnd': case 'dodged':
+    case 'footstep': case 'swing': case 'dodge': case 'dodgeEnd': case 'dodged': case 'graze':
     case 'draw': case 'arrowLoose':
     case 'playerHurt': case 'playerDeath': case 'returned': a.setListener(ev.x, ev.y)
   }

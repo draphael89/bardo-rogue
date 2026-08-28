@@ -2,12 +2,13 @@
 export interface InputFrame {
   moveX: number; moveY: number      // -1..1, normalized by the input layer
   aimX: number; aimY: number        // unit vector from the player toward the aim target
-  aimSoft: boolean                  // true when aim comes from movement (gamepad w/o right stick): sim applies aim assist
-  attack: boolean                   // pressed this tick (edge)
+  aimSoft: boolean                  // coarse/contextual aim (movement, arrows, retained): sim may apply assist; Q lock is exact
+  attack: boolean                   // pressed this tick (edge / discrete bot request)
+  attackHeld: boolean               // physically held; sustains combo flow but is never queued after release
   dodge: boolean                    // pressed this tick (edge)
   restart: boolean
 }
 
 export function emptyInput(): InputFrame {
-  return { moveX: 0, moveY: 0, aimX: 1, aimY: 0, aimSoft: false, attack: false, dodge: false, restart: false }
+  return { moveX: 0, moveY: 0, aimX: 1, aimY: 0, aimSoft: false, attack: false, attackHeld: false, dodge: false, restart: false }
 }

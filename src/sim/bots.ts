@@ -2,6 +2,8 @@
 import type { World, Enemy } from './world'
 import { emptyInput, type InputFrame } from './input'
 import { tuning } from '@/tuning'
+import { hasLineOfSight } from './arena'
+import { overlapsSolid } from './collision'
 
 export type Bot = (world: World) => InputFrame
 export type BotName = 'idle' | 'naive-melee' | 'kite'
@@ -66,7 +68,26 @@ function kite(world: World): InputFrame {
   const incomingBolt = world.projectiles.some(b => b.active && Math.hypot(b.x - p.x, b.y - p.y) < 22)
   if ((threat || incomingBolt) && p.state !== 'dodge') {
     inp.dodge = true
-    inp.moveX = -inp.aimY; inp.moveY = inp.aimX // roll sideways
+    // Prefer the old left-hand sidestep, but do not ask the collision regression probe to roll into
+    // a pillar when the equally valid opposite lane is open. This keeps the bot measuring combat
+    // decisions instead of an obsolete corner-pop escape.
+    const left = { x: -inp.aimY, y: inp.aimX }
+    const right = { x: inp.aimY, y: -inp.aimX }
+    const room = (d: { x: number; y: number }) => {
+      let clear = 0
+      for (let n = 8; n <= tuning.player.dodge.distance; n += 8) {
+        if (overlapsSolid(world.arena, p.x + d.x * n, p.y + d.y * n, p.radius)) break
+        clear = n
+      }
+      return clear
+    }
+    const dir = room(right) > room(left) ? right : left
+    inp.moveX = dir.x; inp.moveY = dir.y
+    return inp
+  }
+  if (!hasLineOfSight(world.arena, p.x, p.y, e.x, e.y)) {
+    inp.moveX = -inp.aimY * e.orbitDir
+    inp.moveY = inp.aimX * e.orbitDir
     return inp
   }
   const punishable = e.state === 'recover' || e.state === 'stagger' || e.state === 'aim' || e.state === 'idle' || e.kind === 'caster'
@@ -74,10 +95,11 @@ function kite(world: World): InputFrame {
     if (d > 20) { inp.moveX = inp.aimX; inp.moveY = inp.aimY }
     if (d <= 26) inp.attack = world.tick % 3 === 0
   } else {
-    // hold spacing just outside brute range, poke when safe
-    if (d < 34) { inp.moveX = -inp.aimX; inp.moveY = -inp.aimY }
-    else if (d > 44) { inp.moveX = inp.aimX; inp.moveY = inp.aimY }
-    if (d <= 26 && e.state === 'chase') inp.attack = world.tick % 3 === 0
+    // Close to a real punish distance. The old 34–44 px dead band could stare at a brute across a
+    // pillar forever; a human routes around it, so the control probe must keep expressing intent too.
+    if (d < 23) { inp.moveX = -inp.aimX; inp.moveY = -inp.aimY }
+    else if (d > 25) { inp.moveX = inp.aimX; inp.moveY = inp.aimY }
+    if (d <= 27 && e.state === 'chase') inp.attack = world.tick % 3 === 0
   }
   return inp
 }

@@ -116,7 +116,7 @@ describe('dodge', () => {
   it('rolls through a bolt without taking damage', () => {
     const w = createWorld(1, 'empty')
     const p = w.player
-    w.fireProjectile(p.x + 30, p.y, Math.PI, 110, 3, 200)
+    w.fireProjectile(p.x + 16, p.y, Math.PI, 110, 3, 200)
     stepWorld(w, { ...emptyInput(), dodge: true, moveX: 1 })
     let hurt = false
     for (let i = 0; i < 30; i++) { stepWorld(w, emptyInput()); if (w.events.some(e => e.type === 'playerHurt')) hurt = true; w.events.length = 0 }
@@ -246,12 +246,12 @@ describe('attack', () => {
     const w = createWorld(1, 'empty')
     const swings: number[] = []
     for (let i = 0; i < 300; i++) {
-      stepWorld(w, { ...emptyInput(), attack: true })   // held, not mashed
+      stepWorld(w, { ...emptyInput(), attack: i === 0, attackHeld: true })
       for (const e of w.events) if (e.type === 'swing') swings.push(e.swing)
       w.events.length = 0
     }
     expect(swings.length).toBeGreaterThan(6)
-    // the buffer is re-armed every tick, so the gates alone must keep the loop honest
+    // held intent sustains the chain but never manufactures discrete queued presses
     for (let i = 0; i < swings.length; i++) expect(swings[i], `swing ${i}`).toBe(i % 3)
   })
   it('hits a dummy in front once per swing and applies hit-stop', () => {

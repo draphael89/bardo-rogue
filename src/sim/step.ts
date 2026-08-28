@@ -72,20 +72,24 @@ function resolveOverlaps(world: World, moved: boolean): void {
   const es = world.enemies
   // A roll ghosts for its whole travel phase, not just its i-frame window. Being hittable on the
   // brake tail is the price of the roll; being body-blocked mid-flight is a broken promise.
-  const playerGhost = p.state === 'dodge' && p.stateTick < tuning.player.dodge.travel
-  for (let i = 0; i < es.length; i++) {
-    const a = es[i]
-    if (!a.active || a.state === 'dead') continue
-    if (!playerGhost && p.state !== 'dead' && a.state !== 'dash') {
-      if (moved) separate(world.arena, p, p.radius, a, a.radius, 0.3, 0.7)
-      else separate(world.arena, p, p.radius, a, a.radius, 1, 0)
-    }
-    if (!moved) continue
-    for (let j = i + 1; j < es.length; j++) {
-      const b = es[j]
-      if (!b.active || b.state === 'dead') continue
-      if (a.state === 'dash' || b.state === 'dash') continue
-      separate(world.arena, a, a.radius, b, b.radius, 0.5, 0.5)
+  const playerGhost = p.dodgeTick >= 0 && p.dodgeTick < tuning.player.dodge.travel
+  // Four passes are cheap at the 32-body ceiling and converge wall-pinned triples below a quarter
+  // pixel without an order-random solver. Fixed count keeps replays bit-for-bit deterministic.
+  for (let pass = 0; pass < 4; pass++) {
+    for (let i = 0; i < es.length; i++) {
+      const a = es[i]
+      if (!a.active || a.state === 'dead') continue
+      if (!playerGhost && p.state !== 'dead' && a.state !== 'dash') {
+        if (moved) separate(world.arena, p, p.radius, a, a.radius, 0.3, 0.7)
+        else separate(world.arena, p, p.radius, a, a.radius, 1, 0)
+      }
+      if (!moved) continue
+      for (let j = i + 1; j < es.length; j++) {
+        const b = es[j]
+        if (!b.active || b.state === 'dead') continue
+        if (a.state === 'dash' || b.state === 'dash') continue
+        separate(world.arena, a, a.radius, b, b.radius, 0.5, 0.5)
+      }
     }
   }
 }

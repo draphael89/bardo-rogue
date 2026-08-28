@@ -4,7 +4,7 @@ import type { World } from './world'
 export class Metrics {
   ticks = 0
   swings = 0; hitsLanded = 0; kills = 0; whiffSwings = 0
-  dodges = 0; successfulDodges = 0
+  dodges = 0; successfulDodges = 0; grazes = 0
   boltsFired = 0; boltsCut = 0
   enemyAttacks = 0; damageTaken = 0; deaths = 0
   wavesCleared = 0; clearTick = -1; deathTick = -1; returns = 0
@@ -16,10 +16,11 @@ export class Metrics {
     for (const ev of events) {
       switch (ev.type) {
         case 'swing': this.swings++; this.lastSwingId = world.player.swingId; this.swingHit.set(this.lastSwingId, false); break
-        case 'hit': this.hitsLanded++; this.swingHit.set(world.player.swingId, true); break
+        case 'hit': this.hitsLanded++; this.swingHit.set(ev.actionId, true); break
         case 'kill': this.kills++; break
         case 'dodge': this.dodges++; break
         case 'dodged': this.successfulDodges++; break
+        case 'graze': this.grazes++; break
         case 'boltFired': this.boltsFired++; break
         case 'arrowLoose': this.boltsFired++; break
         case 'boltCut': this.boltsCut++; break
@@ -39,7 +40,7 @@ export class Metrics {
     return {
       ticks: this.ticks, seconds: +(this.ticks / 60).toFixed(1),
       swings: this.swings, hitsLanded: this.hitsLanded, whiffSwings: whiffs, kills: this.kills,
-      dodges: this.dodges, successfulDodges: this.successfulDodges,
+      dodges: this.dodges, successfulDodges: this.successfulDodges, grazes: this.grazes,
       boltsFired: this.boltsFired, boltsCut: this.boltsCut,
       enemyAttacks: this.enemyAttacks, damageTaken: this.damageTaken, deaths: this.deaths,
       wavesCleared: this.wavesCleared, returns: this.returns,

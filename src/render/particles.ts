@@ -193,6 +193,20 @@ export class Particles {
     }
   }
 
+  // A graze is a whisper, not the perfect-dodge jackpot: three cyan needles peel off the threat
+  // line and vanish before they can read as a hit spark or as the expanding cold success ring.
+  graze(x: number, y: number, angle: number) {
+    for (let i = -1; i <= 1; i++) {
+      const a = angle + Math.PI + i * 0.34
+      const sp = 70 + (i + 1) * 18
+      this.spawn(this.atlas.particle('spark_01'), x + Math.cos(a) * 5, y + Math.sin(a) * 3, {
+        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp * 0.6,
+        maxLife: 0.19 + (i + 1) * 0.015, drag: 0.82,
+        scale0: 7, scale1: 1, tint: 0x70d4ea, blend: 'add', alpha0: 0.95, alpha1: 0,
+      })
+    }
+  }
+
   // Poise break: the guard comes apart. Steel ring, chips that fall, dust at the feet. The brute's
   // version is the only one big enough to see across the room, because only the heavy earns it.
   poiseBreak(x: number, y: number, big: boolean) {

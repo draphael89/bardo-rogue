@@ -1,7 +1,7 @@
 import { tuning, DT } from '@/tuning'
 import type { World, Enemy } from '../world'
 import { angleToPlayer, distToPlayer, moveToward, moveAlong, facePlayer, tickStagger } from './common'
-import { hurtPlayer } from '../combat'
+import { hurtPlayer, noteNearMiss } from '../combat'
 
 const IDLE_TICKS = 20
 
@@ -45,7 +45,9 @@ export function updateCharger(world: World, e: Enemy): void {
       const r = moveAlong(world, e, e.aimAngle, C.dashSpeed)
       if (!e.hitDone) {
         const d = distToPlayer(world, e)
-        if (d <= e.radius + p.radius) { hurtPlayer(world, e.aimAngle, C.damage); e.hitDone = true }
+        const hitR = e.radius + p.radius
+        if (d <= hitR) { hurtPlayer(world, e.aimAngle, C.damage); e.hitDone = true }
+        else if (d <= hitR + tuning.bullet.grazePx) noteNearMiss(world, e.aimAngle)
       }
       if (r.hitX || r.hitY || e.stateTick >= e.dashTicks) { e.state = 'recover'; e.stateTick = 0 }
       break

@@ -14,7 +14,7 @@ export type EncodedRun = [number, number, number, number, number, number]
 export interface EncodedReplay { v: 1; seed: number; scenario: string; god?: boolean; runs: EncodedRun[] }
 
 export const Q = 10000
-const FLAG = { aimSoft: 1, attack: 2, dodge: 4, restart: 8 } as const
+const FLAG = { aimSoft: 1, attack: 2, dodge: 4, restart: 8, attackHeld: 16 } as const
 
 // Encoding rounds axes to 1/Q. Recorders feed the sim quantized frames so encode(decode()) is lossless.
 export function quantizeFrame(f: InputFrame): InputFrame {
@@ -25,7 +25,7 @@ export function quantizeFrame(f: InputFrame): InputFrame {
 export function encodeReplay(r: Replay): EncodedReplay {
   const runs: EncodedRun[] = []
   for (const f of r.frames) {
-    const flags = (f.aimSoft ? FLAG.aimSoft : 0) | (f.attack ? FLAG.attack : 0) | (f.dodge ? FLAG.dodge : 0) | (f.restart ? FLAG.restart : 0)
+    const flags = (f.aimSoft ? FLAG.aimSoft : 0) | (f.attack ? FLAG.attack : 0) | (f.dodge ? FLAG.dodge : 0) | (f.restart ? FLAG.restart : 0) | (f.attackHeld ? FLAG.attackHeld : 0)
     const row: EncodedRun = [Math.round(f.moveX * Q), Math.round(f.moveY * Q), Math.round(f.aimX * Q), Math.round(f.aimY * Q), flags, 1]
     const last = runs[runs.length - 1]
     if (last && last[0] === row[0] && last[1] === row[1] && last[2] === row[2] && last[3] === row[3] && last[4] === row[4]) last[5]++
@@ -42,7 +42,7 @@ export function decodeReplay(e: EncodedReplay): Replay {
   for (const [mx, my, ax, ay, flags, count] of e.runs) {
     const f: InputFrame = {
       moveX: mx / Q, moveY: my / Q, aimX: ax / Q, aimY: ay / Q,
-      aimSoft: !!(flags & FLAG.aimSoft), attack: !!(flags & FLAG.attack), dodge: !!(flags & FLAG.dodge), restart: !!(flags & FLAG.restart),
+      aimSoft: !!(flags & FLAG.aimSoft), attack: !!(flags & FLAG.attack), attackHeld: !!(flags & FLAG.attackHeld), dodge: !!(flags & FLAG.dodge), restart: !!(flags & FLAG.restart),
     }
     for (let i = 0; i < count; i++) frames.push(f)
   }

@@ -4,7 +4,7 @@ import type { Atlas } from '../atlas'
 import type { World, Player } from '@/sim/world'
 import { tuning } from '@/tuning'
 import { lerp, clamp01, easeOutCubic, easeInCubic, lerpAngle } from '../anim'
-import { sweepEase } from '@/sim/combat'
+import { swingProgress } from '@/sim/combat'
 import { hasBoon, swingReach } from '@/sim/boons'
 import { EntityView, SPRITE, WEAPON, HALF_PI } from './shared'
 import { ARM, armOf } from '@/sim/weapons'
@@ -48,7 +48,7 @@ export function updatePlayerRim(v: EntityView, on: boolean, color: number): void
 }
 
 // ---------------------------------------------------------------------------------------------
-// The roll's own art. Seven authored 16 px poses, in the player sprite's exact five-colour palette
+// The roll's own art. Eight authored 16 px poses, in the player sprite's exact five-colour palette
 // (outline 3f2631, shadow 52607c, steel 8b9bb4, highlight c0cbdc, leather bd6c4a), drawn once into
 // nearest-sampled textures at first use. A dodge is NOT the standing sprite under a transform: the
 // body pitches over on the launch, leaves the floor, turns through two tuck halves whose helmet and
@@ -201,6 +201,96 @@ const ROLL_ART: Record<string, string[]> = {
     '...kk.kddk.kk...',
     '......klk.......',
   ],
+  lightCoil: [
+    '................',
+    '......kkkk......',
+    '.....kllllk.....',
+    '.....kllllk.....',
+    '.....kmlmlk.....',
+    '....kmmmmmk.....',
+    '....kmmmmmk.....',
+    '...kkmmmmmk.....',
+    '..kdmkkkkmk.....',
+    '..kdmssssmk.....',
+    '..kdkkmmmkk.....',
+    '..kdk.kddk......',
+    '..kk..kddk......',
+    '......kddk......',
+    '......klk.......',
+    '................',
+  ],
+  lightCut: [
+    '................',
+    '....kkkk........',
+    '...kllllk.......',
+    '...kllllk.......',
+    '...kmllmk.......',
+    '..kmmmmmmk......',
+    '..kmmkmkmk......',
+    '.kmmmmmmmmk.....',
+    'kdmkkkkkkmk.....',
+    'kdk.sssss.k.....',
+    'kk.kmmmmmk......',
+    '...kdddddk......',
+    '...kddkkddk.....',
+    '...kdk..kdk.....',
+    '...klk..klk.....',
+    '................',
+  ],
+  heavyCoil: [
+    '................',
+    '................',
+    '......kkkk......',
+    '.....kllllk.....',
+    '.....kllllk.....',
+    '....kmllllmk....',
+    '....kmmmmmmk....',
+    '...kmmmmmmmmk...',
+    '..kmmkkkkmmmk...',
+    '.kdmssssssmdk...',
+    '.kdkkmmmmkkdk...',
+    '.kk.kddddddk.k..',
+    '....kddk.kddk...',
+    '...kddk...kddk..',
+    '...klk.....klk..',
+    '................',
+  ],
+  heavyCut: [
+    '................',
+    '...kkkk.........',
+    '..kllllk........',
+    '..kllllkk.......',
+    '..kmllmmmk......',
+    '.kmmmmmmmmk.....',
+    'kmmmmmmmmmmk....',
+    'kdmkkkkkkkmk....',
+    'kdk.ssssssmk....',
+    'kk..kmmmmmmk....',
+    '....kddddddk....',
+    '...kddk.kddk....',
+    '..kddk...kdk....',
+    '..klk....klk....',
+    '................',
+    '................',
+  ],
+  heavyHold: [
+    '................',
+    '................',
+    '.....kkkkk......',
+    '....klllllk.....',
+    '....klllllk.....',
+    '...kmlllllmk....',
+    '...kmmmmmmmk....',
+    '..kmmmmmmmmmk...',
+    '.kmmkkkkkmmmk...',
+    'kdmkssssskmdk...',
+    'kdk.kmmmmk.kdk..',
+    'kk.kddddddk.kk..',
+    '...kddk.kddk....',
+    '..kddk...kddk...',
+    '..klk.....klk...',
+    '................',
+  ],
 }
 
 let rollTextures: Record<string, Texture> | null = null
@@ -237,20 +327,47 @@ function rollPose(stateTick: number): { key: string; leanDeg: number; hop: numbe
   return row
 }
 
+// Authored swing silhouettes. Recovery hands the Kenney body back (`key: ''`) so the
+// fighter reads as "on the feet" the moment the blade is done. Lights share one pair;
+// the heavy gets its own plant / throw / hold so a still frame names the swing.
+function attackPose(p: Player): { key: string; leanDeg: number; hop: number } {
+  const s = tuning.player.attack.swings[p.swingIndex]
+  const tk = p.stateTick
+  if (tk < s.startup) {
+    return s.heavy
+      ? { key: 'heavyCoil', leanDeg: -14, hop: -2 }
+      : { key: 'lightCoil', leanDeg: -8, hop: 0 }
+  }
+  if (tk < s.startup + s.active) {
+    return s.heavy
+      ? { key: 'heavyCut', leanDeg: 16, hop: 2 }
+      : { key: 'lightCut', leanDeg: 10, hop: 1 }
+  }
+  if (s.heavy && tk < s.startup + s.active + 8) return { key: 'heavyHold', leanDeg: 6, hop: 0 }
+  return { key: '', leanDeg: 0, hop: 0 }
+}
+
 export function updatePlayerView(v: EntityView, p: Player, world: World, alpha: number, time: number): void {
   const P = tuning.player
   const x = lerp(p.px, p.x, alpha), y = lerp(p.py, p.y, alpha)
   const feetY = y + p.radius + 1
   let sx = 1, sy = 1, rot = 0, hop = 0
   let rollKey = ''
+  let attackKey = ''
+  let moveKey = ''
   const b = v.body
   const speed = Math.hypot(p.vx, p.vy)
 
   if (p.state === 'free') {
     if (speed > 10) {
-      hop = Math.abs(Math.sin(time * 14)) * 1.5
-      rot = (p.vx / P.maxSpeed) * 0.12
-      sy = 1 + Math.sin(time * 28) * 0.04
+      // Two authored silhouettes per plane: profile for lateral movement, front for vertical
+      // movement. Facing still follows aim, so retreating and circle-strafing never flip the sword
+      // away from the target. Reusing the combat palette keeps the 16 px body visually singular.
+      const alternate = (Math.floor(time * 10) & 1) !== 0
+      const vertical = Math.abs(p.vy) > Math.abs(p.vx) * 1.15
+      moveKey = vertical ? (alternate ? 'rise' : 'absorb') : (alternate ? 'lightCut' : 'lightCoil')
+      hop = alternate ? 1 : 0
+      rot = (p.vx / P.maxSpeed) * 0.035
     } else {
       sy = 1 + Math.sin(time * 4) * 0.025
     }
@@ -284,31 +401,22 @@ export function updatePlayerView(v: EntityView, p: Player, world: World, alpha: 
       hop = 2.6 * pop
     }
   } else if (p.state === 'attack') {
-    const s = P.attack.swings[p.swingIndex]
-    const tk = p.stateTick + alpha
+    const pose = attackPose(p)
+    attackKey = pose.key
     const lean = Math.cos(p.swingAngle)
-    if (tk < s.startup) {
-      if (s.heavy) {
-        // greatsword coil: plant, sink, widen — and keep deepening, so the hold is never a dead frame
-        const u = Math.pow(tk / s.startup, 0.7)
-        sx = 1 + 0.18 * u; sy = 1 - 0.22 * u; rot = -lean * 0.42 * u
-        hop = -3 * u + (tk > s.startup - 4 ? Math.sin(time * 90) * 0.6 : 0)
-      } else {
-        const u = easeInCubic(tk / s.startup)
-        sx = 1 - 0.12 * u; sy = 1 + 0.12 * u; rot = -lean * 0.14 * u
-      }
-    } else if (tk < s.startup + s.active) {
-      // the body throws itself along the blade's own curve, so torso and blade arrive together
-      const u = sweepEase((tk - s.startup) / s.active, s.heavy)
-      const peak = s.heavy ? 0.44 : 0.20
-      sx = lerp(1, s.heavy ? 1.38 : 1.18, u); sy = lerp(1, s.heavy ? 0.70 : 0.86, u)
-      rot = lean * peak * u
-      if (s.heavy) hop = -1 + 4 * u
+    const dirSign = (lean >= 0 ? 1 : -1) * p.facing
+    if (attackKey) {
+      // authored frame: do not squash it. Lean names the heading the way the roll does.
+      rot = deg(pose.leanDeg) * dirSign
+      hop = pose.hop
     } else {
+      const s = P.attack.swings[p.swingIndex]
+      const tk = p.stateTick + alpha
       const u = easeOutCubic((tk - s.startup - s.active) / s.recovery)
-      sx = lerp(s.heavy ? 1.38 : 1.18, 1, u); sy = lerp(s.heavy ? 0.70 : 0.86, 1, u)
-      rot = lean * (s.heavy ? 0.44 : 0.20) * (1 - u)
-      if (s.heavy) hop = 3 * (1 - u)
+      sx = lerp(s.heavy ? 1.18 : 1.08, 1, u)
+      sy = lerp(s.heavy ? 0.86 : 0.94, 1, u)
+      rot = lean * (s.heavy ? 0.16 : 0.08) * (1 - u)
+      if (s.heavy) hop = 1 * (1 - u)
     }
   } else if (p.state === 'dead') {
     rot = HALF_PI * p.facing; b.tint = 0x777777
@@ -323,10 +431,12 @@ export function updatePlayerView(v: EntityView, p: Player, world: World, alpha: 
   v.setFlash(p.flash > 0)
   // the roll's own drawing wins over the standing sprite, but never over the hurt flash
   if (rollKey && p.flash <= 0) { const t = rollTexture(rollKey); if (t) b.texture = t }
+  else if (attackKey && p.flash <= 0) { const t = rollTexture(attackKey); if (t) b.texture = t }
+  else if (moveKey && p.flash <= 0) { const t = rollTexture(moveKey); if (t) b.texture = t }
   b.alpha = p.iframes > 0 && p.state !== 'dead' ? ((p.iframes >> 2) & 1 ? 0.35 : 1) : 1
   // the shadow reports how close to the floor the body is. In the slide it stretches along the
   // travel and darkens: the body is not in the air, it is skimming.
-  if (p.state === 'dodge' && p.stateTick < P.dodge.travel) {
+  if (p.dodgeTick >= 0 && p.dodgeTick < P.dodge.travel) {
     const hx = Math.abs(p.dodgeDirX)
     v.setShadow(x, feetY - 1, 12 + 8 * hx, 5 + 3 * (1 - hx), 0.44)
   } else v.setShadow(x, feetY - 1, 12 - hop * 0.4, 5 - hop * 0.2, 0.35 - hop * 0.02)
@@ -366,7 +476,7 @@ function updateSword(v: EntityView, p: Player, world: World, x: number, y: numbe
         r = lerp(3, 8, u)
       }
     } else if (tk < s.startup + s.active) {
-      const u = sweepEase((tk - s.startup) / s.active, s.heavy)
+      const u = displayedSwingProgress(s, p.stateTick)
       a = start + (end - start) * u
       r = s.heavy ? lerp(12, 17, u) : 10
       ws = s.heavy ? lerp(1.38, 1.55, u) : 1
@@ -428,7 +538,7 @@ function swingArc(p: Player, alpha: number, world: World): SwingArc | null {
   const fadeTicks = s.heavy ? A.heavyFade : A.lightFade
   if (tk < s.startup || tk > s.startup + s.active + fadeTicks) return null
   const half = (reach.arcDeg * Math.PI / 180) / 2
-  const swept = s.sweep * half * 2 * sweepEase((tk - s.startup) / s.active, s.heavy)
+  const swept = s.sweep * half * 2 * displayedSwingProgress(s, p.stateTick)
   const over = tk - s.startup - s.active
   const fade = over > 0 ? 1 - over / fadeTicks : 1
   const tail = over > 0 ? Math.pow(over / fadeTicks, 0.7) * 0.9 : 0
@@ -443,6 +553,13 @@ function swingArc(p: Player, alpha: number, world: World): SwingArc | null {
     x: lerp(p.px, p.x, alpha), y: lerp(p.py, p.y, alpha),
     heavy: s.heavy, blessed, hole: A.hole,
   }
+}
+
+// Active collision is resolved once per simulation tick, not continuously between ticks. Hold the
+// rendered blade and crescent on that exact resolved sample for the display interval: this is both
+// more legible at pixel scale and guarantees that every visible contact sector is mechanically live.
+export function displayedSwingProgress(s: (typeof tuning.player.attack.swings)[number], stateTick: number): number {
+  return swingProgress(s, stateTick - s.startup)
 }
 
 // Sword arc: a crescent that grows on exactly the curve the hitbox sweeps on, so contact reads on the

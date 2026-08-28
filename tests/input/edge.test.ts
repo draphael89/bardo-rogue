@@ -108,7 +108,8 @@ describe('attack repeats while held', () => {
       if (t < 40) h2.win.fire('keydown', key('KeyJ', t > 0))
       else if (t === 40) h2.win.fire('keyup', key('KeyJ'))
     })
-    // the 8-tick buffer may still spend one more swing after the release, but not four more
+    // a discrete press already queued before release may still spend one more swing, but held state
+    // itself must never leave a chain of future swings behind
     expect(released.length).toBeLessThan(held.length)
     expect(released.length).toBeLessThanOrEqual(3)
   })
@@ -121,6 +122,16 @@ describe('attack repeats while held', () => {
       if (t === 20) h.win.fire('mouseup', { button: 0 })
     })
     expect(swings.length).toBeLessThanOrEqual(2)
+  })
+
+  it('drops a click latched just before focus loss', () => {
+    const h = harness()
+    const w = createWorld(1, 'empty')
+    h.canvas.fire('mousedown', { button: 0 })
+    h.win.fire('blur')
+    const f = h.input.sample(w)
+    expect(f.attack).toBe(false)
+    expect(f.attackHeld).toBe(false)
   })
 
   it('separate presses each swing, and chain when they land in recovery', () => {
@@ -173,6 +184,17 @@ describe('dodge stays edge-triggered', () => {
 describe('keyboard aim', () => {
   const aimDeg = (f: { aimX: number; aimY: number }) => Math.round(Math.atan2(f.aimY, f.aimX) * 180 / Math.PI)
 
+  it('preserves a complete WASD or arrow tap between simulation samples', () => {
+    const h = harness()
+    const w = createWorld(1, 'empty')
+    h.win.fire('keydown', key('KeyD')); h.win.fire('keyup', key('KeyD'))
+    h.win.fire('keydown', key('ArrowUp')); h.win.fire('keyup', key('ArrowUp'))
+    const pulse = h.input.sample(w)
+    expect(pulse.moveX).toBe(1)
+    expect(aimDeg(pulse)).toBe(-90)
+    expect(h.input.sample(w).moveX).toBe(0) // latched intent is exactly one tick, never a phantom hold
+  })
+
   it('never aims at a cursor that has not moved', () => {
     const h = harness()
     const w = createWorld(1, 'empty')
@@ -191,6 +213,64 @@ describe('keyboard aim', () => {
     const f = h.input.sample(w)
     expect(aimDeg(f)).toBe(180)        // retreating right, striking left
     expect(f.moveX).toBe(1)            // and the arrow did not steal the movement
+  })
+
+  it('locks onto a target in the facing cone while Q is held', () => {
+    const h = harness()
+    const w = createWorld(1, 'dummy')
+    const target = w.enemies.find(e => e.active && e.x > w.player.x)!
+    w.player.x = target.x - 40
+    w.player.y = target.y
+    h.win.fire('keydown', key('KeyQ'))
+    const f = h.input.sample(w)
+    expect(aimDeg(f)).toBe(0)
+    expect(f.aimSoft).toBe(false)
+  })
+
+  it('does not let short-range assist replace a retained Q target', () => {
+    const h = harness()
+    const w = createWorld(1, 'dummy')
+    w.arena.solid.fill(0)
+    const [locked, crossing] = w.enemies
+    for (const e of w.enemies) e.active = false
+    Object.assign(w.player, { x: 100, y: 100, aimAngle: 0 })
+    Object.assign(locked, { active: true, state: 'idle', x: 220, y: 100 })
+    Object.assign(crossing, { active: false, state: 'idle', x: 140, y: 105 })
+
+    h.win.fire('keydown', key('KeyQ'))
+    expect(aimDeg(h.input.sample(w))).toBe(0) // acquire the long-range target
+    crossing.active = true                    // a closer body now crosses the same aim cone
+    const retained = h.input.sample(w)
+    expect(retained.aimSoft).toBe(false)
+    expect(aimDeg(retained)).toBe(0)
+    stepWorld(w, retained)
+    expect(w.player.assistTargetId).toBe(0)
+    expect(w.player.aimAngle).toBeCloseTo(0, 8)
+  })
+
+  it('lets explicit Q lock outrank a cursor that moved earlier', () => {
+    const h = harness()
+    const w = createWorld(1, 'dummy')
+    const target = w.enemies.find(e => e.active)!
+    w.player.x = target.x - 40
+    w.player.y = target.y
+    h.canvas.fire('mousemove', { clientX: w.player.x, clientY: w.player.y - 40 })
+    h.win.fire('keydown', key('KeyQ'))
+    expect(aimDeg(h.input.sample(w))).toBe(0)
+  })
+
+  it('keeps keyboard aim ownership until the pointer actually moves again', () => {
+    const h = harness()
+    const w = createWorld(1, 'empty')
+    const p = w.player
+    h.canvas.fire('mousemove', { clientX: p.x, clientY: p.y - 40 })
+    h.win.fire('keydown', key('ArrowLeft'))
+    expect(aimDeg(h.input.sample(w))).toBe(180)
+    h.win.fire('keyup', key('ArrowLeft'))
+    h.win.fire('keydown', key('KeyD'))
+    expect(aimDeg(h.input.sample(w))).toBe(180)
+    h.canvas.fire('mousemove', { clientX: p.x, clientY: p.y + 40 })
+    expect(aimDeg(h.input.sample(w))).toBe(90)
   })
 
   it('lets the mouse outrank movement once it has actually moved', () => {

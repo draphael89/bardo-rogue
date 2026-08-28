@@ -6,7 +6,7 @@ export function startDraw(world: World): void {
   const p = world.player
   p.state = 'attack'
   p.stateTick = 0
-  p.attackBuffer = 0
+  p.attackQueuedAt = -1
   p.swingIndex = 0
   p.swingAngle = p.aimAngle
   p.swingId = ++world.swingCounter
@@ -19,7 +19,7 @@ export function looseArrow(world: World): void {
   const B = tuning.bow
   const x = p.x + Math.cos(p.swingAngle) * B.muzzle
   const y = p.y + Math.sin(p.swingAngle) * B.muzzle
-  world.fireProjectile(x, y, p.swingAngle, B.speed, B.radius, B.life, 1, B.damage)
+  world.fireProjectile(x, y, p.swingAngle, B.speed, B.radius, B.life, 1, B.damage, p.swingId)
   world.emit({ type: 'arrowLoose', x, y, angle: p.swingAngle })
 }
 

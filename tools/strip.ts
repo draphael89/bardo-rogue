@@ -84,7 +84,7 @@ await page.addInitScript({ content: 'window.__name = f => f' })
 
 // Swallow every rAF before the page boots. Otherwise a variable number of free-running frames render between boot
 // and takeover, and the drifting atmosphere (motes, haze, flicker) makes two runs of the same args differ.
-// From here nothing renders unless this tool asks for it; render() below also does pixi's screen blit by hand.
+// From here nothing renders unless this tool asks for it; render() below owns the complete present.
 await page.addInitScript({ content: '(() => { const q = []; window.__rafQ = q; window.requestAnimationFrame = cb => q.push(cb); window.cancelAnimationFrame = () => {} })()' })
 
 // Backstop only: src/render/fxRng.ts seeds every render RNG stream, so this changes nothing today (verified:
@@ -115,8 +115,7 @@ await page.evaluate(({ token, seed, scenario, god, banner, replay, seedRng }) =>
   const prev = g.presenter.onEvent
   g.presenter.onEvent = (ev: any) => { events.push({ tick: g.world.tick, ...ev }); prev?.(ev) }
   // one render per sim tick at a fixed dt (scaled by slowmo, as the real loop does), so VFX time is tick-aligned
-  const ra = g.presenter.ra
-  const render = () => { h.render(1, (1 / 60) / Math.max(0.05, g.world.timeScale ?? 1)); ra.app.render() }  // .render() blits the 480x270 target to the canvas; pixi's rAF ticker is gone
+  const render = () => { h.render(1, (1 / 60) / Math.max(0.05, g.world.timeScale ?? 1)) }  // renderFrame owns both the low-res target and the final canvas blit
   const origStep = g.step.bind(g)
   g.step = (n = 1) => { for (let i = 0; i < n; i++) { origStep(1); render() } }   // --eval helpers render too
   ;(window as any).__strip = {

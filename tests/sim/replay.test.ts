@@ -7,9 +7,9 @@ import { decodeReplay, encodeReplay, quantizeFrame, replayFromJson, replayToJson
 // Expected hashes for the fixtures under replays/. A changed hash means the sim changed (tuning, rules, rng use).
 // If that change is intended: run `pnpm record-bots`, paste the printed hashes here, and re-check the sanity asserts.
 const FIXTURES = [
-  { file: 'kite-full-s2.json', hash: 1225246916, check: (m: Record<string, unknown>) => expect(m.clearSeconds).not.toBeNull() },
-  { file: 'naive-wave1-s3.json', hash: 3487756806, check: (m: Record<string, unknown>) => expect(m.wavesCleared).toBe(1) },
-  { file: 'idle-wave1-s5.json', hash: 2472639399, check: (m: Record<string, unknown>) => expect(m.deaths).toBe(1) },
+  { file: 'kite-full-s2.json', hash: 1809278648, check: (m: Record<string, unknown>) => expect(m.clearSeconds).not.toBeNull() },
+  { file: 'naive-wave1-s3.json', hash: 4075949549, check: (m: Record<string, unknown>) => expect(m.wavesCleared).toBe(1) },
+  { file: 'idle-wave1-s5.json', hash: 459230487, check: (m: Record<string, unknown>) => expect(m.deaths).toBe(1) },
 ]
 
 function loadFixture(file: string): Replay {
@@ -24,7 +24,8 @@ function randomFrames(n: number, seed = 42): InputFrame[] {
     // change the frame only sometimes so runs form
     if (rng.next() < 0.3) f = quantizeFrame({
       moveX: rng.range(-1, 1), moveY: rng.range(-1, 1), aimX: rng.range(-1, 1), aimY: rng.range(-1, 1),
-      aimSoft: rng.next() < 0.2, attack: rng.next() < 0.3, dodge: rng.next() < 0.1, restart: false,
+      aimSoft: rng.next() < 0.2, attack: rng.next() < 0.3, attackHeld: rng.next() < 0.3,
+      dodge: rng.next() < 0.1, restart: false,
     })
     frames.push(f)
   }

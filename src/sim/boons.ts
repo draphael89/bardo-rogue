@@ -87,11 +87,11 @@ export const BOONS: Record<BoonId, BoonDef> = {
   },
   bloodDebt: {
     id: 'bloodDebt', name: 'THE DEBT PASSES', deity: 'fury', family: 'blade', vow: 'It is never settled.',
-    detail: 'A Branded foe that dies throws its mark to the nearest.',
+    detail: 'A dying foe throws its Brand to the nearest.',
   },
   unanswered: {
     id: 'unanswered', name: 'UNANSWERED', deity: 'fury', family: 'blade', vow: 'Do not let them finish.',
-    detail: 'A heavy that interrupts a wind-up hits far harder.',
+    detail: 'Heavies that interrupt a wind-up hit far harder.',
   },
   betweenStep: {
     id: 'betweenStep', name: 'BETWEEN-STEP', deity: 'hecate', family: 'veil', vow: 'Pass through fear.',
@@ -117,7 +117,7 @@ export const BOONS: Record<BoonId, BoonDef> = {
   // she marks the debt, and the river collects it from everyone standing nearby.
   pyre: {
     id: 'pyre', name: 'PYRE', deity: 'fury', family: 'blade', vow: 'Let the whole room answer.',
-    detail: 'Judgment bursts set everything they touch alight.',
+    detail: 'Judgment bursts set all they touch alight.',
     requires: ['finalJudgment', 'torchlight'],
   },
 }

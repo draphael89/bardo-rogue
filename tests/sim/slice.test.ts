@@ -442,7 +442,7 @@ describe('statuses', () => {
     for (let i = 0; i < tuning.status.burn.interval + 2; i++) {
       stepWorld(w, emptyInput())
       if (w.freeze > 0) freezes++
-      if (e.state === 'stagger') staggers++
+      if (w.events.some(ev => ev.type === 'enemyStagger')) staggers++
       w.events.length = 0
     }
     expect(e.hp).toBe(hp0 - tuning.status.burn.damage * 2)
@@ -512,11 +512,11 @@ describe('the vows of the Kindly One and Hecate', () => {
     resolveWeaponOnHit(w, caught, true, 0, 0, 'windup')
     expect(hp0 - caught.hp).toBe(tuning.boons.unansweredDamage)
 
-    const idle = w.spawnEnemy('brute', 240, 120)!
-    idle.hp = 99
-    const idle0 = idle.hp
-    resolveWeaponOnHit(w, idle, true, 0, 0, 'chase')
-    expect(idle.hp).toBe(idle0)
+    const chasing = w.spawnEnemy('brute', 240, 120)!
+    chasing.hp = 99
+    const before = chasing.hp
+    resolveWeaponOnHit(w, chasing, true, 0, 0, 'chase')
+    expect(chasing.hp).toBe(before)
   })
 
   it('Unanswered reads the state the target was in, not the one the blow left it in', () => {

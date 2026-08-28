@@ -1,5 +1,6 @@
 import { Container, Graphics, Text } from 'pixi.js'
-import { BOONS, type BoonId } from '@/sim/boons'
+import { BOONS, DEITIES, type BoonId, type Deity } from '@/sim/boons'
+import { drawDeityMask, MASK_W } from './views/deity'
 import type { World } from '@/sim/world'
 import { tuning } from '@/tuning'
 import { crispText } from './textCrisp'
@@ -71,14 +72,14 @@ export class RewardOverlay {
     const nextKey = this.paused
       ? `pause|${this.reducedEffects ? 1 : 0}|${tuning.view.width}`
       : offer
-      ? `offer|${offer.options.join('|')}|${offer.focus}|${offer.family}|${tuning.view.width}`
+      ? `offer|${offer.options.join('|')}|${offer.focus}|${offer.deity}|${tuning.view.width}`
       : victory
         ? `won|${world.session.run?.depth}|${world.session.run?.boons.map(b => b.id).join('|')}|${tuning.view.width}`
         : ''
     if (nextKey === this.key) return
     this.key = nextKey
     this.clear()
-    if (offer) this.paintOffer(offer.options, offer.focus, offer.family)
+    if (offer) this.paintOffer(offer.options, offer.focus, offer.deity)
     else if (victory) this.paintVictory(world)
     else this.paintPause()
   }
@@ -118,46 +119,89 @@ export class RewardOverlay {
 
   private add(t: Text): void { this.texts.push(t); this.root.addChild(t) }
 
-  private paintOffer(options: [BoonId, BoonId, BoonId], focus: 0 | 1 | 2, family: 'blade' | 'veil'): void {
+  // The offer is a meeting, not a menu. Someone specific is standing there, they are named, and they
+  // say one line before you take their terms — so the screen leads with the speaker and only then
+  // shows what is on the table.
+  private paintOffer(options: [BoonId, BoonId, BoonId], focus: 0 | 1 | 2, deity: Deity): void {
     const W = tuning.view.width, H = tuning.view.height
-    this.g.rect(0, 0, W, H).fill({ color: P.void, alpha: 0.90 })
-    const accent = family === 'blade' ? P.ember : P.veil
+    const god = DEITIES[deity]
+    const accent = deity === 'fury' ? P.ember : P.veil
+    this.g.rect(0, 0, W, H).fill({ color: P.void, alpha: 0.92 })
     this.g.rect(0, 0, W, 3).fill({ color: accent })
-    const over = label(family === 'blade' ? 'A VOW OF THE BLADE' : 'A VOW FROM BETWEEN', 11, accent)
-    over.position.set(W / 2, 24); this.add(over)
-    const title = label('CHOOSE WHAT THE SWORD REMEMBERS', 16, P.bone)
-    title.position.set(W / 2, 46); this.add(title)
 
+    // --- the speaker plate -------------------------------------------------------------------
+    const plateH = 56
+    const plateY = 12
+    const maskScale = 2
+    const maskSize = MASK_W * maskScale
+    const nameLabel = label(god.name, 16, P.bone)
+    const epithetLabel = label(god.epithet.toUpperCase(), 9, accent)
+    const textW = Math.max(nameLabel.width, epithetLabel.width)
+    const plateW = Math.min(W - 24, maskSize + 16 + textW + 20)
+    const plateX = Math.floor((W - plateW) / 2)
+
+    this.g.rect(plateX, plateY, plateW, plateH).fill({ color: P.face, alpha: 0.96 })
+    this.g.rect(plateX, plateY, 2, plateH).fill(accent)
+    this.g.rect(plateX, plateY + plateH - 1, plateW, 1).fill({ color: accent, alpha: 0.35 })
+    // A niche behind the mask, so the god is lit from her own alcove rather than floating on a panel.
+    const maskX = plateX + 8
+    const maskY = plateY + Math.floor((plateH - maskSize) / 2)
+    this.g.rect(maskX - 2, maskY - 2, maskSize + 4, maskSize + 4).fill({ color: P.void, alpha: 0.9 })
+    drawDeityMask(this.g, deity, maskX, maskY, maskScale)
+
+    const textX = maskX + maskSize + 10
+    nameLabel.anchor.set(0, 0.5)
+    nameLabel.position.set(textX, plateY + 20); this.add(nameLabel)
+    epithetLabel.anchor.set(0, 0.5)
+    epithetLabel.position.set(textX, plateY + 36); this.add(epithetLabel)
+
+    const greeting = label(`"${god.greeting}"`, 10, P.dim)
+    greeting.position.set(W / 2, plateY + plateH + 12); this.add(greeting)
+
+    // --- the terms ---------------------------------------------------------------------------
     const gap = 8
     const cardW = Math.min(142, Math.floor((W - 32 - gap * 2) / 3))
-    const cardH = 142
+    const cardH = 128
     const total = cardW * 3 + gap * 2
     const x0 = Math.floor((W - total) / 2)
-    const y = 70
+    const y = plateY + plateH + 22
     options.forEach((id, i) => {
       const def = BOONS[id]
       const x = x0 + i * (cardW + gap)
       const selected = i === focus
-      const edge = selected ? (def.family === 'blade' ? P.ember : P.veil) : 0x4c4658
+      const tone = def.deity === 'fury' ? P.ember : P.veil
+      const edge = selected ? tone : 0x4c4658
       this.g.roundRect(x, y, cardW, cardH, 3).fill({ color: selected ? P.faceHi : P.face, alpha: 1 })
       this.g.roundRect(x, y, cardW, cardH, 3).stroke({ color: edge, width: selected ? 3 : 1 })
-      this.g.rect(x + 10, y + 31, cardW - 20, 2).fill({ color: edge })
+      this.g.rect(x + 10, y + 29, cardW - 20, 2).fill({ color: edge })
       if (selected) {
         this.g.rect(x + 3, y + 3, cardW - 6, 2).fill({ color: edge })
         this.g.rect(x + 3, y + cardH - 5, cardW - 6, 2).fill({ color: edge })
       }
       const n = label(def.name, 11, selected ? P.bone : P.dim)
-      n.position.set(x + cardW / 2, y + 18); this.add(n)
-      const vow = label(def.vow, 10, def.family === 'blade' ? P.ember : P.veil)
-      vow.position.set(x + cardW / 2, y + 51); this.add(vow)
+      n.position.set(x + cardW / 2, y + 17); this.add(n)
+      const vow = label(def.vow, 10, tone)
+      vow.position.set(x + cardW / 2, y + 45); this.add(vow)
+      // Anchored to its TOP, not its middle: a three-line detail and a one-line detail must both
+      // leave the card's footer alone, and a centred block grows into it.
       const detail = label(def.detail, 11, selected ? P.bone : P.dim)
       detail.style.wordWrap = true; detail.style.wordWrapWidth = cardW - 24
-      detail.position.set(x + cardW / 2, y + 89); this.add(detail)
-      const numeral = label(String(i + 1), 9, edge)
-      numeral.position.set(x + cardW / 2, y + cardH - 13); this.add(numeral)
+      detail.anchor.set(0.5, 0)
+      detail.position.set(x + cardW / 2, y + 60); this.add(detail)
+      // One footer line, never two. A duo is itself the most interesting thing that can be said
+      // about a card, so it speaks instead of the attribution rather than under it.
+      if (def.requires?.length) {
+        this.g.rect(x + 3, y + 3, cardW - 6, 2).fill({ color: P.gold })
+        const duo = label('A PACT BETWEEN POWERS', 8, P.gold)
+        duo.position.set(x + cardW / 2, y + cardH - 11); this.add(duo)
+      } else if (def.deity !== deity) {
+        // The only signal that the run is being offered something from across the crossroads.
+        const from = label(DEITIES[def.deity].name, 8, tone)
+        from.position.set(x + cardW / 2, y + cardH - 11); this.add(from)
+      }
     })
     const act = label('A / D OR ARROWS TO CHOOSE   ·   ENTER / ATTACK TO CLAIM', 10, P.gold)
-    act.position.set(W / 2, H - 25); this.add(act)
+    act.position.set(W / 2, H - 16); this.add(act)
   }
 
   private paintVictory(world: World): void {

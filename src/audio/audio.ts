@@ -37,6 +37,12 @@ export interface Voice {
 
 export const dbToGain = (db: number): number => Math.pow(10, db / 20)
 
+/**
+ * Seconds the master takes to reach silence before a pause stops the clock, and to come back after.
+ * Long enough to cover a transient's tail, short enough that pausing still feels instant.
+ */
+export const SUSPEND_FADE = 0.06
+
 /** 0..1 slider -> linear gain on a dB curve. Store the slider, never the gain. */
 export function sliderToGain(slider01: number, floorDb = -60): number {
   if (slider01 <= 0) return 0
@@ -261,24 +267,59 @@ export class AudioSystem {
   }
 
   private _suspended = false
+  /** The real context, recorded at load(). Never the offline renderer's, which must not be paused. */
+  private liveCtx: AudioContext | null = null
+  private suspendGen = 0
   get suspended(): boolean { return this._suspended }
 
   /**
-   * Pause owns the whole clock, not the master fader. Fading to silence would leave the bed's loops
-   * and every scheduled voice running behind the pause screen, so the music would come back several
-   * bars further on than where it stopped — and a tab left paused would keep a synthesiser awake
-   * forever. Suspending the context freezes `currentTime` itself: everything resumes exactly where
-   * the player left it.
+   * Pause owns the whole clock, not the master fader. Fading alone would leave the bed's loops and
+   * every scheduled voice running behind the pause screen: the music would come back bars further on
+   * than where it stopped, a door stinger queued 1.2 s out would fire the instant play resumed, and
+   * a tab left paused would keep a synthesiser awake indefinitely. Suspending freezes `currentTime`
+   * itself, and every deadline in this file is expressed in context time, so nothing drifts or
+   * expires while the game is away.
+   *
+   * The fade is not decoration. Half the cues here are 30-200 ms transients, and cutting the clock
+   * mid-waveform clicks on the way down and finishes a chopped hit on the way up — so the master
+   * ramps to silence first and the clock stops a beat later, under cover.
    */
   setSuspended(s: boolean): void {
     if (s === this._suspended) return
     this._suspended = s
-    const ctx = this.ctx
-    if (!ctx || !('suspend' in ctx)) return
-    const c = ctx as AudioContext
-    // Both calls return promises that reject if the context is already closed; a pause is never
-    // worth an unhandled rejection.
-    void (s ? c.suspend() : c.resume()).catch(() => { /* context closed or refused; nothing to recover */ })
+    const c = this.liveCtx
+    if (!c) return
+    const gen = ++this.suspendGen
+    const master = this.master
+    const level = () => (this._muted ? 0 : this.masterLevel())
+
+    if (s) {
+      if (master) {
+        const t = this.now()
+        master.gain.cancelScheduledValues(t)
+        master.gain.setTargetAtTime(0, t, SUSPEND_FADE / 3)
+      }
+      // A rapid pause/unpause must not land this suspend after the resume; the generation guard is
+      // what keeps a mashed Escape key from wedging the game silent.
+      setTimeout(() => {
+        if (gen !== this.suspendGen || !this._suspended) return
+        void c.suspend().catch(() => { /* already closed or refused; the fade still silenced it */ })
+      }, SUSPEND_FADE * 1000)
+      return
+    }
+
+    void c.resume().then(() => {
+      if (gen !== this.suspendGen || this._suspended) return
+      if (!master) return
+      const t = this.now()
+      master.gain.cancelScheduledValues(t)
+      master.gain.setTargetAtTime(level(), t, SUSPEND_FADE / 3)
+    }).catch(() => {
+      // A programmatic resume outside a user gesture can be refused. Bring the fader back anyway so
+      // the game is audible again the moment the browser lets the context run.
+      if (gen !== this.suspendGen || this._suspended || !master) return
+      master.gain.setTargetAtTime(level(), this.now(), SUSPEND_FADE / 3)
+    })
   }
 
   private masterLevel(): number { return dbToGain(MIX.masterDb) * this.slider.master }
@@ -291,6 +332,9 @@ export class AudioSystem {
   async load(files: string[], base = '/assets/audio/', ctx?: BaseAudioContext): Promise<void> {
     if (!ctx && typeof AudioContext === 'undefined') return
     this.ctx = ctx ?? new AudioContext()
+    // Only a context we created is ours to pause. OfflineAudioContext also declares suspend(), but
+    // its version takes a required time argument and pausing a render would wedge it forever.
+    this.liveCtx = ctx ? null : (this.ctx as AudioContext)
     this.buildGraph()
     files = files.filter(f => !ANNOUNCER.has(f.replace('.ogg', '')))
     await Promise.all(files.map(async f => {
@@ -309,11 +353,10 @@ export class AudioSystem {
     if (typeof window !== 'undefined' && 'resume' in this.ctx) {
       const c = this.ctx as AudioContext
       // The gesture unlock must not undo a deliberate pause: a player who pauses before ever
-      // clicking would otherwise get the bed back by dismissing the dialog.
-      const unlock = () => {
-        if (!this._suspended) void c.resume().catch(() => {})
-        window.removeEventListener('pointerdown', unlock); window.removeEventListener('keydown', unlock)
-      }
+      // clicking would otherwise get the bed back by dismissing the dialog. It also stays installed
+      // as the recovery path for a suspend the browser initiated on its own (mobile audio focus, a
+      // backgrounded tab) - without it, an interrupted context stays silent with nothing to revive it.
+      const unlock = () => { if (!this._suspended) void c.resume().catch(() => {}) }
       window.addEventListener('pointerdown', unlock); window.addEventListener('keydown', unlock)
     }
   }

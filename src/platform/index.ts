@@ -29,6 +29,9 @@ export interface Platform {
   prefersReducedMotion(): boolean
   fullscreen(on?: boolean): Promise<void>
   setRunActive(active: boolean): void                 // so a host can ask before a quit throws a run away
+  // Fires when something outside this session wrote the save. Only the browser needs it -- two tabs
+  // of the same origin -- and the desktop host prevents the equivalent with a single-instance lock.
+  watchForeignWrites?(cb: () => void): void
   exportFile(text: string, filename: string): Promise<void>
   importFile(): Promise<string | null>                // null = the player cancelled
 }
@@ -38,7 +41,12 @@ declare global {
 }
 
 // Duck-typed on the way in: a half-initialised or older preload must never be able to brick boot.
-export function detectPlatform(): Platform {
+export interface DetectOptions {
+  // `?save=off` means exactly that: no reads, no writes, and no one-time storage upgrade either.
+  migrateLegacy?: boolean
+}
+
+export function detectPlatform(opts: DetectOptions = {}): Platform {
   const bridge = typeof window === 'undefined' ? undefined : window.bardoDesktop
-  return isDesktopBridge(bridge) ? createDesktopPlatform(bridge) : createWebPlatform()
+  return isDesktopBridge(bridge) ? createDesktopPlatform(bridge) : createWebPlatform(opts)
 }

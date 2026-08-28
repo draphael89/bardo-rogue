@@ -50,11 +50,12 @@ async function boot() {
   audio.muted = mute
   audio.load(manifest.audio) // not awaited: the game starts silent-then-sound rather than waiting
 
-  const platform = detectPlatform()
-  // `?save=off` runs the game against a fresh profile and writes nothing. Evidence captures use it so
-  // a machine that has actually played -- attempts counted, reduced effects persisted -- cannot tint a
-  // screenshot or move a `loop` hash (hashWorld folds session.meta into that scenario's hash).
+  // `?save=off` runs the game against a fresh profile and writes nothing -- not even the one-time
+  // legacy storage upgrade. Evidence captures use it so a machine that has actually played -- attempts
+  // counted, reduced effects persisted -- cannot tint a screenshot or move a `loop` hash (hashWorld
+  // folds session.meta into that scenario's hash).
   const noSave = q.get('save') === 'off'
+  const platform = detectPlatform({ migrateLegacy: !noSave })
   const loaded = noSave
     ? { save: defaultSave({ profileId: PROFILE_ID }), writable: false, source: 'default' as const }
     : await loadSave(platform.saves, PROFILE_ID, { preferredReducedEffects: platform.prefersReducedMotion() })
@@ -62,9 +63,10 @@ async function boot() {
   // the envelope carries meta AND settings, and a non-`loop` world's session.meta is the zeroed
   // default, so composing a write from it would wipe real progress the moment V is pressed.
   let savedSave: BardoSave = loaded.save
-  const savable = loaded.writable
+  let savable = loaded.writable
   if (loaded.source === 'backup') console.log('[save] the live save was unreadable; recovered from the backup copy')
-  if (!savable) console.log('[save] this save was written by a newer build; it will not be overwritten')
+  else if (loaded.source === 'unreadable') console.log('[save] this profile could not be read at all; nothing will be written over it')
+  else if (!savable) console.log('[save] this save was written by a newer build; it will not be overwritten')
   // Two values on purpose: what the save document says, and what this session is actually rendering.
   // `?reduced=` is a debug override of the second only -- persisting it would let a URL param
   // permanently rewrite a player's setting the next time any autosave fires.
@@ -108,12 +110,19 @@ async function boot() {
   // an unhandled rejection here would surface as a page error and fail every evidence capture.
   let writing: Promise<void> | null = null
   let queued: string | null = null
+  let writeFailed = false
   const drain = (): void => {
     if (writing || queued === null) return
     const payload = queued
     queued = null
     writing = platform.saves.write(PROFILE_ID, payload)
-      .catch(err => { console.log(`[save] write failed: ${String(err)}`) })
+      .catch(err => {
+        console.log(`[save] write failed: ${String(err)}`)
+        // Say it once, in the game, rather than only in a console nobody has open. A player whose
+        // disk is full or whose save directory is unwritable otherwise loses a whole session's
+        // progress without a single hint that anything went wrong.
+        if (!writeFailed) { writeFailed = true; presenter.hud.showBanner('PROGRESS NOT SAVING', 'this run will not be recorded', 3.0) }
+      })
       .then(() => { writing = null; drain() })
   }
   const persist = () => {
@@ -212,15 +221,21 @@ async function boot() {
   document.addEventListener('fullscreenchange', () => ra.resize())
 
   const exportSave = () => {
-    void platform.exportFile(serializeSave(savedSave), saveFilename(new Date()))
-    presenter.hud.showBanner('SAVE EXPORTED', 'CHECK YOUR DOWNLOADS', 2.0)
+    // For a save from a newer build, export the bytes as they were READ: re-serialising would emit a
+    // schemaVersion-2 document with the newer build's fields quietly dropped, which is indistinguishable
+    // from a real one.
+    void platform.exportFile(loaded.raw ?? serializeSave(savedSave), saveFilename(new Date()))
+    presenter.hud.showBanner('SAVE EXPORTED', savable ? 'CHECK YOUR DOWNLOADS' : 'EXPORTED AS FOUND', 2.0)
   }
   const importSave = async () => {
     const text = await platform.importFile()
     if (text === null) return
     const parsed = parseSave(text, { profileId: PROFILE_ID })
-    if (parsed.kind === 'corrupt') { presenter.hud.showBanner('SAVE NOT READ', 'that file is not a bardo save', 2.2); return }
     if (parsed.kind === 'future') { presenter.hud.showBanner('SAVE NOT READ', 'it came from a newer build', 2.2); return }
+    // Only a document this build actually read counts. 'empty' is the dangerous one: an empty or
+    // whitespace-only file parses to a DEFAULT save, and accepting it would write zeroed counters
+    // over real progress while the banner cheerfully said SAVE IMPORTED.
+    if (parsed.kind !== 'ok' && parsed.kind !== 'migrated') { presenter.hud.showBanner('SAVE NOT READ', 'that file is not a bardo save', 2.2); return }
     // The profile already here is one this build cannot represent. Applying an import would show the
     // player new counters that the next reload silently reverts, so refuse rather than half-apply.
     if (!savable) { presenter.hud.showBanner('PROFILE IS NEWER', 'this build must not overwrite it', 2.4); return }
@@ -255,6 +270,15 @@ async function boot() {
     if (userPaused && e.code === 'KeyE' && !e.repeat) { e.preventDefault(); exportSave() }
     if (userPaused && e.code === 'KeyI' && !e.repeat) { e.preventDefault(); void importSave() }
   })
+  if (!noSave) {
+    platform.watchForeignWrites?.(() => {
+      if (!savable) return
+      savable = false
+      console.log('[save] another tab wrote this profile; this session will stop writing')
+      presenter.hud.showBanner('ANOTHER TAB IS PLAYING', 'progress here will not be saved', 3.0)
+    })
+  }
+
   loop.start()
   if (!noSave) platform.persistHint()   // after first paint: a permission prompt must never land on a black screen
   if (scenario === 'run') presenter.hud.showBanner(world.roomName, 'clear the room', 1.8)

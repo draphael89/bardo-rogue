@@ -1,6 +1,6 @@
 import { META_KEY, SETTINGS_KEY, type StorageLike } from '@/sim/storage'
 import { migrateLegacySave, serializeSave } from '@/sim/save'
-import { PROFILE_ID, type Platform, type SaveStore } from './index'
+import { PROFILE_ID, type DetectOptions, type Platform, type SaveStore } from './index'
 import { downloadText, pickTextFile, prefersReducedMotion } from './dom'
 
 export const saveKey = (profileId: string) => `bardo-rogue.save.${profileId}`
@@ -45,9 +45,9 @@ function safeLocalStorage(): StorageLike | undefined {
   try { return typeof localStorage === 'undefined' ? undefined : localStorage } catch { return undefined }
 }
 
-export function createWebPlatform(): Platform {
+export function createWebPlatform(opts: DetectOptions = {}): Platform {
   const storage = safeLocalStorage()
-  migrateLegacyKeys(storage, PROFILE_ID)
+  if (opts.migrateLegacy !== false) migrateLegacyKeys(storage, PROFILE_ID)
   let picker: HTMLInputElement | null = null
   return {
     kind: 'web',
@@ -71,6 +71,13 @@ export function createWebPlatform(): Platform {
       } catch { /* the browser refused; nothing to recover, the game keeps running windowed */ }
     },
     setRunActive: () => { /* a browser tab has no quit to guard */ },
+    // The storage event fires only in the OTHER tabs, so this is how a session learns that a second
+    // copy of the game is now the one writing. It cannot merge -- each tab holds a whole document in
+    // memory -- so the honest move is to stop writing and say so, rather than overwrite silently.
+    watchForeignWrites: cb => {
+      if (typeof window === 'undefined') return
+      window.addEventListener('storage', e => { if (e.key === saveKey(PROFILE_ID) && e.newValue !== null) cb() })
+    },
     exportFile: downloadText,
     importFile: pickTextFile,
   }

@@ -304,18 +304,24 @@ try {
   writeFileSync(join(savesDir, 'default.json'), CORRUPT, 'utf8')
 
   const l3 = await launch()
-  await check('a corrupt save falls back to the backup and is preserved', 25_000, async () => {
-    const r = await l3.page.evaluate(async () => {
-      const s = (window as unknown as { bardoDesktop: { saves: { read(id: string): Promise<{ ok: boolean; data: string | null; preserved?: string }>; readBackup(id: string): Promise<{ ok: boolean; data: string | null }> } } }).bardoDesktop.saves
-      return { live: await s.read('default'), backup: await s.readBackup('default') }
-    })
-    assert(r.live.ok && r.live.data === null, `a damaged save should read as absent, got ${JSON.stringify(r.live).slice(0, 120)}`)
-    assert(r.backup.ok && r.backup.data === saveA, 'the backup did not survive')
+  await check('a corrupt save is preserved and boot recovers from the backup', 40_000, async () => {
+    // Deliberately asserted on the OUTCOME of the app's own boot recovery rather than on a pre-boot
+    // state: boot runs loadSave() concurrently with this check, so any assertion that the damaged
+    // file is still in the live slot is a race that would fail on a faster machine.
+    await l3.page.waitForFunction(() => !!(window as unknown as { __game?: unknown }).__game, null, { timeout: 40_000 })
     const corrupt = join(savesDir, 'default~corrupt.json')
+    for (let i = 0; i < 60 && !existsSync(corrupt); i++) await new Promise(r => setTimeout(r, 100))
     assert(existsSync(corrupt), 'the corrupt file was not preserved')
     assert(readFileSync(corrupt, 'utf8') === CORRUPT, 'the preserved file is not the original bytes')
-    assert(!existsSync(join(savesDir, 'default.json')), 'the corrupt file is still in the live slot')
-    return `preserved as ${corrupt}`
+
+    // The recovered document is what the game is now playing, and the live slot holds it again.
+    const meta = await l3.page.evaluate(() => (window as unknown as { __game: { world: { session: { meta: { attempts: number } } } } }).__game.world.session.meta)
+    const expected = JSON.parse(saveA) as { meta: { attempts: number } }
+    assert(meta.attempts === expected.meta.attempts, `recovered meta.attempts ${meta.attempts}, expected ${expected.meta.attempts}`)
+    const live = join(savesDir, 'default.json')
+    assert(existsSync(live), 'boot did not re-arm the live slot after recovering')
+    assert(readFileSync(live, 'utf8') === saveA, 'the live slot does not hold the recovered document')
+    return `corrupt bytes kept at ${corrupt}, live slot recovered`
   })
   await close(l3.app)
 

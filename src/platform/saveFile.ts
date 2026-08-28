@@ -6,6 +6,7 @@ import type { SaveStore } from './index'
 
 export interface LoadedSave {
   save: BardoSave
+  raw?: string          // the bytes as read, kept only when this build must not rewrite them
   // False only for a save written by a NEWER build: it stays readable so the player still sees their
   // counters, and every write is refused so the fields this build cannot represent survive.
   writable: boolean
@@ -30,7 +31,7 @@ export async function loadSave(
   const live = await safeRead(store.read.bind(store), profileId)
   const current = parseSave(live.raw, parseOpts)
   if (current.kind === 'ok' || current.kind === 'migrated') return { save: current.save, writable: true, source: 'save' }
-  if (current.kind === 'future') return { save: current.save, writable: false, source: 'save' }
+  if (current.kind === 'future') return { save: current.save, writable: false, source: 'save', raw: current.raw }
 
   // The live copy gave us nothing usable. It may be damaged (the browser hands back the bad bytes;
   // the desktop store has already moved the file aside), or simply absent. Either way the backup is
@@ -44,7 +45,7 @@ export async function loadSave(
     try { await store.write(profileId, serializeSave(backup.save)) } catch { /* recovered in memory regardless */ }
     return { save: backup.save, writable: true, source: 'backup' }
   }
-  if (backup.kind === 'future') return { save: backup.save, writable: false, source: 'backup' }
+  if (backup.kind === 'future') return { save: backup.save, writable: false, source: 'backup', raw: backup.raw }
 
   // Nothing readable anywhere. If either read actually FAILED, this profile is not writable: we hand
   // back defaults so the player can still play, and refuse to write over data we could not see.

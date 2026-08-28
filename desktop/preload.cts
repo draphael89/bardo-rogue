@@ -27,7 +27,7 @@ const api = {
   exportFile(text: string, filename: string): Promise<boolean> { return ipcRenderer.invoke('bardo:file:export', { text, filename }) },
   importFile(): Promise<string | null> { return ipcRenderer.invoke('bardo:file:import') },
   /** NATIVE window fullscreen, not the DOM Fullscreen API -- which is what keeps Escape as pause. */
-  setFullscreen(on: boolean): Promise<boolean> { return ipcRenderer.invoke('bardo:fullscreen', on === true) },
+  setFullscreen(on: boolean | 'toggle'): Promise<boolean> { return ipcRenderer.invoke('bardo:fullscreen', on === 'toggle' ? 'toggle' : on === true) },
   isFullscreen(): Promise<boolean> { return ipcRenderer.invoke('bardo:fullscreen', null) },
 }
 

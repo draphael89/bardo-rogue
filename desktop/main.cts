@@ -1,7 +1,7 @@
 // The Electron main process. Owns the window, the app:// origin the packaged game is served from,
 // the menu, the quit guard and the save filesystem. Imports nothing from src/: this is a window
 // around the game, not part of it.
-import { app, BrowserWindow, Menu, dialog, ipcMain, protocol, screen, session, shell } from 'electron'
+import { app, BrowserWindow, Menu, dialog, ipcMain, protocol, screen, session } from 'electron'
 import { readFile, stat, writeFile } from 'node:fs/promises'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import * as path from 'node:path'
@@ -17,7 +17,10 @@ const APP_ORIGIN = `${SCHEME}://${HOST}`
 // all key off that same decision, so they would follow it there.
 const devHook = (name: string): string | undefined => (app.isPackaged ? undefined : process.env[name])
 
-const DEV_URL = devHook('BARDO_DEV_URL') ?? 'http://localhost:5173'
+// Trailing slash on purpose: a bare 'http://localhost:5173' prefix also matches 'localhost:51730',
+// an ordinary ephemeral port, which would let another local server inherit the preload.
+const DEV_URL = (devHook('BARDO_DEV_URL') ?? 'http://localhost:5173').replace(/\/+$/, '')
+const DEV_ORIGIN = `${DEV_URL}/`
 const MODE = devHook('BARDO_DESKTOP_MODE')                  // 'dev' | 'packaged'; otherwise app.isPackaged decides
 const isDev = MODE === 'packaged' ? false : MODE === 'dev' ? true : !app.isPackaged
 const START_QUERY = devHook('BARDO_QUERY') ?? ''            // '?scenario=wave1&seed=3' for the harness
@@ -181,7 +184,7 @@ function trusted(e: { sender: Electron.WebContents; senderFrame: Electron.WebFra
   if (!w || w !== win) return null
   const frame = e.senderFrame
   if (!frame || frame !== e.sender.mainFrame) return null          // no subframes
-  return frame.url.startsWith(isDev ? DEV_URL : `${APP_ORIGIN}/`) ? w : null
+  return frame.url.startsWith(isDev ? DEV_ORIGIN : `${APP_ORIGIN}/`) ? w : null
 }
 
 ipcMain.on('bardo:run-active', (e, active: unknown) => {
@@ -213,11 +216,18 @@ ipcMain.handle('bardo:file:import', async e => {
     return Buffer.byteLength(text, 'utf8') > MAX_EXPORT_BYTES ? null : text
   } catch { return null }
 })
+// macOS animates fullscreen over ~0.7s and isFullScreen() reads false throughout, so a toggle
+// computed from an observation swallows any second press during the transition. Intent is tracked
+// instead, and corrected by the window's own enter/leave events.
+let fullscreenIntent = false
 ipcMain.handle('bardo:fullscreen', (e, on: unknown) => {
   const w = trusted(e)
-  if (!w) return false
-  if (typeof on === 'boolean') w.setFullScreen(on)                 // null is a pure query
-  return w.isFullScreen()
+  if (!w) return fullscreenIntent
+  if (on === null || on === undefined) return fullscreenIntent     // a pure query
+  const want = on === 'toggle' ? !fullscreenIntent : on === true
+  fullscreenIntent = want
+  w.setFullScreen(want)
+  return want
 })
 
 function createWindow(): BrowserWindow {
@@ -240,15 +250,15 @@ function createWindow(): BrowserWindow {
   let timer: NodeJS.Timeout | null = null
   const persist = (): void => { if (timer) clearTimeout(timer); timer = setTimeout(() => saveWindowState(w), 400) }
   w.on('resize', persist); w.on('move', persist); w.on('maximize', persist); w.on('unmaximize', persist)
-  const onFs = (): void => { w.webContents.send('bardo:fullscreen-changed', w.isFullScreen()) }
+  const onFs = (): void => { fullscreenIntent = w.isFullScreen(); w.webContents.send('bardo:fullscreen-changed', fullscreenIntent) }
   w.on('enter-full-screen', onFs); w.on('leave-full-screen', onFs)
   w.webContents.on('render-process-gone', () => { runActive = false })   // a dead renderer must not lock the quit
-  w.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith('https://')) void shell.openExternal(url)
-    return { action: 'deny' }
-  })
+  // Nothing in the game opens a window or an outbound link. Handing any URL to shell.openExternal
+  // would therefore only ever serve a compromised renderer, which could use it to walk save data out
+  // through the default browser -- past the CSP, which blocks fetch but not this.
+  w.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
   w.webContents.on('will-navigate', (e, url) => {
-    if (!url.startsWith(isDev ? DEV_URL : `${APP_ORIGIN}/`)) e.preventDefault()
+    if (!url.startsWith(isDev ? DEV_ORIGIN : `${APP_ORIGIN}/`)) e.preventDefault()
   })
   w.on('close', e => {
     if (quitConfirmed || !runActive) { if (timer) clearTimeout(timer); saveWindowState(w); return }
@@ -330,12 +340,9 @@ if (!app.requestSingleInstanceLock()) {
   // steered to would inherit window.bardoDesktop -- and with it save-file access. sandbox: true does
   // not close that; this does, for every webContents the app ever creates.
   app.on('web-contents-created', (_e, contents) => {
-    contents.setWindowOpenHandler(({ url }) => {
-      if (url.startsWith('https://')) void shell.openExternal(url)
-      return { action: 'deny' }
-    })
+    contents.setWindowOpenHandler(() => ({ action: 'deny' }))
     contents.on('will-navigate', (e, url) => {
-      if (!url.startsWith(isDev ? DEV_URL : `${APP_ORIGIN}/`)) e.preventDefault()
+      if (!url.startsWith(isDev ? DEV_ORIGIN : `${APP_ORIGIN}/`)) e.preventDefault()
     })
     contents.on('will-attach-webview', e => e.preventDefault())
   })
@@ -351,7 +358,7 @@ if (!app.requestSingleInstanceLock()) {
       // read back and compare in debug and test builds only; it doubles the I/O of every autosave
       verify: !app.isPackaged || process.env.BARDO_SAVE_VERIFY === '1',
       isAllowedSender: wc => wc === target.webContents,
-      allowedOrigins: isDev ? [DEV_URL] : [`${APP_ORIGIN}/`],
+      allowedOrigins: isDev ? [DEV_ORIGIN] : [`${APP_ORIGIN}/`],
     })
     app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) win = createWindow() })
   })

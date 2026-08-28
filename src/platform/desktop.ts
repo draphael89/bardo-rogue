@@ -20,7 +20,7 @@ export interface DesktopBridge {
   setRunActive(active: boolean): void
   exportFile(text: string, filename: string): Promise<boolean>
   importFile(): Promise<string | null>
-  setFullscreen(on: boolean): Promise<boolean>
+  setFullscreen(on: boolean | 'toggle'): Promise<boolean>
   isFullscreen(): Promise<boolean>
 }
 
@@ -66,7 +66,9 @@ export function createDesktopPlatform(bridge: DesktopBridge): Platform {
     prefersReducedMotion,
     // NATIVE window fullscreen rather than the DOM Fullscreen API, which binds Escape to exit --
     // Escape is the pause key, and owning it is one of the reasons the desktop host exists.
-    fullscreen: async on => { await bridge.setFullscreen(on ?? !(await bridge.isFullscreen())) },
+    // 'toggle' is resolved by the host against its own tracked intent: reading the window's state and
+    // inverting it here would swallow a second press during macOS's fullscreen animation.
+    fullscreen: async on => { await bridge.setFullscreen(on ?? 'toggle') },
     setRunActive: active => bridge.setRunActive(active),
     exportFile: async (text, filename) => { await bridge.exportFile(text, filename) },
     importFile: () => bridge.importFile(),

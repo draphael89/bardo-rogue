@@ -91,7 +91,11 @@ export function createSaveStore(dir: string, opts: SaveStoreOptions = {}) {
   const queues = new Map<string, Promise<unknown>>()
   const serial = <T,>(id: string, job: () => Promise<T>): Promise<T> => {
     const next = (queues.get(id) ?? Promise.resolve()).then(job, job)
-    queues.set(id, next.then(() => undefined, () => undefined))
+    const tail = next.then(() => undefined, () => undefined)
+    queues.set(id, tail)
+    // Drop the entry once this is the last operation for that id, so the map cannot grow one entry
+    // per profile name for the life of the process.
+    void tail.then(() => { if (queues.get(id) === tail) queues.delete(id) })
     return next
   }
 

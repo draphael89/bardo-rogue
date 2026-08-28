@@ -83,6 +83,13 @@ export function updateWaves(world: World): void {
       world.roomClearTick = world.tick
       world.timeScale = 0.2
       world.slowmoTicks = tuning.roomClearSlowmoTicks
+      // The fight is over the instant the last body drops. A bolt already in flight would otherwise
+      // keep hunting for up to three seconds, stretched fivefold by the clear slow-mo.
+      for (const b of world.projectiles) {
+        if (!b.active || b.team !== 0) continue
+        b.active = false
+        world.emit({ type: 'boltHitWall', x: b.x, y: b.y })
+      }
       if (world.hasNextRoom()) setDoorWalkable(world.arena, true)
       world.emit({ type: 'roomClear', hasNext: world.hasNextRoom() })
     } else {

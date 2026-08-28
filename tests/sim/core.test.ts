@@ -216,6 +216,21 @@ function forceRoomClear(w: ReturnType<typeof createWorld>): void {
   stepWorld(w, emptyInput())
 }
 
+describe('room clear', () => {
+  it('a live hostile bolt cannot damage the player after roomClear', () => {
+    const w = createWorld(1, 'wave1')
+    const p = w.player
+    // a bolt already in flight, aimed straight at the player, when the last enemy dies
+    expect(w.fireProjectile(p.x - 60, p.y, 0, 110, 3, 180, 0, 1)).not.toBeNull()
+    forceRoomClear(w)
+    expect(w.events.some(e => e.type === 'roomClear')).toBe(true)
+    w.events.length = 0
+    const hp = p.hp
+    run(w, 200)
+    expect(p.hp, 'the player was hit after the room was already clear').toBe(hp)
+  })
+})
+
 describe('run rooms', () => {
   it('starts the first fight with the door sealed', () => {
     const w = createWorld(1, 'run')

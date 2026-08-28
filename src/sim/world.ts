@@ -57,6 +57,7 @@ export interface Enemy extends Body {
   dashTicks: number
   spawnTick: number
   phase: number                 // 0 stock; bosses write 1+ so hashes stay put
+  attackId: number              // which attack a multi-attack enemy is committed to; 0 stock
   brand: number                 // 0..3 stacks: a debt, paid out when something collects it
   brandTicks: number            // status expiry; refreshed whenever Brand is applied
   burn: number                  // 0..N stacks of the river's fire: damage already under way
@@ -64,7 +65,10 @@ export interface Enemy extends Body {
   burnAcc: number               // ticks until the next bite
 }
 
-export type ProjectileKind = 'bolt' | 'arrow' | 'mirror' | 'echo'
+// `verdict` is a mark on the floor rather than a thing in flight: it does not move, cannot be cut,
+// and does its damage when its clock runs out. It rides the projectile pool because that is exactly
+// what a pooled, hashed, room-clear-aware timed object already is - no second entity type needed.
+export type ProjectileKind = 'bolt' | 'arrow' | 'mirror' | 'echo' | 'verdict'
 
 export interface Projectile extends Body {
   id: number; active: boolean; life: number; angle: number
@@ -210,7 +214,7 @@ export function makeEnemy(): Enemy {
     id: 0, active: false, kind: 'brute', x: 0, y: 0, px: 0, py: 0, vx: 0, vy: 0, kbx: 0, kby: 0, radius: 6,
     hp: 1, maxHp: 1, state: 'idle', stateTick: 0, facing: 1, aimAngle: 0, targetX: 0, targetY: 0,
     lastHitSwingId: -1, flash: 0, hitDone: false, orbitAngle: 0, orbitDir: 1, hoverTicks: 0, cooldown: 0, dashTicks: 0, spawnTick: 0,
-    phase: 0, brand: 0, brandTicks: 0, burn: 0, burnTicks: 0, burnAcc: 0,
+    phase: 0, attackId: 0, brand: 0, brandTicks: 0, burn: 0, burnTicks: 0, burnAcc: 0,
   }
 }
 

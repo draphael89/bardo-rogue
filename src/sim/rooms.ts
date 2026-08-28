@@ -63,7 +63,7 @@ function sliceGraph(): RoomDef[] {
     },
     {
       id: 'threshold',
-      name: 'THE THRESHOLD',
+      name: 'THE ACHERON GATE',
       kind: 'threshold',
       waves: SLICE_ROOM_1,
       reward: 'blade',
@@ -74,7 +74,7 @@ function sliceGraph(): RoomDef[] {
     },
     {
       id: 'veil-path',
-      name: 'THE VEILED CROSSING',
+      name: 'THE LETHE CISTERN',
       kind: 'crossing',
       waves: SLICE_ROOM_2_VEIL,
       reward: 'veil',
@@ -82,7 +82,7 @@ function sliceGraph(): RoomDef[] {
     },
     {
       id: 'blade-path',
-      name: 'THE SUNDERED COURT',
+      name: 'THE FIELD OF ASPHODEL',
       kind: 'threshold',
       waves: SLICE_ROOM_2_BLADE,
       reward: 'blade',
@@ -90,7 +90,7 @@ function sliceGraph(): RoomDef[] {
     },
     {
       id: 'black-step',
-      name: 'THE BLACK STEP',
+      name: "CHARON'S LANDING",
       kind: 'crossing',
       waves: SLICE_ROOM_3,
       reward: 'veil',
@@ -98,7 +98,7 @@ function sliceGraph(): RoomDef[] {
     },
     {
       id: 'warden',
-      name: 'THE WARDEN',
+      name: 'THE HALL OF MINOS',
       kind: 'threshold',
       waves: SLICE_WARDEN,
       boss: true,

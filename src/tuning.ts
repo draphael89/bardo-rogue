@@ -173,9 +173,18 @@ export const tuning = {
     freezeTicks: 16, dashSpeed: 160, dashDist: 80, recovery: 30, damage: 1, staggerTicks: 8, knockbackScale: 1.2,
     hoverMinTicks: 40, hoverMaxTicks: 90,
   },
-  // First judge. A long plant, a radial slam you can walk out of, a long punish. At half life the
-  // veil breaks and the slam throws a ring of bolts. Poise: lights bounce; heavies stagger only
-  // while he is not committed.
+  // MINOS, JUDGE OF THE FIRST GATE. The code name stays `warden` because the enemy kind is an
+  // append-only hashed enum and renaming it would churn every replay for nothing; everything the
+  // player ever reads says Minos.
+  //
+  // He judges, and each of his three attacks asks the player a different question:
+  //   THE GAVEL   - a radial slam you can walk out of. Spacing, and the punish window after it.
+  //   THE VERDICT - a sweeping line of fire that rotates through an arc. You cannot sidestep this
+  //                 one; you have to move WITH it or get behind him.
+  //   THE SCALES  - marks on the floor that fall due. It takes away standing still.
+  // At half life the veil breaks and he stops taking turns: the gavel now drops scales where it
+  // lands, and the verdict is answered by a ring. Phase two recombines what he already taught
+  // rather than merely running it faster.
   warden: {
     hp: 36, radius: 10, speed: 28, orbitMin: 52, orbitMax: 76, orbitSpeed: 0.9,
     windup: 36, windup2: 24, commitLead: 8,
@@ -184,6 +193,21 @@ export const tuning = {
     staggerTicks: 10, knockbackScale: 0.22,
     boltCount: 8, boltSpeed: 96, boltRadius: 3, boltLife: 84, boltDamage: 1, boltDelay: 6,
     idleTicks: 20,
+    // The verdict. A long plant so the arc can be read, then a rotating stream. `arcDeg` is swept
+    // from one edge to the other across the whole stream, centred on where the player was at commit.
+    sweep: {
+      windup: 34, windup2: 26,
+      bolts: 7, bolts2: 9,
+      arcDeg: 96,
+      interval: 5,     // ticks between bolts; the stream is bolts * interval long
+      speed: 104,
+      range: 150,      // he only calls the verdict from far enough away for it to be a lane
+    },
+    // The scales. Three marks, one under the player and two flanking, that fall due together.
+    scales: {
+      count: 3, radius: 26, delay: 52, damage: 1, spread: 42,
+      gavelCount: 2,   // phase two: how many the gavel itself leaves behind
+    },
   },
 
   juice: {

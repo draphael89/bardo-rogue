@@ -14,7 +14,7 @@ const ENEMY_STATE: Record<EnemyState, number> = {
 const ENEMY_KIND: Record<EnemyKind, number> = { brute: 0, caster: 1, charger: 2, dummy: 3, warden: 4 }
 const WAVE_STATE: Record<WaveState, number> = { idle: 0, pending: 1, active: 2, done: 3 }
 const ROOM_PHASE: Record<RoomPhase, number> = { town: 0, entering: 1, fighting: 2, reward: 3, exits: 4, transitioning: 5, resolved: 6 }
-const PROJECTILE_KIND: Record<ProjectileKind, number> = { bolt: 0, arrow: 1, mirror: 2, echo: 3 }
+const PROJECTILE_KIND: Record<ProjectileKind, number> = { bolt: 0, arrow: 1, mirror: 2, echo: 3, verdict: 4 }
 
 // FNV-1a over a canonical snapshot of everything the sim's outcome depends on.
 // Deliberately NOT hashed: world.visualRng (cosmetic-only stream) and the arena's DECORATION, so
@@ -84,6 +84,7 @@ export function hashWorld(world: World): number {
     int(e.lastHitSwingId); num(e.flash); flag(e.hitDone)
     num(e.orbitAngle); int(e.orbitDir); int(e.hoverTicks); int(e.cooldown); int(e.dashTicks); int(e.spawnTick)
     if (e.phase) byte(e.phase)
+    if (e.attackId) byte(e.attackId)
     if (e.brand) { byte(e.brand); int(e.brandTicks) }
   }
 
@@ -95,7 +96,7 @@ export function hashWorld(world: World): number {
     int(b.id); num(b.x); num(b.y); num(b.px); num(b.py); num(b.vx); num(b.vy)
     num(b.radius); int(b.life); num(b.angle)
     if (b.team) { byte(b.team); int(b.damage); int(b.actionId) }
-    if (b.kind === 'mirror' || b.kind === 'echo') byte(PROJECTILE_KIND[b.kind])
+    if (b.kind !== 'bolt' && b.kind !== 'arrow') byte(PROJECTILE_KIND[b.kind])
     if (b.srcKind !== 'player') byte(ENEMY_KIND[b.srcKind] + 1)
   }
 

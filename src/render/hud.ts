@@ -94,12 +94,15 @@ function fightChrome(cardAge: number): number {
   return 0
 }
 
+// The shades of this realm, by name. A death card's first job is to teach, and the silhouette
+// already teaches which body it was - so the name gets to do the other job, which is to make the
+// place feel like somewhere with its own dead in it rather than enemy types 1 through 3.
 function takenBy(kind: EnemyKind | 'none'): string {
   switch (kind) {
-    case 'brute': return 'THE HEAVY'
-    case 'caster': return 'THE MARK'
-    case 'charger': return 'THE RUSH'
-    case 'warden': return 'THE WARDEN'
+    case 'brute': return 'A FALLEN HOPLITE'
+    case 'caster': return 'A LAMPAD'
+    case 'charger': return 'AN EMPUSA'
+    case 'warden': return 'MINOS'
     case 'dummy': return 'A BLOW'
     case 'none': return 'A BLOW'
     default: {
@@ -270,7 +273,7 @@ export class Hud {
     this.waveText = new Text({ text: '', style: { fontFamily: 'Kenney Pixel', fontSize: 16, fill: C.bone }, resolution: 1 })
     this.waveText.anchor.set(1, 0); this.waveText.position.set(V.width - 12, 2)
     this.bossName = new Text({
-      text: 'THE WARDEN',
+      text: 'MINOS',
       style: { fontFamily: 'Kenney Mini', fontSize: 8, fill: C.bone, letterSpacing: 2 },
       resolution: 1,
     })

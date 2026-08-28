@@ -206,7 +206,7 @@ async function boot() {
   else if (scenario === 'shore') presenter.hud.showBanner('THE FAR SHORE', 'a life waits', 1.8)
   else if (scenario === 'blessed') presenter.hud.showBanner('THE THRESHOLD', 'the blade reaches farther', 1.8)
   else if (scenario === 'bow') presenter.hud.showBanner('THE THRESHOLD', 'the string is taut', 1.8)
-  else if (scenario === 'boss') presenter.hud.showBanner('THE WARDEN', 'the first judge', 1.8)
+  else if (scenario === 'boss') presenter.hud.showBanner('MINOS', 'judge of the first gate', 1.8)
   else presenter.hud.showBanner(scenario.toUpperCase(), '', 1.2)
 }
 

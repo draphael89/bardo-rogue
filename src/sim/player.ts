@@ -217,7 +217,8 @@ export function updatePlayer(world: World, input: InputFrame): void {
         }
       }
       for (const b of world.projectiles) {
-        if (!b.active || b.team !== 0) continue
+        // A verdict is written on the floor, not loosed through the air: there is nothing to cut.
+        if (!b.active || b.team !== 0 || b.kind === 'verdict') continue
         if (arcHits(p.x, p.y, mid, reach.radius, spanDeg, b.x, b.y, b.radius)) {
           // Punish the caster that owns this bolt here and now. Deferring it until the caster next
           // runs needs the news to survive as world state, which cannot represent two bolts cut on

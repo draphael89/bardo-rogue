@@ -223,6 +223,13 @@ export function playEventSfx(a: AudioSystem, ev: SimEvent): void {
     case 'burnTick':
     case 'burnEnded':
       break
+    case 'verdictMarked':
+      a.play('impactGeneric_light', { ...at, gain: 0.16, pitch: 0.7 })
+      break
+    case 'verdictFell':
+      a.play('impactPunch_heavy', { ...at, gain: 0.44, pitch: 0.82 })
+      a.thump(0.36, 110, 48, 0.2)
+      break
     case 'brandPassed':
       a.play('impactGeneric_light', { x: ev.toX, y: ev.toY, gain: 0.22, pitch: 1.35 })
       break

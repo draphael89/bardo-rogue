@@ -210,7 +210,7 @@ export class RewardOverlay {
     this.g.rect(0, 0, W, H).fill({ color: P.void, alpha: 0.91 })
     this.g.rect(0, 0, W, 4).fill({ color: P.gold })
     this.g.roundRect(W / 2 - 150, 34, 300, 190, 3).fill({ color: P.face, alpha: 1 }).stroke({ color: P.gold, width: 2 })
-    const over = label('THE FIRST JUDGE HAS FALLEN', 11, P.gold)
+    const over = label('MINOS HAS GIVEN HIS VERDICT', 11, P.gold)
     over.position.set(W / 2, 58); this.add(over)
     const title = label('YOU RETURN WITH YOUR NAME', 16, P.bone)
     title.position.set(W / 2, 84); this.add(title)

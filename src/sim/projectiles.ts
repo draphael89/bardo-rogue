@@ -8,6 +8,20 @@ export function updateProjectiles(world: World): void {
   const p = world.player
   for (const b of world.projectiles) {
     if (!b.active) continue
+    // A verdict is a mark on the floor waiting to fall due. It ignores walls (it IS the floor), does
+    // nothing on contact, and spends its whole damage in one radial beat when its clock runs out.
+    if (b.kind === 'verdict') {
+      if (--b.life > 0) continue
+      b.active = false
+      const d = Math.hypot(p.x - b.x, p.y - b.y)
+      world.emit({ type: 'verdictFell', x: b.x, y: b.y, radius: b.radius })
+      if (p.state !== 'dead' && d <= b.radius + p.radius) {
+        hurtPlayer(world, Math.atan2(p.y - b.y, p.x - b.x), b.damage, b.srcKind === 'player' ? 'none' : b.srcKind, true)
+      } else if (d <= b.radius + p.radius + tuning.bullet.grazePx) {
+        noteNearMiss(world, Math.atan2(p.y - b.y, p.x - b.x), b.x, b.y)
+      }
+      continue
+    }
     b.x += b.vx * DT; b.y += b.vy * DT
     b.life--
     if (b.life <= 0 || isSolid(world.arena, b.x, b.y)) {

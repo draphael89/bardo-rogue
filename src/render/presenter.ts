@@ -407,6 +407,15 @@ export class Presenter {
           break
         case 'burnEnded':
           break
+        case 'verdictMarked':
+          this.particles.puff(ev.x, ev.y, 4, 0xd4551c)
+          break
+        case 'verdictFell':
+          this.particles.ring(ev.x, ev.y, 0xffd070)
+          this.particles.puff(ev.x, ev.y, 10, 0xff8c30)
+          this.particles.slashWave(ev.x, ev.y, 0, Math.PI * 2, 8)
+          this.camera.addTrauma(0.2)
+          break
         case 'brandConsumed':
           this.particles.ring(ev.x, ev.y, 0xffe090)
           this.particles.puff(ev.x, ev.y, 4 + ev.stacks * 2, 0xff7a18)
@@ -717,6 +726,9 @@ export class Presenter {
         if (!this.mirrorViews.has(b.id)) this.mirrorViews.set(b.id, new MirrorBoltView(L.fx))
       } else if (b.kind === 'echo') {
         if (!this.echoViews.has(b.id)) this.echoViews.set(b.id, new EchoView(L.fx))
+      } else if (b.kind === 'verdict') {
+        // Drawn per frame on the floor, not as a pooled sprite: it never moves and its whole job is
+        // to show a clock running down.
       } else if (!this.boltViews.has(b.id)) this.boltViews.set(b.id, new BoltView(this.atlas, L.fx))
     }
     for (const [id, v] of this.boltViews) {
@@ -774,6 +786,9 @@ export class Presenter {
       if (e.kind === 'caster' && e.state === 'aim') drawAimLine(this.fxGraphics, e, slowAlpha)
       if (e.brand > 0) drawBrandPips(this.fxGraphics, e, slowAlpha)
       if (e.burn > 0) drawBurn(this.fxGraphics, this.groundFx, e, slowAlpha, this.time)
+    }
+    for (const b of w.projectiles) {
+      if (b.active && b.kind === 'verdict') drawVerdict(this.groundFx, b, this.time)
     }
     if (w.session.run?.primedBrand) drawPrimedEdge(this.fxGraphics, p, alpha)
     if (armOf(w) === ARM.bow) drawBowAim(this.fxGraphics, p, alpha)
@@ -851,6 +866,43 @@ function drawBurn(g: Graphics, ground: Graphics, e: Enemy, alpha: number, time: 
     // The ramp stays hot most of the way up: the dark tail of a fire is invisible on a dark floor,
     // which is where the first pass lost most of its pixels.
     g.rect(lx, ly, 1, h).fill(rise < 0.55 ? 0xffe08a : rise < 0.85 ? 0xffa03a : 0xd4551c)
+  }
+}
+
+// A sentence with a clock on it. The outer ring is the ground that will be struck and never moves,
+// so the player can judge the edge exactly; the inner ring closes toward the centre as the delay
+// runs out, which is the countdown. It is drawn on the FLOOR layer only — a hazard that paints over
+// a body would hide the thing the player is dodging.
+function drawVerdict(g: Graphics, b: World['projectiles'][number], time: number): void {
+  const S = tuning.warden.scales
+  const t = 1 - Math.max(0, Math.min(1, b.life / S.delay))   // 0 fresh, 1 about to fall
+  const x = Math.round(b.x), y = Math.round(b.y)
+  const R = b.radius
+  // Urgency: a slow breath at first, a hard blink in the last quarter.
+  const rate = 4 + t * 16
+  const pulse = 0.5 + 0.5 * Math.sin(time * rate)
+  const hot = t > 0.75
+  circlePx(g, x, y, R, 0x140a10, 0.9)
+  circlePx(g, x, y, R - 1, hot ? 0xffd070 : 0xd4551c, 0.5 + 0.35 * pulse)
+  const inner = Math.max(1, Math.round(R * (1 - t)))
+  circlePx(g, x, y, inner, hot ? 0xfff0c0 : 0xff9a30, 0.8)
+  g.ellipse(x, y, R - 2, Math.round((R - 2) * 0.62)).fill({ color: 0xff7a18, alpha: 0.07 + 0.10 * t })
+}
+
+// A continuous circle of whole pixels, by midpoint. A stroked circle at 480x270 lands on half pixels
+// and the NEAREST upscale doubles the smear; the octagon the HUD uses for its small rings falls apart
+// into four disconnected strokes by the time it is 26 px across, which is the size a hazard needs to
+// be. This is the same pixel discipline with the gaps closed.
+function circlePx(g: Graphics, cx: number, cy: number, r: number, col: number, alpha: number): void {
+  if (r < 1) return
+  let x = r, y = 0, err = 1 - r
+  const px = (a: number, b: number) => g.rect(a, b, 1, 1).fill({ color: col, alpha })
+  while (x >= y) {
+    px(cx + x, cy + y); px(cx - x, cy + y); px(cx + x, cy - y); px(cx - x, cy - y)
+    px(cx + y, cy + x); px(cx - y, cy + x); px(cx + y, cy - x); px(cx - y, cy - x)
+    y++
+    if (err < 0) err += 2 * y + 1
+    else { x--; err += 2 * (y - x) + 1 }
   }
 }
 

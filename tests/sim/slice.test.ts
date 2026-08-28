@@ -80,7 +80,7 @@ describe('production vertical slice', () => {
     expect(world.roomPhase).toBe('town')
     expect(world.player.armed).toBe(false)
     prepareAndDescend(world)
-    expect(world.roomName).toBe('THE THRESHOLD')
+    expect(world.rooms[world.roomIndex].id).toBe('threshold')
     expect(world.roomPhase).toBe('fighting')
     expect(world.session.run?.weapon).toBe('blade')
     expect(world.session.run).toMatchObject({ hp: tuning.player.hp, maxHp: tuning.player.hp })
@@ -127,11 +127,11 @@ describe('production vertical slice', () => {
   it.each(['north', 'east'] as const)('connects the %s branch through Room 3 to victory and a clean Bardo return', dir => {
     const world = prepareAndDescend(createWorld(dir === 'north' ? 21 : 22, 'loop'))
     forceRoomClear(world); chooseFocusedReward(world); takeDoor(world, dir)
-    expect(['THE VEILED CROSSING', 'THE SUNDERED COURT']).toContain(world.roomName)
+    expect(['veil-path', 'blade-path']).toContain(world.rooms[world.roomIndex].id)
     forceRoomClear(world); chooseFocusedReward(world); takeDoor(world, 'north')
-    expect(world.roomName).toBe('THE BLACK STEP')
+    expect(world.rooms[world.roomIndex].id).toBe('black-step')
     forceRoomClear(world); chooseFocusedReward(world); takeDoor(world, 'north')
-    expect(world.roomName).toBe('THE WARDEN')
+    expect(world.rooms[world.roomIndex].id).toBe('warden')
     forceRoomClear(world)
     expect(world.session.run?.result).toBe('won')
     expect(world.roomPhase).toBe('resolved')
@@ -637,6 +637,20 @@ describe('the offer', () => {
       const opts = w.session.run!.pendingReward!.options
       expect(new Set(opts).size).toBe(3)
       for (const id of opts) expect(hasBoon(w, id)).toBe(false)
+    }
+  })
+})
+
+describe('the realm reads as a place', () => {
+  // Names are content and will be rewritten; what must hold is that every room HAS one, that no two
+  // rooms share it, and that the run does not silently fall back to a placeholder.
+  it('gives every room of the run its own name', () => {
+    const rooms = roomsFor('loop')
+    const names = rooms.map(r => r.name)
+    expect(new Set(names).size).toBe(names.length)
+    for (const r of rooms) {
+      expect(r.name.length).toBeGreaterThan(3)
+      expect(r.name).toBe(r.name.toUpperCase())
     }
   })
 })

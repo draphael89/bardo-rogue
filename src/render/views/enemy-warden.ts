@@ -1,7 +1,7 @@
 import { Graphics, Texture, type Container } from 'pixi.js'
 import type { Enemy } from '@/sim/world'
 import { tuning } from '@/tuning'
-import { wardenWindup } from '@/sim/enemies/warden'
+import { ATTACK, wardenWindup } from '@/sim/enemies/warden'
 import { clamp01, lerp } from '../anim'
 import { EntityView, type EnemyFrame, type Pose } from './shared'
 
@@ -277,6 +277,49 @@ function updateWardenEyes(v: EntityView, e: Enemy, x: number, y: number, hop: nu
   g.zIndex = y + e.radius + 2
 }
 
+// The verdict denies a moving lane rather than a circle, so its tell is the wedge the stream will
+// sweep through: it opens from his facing to the full arc as the plant completes, and hardens to gold
+// when the aim locks. What lights up is exactly the ground the bolts will cross.
+function drawVerdictTell(g: Graphics, hi: Graphics | null, e: Enemy, x: number, y: number, tk: number): void {
+  const W = tuning.warden
+  const V = W.sweep
+  const s = e.state
+  const windup = e.phase ? V.windup2 : V.windup
+  const q = s === 'attack' ? 1 : clamp01(tk / Math.max(1, windup))
+  const bloom = s === 'windup' ? clamp01((tk + 1) / 3) : 1
+  const committed = s === 'attack' || tk >= windup - W.commitLead + 1
+  const span = (V.arcDeg * Math.PI) / 180
+  const reach = V.range
+  const cx = Math.round(x), cy = Math.round(y + tuning.player.radius + 1)
+  const col = committed ? (e.phase ? 0xffe8a0 : 0xd4b060) : 0x121018
+  const alpha = (committed ? 0.85 : 0.5) * bloom
+  // Whole-pixel dashes along the two edges and the leading arc: a filled wedge would cover the very
+  // bodies the player is trying to read, and this is a floor plane, not a HUD element.
+  const edges = [-span / 2, span / 2]
+  for (const off of edges) {
+    const a = e.aimAngle + e.orbitDir * off
+    for (let r = 10; r < reach * q; r += 4) {
+      g.rect(Math.round(cx + Math.cos(a) * r), Math.round(cy + Math.sin(a) * r * 0.62), 1, 1).fill({ color: col, alpha })
+    }
+  }
+  const steps = 26
+  for (let i = 0; i <= steps; i++) {
+    const a = e.aimAngle + e.orbitDir * (-span / 2 + span * (i / steps))
+    const r = reach * q
+    g.rect(Math.round(cx + Math.cos(a) * r), Math.round(cy + Math.sin(a) * r * 0.62), 1, 1).fill({ color: col, alpha })
+  }
+  if (hi) {
+    hi.visible = committed
+    if (committed) {
+      hi.clear()
+      for (let i = 0; i <= steps; i++) {
+        const a = e.aimAngle + e.orbitDir * (-span / 2 + span * (i / steps))
+        hi.rect(Math.round(cx + Math.cos(a) * reach), Math.round(cy + Math.sin(a) * reach * 0.62), 1, 1).fill({ color: 0xfff4d8, alpha: 1 })
+      }
+    }
+  }
+}
+
 function updateWardenTell(v: EntityView, e: Enemy, x: number, y: number, tk: number): void {
   const g = tellFor(v)
   if (!g) return
@@ -288,6 +331,18 @@ function updateWardenTell(v: EntityView, e: Enemy, x: number, y: number, tk: num
   if (!live && !scorching) { g.visible = false; if (hi) hi.visible = false; return }
   g.visible = true; g.clear()
   if (hi) { hi.visible = true; hi.clear() }
+
+  // The floor tell is a promise about WHERE the blow lands, so it has to answer to which attack he
+  // is actually committed to. Drawing the slam plate under a verdict taught the player to run out of
+  // a circle that was never going to be struck - the worst lie a telegraph can tell.
+  if (e.attackId === ATTACK.verdict) { drawVerdictTell(g, hi, e, x, y, tk); return }
+  if (e.attackId === ATTACK.scales) {
+    // The scales write themselves on the floor the instant he commits, and each mark carries its own
+    // countdown. That IS the telegraph, and it is a fairer one than anything drawn under his feet.
+    g.visible = false
+    if (hi) hi.visible = false
+    return
+  }
 
   const q = tellProgress(e, tk)
   const past = s === 'attack' ? tk : 0

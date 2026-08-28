@@ -48,6 +48,8 @@ export type SimEvent =
   | { type: 'brandConsumed'; id: number; stacks: number; x: number; y: number }
   | { type: 'brandPassed'; fromX: number; fromY: number; toX: number; toY: number; stacks: number }
   | { type: 'interrupt'; id: number; x: number; y: number }
+  | { type: 'verdictMarked'; x: number; y: number; radius: number; ticks: number }
+  | { type: 'verdictFell'; x: number; y: number; radius: number }
   | { type: 'runWon' | 'runLost'; depth: number; ticks: number; boons: BoonId[]; by: DeathKind; ranged: boolean }
   | { type: 'draw'; x: number; y: number; angle: number }
   | { type: 'arrowLoose'; x: number; y: number; angle: number }

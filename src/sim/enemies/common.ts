@@ -1,7 +1,7 @@
 import { DT, tuning } from '@/tuning'
 import type { World, Enemy } from '../world'
 import { moveWithWalls } from '../collision'
-import { hurtPlayer } from '../combat'
+import { hurtPlayer, noteNearMiss } from '../combat'
 import { arcHits } from '../combat'
 
 export function distToPlayer(world: World, e: Enemy): number {
@@ -40,17 +40,26 @@ export function facePlayer(world: World, e: Enemy): void {
 // Full circle around the enemy. Returns true when the player was in range (damage or i-frames).
 export function enemyRadialAttack(world: World, e: Enemy, radius: number, damage: number): boolean {
   const p = world.player
-  if (Math.hypot(p.x - e.x, p.y - e.y) > radius + p.radius) return false
-  hurtPlayer(world, Math.atan2(p.y - e.y, p.x - e.x), damage)
-  return true
+  const d = Math.hypot(p.x - e.x, p.y - e.y)
+  if (d <= radius + p.radius) {
+    hurtPlayer(world, Math.atan2(p.y - e.y, p.x - e.x), damage)
+    return true
+  }
+  if (d <= radius + p.radius + tuning.bullet.grazePx) noteNearMiss(world)
+  return false
 }
 
 // Enemy melee arc against the player. Returns true when damage was applied (or absorbed by i-frames).
 export function enemyArcAttack(world: World, e: Enemy, radius: number, arcDeg: number, damage: number): boolean {
   const p = world.player
-  if (!arcHits(e.x, e.y, e.aimAngle, radius, arcDeg, p.x, p.y, p.radius)) return false
-  hurtPlayer(world, e.aimAngle, damage)
-  return true
+  if (arcHits(e.x, e.y, e.aimAngle, radius, arcDeg, p.x, p.y, p.radius)) {
+    hurtPlayer(world, e.aimAngle, damage)
+    return true
+  }
+  if (arcHits(e.x, e.y, e.aimAngle, radius, arcDeg, p.x, p.y, p.radius + tuning.bullet.grazePx)) {
+    noteNearMiss(world)
+  }
+  return false
 }
 
 // Returns true on the tick the stagger ends.

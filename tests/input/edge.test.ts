@@ -193,6 +193,18 @@ describe('keyboard aim', () => {
     expect(f.moveX).toBe(1)            // and the arrow did not steal the movement
   })
 
+  it('locks onto a target in the facing cone while Q is held', () => {
+    const h = harness()
+    const w = createWorld(1, 'dummy')
+    const target = w.enemies.find(e => e.active && e.x > w.player.x)!
+    w.player.x = target.x - 40
+    w.player.y = target.y
+    h.win.fire('keydown', key('KeyQ'))
+    const f = h.input.sample(w)
+    expect(aimDeg(f)).toBe(0)
+    expect(f.aimSoft).toBe(true)
+  })
+
   it('lets the mouse outrank movement once it has actually moved', () => {
     const h = harness()
     const w = createWorld(1, 'empty')

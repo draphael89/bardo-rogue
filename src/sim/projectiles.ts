@@ -1,7 +1,7 @@
 import { DT, tuning } from '@/tuning'
 import type { World } from './world'
 import { isSolid } from './arena'
-import { damageEnemy, hurtPlayer, isPlayerInvulnerable } from './combat'
+import { damageEnemy, hurtPlayer, isPlayerInvulnerable, noteNearMiss } from './combat'
 
 export function updateProjectiles(world: World): void {
   const p = world.player
@@ -26,13 +26,16 @@ export function updateProjectiles(world: World): void {
     }
     if (p.state === 'dead') continue
     const d = Math.hypot(p.x - b.x, p.y - b.y)
-    if (d <= b.radius + p.radius) {
+    const hitR = b.radius + p.radius
+    if (d <= hitR) {
       if (p.state === 'dodge' && isPlayerInvulnerable(world)) {
         hurtPlayer(world, b.angle, 1) // announces the read once; the bolt stays
         continue
       }
       hurtPlayer(world, b.angle, 1)
       b.active = false
+    } else if (d <= hitR + tuning.bullet.grazePx) {
+      noteNearMiss(world)
     }
   }
 }

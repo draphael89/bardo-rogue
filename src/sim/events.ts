@@ -29,6 +29,7 @@ export type SimEvent =
   | { type: 'arrowLoose'; x: number; y: number; angle: number }
   | { type: 'arrowHitWall'; x: number; y: number }
   | { type: 'dodged'; x: number; y: number }
+  | { type: 'graze'; x: number; y: number }
   | { type: 'restart' }
   // a pooled slot was unavailable and the spawn/shot was dropped; the sim never fails silently
   | { type: 'poolOverflow'; pool: 'enemy'; kind: EnemyKind; x: number; y: number }

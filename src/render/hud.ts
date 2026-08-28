@@ -1297,8 +1297,9 @@ export class Hud {
     type Item = { kind: 'word' | 'crosshair' | 'lmb' | 'stickL' | 'stickR' | 'btnX' | 'btnA'; word?: string; label: string }
     const items: Item[] = this.padMode
       ? [{ kind: 'stickL', label: 'MOVE' }, { kind: 'stickR', label: 'AIM' }, { kind: 'btnX', label: 'STRIKE' }, { kind: 'btnA', label: 'DODGE' }]
-      : [{ kind: 'word', word: 'WASD', label: 'MOVE' }, { kind: 'crosshair', label: 'AIM' },
-         { kind: 'lmb', label: 'STRIKE' }, { kind: 'word', word: 'SPACE', label: 'DODGE' }]
+      : [{ kind: 'word', word: 'WASD', label: 'MOVE' }, { kind: 'word', word: 'ARROWS', label: 'AIM' },
+         { kind: 'word', word: 'J', label: 'STRIKE' }, { kind: 'word', word: 'SPACE', label: 'DODGE' },
+         { kind: 'word', word: 'Q', label: 'LOCK' }]
 
     const GAP = 4, SEP = 12
     const widths = items.map(it => it.kind === 'word' ? this.measure(it.word!) + 9 : it.kind === 'lmb' ? 9 : it.kind === 'crosshair' ? 11 : 10)

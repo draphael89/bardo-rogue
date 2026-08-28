@@ -1228,7 +1228,20 @@ export class Hud {
   }
 
   // --- place plate + control hint --------------------------------------------------------------------------------
+  /**
+   * Hide every piece of fight chrome at once. Suppression used to be scattered across the life
+   * plate, the wave box, the crown and the footer, so a full-screen overlay had no way to say
+   * "not now" without adding a sixth special case.
+   */
+  setChromeHidden(hidden: boolean): void {
+    if (this.chromeHidden === hidden) return
+    this.chromeHidden = hidden
+    if (hidden) { this.place.alpha = 0; this.footG.clear(); this.hintRow.alpha = 0 }
+  }
+  private chromeHidden = false
+
   private updateFooter(world: World, now: number) {
+    if (this.chromeHidden) { this.place.alpha = 0; this.footG.clear(); return }
     const p = world.player
     const dead = p.state === 'dead'
     const intro = this.bannerTicks > 0 && this.bannerStart >= 0 && now - this.bannerStart < this.bannerTicks && this.bannerTone === 'wave'
@@ -1250,7 +1263,7 @@ export class Hud {
 
     const age = now - this.hintStart
     const alpha = age < this.hintTicks - 80 ? 0.8 : Math.max(0, (this.hintTicks - age) / 80) * 0.8
-    this.hintRow.alpha = dead || world.roomPhase === 'town' || world.roomPhase === 'reward' ? 0 : alpha
+    this.hintRow.alpha = this.chromeHidden || dead || world.roomPhase === 'town' || world.roomPhase === 'reward' ? 0 : alpha
     this.hintRow.visible = this.hintRow.alpha > 0.02
   }
 

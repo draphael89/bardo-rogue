@@ -60,7 +60,7 @@ async function boot() {
   presenter.particles.attachRenderer(ra.app.renderer)
   presenter.onEvent = ev => playEventSfx(audio, ev)
   ra.viewOverride = viewOverride
-  ra.onViewResize = () => { presenter.rebuildRoom(); presenter.hud.relayout(); presenter.reward.relayout() }
+  ra.onViewResize = () => { presenter.rebuildRoom(); presenter.hud.relayout(); presenter.reward.relayout(); presenter.title.relayout() }
   const input = new InputSystem(ra)
   const overlay = new DebugOverlay(ra.layers.debug, ra.layers.hud)
   overlay.setVisible(debug)
@@ -142,9 +142,27 @@ async function boot() {
 
   const loop = new Loop({
     tick,
-    render: (alpha, dt) => { presenter.reward.setPaused(userPaused); presenter.render(alpha, dt); overlay.update(world, loop); updateRecText(); ra.renderFrame() },
+    render: (alpha, dt) => {
+      // The pad is polled here rather than in the input system because the simulation is stopped
+      // while the title is up, and a controller player must not be the one person who cannot start.
+      if (presenter.title.visible && padWantsStart()) dismissTitle()
+      presenter.reward.setPaused(userPaused)
+      presenter.render(alpha, dt)
+      overlay.update(world, loop)
+      updateRecText()
+      ra.renderFrame()
+    },
     timeScale: () => world.timeScale,
   })
+
+  // Start, A, X, or either shoulder — the same buttons that confirm everywhere else in the game.
+  const PAD_START = [0, 2, 3, 5, 7, 9]
+  const padWantsStart = (): boolean => {
+    const pads = typeof navigator !== 'undefined' && navigator.getGamepads ? navigator.getGamepads() : []
+    const pad = pads && pads[0]
+    if (!pad) return false
+    return PAD_START.some(i => !!pad.buttons[i]?.pressed)
+  }
 
   installApi({
     getWorld: () => world,
@@ -155,6 +173,12 @@ async function boot() {
     presenter,
     get metrics() { return metrics },
     mute: m => { audio.muted = m ?? !audio.muted; return audio.muted },
+    title: show => {
+      const want = show ?? !presenter.title.visible
+      if (want) { presenter.title.setShown(true); loop.paused = true; audio.setSuspended(true) }
+      else dismissTitle()
+      return presenter.title.visible
+    },
     debug: v => { overlay.setVisible(v ?? !overlay.visible); return overlay.visible },
     record, stopRecord, replay,
     download: name => { if (recorder.recording) stopRecord(); recorder.download(name) },
@@ -172,22 +196,50 @@ async function boot() {
     } catch { /* the browser refused; nothing to recover, the game keeps running windowed */ }
   }
   document.addEventListener('fullscreenchange', () => ra.resize())
+  // A click answers the title too. Registered on the window rather than the canvas so a player who
+  // clicks the letterbox is not left staring at a screen that ignores them.
+  window.addEventListener('mousedown', () => dismissTitle())
+
+  // The title is held over the living hub: the simulation is stopped but the loop keeps rendering,
+  // so the room the player is about to stand in gutters and drifts behind its own name. A run driven
+  // by a bot or a replay skips it - those are measurements, not first impressions.
+  const wantsTitle = scenario === 'loop' && !botName
+  presenter.title.setShown(wantsTitle)
 
   // One place decides what "paused" means, so the sim, the audio clock and the overlay can never
   // disagree. Pausing used to stop only the simulation: the bed kept playing behind the overlay and
   // a backgrounded tab kept a synthesiser running indefinitely.
   const setPaused = (p: boolean) => {
-    if (p === userPaused) return
+    const held = p || presenter.title.visible
     userPaused = p
-    loop.paused = p
-    audio.setSuspended(p)
+    loop.paused = held
+    audio.setSuspended(held)
   }
+  const dismissTitle = () => {
+    if (!presenter.title.visible) return
+    presenter.title.setShown(false)
+    loop.paused = userPaused
+    audio.setSuspended(userPaused)
+  }
+  if (wantsTitle) { loop.paused = true; audio.setSuspended(true) }
 
   // Losing focus is a pause the player did not ask for but always wants: a tab switch should not
   // cost health, and it should not keep making noise from behind another window.
   document.addEventListener('visibilitychange', () => { if (document.hidden) setPaused(true) })
 
+  // While the title is up the simulation is stopped, so nothing is sampling input: it needs its own
+  // way out. Any key or click answers it, and the key that answers it does nothing else — a player
+  // dismissing a title screen with Escape should not land in a pause menu.
+  const TITLE_KEYS = new Set(['Enter', 'NumpadEnter', 'Space', 'KeyJ', 'KeyZ', 'Escape', 'KeyP'])
   window.addEventListener('keydown', e => {
+    if (presenter.title.visible) {
+      if (e.repeat) return
+      if (TITLE_KEYS.has(e.code) || e.code.startsWith('Key') || e.code.startsWith('Digit')) {
+        e.preventDefault()
+        dismissTitle()
+      }
+      return
+    }
     if ((e.code === 'Escape' || e.code === 'KeyP') && !e.repeat) { e.preventDefault(); setPaused(!userPaused) }
     if (e.code === 'KeyV' && !e.repeat) {
       reducedEffects = !reducedEffects

@@ -26,6 +26,7 @@ export interface GameApi {
   state(): unknown
   frameStats(): unknown
   fxSeed(n: number): void
+  title(show?: boolean): boolean
   mute(m?: boolean): boolean
   debug(v?: boolean): boolean
   record(on?: boolean): boolean
@@ -45,6 +46,7 @@ export function installApi(host: {
   metrics: Metrics
   mute(m?: boolean): boolean
   debug(v?: boolean): boolean
+  title(show?: boolean): boolean
   record(on?: boolean): boolean
   stopRecord(): Replay
   download(name?: string): void
@@ -115,6 +117,7 @@ export function installApi(host: {
     frameStats: () => host.loop.stats(),
     // force the presentation PRNG (particles, flicker, damage-number jitter) so a capture is reproducible
     fxSeed: n => seedFx(n),
+    title: show => host.title(show),
     mute: m => host.mute(m),
     debug: v => host.debug(v),
     record: on => host.record(on),

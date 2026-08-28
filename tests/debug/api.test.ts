@@ -23,6 +23,7 @@ function makeHost() {
     get metrics() { return metrics },
     mute: () => false,
     debug: () => false,
+    title: () => false,
     record: () => false,
     stopRecord: (): Replay => ({ v: 1, seed: 1, scenario: 'empty', frames: [] }),
     download: () => {},

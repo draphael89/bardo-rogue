@@ -22,6 +22,7 @@ import { seedFx } from './fxRng'
 import { BOONS, hasBoon } from '@/sim/boons'
 import { ActionFeedbackGate, crowdScreenMultiplier } from './feedback'
 import { RewardOverlay } from './reward'
+import { TitleOverlay } from './title'
 
 interface ImpactStamp {
   t: number; r: number; a: number; snap: number; sweep: number
@@ -54,6 +55,7 @@ export class Presenter {
   damageNumbers: DamageNumbers
   atmosphere: Atmosphere
   reward: RewardOverlay
+  title: TitleOverlay
   private lastHurtAngle = 0
   private emberAcc = 0
   // contact reaction on real time, so it plays out *inside* the hit-stop instead of waiting for it
@@ -90,6 +92,8 @@ export class Presenter {
     this.flashOverlay = new Sprite(Texture.WHITE); this.flashOverlay.width = tuning.view.width; this.flashOverlay.height = tuning.view.height
     this.flashOverlay.alpha = 0; L.hud.addChild(this.flashOverlay)
     this.reward = new RewardOverlay(L.hud)
+    // Above the reward overlay in z-order: the title is the one thing that covers everything.
+    this.title = new TitleOverlay(L.hud)
     // juice hooks
     this.lighting = new Lighting(ra, atlas, this.particles, ra.app.renderer, world.arena)
     this.postfx = new PostFx(ra)
@@ -825,8 +829,11 @@ export class Presenter {
     this.ra.world.rotation = this.camera.rotation
 
     if (this.flashAlpha > 0) { this.flashOverlay.alpha = this.flashAlpha; this.flashAlpha = Math.max(0, this.flashAlpha - dtSec * 6) } else this.flashOverlay.alpha = 0
+    this.hud.setChromeHidden(this.title.visible)
+    this.reward.setSuppressed(this.title.visible)
     this.hud.update(w, dtSec)
     this.reward.update(w)
+    this.title.update(w, dtSec)
   }
 }
 

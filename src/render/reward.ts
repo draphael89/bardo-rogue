@@ -3,36 +3,7 @@ import { BOONS, DEITIES, type BoonId, type Deity } from '@/sim/boons'
 import { drawDeityMask, MASK_W } from './views/deity'
 import type { World } from '@/sim/world'
 import { tuning } from '@/tuning'
-import { crispText } from './textCrisp'
-
-const P = {
-  void: 0x08070e,
-  face: 0x181824,
-  faceHi: 0x242638,
-  bone: 0xd8c8ae,
-  dim: 0x8c806f,
-  gold: 0xd4b060,
-  ember: 0xff7a30,
-  veil: 0xa878ff,
-  red: 0x9e4658,
-}
-
-function label(text: string, size: number, color = P.bone): Text {
-  const t = new Text({
-    text,
-    style: {
-      fontFamily: size >= 16 ? 'Kenney Pixel' : 'Kenney Mini',
-      fontSize: size,
-      fill: color,
-      align: 'center',
-      letterSpacing: size < 16 ? 1 : 0,
-    },
-    resolution: 1,
-  })
-  t.anchor.set(0.5)
-  t.filters = [crispText]
-  return t
-}
+import { label, P } from './ui'
 
 export class RewardOverlay {
   root = new Container()
@@ -46,6 +17,7 @@ export class RewardOverlay {
   private metaG = new Graphics()
   private metaText = label('', 9, P.dim)
   private paused = false
+  private suppressed = false
   private reducedEffects = false
 
   constructor(layer: Container) {
@@ -57,11 +29,19 @@ export class RewardOverlay {
 
   relayout(): void { this.key = '' }
   setPaused(paused: boolean): void { if (this.paused !== paused) { this.paused = paused; this.key = '' } }
+  /** Stand down entirely while a higher overlay owns the screen, so nothing of ours shows under it. */
+  setSuppressed(suppressed: boolean): void { if (this.suppressed !== suppressed) { this.suppressed = suppressed; this.key = '' } }
   setReducedEffects(reduced: boolean): void {
     if (this.reducedEffects !== reduced) { this.reducedEffects = reduced; this.key = '' }
   }
 
   update(world: World): void {
+    if (this.suppressed) {
+      this.root.visible = false
+      this.build.visible = false
+      this.meta.visible = false
+      return
+    }
     const offer = this.paused ? null : world.session.run?.pendingReward
     const victory = !this.paused && world.session.run?.result === 'won'
     this.root.visible = !!offer || victory || this.paused

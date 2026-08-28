@@ -63,8 +63,14 @@ async function boot() {
   // the envelope carries meta AND settings, and a non-`loop` world's session.meta is the zeroed
   // default, so composing a write from it would wipe real progress the moment V is pressed.
   let savedSave: BardoSave = loaded.save
-  let savable = loaded.writable
+  // Ownership is claimed BEFORE the first write can happen: a second tab of the same profile starts
+  // read-only instead of discovering the conflict after its first clobbering save. The desktop host
+  // has no claimSaves -- its single-instance lock already guarantees one writer per profile.
+  const ownsProfile = noSave ? false : platform.claimSaves?.(PROFILE_ID) ?? true
+  let savable = loaded.writable && (noSave || ownsProfile)
   if (noSave) console.log('[save] save=off: this session reads and writes nothing')
+  else if (!ownsProfile) console.log('[save] another tab owns this profile; this session will not write')
+  else if (loaded.source === 'damaged') console.log('[save] the save was damaged and no backup was usable; a fresh profile started, the damaged bytes are kept')
   else if (loaded.source === 'backup') console.log('[save] the live save was unreadable; recovered from the backup copy')
   else if (loaded.source === 'unreadable') console.log('[save] this profile could not be read at all; nothing will be written over it')
   else if (!savable) console.log('[save] this save was written by a newer build; it will not be overwritten')
@@ -310,8 +316,10 @@ async function boot() {
   // not just the console -- overriding the room banner in exactly the rare case where the warning
   // matters more than the room name. save=off skips it, so evidence captures stay clean.
   if (!noSave) {
-    if (loaded.source === 'unreadable') presenter.hud.showBanner('SAVE COULD NOT BE READ', 'playing without saving, nothing will be overwritten', 3.5)
+    if (!ownsProfile) presenter.hud.showBanner('ANOTHER TAB IS PLAYING', 'progress here will not be saved', 3.5)
+    else if (loaded.source === 'unreadable') presenter.hud.showBanner('SAVE COULD NOT BE READ', 'playing without saving, nothing will be overwritten', 3.5)
     else if (!savable) presenter.hud.showBanner('SAVE FROM A NEWER BUILD', 'playing without saving, nothing will be overwritten', 3.5)
+    else if (loaded.source === 'damaged') presenter.hud.showBanner('SAVE WAS DAMAGED', 'a fresh start; the damaged file is kept', 3.5)
     else if (loaded.source === 'backup') presenter.hud.showBanner('SAVE RESTORED', 'recovered from the backup copy', 3.0)
   }
 }

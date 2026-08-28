@@ -17,8 +17,11 @@ const VIDEO = /\.(mp4|mov|webm|mkv|avi)$/i
 // this list their deletion would pass the gate and boot to a missing-texture failure.
 const HARDCODED_RUNTIME = ['assets/sprites/bardo_hero.png', 'assets/sprites/bardo_brute.png']
 const REQUIRED = ['index.html', 'assets/manifest.json', ...HARDCODED_RUNTIME]
-// The bundle's own artifacts live flat in assets/: hashed js chunks, css, and their maps.
-const BUNDLE_ARTIFACT = /^assets\/[^/]+\.(?:js|css)(?:\.map)?$/
+// The bundle's own artifacts live flat in assets/ and carry Vite's 8-char content hash
+// (index-CjDo0xU0.js). Requiring the hash, not just the extension, keeps a stray debug.js dropped
+// into public/assets from reading as generated output. A file NAMED like a hashed chunk still slips
+// through -- this gate is fail-safe against accidents, not proof against an author faking names.
+const BUNDLE_ARTIFACT = /^assets\/[^/]+-[A-Za-z0-9_-]{8}\.(?:js|css)(?:\.map)?$/
 const FLOOR_BYTES = 1.5 * 1024 * 1024     // measured shipped payload is ~2.1MB across 202 files
 const BUDGET_BYTES = 4 * 1024 * 1024      // shipped payload, .map excluded (measured ~2.2MB: pixi + 174 assets)
 const MAP_BUDGET_BYTES = 8 * 1024 * 1024  // sourcemaps are not fetched by the game; budgeted apart so a

@@ -539,6 +539,17 @@ fixed — every one in persistence, which is where all four review rounds' genui
   for** — and closing that hole surfaced two runtime sprites (`bardo_hero.png`,
   `bardo_brute.png`) hardcoded in `atlas.ts` that no check protected; they are REQUIRED entries now.
 
+A third bot round on the fixed head found five more, again all real and again all in persistence's
+edges: the web recovery could destroy the only good copy (the rotate-first write order clobbered the
+good backup with corrupt bytes before the live write could fail -- live commits first now, so at
+every step one slot holds the newest good generation); two tabs could still race in the window
+before the storage event propagates (a heartbeat ownership lock now makes the second tab read-only
+from BOOT rather than after its first clobbering write); both-copies-corrupt masqueraded as a first
+boot (a distinct 'damaged' source now banners it); the build gate accepted any root-level .js as
+bundle output (the 8-char content hash is required now); and the smoke drove fullscreen from the
+main process instead of the player's F key (it now exercises keybind -> seam -> preload -> IPC on
+every platform, plus the real window transition on macOS).
+
 Deferred deliberately, with reasons: `RunCheckpoint` stays a reserved `null` slot until run structure
 settles (the envelope is ready for it); IndexedDB stays unbuilt while saves are kilobytes; and
 electron-builder is configured (`electron-builder.yml`, `build/entitlements.mac.plist`) but not

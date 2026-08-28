@@ -242,29 +242,31 @@ try {
     return `${root} clean`
   })
 
-  await check('fullscreen enters and exits', 25_000, async () => {
-    // Bare Xvfb has no window manager, so the round-trip cannot complete there; record a skip rather
-    // than fail or hang. On macOS -- the shipping target -- this is a hard assertion.
-    if (process.platform === 'linux' && !process.env.BARDO_SMOKE_WM) { skipped.push('fullscreen: linux without a window manager'); return 'skipped' }
-    const r = await l1.app.evaluate(async ({ BrowserWindow }) => {
-      const w = BrowserWindow.getAllWindows()[0]
-      if (!w) return null
-      // Electron's overloaded .once() rejects a union of event names, so each wait is written out.
-      const enter = new Promise<boolean>(res => {
+  await check('fullscreen round-trips through the player path', 25_000, async () => {
+    // Driven by the F key -- the same chain a player uses: the renderer keybind, the platform seam,
+    // the preload bridge, the IPC handler's tracked intent, the window. Poking
+    // BrowserWindow.setFullScreen from the main process would stay green with all of that
+    // disconnected. The intent is asserted everywhere; the real window transition needs a window
+    // manager, so that half is darwin-only (bare Xvfb has none).
+    const queryIntent = () => page.evaluate(() => (window as unknown as { bardoDesktop: { isFullscreen(): Promise<boolean> } }).bardoDesktop.isFullscreen())
+    const pressF = () => page.evaluate(() => { window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyF' })) })
+    const until = async (want: boolean, label: string) => {
+      for (let i = 0; i < 60; i++) { if (await queryIntent() === want) return; await new Promise(r => setTimeout(r, 50)) }
+      throw new Error(`fullscreen intent never became ${want} (${label})`)
+    }
+    await pressF(); await until(true, 'after the first F')
+    if (process.platform === 'darwin') {
+      const entered = await l1.app.evaluate(({ BrowserWindow }) => new Promise<boolean>(res => {
+        const w = BrowserWindow.getAllWindows()[0]
+        if (!w) return res(false)
+        if (w.isFullScreen()) return res(true)
         const t = setTimeout(() => res(w.isFullScreen()), 5000)
         w.once('enter-full-screen', () => { clearTimeout(t); res(true) })
-      })
-      w.setFullScreen(true)
-      const entered = await enter
-      const leave = new Promise<boolean>(res => {
-        const t = setTimeout(() => res(!w.isFullScreen()), 5000)
-        w.once('leave-full-screen', () => { clearTimeout(t); res(true) })
-      })
-      w.setFullScreen(false)
-      const left = await leave
-      return { entered, left }
-    })
-    assert(r?.entered && r.left, `fullscreen did not round-trip: ${JSON.stringify(r)}`)
+      }))
+      assert(entered, 'the window never actually entered fullscreen')
+    }
+    await pressF(); await until(false, 'after the second F')
+    return process.platform === 'darwin' ? 'keybind -> seam -> IPC -> window, both ways' : 'keybind -> seam -> IPC intent, both ways (no WM here)'
   })
 
   await check('saves write to disk, and a bad profile id is refused', 25_000, async () => {

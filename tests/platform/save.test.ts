@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { META_KEY, SETTINGS_KEY, type StorageLike } from '@/sim/storage'
 import { defaultSave, serializeSave, type BardoSave } from '@/sim/save'
-import { backupKey, createStorageSaveStore, createWebSaveStore, migrateLegacyKeys, saveKey } from '@/platform/web'
+import { backupKey, claimProfileLock, createStorageSaveStore, createWebSaveStore, lockKey, migrateLegacyKeys, saveKey } from '@/platform/web'
 import { createDesktopPlatform, type DesktopBridge } from '@/platform/desktop'
 import { loadSave, saveFilename } from '@/platform/saveFile'
 
@@ -99,14 +99,28 @@ describe('loadSave recovery', () => {
     expect(storage.getItem(backupKey(ID))).toBe('{broken')  // ...and the corrupt blob is kept, not erased
   })
 
-  it('returns defaults and writes nothing when both copies are unreadable', async () => {
+  it('reports both copies corrupt as damage, never as a first boot', async () => {
+    // The player HAD progress; starting fresh silently would leave them to discover the loss alone.
+    // main.ts banners this source; the bytes stay where they are until the first autosave rotates
+    // them into the backup slot (live commits first, so nothing is destroyed to do it).
     const storage = new MemoryStorage()
     storage.setItem(saveKey(ID), '{broken')
     storage.setItem(backupKey(ID), 'also broken')
     const loaded = await loadSave(createStorageSaveStore(storage), ID)
-    expect(loaded.source).toBe('default')
+    expect(loaded.source).toBe('damaged')
+    expect(loaded.writable).toBe(true)
     expect(loaded.save).toEqual(defaultSave({ profileId: ID }))
-    expect(storage.getItem(saveKey(ID))).toBe('{broken')  // a transient read failure must not destroy anything
+    expect(storage.getItem(saveKey(ID))).toBe('{broken')  // loading alone must not destroy anything
+  })
+
+  it('reports a corrupt backup behind an absent live slot as damage too', async () => {
+    const storage = new MemoryStorage()
+    storage.setItem(backupKey(ID), '{broken')
+    expect((await loadSave(createStorageSaveStore(storage), ID)).source).toBe('damaged')
+  })
+
+  it('still reports a genuinely empty profile as a first boot', async () => {
+    expect((await loadSave(createStorageSaveStore(new MemoryStorage()), ID)).source).toBe('default')
   })
 
   it('marks a save from a newer build unwritable so it can never be overwritten', async () => {
@@ -121,6 +135,84 @@ describe('loadSave recovery', () => {
     const loaded = await loadSave(createStorageSaveStore(new MemoryStorage()), ID, { preferredReducedEffects: true })
     expect(loaded.source).toBe('default')
     expect(loaded.save.settings.reducedEffects).toBe(true)
+  })
+})
+
+describe('recovery cannot destroy the only good copy', () => {
+  class FailsLiveWrites extends MemoryStorage {
+    override setItem(key: string, value: string): void {
+      if (key === saveKey(ID)) throw new Error('quota exceeded')
+      super.setItem(key, value)
+    }
+  }
+
+  it('keeps the good backup when re-arming the live slot fails', async () => {
+    // The losing sequence under the old rotate-first order: recovery rotated the corrupt live bytes
+    // into the backup slot -- destroying the only good copy -- and THEN failed to write the live
+    // slot. Live-commits-first means a failed write changes nothing.
+    const storage = new FailsLiveWrites()
+    const good = serializeSave(withMeta(12, 3))
+    storage.data.set(saveKey(ID), '{broken')
+    storage.data.set(backupKey(ID), good)
+    const loaded = await loadSave(createStorageSaveStore(storage), ID)
+    expect(loaded.source).toBe('backup')
+    expect(loaded.save.meta.attempts).toBe(12)
+    expect(storage.getItem(backupKey(ID))).toBe(good)      // the good generation survived the failed recovery
+    expect(storage.getItem(saveKey(ID))).toBe('{broken')   // and nothing pretended the live slot was fixed
+  })
+
+  it('treats a failed best-effort rotation as a successful write', async () => {
+    // Once the live slot holds the newest bytes, the write HAS succeeded; a backup slot that cannot
+    // be written must not turn that success into a PROGRESS NOT SAVING banner.
+    class FailsBackupWrites extends MemoryStorage {
+      override setItem(key: string, value: string): void {
+        if (key === backupKey(ID)) throw new Error('quota exceeded')
+        super.setItem(key, value)
+      }
+    }
+    const storage = new FailsBackupWrites()
+    const store = createStorageSaveStore(storage)
+    await store.write(ID, 'first')
+    await expect(store.write(ID, 'second')).resolves.toBeUndefined()
+    expect(storage.getItem(saveKey(ID))).toBe('second')
+    expect(storage.getItem(backupKey(ID))).toBeNull()
+  })
+})
+
+describe('profile ownership lock', () => {
+  const NOW = 1_000_000
+  it('grants a fresh profile and blocks a second owner while the heartbeat is live', () => {
+    const storage = new MemoryStorage()
+    const a = claimProfileLock(storage, ID, 'tab-a', () => NOW)
+    expect(a.claimed).toBe(true)
+    expect(claimProfileLock(storage, ID, 'tab-b', () => NOW + 5_000).claimed).toBe(false)
+  })
+
+  it('lets a new tab take over once the heartbeat has gone stale', () => {
+    const storage = new MemoryStorage()
+    claimProfileLock(storage, ID, 'tab-a', () => NOW)
+    expect(claimProfileLock(storage, ID, 'tab-b', () => NOW + 60_000).claimed).toBe(true)
+  })
+
+  it('release clears only its own lock', () => {
+    const storage = new MemoryStorage()
+    const a = claimProfileLock(storage, ID, 'tab-a', () => NOW)
+    const b = claimProfileLock(storage, ID, 'tab-b', () => NOW + 60_000)   // took over from stale a
+    a.release()
+    expect(storage.getItem(lockKey(ID))).not.toBeNull()   // b's lock survives a's release
+    b.release()
+    expect(storage.getItem(lockKey(ID))).toBeNull()
+  })
+
+  it('re-claiming by the same owner refreshes rather than fails', () => {
+    const storage = new MemoryStorage()
+    claimProfileLock(storage, ID, 'tab-a', () => NOW)
+    expect(claimProfileLock(storage, ID, 'tab-a', () => NOW + 5_000).claimed).toBe(true)
+  })
+
+  it('never throws when storage is missing or hostile', () => {
+    expect(claimProfileLock(undefined, ID, 'tab-a').claimed).toBe(false)
+    expect(claimProfileLock(new HostileStorage(), ID, 'tab-a').claimed).toBe(false)
   })
 })
 

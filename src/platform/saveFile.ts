@@ -10,7 +10,7 @@ export interface LoadedSave {
   // False only for a save written by a NEWER build: it stays readable so the player still sees their
   // counters, and every write is refused so the fields this build cannot represent survive.
   writable: boolean
-  source: 'save' | 'backup' | 'default' | 'unreadable'
+  source: 'save' | 'backup' | 'default' | 'unreadable' | 'damaged'
 }
 
 // A read that threw is NOT a read that found nothing: an EACCES, an EIO or a half-mounted volume
@@ -47,10 +47,14 @@ export async function loadSave(
   }
   if (backup.kind === 'future') return { save: backup.save, writable: false, source: 'backup', raw: backup.raw }
 
-  // Nothing readable anywhere. If either read actually FAILED, this profile is not writable: we hand
-  // back defaults so the player can still play, and refuse to write over data we could not see.
-  const readsFailed = live.failed || spare.failed
-  return { save: current.save, writable: !readsFailed, source: readsFailed ? 'unreadable' : 'default' }
+  // Nothing usable anywhere. Three cases, told apart because they deserve different treatment:
+  // a read that FAILED means the profile may be fine on a disk we cannot see -- never write over it;
+  // bytes that read fine but parse as damage mean progress EXISTED -- start fresh, but say so and
+  // leave the damaged bytes preserved (the desktop store moved them aside; the web write commits the
+  // live slot first and rotates them into the backup); and genuinely nothing at all is a new player.
+  if (live.failed || spare.failed) return { save: current.save, writable: false, source: 'unreadable' }
+  if (current.kind === 'corrupt' || backup.kind === 'corrupt') return { save: current.save, writable: true, source: 'damaged' }
+  return { save: current.save, writable: true, source: 'default' }
 }
 
 // Sortable, collision-free in a downloads folder, .json so any text editor opens it. The Date comes

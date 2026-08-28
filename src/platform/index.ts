@@ -29,6 +29,9 @@ export interface Platform {
   prefersReducedMotion(): boolean
   fullscreen(on?: boolean): Promise<void>
   setRunActive(active: boolean): void                 // so a host can ask before a quit throws a run away
+  // Claim exclusive write ownership of a profile for this session; false = someone else holds it and
+  // this session must not write. Optional: the desktop's single-instance lock already guarantees it.
+  claimSaves?(profileId: string): boolean
   // "A write is in flight or queued." Only the desktop host consumes it -- its quit path holds the
   // window open until the last write lands, instead of racing it. Optional: the web has no quit.
   setSaving?(saving: boolean): void

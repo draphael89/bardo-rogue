@@ -27,9 +27,14 @@ export function createStorageSaveStore(storage: StorageLike | undefined): SaveSt
     read: async id => get(saveKey(id)),
     readBackup: async id => get(backupKey(id)),
     write: async (id, data) => {
+      // The LIVE slot commits first, so at every step at least one slot holds the newest good
+      // generation. The old order -- rotate, then replace -- had a losing sequence during recovery:
+      // with corrupt bytes live and the only good copy in the backup, the rotation overwrote that
+      // good backup with the corrupt bytes, and if the live write then threw (quota), both slots
+      // were corrupt and the good generation existed nowhere on disk.
       const prev = get(saveKey(id))
-      if (prev !== null && prev !== data) set(backupKey(id), prev)   // rotate, then replace
-      set(saveKey(id), data)
+      set(saveKey(id), data)                                           // primary commit: throws = write failed
+      try { if (prev !== null && prev !== data) set(backupKey(id), prev) } catch { /* preservation is best-effort; the newest data is already durable */ }
     },
     delete: async id => { if (!storage) throw new Error('storage unavailable'); storage.removeItem(saveKey(id)); storage.removeItem(backupKey(id)) },
   }
@@ -78,13 +83,63 @@ function safeLocalStorage(): StorageLike | undefined {
   try { return typeof localStorage === 'undefined' ? undefined : localStorage } catch { return undefined }
 }
 
+export const lockKey = (profileId: string) => `bardo-rogue.lock.${profileId}`
+const LOCK_TTL_MS = 10_000
+const LOCK_REFRESH_MS = 4_000
+
+interface LockDoc { owner: string; ts: number }
+
+function readLock(storage: StorageLike, key: string): LockDoc | null {
+  try {
+    const raw = storage.getItem(key)
+    if (!raw) return null
+    const v = JSON.parse(raw) as Partial<LockDoc>
+    return typeof v.owner === 'string' && typeof v.ts === 'number' ? { owner: v.owner, ts: v.ts } : null
+  } catch { return null }
+}
+
+// Claim write ownership of a profile for this session. The storage event only tells a tab about a
+// foreign write AFTER it happened, so post-hoc watching alone leaves a window -- a second tab that
+// boots and saves before the first event arrives -- where two whole-document writers clobber each
+// other. A heartbeat lock closes it: the second tab discovers at BOOT that someone else owns the
+// profile and starts read-only. localStorage has no atomic claim, so the write is verified by
+// reading it back, which shrinks the remaining race from seconds to the gap between two statements.
+export function claimProfileLock(
+  storage: StorageLike | undefined, profileId: string, owner: string, now: () => number = Date.now,
+): { claimed: boolean; release(): void; refresh(): void } {
+  const none = { claimed: false, release: () => {}, refresh: () => {} }
+  if (!storage) return none
+  const key = lockKey(profileId)
+  try {
+    const held = readLock(storage, key)
+    if (held && held.owner !== owner && now() - held.ts < LOCK_TTL_MS) return none   // live and someone else's
+    storage.setItem(key, JSON.stringify({ owner, ts: now() } satisfies LockDoc))
+    if (readLock(storage, key)?.owner !== owner) return none                         // lost the last-write race
+  } catch { return none }
+  return {
+    claimed: true,
+    refresh: () => { try { storage.setItem(key, JSON.stringify({ owner, ts: now() } satisfies LockDoc)) } catch { /* an expired heartbeat only means another tab may take over */ } },
+    release: () => { try { if (readLock(storage, key)?.owner === owner) storage.removeItem(key) } catch { /* stale locks expire on their own */ } },
+  }
+}
+
 export function createWebPlatform(opts: DetectOptions = {}): Platform {
   const storage = safeLocalStorage()
   if (opts.migrateLegacy !== false) migrateLegacyKeys(storage, PROFILE_ID, prefersReducedMotion())
   let picker: HTMLInputElement | null = null
+  let heartbeat: ReturnType<typeof setInterval> | null = null
   return {
     kind: 'web',
     saves: createWebSaveStore(storage, prefersReducedMotion()),
+    claimSaves: profileId => {
+      const owner = crypto.randomUUID()
+      const lock = claimProfileLock(storage, profileId, owner)
+      if (!lock.claimed) return false
+      heartbeat = setInterval(() => lock.refresh(), LOCK_REFRESH_MS)
+      // pagehide, not beforeunload: it also fires when a tab is frozen into the back/forward cache.
+      window.addEventListener('pagehide', () => { if (heartbeat) clearInterval(heartbeat); lock.release() })
+      return true
+    },
     persistHint: () => {
       // Fire-and-forget and deliberately silent: some browsers prompt, some decide heuristically, some
       // have no such API. Never awaited (boot must not wait behind a permission dialog) and never

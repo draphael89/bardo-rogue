@@ -536,8 +536,8 @@ fixed — every one in persistence, which is where all four review rounds' genui
 - **The save IPC accepted any syntactically valid profile name**; it now accepts only the profiles
   that exist.
 - **The build gate checked only that manifested files exist, not that shipped files are accounted
-  for** — and closing that hole surfaced two runtime sprites (`bardo_hero`, `bardo_props`' hero and
-  brute sheets) hardcoded in `atlas.ts` that no check protected; they are REQUIRED entries now.
+  for** — and closing that hole surfaced two runtime sprites (`bardo_hero.png`,
+  `bardo_brute.png`) hardcoded in `atlas.ts` that no check protected; they are REQUIRED entries now.
 
 Deferred deliberately, with reasons: `RunCheckpoint` stays a reserved `null` slot until run structure
 settles (the envelope is ready for it); IndexedDB stays unbuilt while saves are kilobytes; and

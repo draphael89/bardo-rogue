@@ -53,12 +53,16 @@ async function boot() {
   const storedSettings = loadSettings(browserStorage, preferredReducedEffects)
   let reducedEffects = q.has('reduced') ? q.get('reduced') !== '0' : storedSettings.reducedEffects
   let world: World = createWorld(seed, scenario, { god, ...(scenario === 'loop' ? { meta: loadMeta(browserStorage) } : {}) })
+  // Spatial audio starts with the player's actual spawn, before the first enemy tell can arrive.
+  audio.setListener(world.player.x, world.player.y)
   let userPaused = false
   let metrics = new Metrics()
   const presenter = new Presenter(ra, atlas, world)
   presenter.setReducedEffects(reducedEffects)
   presenter.particles.attachRenderer(ra.app.renderer)
-  presenter.onEvent = ev => playEventSfx(audio, ev)
+  // Refresh the ears immediately before every sound. Footsteps are cadence, not authority: a
+  // stationary player and a freshly reset room must spatialize enemy tells just as accurately.
+  presenter.onEvent = ev => playEventSfx(audio, ev, world.player)
   ra.viewOverride = viewOverride
   ra.onViewResize = () => { presenter.rebuildRoom(); presenter.hud.relayout(); presenter.reward.relayout() }
   const input = new InputSystem(ra)
@@ -76,6 +80,7 @@ async function boot() {
     const suppliedMeta = Object.prototype.hasOwnProperty.call(opts, 'meta')
     const meta = sc === 'loop' ? (suppliedMeta ? opts.meta : world.scenario === 'loop' ? world.session.meta : undefined) : undefined
     world = createWorld(s, sc, { ...opts, ...(meta ? { meta } : {}) })
+    audio.setListener(world.player.x, world.player.y)
     metrics = new Metrics()
     replayFrames = null
     if (recorder.recording) { recorder.stop(); console.log('[replay] recording stopped by restart') }
@@ -86,6 +91,9 @@ async function boot() {
   const tick = () => {
     // always sample live input, even when a bot or replay drives the sim, so latched presses do not pile up
     const live = input.sample(world)
+    // The Q reticle describes the controls actually driving this run. It is presentation-only and
+    // deliberately disappears while a deterministic replay or bot owns the simulation input.
+    presenter.setHardLockTarget(!replayFrames && !bot ? input.hardLockTargetId : null)
     let frame: InputFrame
     if (replayFrames) {
       frame = replayFrames[replayIdx++]

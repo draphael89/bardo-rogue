@@ -6,10 +6,10 @@ import { ARM } from './weapons'
 import { BOON } from './boons'
 
 // Stable integer codes. Enum order is part of the hash contract: append, never reorder.
-const PLAYER_STATE: Record<PlayerState, number> = { free: 0, dodge: 1, attack: 2, dead: 3 }
+const PLAYER_STATE: Record<PlayerState, number> = { free: 0, dodge: 1, attack: 2, dead: 3, hurt: 4 }
 const ENEMY_STATE: Record<EnemyState, number> = {
   idle: 0, chase: 1, windup: 2, attack: 3, recover: 4, stagger: 5, dead: 6,
-  position: 7, aim: 8, hover: 9, freeze: 10, dash: 11,
+  position: 7, aim: 8, hover: 9, freeze: 10, dash: 11, phase: 12,
 }
 const ENEMY_KIND: Record<EnemyKind, number> = { brute: 0, caster: 1, charger: 2, dummy: 3, warden: 4 }
 const WAVE_STATE: Record<WaveState, number> = { idle: 0, pending: 1, active: 2, done: 3 }
@@ -62,9 +62,11 @@ export function hashWorld(world: World): number {
   num(p.x); num(p.y); num(p.px); num(p.py); num(p.vx); num(p.vy); num(p.kbx); num(p.kby)
   int(p.hp); int(p.maxHp); int(p.facing)
   num(p.aimAngle); num(p.moveAngle); num(p.dodgeDirX); num(p.dodgeDirY)
-  int(p.swingIndex); num(p.swingAngle); int(p.swingId); int(p.assistTargetId)
+  int(p.swingIndex); num(p.swingAngle); int(p.swingId); flag(p.bladeActionConnected); int(p.assistTargetId)
   int(p.controlTick); int(p.attackQueuedAt); int(p.dodgeQueuedAt); int(p.dodgeTick)
   int(p.iframes); num(p.flash); int(p.dodgeRead)
+  // Preserve the historical byte stream for worlds that never earn this opt-in mechanic.
+  if (p.reversalTicks || p.reversalActionId !== -1) { int(p.reversalTicks); int(p.reversalActionId) }
   num(p.moveX); num(p.moveY); int(p.footTick); int(p.deathTick); flag(p.god)
   if (p.arm) byte(p.arm)
   if (!p.armed) flag(false)
@@ -80,8 +82,13 @@ export function hashWorld(world: World): number {
     num(e.aimAngle); num(e.targetX); num(e.targetY)
     int(e.lastHitSwingId); num(e.flash); flag(e.hitDone)
     num(e.orbitAngle); int(e.orbitDir); int(e.hoverTicks); int(e.cooldown); int(e.dashTicks); int(e.spawnTick)
-    if (e.phase) byte(e.phase)
+    if (e.phase || e.phasePending || e.actionPhase || e.pattern || e.patternCursor || e.patternStep) {
+      byte(e.phase); flag(e.phasePending); byte(e.actionPhase); byte(e.pattern); int(e.patternCursor); int(e.patternStep)
+    }
+    // poseTick is a cosmetic clock, like visualRng above: deterministic presentation state, but it
+    // cannot affect an outcome and therefore is deliberately outside the gameplay hash contract.
     if (e.brand) { byte(e.brand); int(e.brandTicks) }
+    if (e.knockbackHeavy) { flag(true); int(e.knockbackActionId) }
   }
 
   let bolts = 0
@@ -91,7 +98,10 @@ export function hashWorld(world: World): number {
     if (!b.active) continue
     int(b.id); num(b.x); num(b.y); num(b.px); num(b.py); num(b.vx); num(b.vy)
     num(b.radius); int(b.life); num(b.angle)
+    // Preserve the established friendly-projectile byte order; hostile bolts previously omitted
+    // damage entirely, so append it only on that old empty branch.
     if (b.team) { byte(b.team); int(b.damage); int(b.actionId) }
+    else int(b.damage)
     if (b.kind === 'mirror' || b.kind === 'echo') byte(PROJECTILE_KIND[b.kind])
   }
 

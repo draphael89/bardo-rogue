@@ -9,6 +9,7 @@ import { hasBoon, swingReach } from '@/sim/boons'
 import { EntityView, SPRITE, WEAPON, HALF_PI } from './shared'
 import { ARM, armOf } from '@/sim/weapons'
 import { restoreSword, updateBow } from './bow'
+import { nearestHeroDirection, stableHeroDirection, verticalDodgeFrame, type HeroDirection } from '../heroDirection'
 
 const deg = (d: number): number => d * Math.PI / 180
 
@@ -27,14 +28,24 @@ const HERO = {
 // 32 (especially the horizontal dodge), so the pivot is part of the clip metadata rather than a
 // hidden per-frame correction in the renderer.
 const HERO_PIVOT_Y = [28, 28, 28, 28, 26, 26, 32, 26, 25, 25, 25, 25, 21, 14, 21, 23] as const
-type PlayerArt = { stock: Texture; stockWhite: Texture; hero: Texture[]; heroWhite: Texture[] }
+// Per-sheet travel cells have different transparent padding. Anchor each on its last occupied row
+// so the authored tuck skims the same floor plane instead of sinking below its contact shadow.
+const HERO_TRAVEL_PIVOT_Y: Record<HeroDirection, number> = { side: 14, north: 20, south: 18 }
+const VERTICAL_ROLL_PIVOT_Y = {
+  north: [28, 28, 28, 28],
+  south: [28, 28, 28, 28],
+} as const
+const VERTICAL_ROLL_HOP = [0, 1, 2, 0] as const
+type HeroSheet = { frames: Texture[]; whites: Texture[]; rollFrames?: Texture[]; rollWhites?: Texture[] }
+type PlayerArt = { stock: Texture; stockWhite: Texture; hero: Record<HeroDirection, HeroSheet> }
 const playerArt = new WeakMap<EntityView, PlayerArt>()
-type ClipSelection = { key: string; authored: boolean; stateTick: number }
+type ClipSelection = { key: string; direction: HeroDirection; stateTick: number }
 const clipSelection = new WeakMap<EntityView, ClipSelection>()
+const freeDirection = new WeakMap<EntityView, HeroDirection>()
 
 function heroFrame(p: Player, world: World, time: number): number {
   if (p.state === 'dead') return HERO.dead
-  if (p.flash > 0) return HERO.hurt
+  if (p.state === 'hurt' || p.flash > 0) return HERO.hurt
   if (p.state === 'free') return Math.hypot(p.vx, p.vy) > 10 ? (Math.floor(time * 9) & 1 ? HERO.runA : HERO.runB) : HERO.idle
   if (p.state === 'dodge') return p.stateTick < 3 ? HERO.dodgeStart : p.stateTick < tuning.player.dodge.travel ? HERO.dodgeTravel : HERO.dodgeLand
   if (p.state !== 'attack' || armOf(world) !== ARM.blade) return HERO.idle
@@ -46,37 +57,79 @@ function heroFrame(p: Player, world: World, time: number): number {
   return p.stateTick < s.startup ? HERO.heavyStart : p.stateTick < s.startup + s.active ? HERO.heavyContact : HERO.heavyRecover
 }
 
-function authoredBladeFor(v: EntityView, p: Player, bladeEquipped: boolean): boolean {
-  if (!bladeEquipped) { clipSelection.delete(v); return false }
-  if (p.state === 'free' || p.state === 'dead') { clipSelection.delete(v); return true }
-  if (p.state !== 'attack' && p.state !== 'dodge') return false
+function directionalHeroFrame(direction: HeroDirection, frame: number): number {
+  // The south sheet's second cut resolves downward in cell 9 and recoils overhead in cell 8. Its
+  // generated semantic pair is intentionally reversed to keep both the contact axis and recovery
+  // silhouette truthful; simulation timing and the public 16-frame contract stay unchanged.
+  if (direction === 'south' && frame === HERO.light2Contact) return HERO.light2Recover
+  if (direction === 'south' && frame === HERO.light2Recover) return HERO.light2Contact
+  return frame
+}
 
-  const key = p.state === 'attack' ? `attack:${p.swingId}` : 'dodge'
+function authoredDirectionFor(v: EntityView, p: Player, bladeEquipped: boolean): HeroDirection | null {
+  if (!bladeEquipped) { clipSelection.delete(v); freeDirection.delete(v); return null }
+  if (p.state === 'free') {
+    clipSelection.delete(v)
+    const direction = stableHeroDirection(p.aimAngle, freeDirection.get(v))
+    freeDirection.set(v, direction)
+    return direction
+  }
+
+  const key = p.state === 'attack' ? `attack:${p.swingId}` : p.state
   const previous = clipSelection.get(v)
-  // swingAngle may track the pointer during early startup. Choose the renderer once per action (or
-  // combo swing) and retain it until stateTick resets, so crossing the horizontal threshold cannot
-  // swap between a 32px authored body and the 16px puppet in the middle of a clip.
+  // swingAngle may track the pointer during early startup. Choose one directional sheet per action
+  // (or combo swing) and retain it until stateTick resets, so an aim correction never pops the body
+  // between viewpoints in the middle of a semantic clip.
   if (!previous || previous.key !== key || p.stateTick < previous.stateTick) {
-    const authored = p.state === 'attack'
-      ? Math.abs(Math.cos(p.swingAngle)) >= 0.92
-      : Math.abs(p.dodgeDirX) >= 0.92
-    clipSelection.set(v, { key, authored, stateTick: p.stateTick })
-    return authored
+    // Hold the interrupted action's viewpoint through the recoil. The hit changes the pose, not
+    // which side of the hero the camera is looking at; this prevents a north/south pop on contact.
+    if (p.state === 'hurt' && previous) {
+      clipSelection.set(v, { key, direction: previous.direction, stateTick: p.stateTick })
+      return previous.direction
+    }
+    const angle = p.state === 'attack'
+      ? p.swingAngle
+      : p.state === 'dodge'
+        ? Math.atan2(p.dodgeDirY, p.dodgeDirX)
+        : p.aimAngle
+    const direction = nearestHeroDirection(angle)
+    clipSelection.set(v, { key, direction, stateTick: p.stateTick })
+    return direction
   }
   previous.stateTick = p.stateTick
-  return previous.authored
+  return previous.direction
 }
 
 export function createPlayerView(atlas: Atlas, layers: { entities: Container; shadows: Container }): EntityView {
   const v = new EntityView(atlas, SPRITE.player, WEAPON.player, layers)
-  const art = {
+  const art: PlayerArt = {
     stock: atlas.tile(SPRITE.player), stockWhite: atlas.white(SPRITE.player),
-    hero: Array.from({ length: 16 }, (_, i) => atlas.hero(i)),
-    heroWhite: Array.from({ length: 16 }, (_, i) => atlas.heroWhite(i)),
+    hero: {
+      side: {
+        frames: Array.from({ length: 16 }, (_, i) => atlas.hero(i)),
+        whites: Array.from({ length: 16 }, (_, i) => atlas.heroWhite(i)),
+      },
+      north: {
+        frames: Array.from({ length: 16 }, (_, i) => atlas.heroNorth(i)),
+        whites: Array.from({ length: 16 }, (_, i) => atlas.heroNorthWhite(i)),
+        rollFrames: Array.from({ length: 4 }, (_, i) => atlas.heroNorthRoll(i)),
+        rollWhites: Array.from({ length: 4 }, (_, i) => atlas.heroNorthRollWhite(i)),
+      },
+      south: {
+        frames: Array.from({ length: 16 }, (_, i) => atlas.heroSouth(i)),
+        whites: Array.from({ length: 16 }, (_, i) => atlas.heroSouthWhite(i)),
+        rollFrames: Array.from({ length: 4 }, (_, i) => atlas.heroSouthRoll(i)),
+        rollWhites: Array.from({ length: 4 }, (_, i) => atlas.heroSouthRollWhite(i)),
+      },
+    },
   }
   playerArt.set(v, art)
   whiteFor.set(atlas.tile(SPRITE.player), atlas.white(SPRITE.player))
-  for (let i = 0; i < art.hero.length; i++) whiteFor.set(art.hero[i], art.heroWhite[i])
+  for (const direction of ['side', 'north', 'south'] as const) {
+    const sheet = art.hero[direction]
+    for (let i = 0; i < sheet.frames.length; i++) whiteFor.set(sheet.frames[i], sheet.whites[i])
+    for (let i = 0; i < (sheet.rollFrames?.length ?? 0); i++) whiteFor.set(sheet.rollFrames![i], sheet.rollWhites![i])
+  }
   for (let i = 0; i < RIM_OFFSETS.length; i++) {
     const s = new Sprite(); s.anchor.set(0.5, 1); s.visible = false
     rimSprites.push(s); layers.entities.addChild(s)
@@ -398,6 +451,12 @@ function rollPose(stateTick: number): { key: string; leanDeg: number; hop: numbe
 function attackPose(p: Player): { key: string; leanDeg: number; hop: number } {
   const s = tuning.player.attack.swings[p.swingIndex]
   const tk = p.stateTick
+  if (p.reversalActionId === p.swingId && p.swingIndex === 0 && tk === 0 && Math.abs(p.dodgeDirX) > 0.45) {
+    // A lateral counter borrows the roll's authored extension for one frame before coiling. That is
+    // the missing motion match between the last tuck and the sword pose; vertical sheets keep their
+    // own viewpoint and use the rotational bridge below instead.
+    return { key: 'extend', leanDeg: 10, hop: 0 }
+  }
   if (tk < s.startup) {
     return s.heavy
       ? { key: 'heavyCoil', leanDeg: -14, hop: -2 }
@@ -420,28 +479,47 @@ export function updatePlayerView(v: EntityView, p: Player, world: World, alpha: 
   let rollKey = ''
   let attackKey = ''
   let moveKey = ''
+  let verticalRollFrame = -1
   const b = v.body
   const speed = Math.hypot(p.vx, p.vy)
   const bladeEquipped = armOf(world) === ARM.blade
-  // This first production sheet proves the horizontal combat sentence. Until matching diagonal and
-  // vertical clips exist, preserve the legacy directional renderer rather than make an authored
-  // right-facing sword lie about a northward attack or dodge.
-  const authoredBlade = authoredBladeFor(v, p, bladeEquipped)
+  const heroDirection = authoredDirectionFor(v, p, bladeEquipped)
+  const authoredBlade = heroDirection !== null
   const art = playerArt.get(v)
 
   b.tint = 0xffffff
-  if (art && authoredBlade) {
-    const frame = heroFrame(p, world, time)
-    v.bindBody(art.hero[frame], art.heroWhite[frame])
-    b.anchor.set(0.5, HERO_PIVOT_Y[frame] / 32)
+  if (art && heroDirection) {
+    const frame = directionalHeroFrame(heroDirection, heroFrame(p, world, time))
+    const sheet = art.hero[heroDirection]
+    verticalRollFrame = verticalDodgeFrame(heroDirection, p.stateTick, P.dodge.travel)
+    if (p.state === 'dodge' && verticalRollFrame >= 0 && sheet.rollFrames && sheet.rollWhites) {
+      v.bindBody(sheet.rollFrames[verticalRollFrame], sheet.rollWhites[verticalRollFrame])
+      if (verticalRollFrame === 1 || verticalRollFrame === 2) {
+        // The compact tuck and boots-over-head apex both need a readable rotation axis at native
+        // scale. Turn them around their own centres: the compensating hop preserves the authored
+        // floor plane while separating helm, torso, and boots from one round floor-bound mass.
+        b.anchor.set(0.5, 0.5)
+        hop = 11
+      } else {
+        b.anchor.set(0.5, VERTICAL_ROLL_PIVOT_Y[heroDirection as 'north' | 'south'][verticalRollFrame] / 32)
+        hop = VERTICAL_ROLL_HOP[verticalRollFrame]
+      }
+    } else {
+      v.bindBody(sheet.frames[frame], sheet.whites[frame])
+      const pivotY = frame === HERO.dodgeTravel ? HERO_TRAVEL_PIVOT_Y[heroDirection] : HERO_PIVOT_Y[frame]
+      b.anchor.set(0.5, pivotY / 32)
+    }
   } else if (art) {
     v.bindBody(art.stock, art.stockWhite)
     b.anchor.set(0.5, 1)
   }
 
   if (authoredBlade) {
-    // Translation is simulation truth. The authored frame already contains the pose; secondary
-    // camera/particles remain elsewhere, but the renderer does not bend the complete body drawing.
+    // Translation is simulation truth. Depth-axis dodges select four discrete authored turn keys
+    // above. The tuck begins the diagonal read and the already-inverted apex completes it; the
+    // outer keys remain untransformed, and no interpolation or squash manufactures extra poses.
+    if (verticalRollFrame === 1) rot = heroDirection === 'north' ? deg(14) : deg(-14)
+    else if (verticalRollFrame === 2) rot = heroDirection === 'north' ? deg(28) : deg(-28)
   } else if (p.state === 'free') {
     if (speed > 10) {
       // Two authored silhouettes per plane: profile for lateral movement, front for vertical
@@ -493,6 +571,14 @@ export function updatePlayerView(v: EntityView, p: Player, world: World, alpha: 
       // authored frame: do not squash it. Lean names the heading the way the roll does.
       rot = deg(pose.leanDeg) * dirSign
       hop = pose.hop
+      if (p.reversalActionId === p.swingId && p.swingIndex === 0) {
+        // Continue the roll's brake into the answer for two startup ticks. Simulation translation
+        // and startup remain untouched; this merely avoids a tuck -> upright-coil pose pop.
+        const bridge = 1 - Math.min(1, (p.stateTick + alpha) / 2)
+        const rollSign = (p.dodgeDirX >= 0 ? 1 : -1) * p.facing
+        rot += deg(10 + 18 * Math.abs(p.dodgeDirY)) * rollSign * bridge
+        hop += bridge
+      }
     } else {
       const s = P.attack.swings[p.swingIndex]
       const tk = p.stateTick + alpha
@@ -509,7 +595,9 @@ export function updatePlayerView(v: EntityView, p: Player, world: World, alpha: 
   if (!authoredBlade && v.squash > 0) { const q = v.squash / tuning.juice.squashTicks; sx *= 1 + 0.25 * q; sy *= 1 - 0.25 * q }
 
   b.position.set(Math.round(x), Math.round(feetY - hop))
-  b.scale.set(sx * p.facing, sy)
+  // The side sheet is authored facing right and mirrors cleanly. Front/back sheets keep a stable
+  // handed silhouette; exact diagonal intent remains visible in the mechanically truthful arc.
+  b.scale.set(sx * (heroDirection === 'side' || !authoredBlade ? p.facing : 1), sy)
   b.rotation = rot
   // Horizontal authored melee is intentionally drawn a fraction above an equal-footed victim. At
   // exact contact both sprites otherwise share z and enemy insertion order deletes the attacker;
@@ -518,7 +606,7 @@ export function updatePlayerView(v: EntityView, p: Player, world: World, alpha: 
   // The authored clip already spends the hurt event on a distinct recoiling pose. Whitening that
   // entire 32px drawing for the four frozen ticks turns the victim into the impact core and removes
   // attribution; legacy sprites still need their texture flash because they have no hurt frame.
-  v.setFlash(p.flash > 0 && !authoredBlade)
+  v.setFlash((p.flash > 0 || p.state === 'hurt') && !authoredBlade)
   // the roll's own drawing wins over the standing sprite, but never over the hurt flash
   if (rollKey && p.flash <= 0) { const t = rollTexture(rollKey); if (t) b.texture = t }
   else if (attackKey && p.flash <= 0) { const t = rollTexture(attackKey); if (t) b.texture = t }
@@ -532,11 +620,14 @@ export function updatePlayerView(v: EntityView, p: Player, world: World, alpha: 
   } else v.setShadow(x, feetY - 1, 12 - hop * 0.4, 5 - hop * 0.2, 0.35 - hop * 0.02)
 
   if (armOf(world) === ARM.bow) updateBow(v, p, x, y, alpha, time)
-  else if (authoredBlade) { if (v.weapon) v.weapon.visible = false }
+  else if (authoredBlade) {
+    if (verticalRollFrame >= 0) { restoreSword(v); updateSword(v, p, world, x, y, alpha, time, true) }
+    else if (v.weapon) v.weapon.visible = false
+  }
   else { restoreSword(v); updateSword(v, p, world, x, y, alpha, time) }
 }
 
-function updateSword(v: EntityView, p: Player, world: World, x: number, y: number, alpha: number, time: number): void {
+function updateSword(v: EntityView, p: Player, world: World, x: number, y: number, alpha: number, time: number, separateRollWeapon = false): void {
   const w = v.weapon!
   const P = tuning.player
   const f = p.facing
@@ -581,24 +672,28 @@ function updateSword(v: EntityView, p: Player, world: World, x: number, y: numbe
     inFront = s.heavy || Math.sin(a) > -0.3
   } else if (p.state === 'dodge') {
     // The blade is never deleted mid-roll — a weapon that blinks out of existence is the tell — but
-    // it must not stand up out of the tuck as a fin, and it must not lie flat across the floor
-    // streak as a second dark bar. So it is swept down onto a back-and-down diagonal as the body
-    // pitches over, carried short and tight through the turn, and brought back to guard on the plant.
+    // it must not merge with the compact body into a false floor ring. Carry it short on the exact
+    // back-travel axis through the turn, then bring it back to guard on the plant.
     const d = P.dodge
     const tk = p.stateTick + alpha
     const roll = Math.atan2(p.dodgeDirY, p.dodgeDirX)
     const trail = roll + Math.PI                       // straight back down the line he came from
-    const tuck = lerpAngle(trail, HALF_PI, 0.35)       // ...and tipped toward the floor
     const pull = clamp01(tk / 3)                       // three ticks to sweep the blade onto the line
     if (tk < d.travel) {
-      angle = lerpAngle(restAngle, tuck, pull)
-      wx = x - Math.cos(roll) * (1 + 2 * pull); wy = y + pull
+      const lateral = separateRollWeapon ? 3 * pull : 0
+      angle = lerpAngle(restAngle, trail, pull)
+      wx = x - Math.cos(roll) * (1 + 2 * pull) - Math.sin(roll) * lateral
+      wy = y - Math.sin(roll) * (1 + 2 * pull) + Math.cos(roll) * lateral
       inFront = false
       ws = lerp(1, 0.82, pull)
     } else {
       const u = easeOutCubic((tk - d.travel) / (d.total - d.travel))
-      angle = lerpAngle(tuck, restAngle, u)
-      wx = lerp(x - Math.cos(roll) * 3, restX, u); wy = lerp(y + 1, restY, u)
+      const lateral = separateRollWeapon ? 3 : 0
+      const trailX = x - Math.cos(roll) * 3 - Math.sin(roll) * lateral
+      const trailY = y - Math.sin(roll) * 3 + Math.cos(roll) * lateral
+      angle = lerpAngle(trail, restAngle, u)
+      wx = lerp(trailX, restX, u)
+      wy = lerp(trailY, restY, u)
       inFront = u > 0.6 && f === 1
       ws = lerp(0.82, 1, u)
     }
@@ -662,10 +757,13 @@ export function drawSwingArc(g: Graphics, p: Player, alpha: number, world: World
   const { a0, a1, outer, thick, fade, x, y, heavy, blessed, hole } = arc
   const steel = heavy ? 0xfff6d0 : 0xeaf4ff
   const fire = heavy ? 0xffc050 : 0xffc060
+  // The directional keel already names a vertical cut. Ease the broad white crescent slightly in
+  // that view so the rear/front fighter remains a readable actor inside the contact composition.
+  const verticalClarity = Math.abs(Math.sin(p.swingAngle)) >= A.axisMinVertical ? 0.84 : 1
   smear(g, x, y, a0, a1, outer + 2, thick + 5, A.rimColor, A.rimAlpha * fade, 1.0, hole)
   if (heavy) smear(g, x, y, a0, a1, outer + 1, thick + 3, blessed ? 0xff9020 : 0xff9a28, A.ghostAlpha * fade, 1.2, hole)
-  smear(g, x, y, a0, a1, outer, thick, blessed ? fire : steel, (heavy ? A.heavyAlpha : A.lightAlpha) * fade, 0.8, hole)
-  smear(g, x, y, a0 + (a1 - a0) * 0.5, a1, outer - thick * 0.2, thick * 0.65, blessed ? 0xfff0c0 : 0xffffff, fade, 0.7, hole)
+  smear(g, x, y, a0, a1, outer, thick, blessed ? fire : steel, (heavy ? A.heavyAlpha : A.lightAlpha) * fade * verticalClarity, 0.8, hole)
+  smear(g, x, y, a0 + (a1 - a0) * 0.5, a1, outer - thick * 0.2, thick * 0.65, blessed ? 0xfff0c0 : 0xffffff, fade * verticalClarity, 0.7, hole)
 }
 
 // The blade itself: a short hot wedge on the leading edge, drawn in air over the fighters.
@@ -682,6 +780,30 @@ export function drawSwingTip(g: Graphics, p: Player, alpha: number, world: World
     x + c1 * tip, y + s1 * tip,
     x + c1 * hilt - nx, y + s1 * hilt - ny,
   ]).fill({ color: blessed ? 0xfff0c0 : 0xffffff, alpha: fade })
+
+  // On a vertical cut the tangent of a truthful circular arc is horizontal, so a freeze-frame can
+  // misread the action as lateral even though the target lies north/south. After the swept sector
+  // has mechanically crossed the centre ray, stamp one narrow tapered keel through that same live
+  // ray. It complements the broad coverage crescent; it never predicts an untested hit direction.
+  const s = tuning.player.attack.swings[p.swingIndex]
+  const A = tuning.juice.arc
+  const vertical = Math.abs(Math.sin(p.swingAngle))
+  if (vertical >= A.axisMinVertical && displayedSwingProgress(s, p.stateTick) >= 0.5) {
+    const ca = Math.cos(p.swingAngle), sa = Math.sin(p.swingAngle) * 0.9
+    const px = -Math.sin(p.swingAngle), py = Math.cos(p.swingAngle) * 0.9
+    const root = hole + 1, end = outer + (heavy ? 4 : 3)
+    const width = A.axisWidth * (heavy ? 1.5 : 1)
+    g.poly([
+      x + ca * (root - 1) + px * (width + 1), y + sa * (root - 1) + py * (width + 1),
+      x + ca * (end + 1), y + sa * (end + 1),
+      x + ca * (root - 1) - px * (width + 1), y + sa * (root - 1) - py * (width + 1),
+    ]).fill({ color: A.rimColor, alpha: A.rimAlpha * fade })
+    g.poly([
+      x + ca * root + px * width, y + sa * root + py * width,
+      x + ca * end, y + sa * end,
+      x + ca * root - px * width, y + sa * root - py * width,
+    ]).fill({ color: blessed ? 0xfff0c0 : 0xffffff, alpha: A.axisAlpha * fade })
+  }
   if (heavy) {
     g.poly([
       x + c1 * (hilt + 2), y + s1 * (hilt + 2),

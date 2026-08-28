@@ -1,5 +1,96 @@
 # Combat, Controls & Game-Feel Deep Audit
 
+## Implementation closeout — 2026-08-28
+
+**Final implementation score:** **95/100**
+
+**Release judgment:** Every audited combat dimension is at or above 90. The remaining work is
+human sensory and device certification, not a known implementation blocker.
+
+This closeout evaluates the combat overhaul in the current working tree against
+`origin/main` (`4d443115fc89`). The 76/100 report below is retained intact as the historical baseline
+that motivated the work; its findings should not be read as the state of the current implementation.
+A fresh independent critic traced input through simulation, collision, presentation, and audio,
+reviewed current motion strips and browser evidence, and reproduced the automated gates before
+scoring the result.
+
+| Dimension | Final score | Decisive change |
+|---|---:|---|
+| Movement | 92 | Vector-normalized acceleration, quick reversal, reliable wall slide |
+| Responsiveness | 94 | Edge-latched input, freeze-aware buffers, single next-tick action contract |
+| Player control / agency | 96 | Retained explicit aim, hard lock, cover play, blade/bolt interaction |
+| Dodge / roll feel | 95 | Exact travel promise, real iframe truth, Reversal choice, authored vertical tumble |
+| Attack feel | 95 | Distinct commitments, truthful swept arcs, contact anatomy, hit/whiff pricing |
+| Input handling | 97 | Tap/blur/modal safety, per-control gamepad rearm, stable aim ownership |
+| Physics / collision | 95 | Deterministic rounded-tile rays and shared terrain authority for hits and tells |
+| Animation timing | 95 | Latched viewpoints, motion-bridged counters, shared mechanical/visual timing |
+| Enemy attack readability | 97 | Exact finite tells and a swept phase-two Warden decision grammar |
+| Hit feedback | 97 | Immutable provenance, contact classes, causal reactions, action-level hierarchy |
+| Camera | 93 | Capped directional kick, guarded restraint, wall-normal punctuation, reduced-effects path |
+| Audio feedback | 93 | Authoritative listener, event-specific cues, buses, ducking, caps, limiter |
+| Visual feedback | 97 | Separate guard, graze, Reversal, contact, kill, wall, and lock languages |
+| Overall combat juice | 96 | Truthful near-misses, reactions, scars, time, camera, particles, and sound compose |
+| Overall polish | 94 | Shared contracts, deterministic evidence, lifecycle coverage, clean replay fixtures |
+| **Overall combat** | **95** | Cohesive, skill-sensitive combat with a truthful signature counter-loop |
+
+### Design resolution
+
+The pass followed five rules. First, every action makes a promise: a roll is safe only during its
+authored iframe window, a wall can end travel, and cover blocks the tell and the damage alike.
+Second, commitment creates decisions rather than dropped inputs: buffers survive freezes, but
+startup, recovery, and whiff costs remain meaningful. Third, enemies speak different visual
+languages instead of sharing louder circles; the Warden deliberately rotates slam, ring, and fan,
+then changes cadence in phase two. Fourth, contact feedback describes what actually happened:
+guarded damage cannot impersonate an exposed heavy hit, and a delayed arrow, echo, judgment, or
+backlash cannot borrow the player's current sword pose. Fifth, intensity is earned once per action;
+cleaving three bodies adds local wounds without multiplying camera trauma three times.
+
+The result is a coherent first pass rather than a collection of stronger effects. North/south hero
+views keep direction through attacks, hurt, and dodge. The depth-axis roll uses four body-only keys
+plus a separately held weapon, with a diagonal boots-over-head apex that reads as rotation at native
+scale. Enemy telegraphs terminate at exact collision cover and actual hurt reach. The Warden's guard,
+poise break, phase transition, patterns, and punish windows now form a learnable fight instead of a
+large-health version of an ordinary enemy.
+
+The final delight pass adds one signature idea without changing the damage economy. A true
+pass-through opens a twenty-player-tick **Reversal** breath; the player chooses blade or bow, and
+the hostile clock resumes on the first live blade tick or arrow release. Ordinary roll-cancels never
+overlap live contact with invulnerability, old hurt i-frames cannot counterfeit the reward, and
+cancel, hurt, death, room, reward, and return boundaries all close it. Contact now distinguishes
+guard, pierce, blade body, blade edge, and burst from immutable hit data. Enemies answer those causes
+with directional, mass-aware reactions; committed momentum earns a wall-normal stone punctuation
+without bonus damage. Near-miss wakes remain on the actual threat path, and persistent scars recede
+while hostile floor information is live. These are recognition systems, not hidden DPS systems.
+
+### Acceptance evidence
+
+- `pnpm test`: 24/24 files, 292/292 tests.
+- `pnpm typecheck` and `pnpm build`: pass.
+- All three pinned replay fixtures pass their deterministic hash and sanity contracts; the refreshed
+  Reversal and Warden browser strips report no console or page errors.
+- Skilled full-encounter bot: 8/8 clears across seeds 1–8, 59.5–67.3 seconds, taking 1–4 damage;
+  naive melee: 0/8 clears.
+- Isolated Warden policy: 7/8 clears, 21.3–23.1 seconds. This bot gate measures decision/pacing
+  coverage, not human tell comprehension; the complete encounter remains 8/8.
+- Focused Warden contract sweep: worst sampled tick 1.451 ms against the 2 ms gate.
+- Prior browser play probe: 1.7 ms p50, 8.3 ms p95 across 126 frames, with zero catch-up drops.
+- Two independent directional release gates pass every melee/roll sub-score at 91–94; the final
+  north/south roll strips preserve monotonic 22.5 px travel and visible weapon continuity.
+- Terrain audit: 13,500 randomized circle rays and 200,000 reverse line-of-sight pairs without a
+  mismatch or asymmetry; four simultaneous exact Charger tells rendered in about 0.91 ms under
+  headless SwiftShader.
+- Audio mix evidence covers 91 manifested assets; peak remained below -7 dBFS with zero clipped
+  samples in both combat and hurt mixes.
+
+The audio and camera scores are structural implementation judgments. A final headphone/speaker
+audition, several human keyboard/controller sessions, high-DPR/low-end hardware coverage, and a
+maximum-density phase-two fight remain release QA. Those checks may tune comfort or mix values, but
+no unresolved correctness defect is being hidden behind the score.
+
+---
+
+## Historical baseline audit
+
 **Audit date:** 2026-08-28
 
 **Audited revision:** `1ef5b18a7280b34b93b0ed23528bc95b3948139c` (`origin/main`)

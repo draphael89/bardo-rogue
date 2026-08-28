@@ -1,6 +1,6 @@
 import { tuning } from '@/tuning'
 import type { World, Enemy } from '../world'
-import { angleToPlayer, distToPlayer, moveToward, moveAlong, facePlayer, enemyArcAttack, tickStagger } from './common'
+import { angleToPlayer, distToPlayer, moveToward, moveAlong, facePlayer, enemyArcAttack, tickStagger, familyTellSlotOpen, hasPlayerLineOfSight } from './common'
 
 const IDLE_TICKS = 20
 
@@ -18,7 +18,7 @@ export function updateBrute(world: World, e: Enemy): void {
     case 'chase': {
       if (p.state === 'dead') { e.vx = 0; e.vy = 0; break }
       const d = distToPlayer(world, e)
-      if (d <= B.attackRange) {
+      if (d <= B.attackRange && hasPlayerLineOfSight(world, e) && familyTellSlotOpen(world, e)) {
         e.state = 'windup'; e.stateTick = 0
         e.aimAngle = angleToPlayer(world, e)
         world.emit({ type: 'enemyWindup', id: e.id, kind: 'brute', x: e.x, y: e.y })

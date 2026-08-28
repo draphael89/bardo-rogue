@@ -9,7 +9,7 @@ import type { RenderApp } from '@/render/app'
 const PAD_ATTACK = [2, 5, 7]      // X / RB / RT
 const PAD_DODGE = [0, 1, 4]       // A / B / LB
 const PAD_RESTART = [9]           // start
-const PAD_EDGE = new Set([...PAD_ATTACK, ...PAD_DODGE, ...PAD_RESTART])
+const PAD_EDGE = new Set([...PAD_DODGE, ...PAD_RESTART])   // attack is read held, so it needs no edge
 
 // Keyboard + mouse + gamepad -> one InputFrame per sim tick. Presses between ticks are latched so nothing is dropped.
 export class InputSystem {
@@ -18,6 +18,7 @@ export class InputSystem {
   private mouseX = 0; private mouseY = 0
   private mouseSeen = false          // (0,0) is the window corner, not "no cursor" — see resolveAim
   private mousePressed = false
+  private mouseHeld = false
   private padPrev: boolean[] = []
   private cursorScreen = new Point()
   private cursorWorld = new Point()
@@ -31,10 +32,13 @@ export class InputSystem {
       if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault()
     })
     window.addEventListener('keyup', e => this.down.delete(e.code))
-    window.addEventListener('blur', () => this.down.clear())
+    // drop held AND latched state: a press caught just before focus loss must not fire on return,
+    // and a button still down when the tab goes away must not keep swinging forever
+    window.addEventListener('blur', () => { this.down.clear(); this.pressed.clear(); this.mouseHeld = false })
     const c = ra.app.canvas
     c.addEventListener('mousemove', e => { this.mouseX = e.clientX; this.mouseY = e.clientY; this.mouseSeen = true })
-    c.addEventListener('mousedown', e => { if (e.button === 0) this.mousePressed = true })
+    c.addEventListener('mousedown', e => { if (e.button === 0) { this.mousePressed = true; this.mouseHeld = true } })
+    window.addEventListener('mouseup', e => { if (e.button === 0) this.mouseHeld = false })
     c.addEventListener('contextmenu', e => e.preventDefault())
   }
 
@@ -63,8 +67,12 @@ export class InputSystem {
       if (al > 0.5) { mouseAimX = ax / al; mouseAimY = ay / al }
     }
 
-    // attack is an edge, like dodge: one press = one attack intention, holding never re-triggers (no hold-to-repeat)
-    let attack = this.mousePressed || this.pressed.has('KeyJ') || this.pressed.has('KeyZ')
+    // Attack repeats while held: the chain gates its own rhythm, so holding flows the combo at the
+    // designed pace instead of taxing the player one press per swing. Whiffs still cost recovery.
+    // The latch is kept as well, so a tap that starts and ends between two ticks is never dropped.
+    const tapped = (code: string) => d.has(code) || this.pressed.has(code)
+    let attack = this.mousePressed || this.mouseHeld || tapped('KeyJ') || tapped('KeyZ')
+    // dodge stays an edge: holding it would just be free travel
     let dodge = this.pressed.has('Space') || this.pressed.has('ShiftLeft') || this.pressed.has('KeyK') || this.pressed.has('KeyX')
     let restart = this.pressed.has('KeyR')
 
@@ -88,7 +96,7 @@ export class InputSystem {
       const edge = (i: number) => { const now = b(i); const was = this.padPrev[i] ?? false; this.padPrev[i] = now; return now && !was }
       // no short-circuit: every listed button must be sampled or padPrev goes stale and it double-fires next tick
       const anyEdge = (ids: readonly number[]) => { let hit = false; for (const i of ids) if (edge(i)) hit = true; return hit }
-      if (anyEdge(PAD_ATTACK)) attack = true
+      for (const i of PAD_ATTACK) if (b(i)) attack = true   // held, to match the keyboard and mouse
       if (anyEdge(PAD_DODGE)) dodge = true
       if (anyEdge(PAD_RESTART)) restart = true
       for (let i = 0; i < 16; i++) if (!PAD_EDGE.has(i)) this.padPrev[i] = b(i)

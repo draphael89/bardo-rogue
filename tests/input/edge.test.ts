@@ -64,51 +64,144 @@ function swingsOver(input: InputSystem, ticks: number, before: (t: number) => vo
   return swings
 }
 
-describe('attack is edge-triggered', () => {
-  it('holding the attack key for 150 ticks swings once', () => {
+describe('attack repeats while held', () => {
+  const chain = (swings: number[]) => swings.every((v, i) => v === i % 3)
+
+  it('holding the attack key flows the combo at the chain\'s own pace', () => {
     const h = harness()
     const swings = swingsOver(h.input, 150, t => {
       // a real browser sends one keydown per press; the auto-repeats that follow carry repeat=true
       h.win.fire('keydown', key('KeyJ', t > 0))
     })
-    expect(swings).toEqual([0])
+    expect(swings.length).toBeGreaterThan(1)
+    expect(chain(swings), `chain broke: ${swings}`).toBe(true)
   })
 
-  it('holding the mouse button for 150 ticks swings once', () => {
+  it('holding the mouse button flows the combo too', () => {
     const h = harness()
-    const swings = swingsOver(h.input, 150, t => {
-      if (t === 0) h.canvas.fire('mousedown', { button: 0 })
-    })
-    expect(swings).toEqual([0])
+    const swings = swingsOver(h.input, 150, t => { if (t === 0) h.canvas.fire('mousedown', { button: 0 }) })
+    expect(swings.length).toBeGreaterThan(1)
+    expect(chain(swings), `chain broke: ${swings}`).toBe(true)
   })
 
-  it('holding a gamepad attack button for 150 ticks swings once', () => {
+  it('holding a gamepad attack button flows the combo too', () => {
     const pad: FakePad = { axes: [0, 0, 0, 0], buttons: Array.from({ length: 16 }, () => ({ pressed: false })) }
     const h = harness(pad)
     const swings = swingsOver(h.input, 150, t => { pad.buttons[2]!.pressed = t > 0 })
-    expect(swings).toEqual([0])
+    expect(swings.length).toBeGreaterThan(1)
+    expect(chain(swings), `chain broke: ${swings}`).toBe(true)
   })
 
-  it('two gamepad attack buttons pressed together still swing once each press', () => {
-    const pad: FakePad = { axes: [0, 0, 0, 0], buttons: Array.from({ length: 16 }, () => ({ pressed: false })) }
-    const h = harness(pad)
-    // both attack buttons go down on the same tick and stay down: one swing, and no stale-padPrev double-fire after
+  it('a tap swings exactly once', () => {
+    const h = harness()
     const swings = swingsOver(h.input, 150, t => {
-      pad.buttons[2]!.pressed = t > 0
-      pad.buttons[5]!.pressed = t > 0
+      if (t === 0) { h.win.fire('keydown', key('KeyJ')); h.win.fire('keyup', key('KeyJ')) }
     })
     expect(swings).toEqual([0])
   })
 
-  it('separate presses still swing, and still chain the combo', () => {
+  it('releasing the button stops the combo', () => {
     const h = harness()
-    // one press every 40 ticks: each lands while free, so each is a fresh swing 0
-    const tapped = swingsOver(h.input, 150, t => { if (t % 40 === 0) h.win.fire('keydown', key('KeyJ')) })
-    expect(tapped).toEqual([0, 0, 0, 0])
-    // a second press during the first swing's recovery chains into swing 1
+    const held = swingsOver(h.input, 150, t => h.win.fire('keydown', key('KeyJ', t > 0)))
     const h2 = harness()
-    const chained = swingsOver(h2.input, 60, t => { if (t === 0 || t === 20) h2.win.fire('keydown', key('KeyJ')) })
+    const released = swingsOver(h2.input, 150, t => {
+      if (t < 40) h2.win.fire('keydown', key('KeyJ', t > 0))
+      else if (t === 40) h2.win.fire('keyup', key('KeyJ'))
+    })
+    // the 8-tick buffer may still spend one more swing after the release, but not four more
+    expect(released.length).toBeLessThan(held.length)
+    expect(released.length).toBeLessThanOrEqual(3)
+  })
+
+  it('releasing the mouse anywhere on the page stops the combo', () => {
+    const h = harness()
+    // the button often comes up outside the canvas, so the listener has to be on the window
+    const swings = swingsOver(h.input, 150, t => {
+      if (t === 0) h.canvas.fire('mousedown', { button: 0 })
+      if (t === 20) h.win.fire('mouseup', { button: 0 })
+    })
+    expect(swings.length).toBeLessThanOrEqual(2)
+  })
+
+  it('separate presses each swing, and chain when they land in recovery', () => {
+    const h = harness()
+    // one tap every 40 ticks: each lands while free, so each is a fresh swing 0
+    const tapped = swingsOver(h.input, 150, t => {
+      if (t % 40 === 0) { h.win.fire('keydown', key('KeyJ')); h.win.fire('keyup', key('KeyJ')) }
+    })
+    expect(tapped).toEqual([0, 0, 0, 0])
+    // a second tap during the first swing's recovery chains into swing 1
+    const h2 = harness()
+    const chained = swingsOver(h2.input, 60, t => {
+      if (t === 0 || t === 20) { h2.win.fire('keydown', key('KeyJ')); h2.win.fire('keyup', key('KeyJ')) }
+    })
     expect(chained).toEqual([0, 1])
+  })
+})
+
+describe('dodge stays edge-triggered', () => {
+  it('holding dodge rolls once, not forever', () => {
+    const h = harness()
+    const w: World = createWorld(1, 'empty')
+    let rolls = 0
+    for (let t = 0; t < 150; t++) {
+      h.win.fire('keydown', key('Space', t > 0))
+      stepWorld(w, h.input.sample(w))
+      for (const ev of w.events) if (ev.type === 'dodge') rolls++
+      w.events.length = 0
+    }
+    expect(rolls).toBe(1)
+  })
+
+  it('two gamepad dodge buttons pressed together still roll once', () => {
+    const pad: FakePad = { axes: [0, 0, 0, 0], buttons: Array.from({ length: 16 }, () => ({ pressed: false })) }
+    const h = harness(pad)
+    const w: World = createWorld(1, 'empty')
+    let rolls = 0
+    // both go down on the same tick and stay down: one roll, and no stale-padPrev double-fire after
+    for (let t = 0; t < 150; t++) {
+      pad.buttons[0]!.pressed = t > 0
+      pad.buttons[1]!.pressed = t > 0
+      stepWorld(w, h.input.sample(w))
+      for (const ev of w.events) if (ev.type === 'dodge') rolls++
+      w.events.length = 0
+    }
+    expect(rolls).toBe(1)
+  })
+})
+
+describe('keyboard aim', () => {
+  const aimDeg = (f: { aimX: number; aimY: number }) => Math.round(Math.atan2(f.aimY, f.aimX) * 180 / Math.PI)
+
+  it('never aims at a cursor that has not moved', () => {
+    const h = harness()
+    const w = createWorld(1, 'empty')
+    // the fake canvas puts client (0,0) up and left of the player, exactly like a real untouched window
+    h.win.fire('keydown', key('KeyD'))
+    const f = h.input.sample(w)
+    expect(aimDeg(f)).toBe(0)          // walks right, swings right
+    expect(f.aimSoft).toBe(true)       // intent, so the sim may finish the angle
+  })
+
+  it('aims with the arrows, independently of where you walk', () => {
+    const h = harness()
+    const w = createWorld(1, 'empty')
+    h.win.fire('keydown', key('KeyD'))
+    h.win.fire('keydown', key('ArrowLeft'))
+    const f = h.input.sample(w)
+    expect(aimDeg(f)).toBe(180)        // retreating right, striking left
+    expect(f.moveX).toBe(1)            // and the arrow did not steal the movement
+  })
+
+  it('lets the mouse outrank movement once it has actually moved', () => {
+    const h = harness()
+    const w = createWorld(1, 'empty')
+    const p = w.player
+    h.canvas.fire('mousemove', { clientX: p.x, clientY: p.y - 40 })
+    h.win.fire('keydown', key('KeyD'))
+    const f = h.input.sample(w)
+    expect(aimDeg(f)).toBe(-90)
+    expect(f.aimSoft).toBe(false)      // the mouse is precise; leave it alone
   })
 })
 

@@ -116,6 +116,18 @@ describe('attack', () => {
     expect(swings.slice(0, 3)).toEqual([0, 1, 2])
     expect(swings[3]).toBe(0)
   })
+  it('flows the chain at its own pace while the button is held', () => {
+    const w = createWorld(1, 'empty')
+    const swings: number[] = []
+    for (let i = 0; i < 300; i++) {
+      stepWorld(w, { ...emptyInput(), attack: true })   // held, not mashed
+      for (const e of w.events) if (e.type === 'swing') swings.push(e.swing)
+      w.events.length = 0
+    }
+    expect(swings.length).toBeGreaterThan(6)
+    // the buffer is re-armed every tick, so the gates alone must keep the loop honest
+    for (let i = 0; i < swings.length; i++) expect(swings[i], `swing ${i}`).toBe(i % 3)
+  })
   it('hits a dummy in front once per swing and applies hit-stop', () => {
     const w = createWorld(1, 'dummy')
     const dummy = w.enemies.find(e => e.active)!

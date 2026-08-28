@@ -1,0 +1,60 @@
+name: ci
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # The simulation is deterministic and headless, so almost everything worth proving is provable
+  # without a browser. This job is the fast gate: if it is red, nothing else matters.
+  sim:
+    name: sim
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: typecheck
+        run: pnpm typecheck
+      - name: tests (includes pinned replay hashes)
+        run: pnpm test
+      - name: production build
+        run: pnpm build
+      # Structural gate: no seed may strand a player mid-run. Also reports the win-rate band, which
+      # is how a balance regression announces itself before a human ever notices.
+      - name: seeded acceptance matrix
+        run: pnpm matrix -- --seeds 1-100
+
+  # What the sim suite cannot see: the page booting, the atlas and fonts loading, the presenter
+  # surviving six room rebuilds, and a run reaching its summary without throwing.
+  browser:
+    name: browser
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: install chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: build
+        run: pnpm build
+      - name: serve
+        run: pnpm preview &
+      - name: wait for server
+        run: npx --yes wait-on http://localhost:5173 --timeout 60000
+      # Drives both endings — a won run and a lost one — through the real renderer.
+      - name: golden-path smoke
+        run: pnpm smoke -- --url http://localhost:5173

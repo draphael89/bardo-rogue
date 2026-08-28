@@ -19,8 +19,12 @@ per tick: `stepWorld(world, inputFrame)`.
 | `pnpm sim -- ...` | Headless bot or replay run in Node, prints metrics JSON (`tools/headless.ts`) |
 | `pnpm shot -- ...` | Playwright: open the game, run ticks, screenshot + state JSON (`tools/shot.ts`) |
 | `pnpm record-bots` | Regenerate the replay fixtures in `replays/` (`tools/record-bot.ts`) |
+| `pnpm matrix` | Seeded acceptance gate: every seed must resolve and come home; reports the win-rate band (`tools/matrix.ts`) |
+| `pnpm smoke` | Drives both endings of the production loop in a real browser and asserts the golden path (`tools/smoke.ts`; needs a server) |
 | `pnpm record-bot -- --bot kite --scenario full --seed 1 --out replays/x.json` | Record one bot run |
 | `pnpm poses` | Pose sheet of key animation frames (`tools/poses.ts`) |
+| `pnpm strip -- ...` | Frame strip of anything that moves, for judging motion (`tools/strip.ts`; writes a JSON state/event sidecar beside the PNG) |
+| `pnpm assets` / `pnpm tiles` | Regenerate `public/assets/` (Kenney subset, then the original bardo tilesets). Both rewrite `manifest.json`; run `tiles` **after** `assets` or the bardo sprites drop out. |
 
 `pnpm sim -- --scenario wave3 --bot naive-melee --seeds 1-20 --ticks 10800` prints one row per seed:
 swings, hitsLanded, whiffSwings, kills, dodges, successfulDodges, boltsFired, boltsCut, enemyAttacks, damageTaken,
@@ -52,7 +56,7 @@ Available once the page has booted (`await page.waitForFunction(() => !!window._
 - `loop`: the fixed-step loop; `loop.paused`, `loop.frameTimes`.
 - `reset(seed?, scenario?, { god? })`: fresh world. Omitted args keep the current run's seed/scenario.
 - `step(n = 1)`: advance the sim n ticks by hand (pause first, or the loop keeps ticking too).
-- `setInput(partial | null)`: force an `InputFrame` (`moveX moveY aimX aimY aimSoft attack dodge restart choiceDelta confirm`). Forced action/modal fields fire once, then clear. `null` returns control to the keyboard.
+- `setInput(partial | null)`: force an `InputFrame` (`moveX moveY aimX aimY aimSoft attack attackHeld dodge restart choiceDelta confirm`). Forced action/modal fields fire once, then clear. `null` returns control to the keyboard.
 - `bot(name | null)`: swap in or remove any bot listed above.
 - `pause(p?)`: pause/unpause the loop, returns the new state.
 - `hash()`: FNV hash of the sim state. Equal hashes = identical worlds.
@@ -78,7 +82,8 @@ Available once the page has booted (`await page.waitForFunction(() => !!window._
 
 A replay is `{ v: 1, seed, scenario, god?, frames: InputFrame[] }` (`src/sim/replay.ts`). On disk it is run-length
 encoded: `runs: [moveX, moveY, aimX, aimY, flags, count]` with axes as ints x10000 and flags bits
-`1 aimSoft, 2 attack, 4 dodge, 8 restart, 16 confirm, 32 choice-left, 64 choice-right`. The browser quantizes every frame to 1/10000 before the sim sees it, so
+`1 aimSoft, 2 attack, 4 dodge, 8 restart, 16 attackHeld, 32 confirm, 64 choice-left, 128 choice-right`
+(the table in `src/sim/replay.ts` is the source of truth; CI fails if this line drifts from it). The browser quantizes every frame to 1/10000 before the sim sees it, so
 what was played and what is stored are identical.
 
 - Browser: F2 starts a fresh run and records; F2 again stops; F3 downloads `<scenario>-<seed>-<ticks>.json`. Move the

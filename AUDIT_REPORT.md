@@ -1,5 +1,10 @@
 # Bardo Rogue — Oracle Audit
 
+> **HISTORICAL — superseded by `VERTICAL_SLICE_PLAN.md`.** Audited at `6807248`, before the room graph,
+> boons, boss, session state, and persistence existed. Its scores grade that build. The architectural
+> judgments (run state above the room world, cosmetic/gameplay RNG split, art-pipeline path) were acted
+> on and still hold; the dimension scores do not.
+
 **Audited 27 August 2026.** Repository: `/Users/davidraphael/Desktop/bardo-rogue-web`. Exact head: `68072486b5c2f886aef49363cf625647dbb73a4e`, branch `main`. Read against `VISION.md`, including its full-game requirements. Scores use the requested commercial-game scale.
 
 ## 1. TL;DR

@@ -17,7 +17,9 @@
     "poses": "tsx tools/poses.ts",
     "strip": "tsx tools/strip.ts",
     "record-bot": "tsx tools/record-bot.ts",
-    "record-bots": "tsx tools/record-bot.ts --all"
+    "record-bots": "tsx tools/record-bot.ts --all",
+    "smoke": "tsx tools/smoke.ts",
+    "matrix": "tsx tools/matrix.ts"
   },
   "dependencies": {
     "pixi.js": "^8.20.1"

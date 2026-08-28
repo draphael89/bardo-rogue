@@ -16,7 +16,9 @@ export type EncodedRun = [number, number, number, number, number, number]
 export interface EncodedReplay { v: 1; seed: number; scenario: string; god?: boolean; meta?: MetaStateV1; runs: EncodedRun[] }
 
 export const Q = 10000
-const FLAG = { aimSoft: 1, attack: 2, dodge: 4, restart: 8, attackHeld: 16, confirm: 32, choiceLeft: 64, choiceRight: 128 } as const
+// Exported so the harness documentation can be checked against it: the flag table drifted from
+// HARNESS.md once already, and a wrong bit list is worse than none for anyone decoding a fixture.
+export const FLAG = { aimSoft: 1, attack: 2, dodge: 4, restart: 8, attackHeld: 16, confirm: 32, choiceLeft: 64, choiceRight: 128 } as const
 
 function copyMeta(meta: MetaStateV1): MetaStateV1 {
   if (meta.version !== 1) return defaultMetaState()

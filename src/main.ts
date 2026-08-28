@@ -91,11 +91,26 @@ async function boot() {
     presenter.handleEvents([{ type: 'restart' }])
   }
 
-  // One write path for the whole envelope. Refused outright for a save from a newer build.
+  // One write path for the whole envelope, refused outright for a save this build cannot represent.
+  // Writes are coalesced into a single slot and chained: two in flight at once (V pressed on the same
+  // frame as a `returned` event) could each rotate the live copy into the backup, leaving both slots
+  // holding the new revision and the previous-known-good gone. The chain always ends in a catch --
+  // an unhandled rejection here would surface as a page error and fail every evidence capture.
+  let writing: Promise<void> | null = null
+  let queued: string | null = null
+  const drain = (): void => {
+    if (writing || queued === null) return
+    const payload = queued
+    queued = null
+    writing = platform.saves.write(PROFILE_ID, payload)
+      .catch(err => { console.log(`[save] write failed: ${String(err)}`) })
+      .then(() => { writing = null; drain() })
+  }
   const persist = () => {
     if (!savable) return
     savedSave = bumpRevision({ ...savedSave, settings: { version: 1, reducedEffects } })
-    void platform.saves.write(PROFILE_ID, serializeSave(savedSave))
+    queued = serializeSave(savedSave)      // only the newest payload survives; older ones are stale by definition
+    drain()
   }
 
   const tick = () => {
@@ -110,11 +125,15 @@ async function boot() {
     stepWorld(world, frame)
     metrics.consume(world, world.events)
     presenter.handleEvents(world.events)
+    // tests/sim/harness.test.ts hand-copies this ordering to prove the browser and headless agree
+    // across a mid-replay restart. Keep the save write here -- after the events are handled, before
+    // they are cleared -- and keep it read-only against `world`.
     if (world.scenario === 'loop' && world.events.some(ev => ev.type === 'runStarted' || ev.type === 'runWon' || ev.type === 'returned')) {
       // An explicit copy: reset() builds a NEW meta object, so holding the live one would leave this
       // pointing at a dead object and persist stale counters.
       savedSave = { ...savedSave, meta: { ...world.session.meta, unlockedWeapons: [...world.session.meta.unlockedWeapons] } }
       persist()
+      platform.setRunActive(world.session.run !== null)   // so a desktop quit can ask before binning a run
     }
     world.events.length = 0
     if (world.wantsRestart) {
@@ -192,6 +211,9 @@ async function boot() {
     const parsed = parseSave(text, { profileId: PROFILE_ID })
     if (parsed.kind === 'corrupt') { presenter.hud.showBanner('SAVE NOT READ', 'that file is not a bardo save', 2.2); return }
     if (parsed.kind === 'future') { presenter.hud.showBanner('SAVE NOT READ', 'it came from a newer build', 2.2); return }
+    // The profile already here is one this build cannot represent. Applying an import would show the
+    // player new counters that the next reload silently reverts, so refuse rather than half-apply.
+    if (!savable) { presenter.hud.showBanner('PROFILE IS NEWER', 'this build must not overwrite it', 2.4); return }
     // A live run holds sim state no import can reconcile; refuse rather than half-apply it.
     if (world.session.run) { presenter.hud.showBanner('A RUN IS UNDERWAY', 'return to the bardo first', 2.2); return }
     savedSave = parsed.save

@@ -9,7 +9,13 @@ export interface LoadedSave {
   // False only for a save written by a NEWER build: it stays readable so the player still sees their
   // counters, and every write is refused so the fields this build cannot represent survive.
   writable: boolean
-  source: 'save' | 'backup' | 'default'
+  source: 'save' | 'backup' | 'default' | 'unreadable'
+}
+
+// A read that threw is NOT a read that found nothing: an EACCES, an EIO or a half-mounted volume
+// must never look like a fresh player, or the next autosave overwrites a healthy file.
+async function safeRead(read: (id: string) => Promise<string | null>, profileId: string): Promise<{ raw: string | null; failed: boolean }> {
+  try { return { raw: await read(profileId), failed: false } } catch { return { raw: null, failed: true } }
 }
 
 // Recovery order: the save, then the backup, then defaults. (A host whose storage predates the
@@ -21,25 +27,29 @@ export async function loadSave(
 ): Promise<LoadedSave> {
   const parseOpts = { profileId, preferredReducedEffects: !!opts.preferredReducedEffects }
 
-  const current = parseSave(await store.read(profileId), parseOpts)
+  const live = await safeRead(store.read.bind(store), profileId)
+  const current = parseSave(live.raw, parseOpts)
   if (current.kind === 'ok' || current.kind === 'migrated') return { save: current.save, writable: true, source: 'save' }
   if (current.kind === 'future') return { save: current.save, writable: false, source: 'save' }
 
-  if (current.kind === 'corrupt') {
-    const backup = parseSave(await store.readBackup(profileId), parseOpts)
-    if (backup.kind === 'ok' || backup.kind === 'migrated') {
-      // Write the recovered document straight back. That rotates the CORRUPT blob into the backup
-      // slot -- preserving it for inspection -- and puts good bytes in the live slot before any
-      // gameplay write can rotate the good backup away underneath us.
-      await store.write(profileId, serializeSave(backup.save))
-      return { save: backup.save, writable: true, source: 'backup' }
-    }
-    if (backup.kind === 'future') return { save: backup.save, writable: false, source: 'backup' }
+  // The live copy gave us nothing usable. It may be damaged (the browser hands back the bad bytes;
+  // the desktop store has already moved the file aside), or simply absent. Either way the backup is
+  // the next place to look.
+  const spare = await safeRead(store.readBackup.bind(store), profileId)
+  const backup = parseSave(spare.raw, parseOpts)
+  if (backup.kind === 'ok' || backup.kind === 'migrated') {
+    // Write the recovered document straight back. On the browser that rotates the CORRUPT blob into
+    // the backup slot -- preserving it for inspection -- and either way it puts good bytes in the
+    // live slot before any gameplay write can rotate the good backup away underneath us.
+    try { await store.write(profileId, serializeSave(backup.save)) } catch { /* recovered in memory regardless */ }
+    return { save: backup.save, writable: true, source: 'backup' }
   }
+  if (backup.kind === 'future') return { save: backup.save, writable: false, source: 'backup' }
 
-  // Both copies unreadable and no legacy keys: hand back defaults and write NOTHING at boot, so a
-  // transient read failure cannot destroy a save the player might still recover by other means.
-  return { save: current.save, writable: true, source: 'default' }
+  // Nothing readable anywhere. If either read actually FAILED, this profile is not writable: we hand
+  // back defaults so the player can still play, and refuse to write over data we could not see.
+  const readsFailed = live.failed || spare.failed
+  return { save: current.save, writable: !readsFailed, source: readsFailed ? 'unreadable' : 'default' }
 }
 
 // Sortable, collision-free in a downloads folder, .json so any text editor opens it. The Date comes

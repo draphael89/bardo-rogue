@@ -19,6 +19,12 @@ export interface Atlas {
 }
 
 export async function loadAtlas(manifest: Record<string, string[]>): Promise<Atlas> {
+  // Pixi resolves a root-relative asset path against path.rootname(document.baseURI), and its
+  // path.isUrl() matches only /^https?:/ -- so under the desktop host's app://bardo origin rootname()
+  // falls back to the protocol alone and '/assets/sprites/x.png' becomes 'app://assets/sprites/x.png':
+  // the host turns into 'assets' and the load dies cross-origin. Pinning rootPath to this document's
+  // own root is a no-op on http(s) and correct on any scheme.
+  Assets.resolver.rootPath = new URL('/', location.href).href
   const base = '/assets/'
   const tiny = await Assets.load<Texture>(base + 'sprites/tiny_dungeon.png')
   const room = await Assets.load<Texture>(base + 'sprites/bardo_room.png')

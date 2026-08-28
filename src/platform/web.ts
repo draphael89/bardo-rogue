@@ -1,6 +1,7 @@
 import { META_KEY, SETTINGS_KEY, type StorageLike } from '@/sim/storage'
 import { migrateLegacySave, serializeSave } from '@/sim/save'
 import { PROFILE_ID, type Platform, type SaveStore } from './index'
+import { downloadText, pickTextFile, prefersReducedMotion } from './dom'
 
 export const saveKey = (profileId: string) => `bardo-rogue.save.${profileId}`
 export const backupKey = (profileId: string) => `${saveKey(profileId)}.bak`
@@ -37,8 +38,15 @@ export function migrateLegacyKeys(storage: StorageLike | undefined, profileId: s
   } catch { /* nothing to recover; boot proceeds on defaults */ }
 }
 
+// Reading `localStorage` can THROW, not merely be undefined: Chromium raises SecurityError when site
+// data is blocked. This runs synchronously inside boot(), so an uncaught throw here means no
+// window.__game at all -- which reaches an agent as an opaque 15s waitForFunction timeout.
+function safeLocalStorage(): StorageLike | undefined {
+  try { return typeof localStorage === 'undefined' ? undefined : localStorage } catch { return undefined }
+}
+
 export function createWebPlatform(): Platform {
-  const storage = typeof localStorage === 'undefined' ? undefined : localStorage
+  const storage = safeLocalStorage()
   migrateLegacyKeys(storage, PROFILE_ID)
   let picker: HTMLInputElement | null = null
   return {
@@ -50,7 +58,7 @@ export function createWebPlatform(): Platform {
       // logged -- tools/shot.ts collects console warnings as evidence failures.
       try { void navigator.storage?.persist?.().catch(() => {}) } catch { /* no navigator.storage at all */ }
     },
-    prefersReducedMotion: () => typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches,
+    prefersReducedMotion,
     // Fullscreen is the only lever that actually enlarges the stage. The target is drawn at an INTEGER
     // scale in physical pixels, so the room's size on screen steps rather than slides: a 713px-tall
     // viewport caps it at 5, and 6 needs 810 (270 * 6 / dpr 2). Fullscreen buys exactly that, which is
@@ -62,30 +70,8 @@ export function createWebPlatform(): Platform {
         else await document.documentElement.requestFullscreen({ navigationUI: 'hide' })
       } catch { /* the browser refused; nothing to recover, the game keeps running windowed */ }
     },
-    exportFile: async (text, filename) => {
-      // Same idiom the replay downloader already uses (src/input/recorder.ts): Blob + object URL.
-      const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }))
-      const a = document.createElement('a')
-      a.href = url; a.download = filename; a.click()
-      setTimeout(() => URL.revokeObjectURL(url), 1000)
-    },
-    importFile: () => new Promise(resolve => {
-      if (!picker) {
-        picker = document.createElement('input')
-        picker.type = 'file'
-        picker.accept = '.json,application/json'
-        picker.style.display = 'none'
-        document.body.appendChild(picker)
-      }
-      const el = picker
-      const done = (v: string | null | Promise<string>) => {
-        el.onchange = null; el.oncancel = null
-        Promise.resolve(v).then(resolve, () => resolve(null))
-      }
-      el.onchange = () => { const f = el.files?.[0]; done(f ? f.text() : null) }
-      el.oncancel = () => done(null)
-      el.value = ''      // so picking the SAME file twice in a row still fires change
-      el.click()         // must run inside the keydown gesture the browser is still processing
-    }),
+    setRunActive: () => { /* a browser tab has no quit to guard */ },
+    exportFile: downloadText,
+    importFile: pickTextFile,
   }
 }

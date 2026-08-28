@@ -116,6 +116,45 @@ describe('loadSave recovery', () => {
   })
 })
 
+describe('a read that failed is not a read that found nothing', () => {
+  const failing = (which: 'read' | 'readBackup' | 'both') => {
+    const store = createStorageSaveStore(new MemoryStorage())
+    const boom = () => Promise.reject(new Error('EACCES'))
+    return {
+      ...store,
+      read: which === 'readBackup' ? store.read : boom,
+      readBackup: which === 'read' ? store.readBackup : boom,
+    }
+  }
+
+  it('refuses to authorise a write when the save could not be read at all', async () => {
+    // The alternative is catastrophic: an EACCES or a half-mounted volume looks like a new player,
+    // and the first autosave overwrites a healthy file with zeroed counters.
+    const loaded = await loadSave(failing('both'), ID)
+    expect(loaded.source).toBe('unreadable')
+    expect(loaded.writable).toBe(false)
+    expect(loaded.save).toEqual(defaultSave({ profileId: ID }))
+  })
+
+  it('still recovers when only the live copy is unreadable', async () => {
+    const storage = new MemoryStorage()
+    storage.setItem(backupKey(ID), serializeSave(withMeta(5)))
+    const store = createStorageSaveStore(storage)
+    const loaded = await loadSave({ ...store, read: () => Promise.reject(new Error('EIO')) }, ID)
+    expect(loaded.source).toBe('backup')
+    expect(loaded.writable).toBe(true)
+    expect(loaded.save.meta.attempts).toBe(5)
+  })
+
+  it('recovers from the backup when the live copy is merely missing', async () => {
+    const storage = new MemoryStorage()
+    storage.setItem(backupKey(ID), serializeSave(withMeta(3)))
+    const loaded = await loadSave(createStorageSaveStore(storage), ID)
+    expect(loaded.source).toBe('backup')
+    expect(loaded.save.meta.attempts).toBe(3)
+  })
+})
+
 describe('legacy key migration', () => {
   const seedLegacy = (storage: MemoryStorage) => {
     storage.setItem(META_KEY, JSON.stringify({ version: 1, attempts: 7, victories: 2, unlockedWeapons: ['blade'] }))

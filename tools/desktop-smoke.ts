@@ -269,12 +269,33 @@ try {
     return 'live + backup on disk, traversal refused'
   })
 
+  // The bridge checks above prove the IPC works. This proves the GAME uses it: pressing V is the one
+  // player action that persists settings in every scenario, so the whole chain -- detectPlatform ->
+  // the desktop adapter -> IPC -> the filesystem store -- has to be intact for a file to appear.
+  await check('the game itself saves through the seam', 20_000, async () => {
+    rmSync(join(savesDir, 'default.json'), { force: true })
+    rmSync(join(savesDir, 'default~bak.json'), { force: true })
+    await page.evaluate(() => { window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyV' })) })
+    const live = join(savesDir, 'default.json')
+    for (let i = 0; i < 40 && !existsSync(live); i++) await new Promise(r => setTimeout(r, 100))
+    assert(existsSync(live), 'pressing V wrote no save file through the seam')
+    const doc = JSON.parse(readFileSync(live, 'utf8')) as { schemaVersion: number; revision: number; settings: { reducedEffects: boolean } }
+    assert(doc.schemaVersion === 2, `unexpected schemaVersion ${doc.schemaVersion}`)
+    assert(doc.revision >= 1, `revision did not advance: ${doc.revision}`)
+    assert(doc.settings.reducedEffects === true, 'the V keypress did not reach the persisted settings')
+    return `envelope v${doc.schemaVersion} rev${doc.revision} written by the game`
+  })
+
   await close(l1.app)
+
+  // Put the known fixture bytes back, since the game's own write above replaced them.
+  writeFileSync(join(savesDir, 'default.json'), saveA, 'utf8')
+  writeFileSync(join(savesDir, 'default~bak.json'), saveA, 'utf8')
 
   const l2 = await launch()
   await check('relaunch reads back the same bytes', 25_000, async () => {
     const r = await l2.page.evaluate(() => (window as unknown as { bardoDesktop: { saves: { read(id: string): Promise<{ ok: boolean; data: string }> } } }).bardoDesktop.saves.read('default'))
-    assert(r.ok && r.data === saveB, 'the relaunched app did not read back the saved bytes')
+    assert(r.ok && r.data === saveA, 'the relaunched app did not read back the saved bytes')
     return 'byte-identical across a relaunch'
   })
   await close(l2.app)

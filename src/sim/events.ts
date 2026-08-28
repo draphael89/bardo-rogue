@@ -6,7 +6,7 @@ export type EnemyKind = 'brute' | 'caster' | 'charger' | 'dummy' | 'warden'
 export type DeathKind = EnemyKind | 'none'
 
 import type { ArmId } from './weapons'
-import type { BoonId } from './boons'
+import type { BoonId, Deity } from './boons'
 
 export type SimEvent =
   | { type: 'swing'; x: number; y: number; angle: number; swing: number; heavy: boolean; dash: boolean }
@@ -38,11 +38,16 @@ export type SimEvent =
   | { type: 'offeringTaken'; kind: 'life'; x: number; y: number }
   | { type: 'weaponPrepared'; weapon: ArmId; x: number; y: number }
   | { type: 'runStarted'; weapon: ArmId }
-  | { type: 'rewardOffered'; options: [BoonId, BoonId, BoonId] }
+  | { type: 'rewardOffered'; options: [BoonId, BoonId, BoonId]; deity: Deity }
   | { type: 'rewardFocus'; focus: 0 | 1 | 2 }
   | { type: 'boonChosen'; boon: BoonId; x: number; y: number }
   | { type: 'brandApplied'; id: number; stacks: number; x: number; y: number }
+  | { type: 'burnApplied'; id: number; stacks: number; x: number; y: number }
+  | { type: 'burnTick'; id: number; stacks: number; x: number; y: number }
+  | { type: 'burnEnded'; id: number; x: number; y: number }
   | { type: 'brandConsumed'; id: number; stacks: number; x: number; y: number }
+  | { type: 'brandPassed'; fromX: number; fromY: number; toX: number; toY: number; stacks: number }
+  | { type: 'interrupt'; id: number; x: number; y: number }
   | { type: 'runWon' | 'runLost'; depth: number; ticks: number; boons: BoonId[]; by: DeathKind; ranged: boolean }
   | { type: 'draw'; x: number; y: number; angle: number }
   | { type: 'arrowLoose'; x: number; y: number; angle: number }

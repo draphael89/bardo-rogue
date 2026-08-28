@@ -4,6 +4,10 @@ import { SLOW_FULL } from './world'
 import type { World, Enemy } from './world'
 import type { DeathKind } from './events'
 import { finishRun } from './session'
+// boons.ts imports damageEnemy from here, so this pair is circular. Both sides are hoisted function
+// declarations, so the cycle resolves before either is ever called; keep it that way (no top-level
+// work in either module) rather than adding a registration hook nothing else would use.
+import { resolveKill } from './boons'
 
 // --- swing curves -------------------------------------------------------------------------------
 // Sim and renderer read the same three functions, so the hitbox is exactly where the crescent is.
@@ -71,32 +75,40 @@ export function clearBulletTime(world: World): void {
   world.slowTicks = 0
 }
 
-export function damageEnemy(world: World, e: Enemy, damage: number, angle: number, knockback: number, heavy: boolean, hitstop: number, sourceActionId = world.player.swingId): void {
+// `silent` is damage with no blow behind it: a status burning a body down. It still kills, and the
+// kill still reads, but it earns no hit-stop, no knockback, no stagger and no contact stamp — a
+// crowd on fire would otherwise stutter the whole fight and stun-lock itself on its own damage.
+export function damageEnemy(world: World, e: Enemy, damage: number, angle: number, knockback: number, heavy: boolean, hitstop: number, sourceActionId = world.player.swingId, opts?: { silent?: boolean }): void {
   if (!e.active || e.state === 'dead') return
+  const silent = !!opts?.silent
   e.hp -= damage
   e.flash = tuning.juice.flashTicks
   const kind = e.kind
   const killed = e.hp <= 0
   const actionId = sourceActionId
   const scale = kind === 'dummy' ? 0 : tuning[kind].knockbackScale
-  const kb = killed ? knockback * 1.5 : knockback * scale
+  const kb = silent ? 0 : killed ? knockback * 1.5 : knockback * scale
   e.kbx += Math.cos(angle) * kb
   e.kby += Math.sin(angle) * kb
-  e.facing = Math.cos(angle) > 0 ? -1 : 1 // face the attacker
+  if (!silent) e.facing = Math.cos(angle) > 0 ? -1 : 1 // face the attacker
 
   // A heavy is the committed swing. The world takes a short breath; the player does not.
   // Dummies are a training bag — they must not put the room in slow motion.
-  if (heavy && kind !== 'dummy') addBulletTime(world, tuning.bullet.heavyTicks, tuning.bullet.heavyRate)
+  if (heavy && kind !== 'dummy' && !silent) addBulletTime(world, tuning.bullet.heavyTicks, tuning.bullet.heavyRate)
 
   if (killed) {
     e.state = 'dead'
     e.stateTick = 0
-    addFreeze(world, hitstop + tuning.hitstop.killBonus)
+    if (!silent) addFreeze(world, hitstop + tuning.hitstop.killBonus)
     world.emit({ type: 'hit', x: e.x, y: e.y, angle, damage, heavy, targetId: e.id, kind, killed: true, actionId })
     world.emit({ type: 'kill', x: e.x, y: e.y, angle, kind, id: e.id, actionId })
+    // Anything the body still owed is settled here, while its marks are readable and before the
+    // slot is recycled.
+    resolveKill(world, e)
     e.active = false
     return
   }
+  if (silent) return   // fire is a consequence, not a blow: no stamp, no freeze, no poise break
   addFreeze(world, hitstop)
   world.emit({ type: 'hit', x: e.x, y: e.y, angle, damage, heavy, targetId: e.id, kind, killed: false, actionId })
 

@@ -1,5 +1,5 @@
 import type { ArmId } from './weapons'
-import type { BoonId } from './boons'
+import type { BoonId, Deity } from './boons'
 import type { DeathKind } from './events'
 import type { DoorMark } from './arena'
 import type { World } from './world'
@@ -26,6 +26,7 @@ export interface RewardOffer {
   family: RewardFamily
   options: [BoonId, BoonId, BoonId]
   focus: 0 | 1 | 2
+  deity: Deity            // who is speaking; the door's mark promised this
 }
 
 export interface RunState {

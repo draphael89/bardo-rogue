@@ -1,5 +1,5 @@
 import { setDoorWalkable } from './arena'
-import { BOONS, BOON_IDS, grantBoon, hasBoon, type BoonId } from './boons'
+import { BOONS, BOON_IDS, DEITIES, grantBoon, hasBoon, type BoonId, type Deity } from './boons'
 import type { InputFrame } from './input'
 import type { RewardFamily } from './session'
 import type { World } from './world'
@@ -13,38 +13,68 @@ function shuffled(world: World, ids: BoonId[]): BoonId[] {
   return out
 }
 
+// A vow that pays out only through another vow is a dead card until its partner exists. Offering
+// Judgment with nothing to judge, or the duo before either half is in hand, spends one of a run's
+// three choices on nothing — the fastest way to make a reward screen feel like a formality.
+function usable(world: World, id: BoonId): boolean {
+  const def = BOONS[id]
+  if (def.requires?.some(req => !hasBoon(world, req))) return false
+  if (id === 'finalJudgment') return hasBoon(world, 'ashenEdge') || hasBoon(world, 'betweenStep')
+  return true
+}
+
+// What the run is one step away from. This is the difference between a pool of effects and a build:
+// once the player has shown an intent, the offer leans toward the piece that completes it — never
+// guaranteeing the combination, only refusing to hide it.
+const FOLLOWUPS: Array<[BoonId, BoonId]> = [
+  // the duo first: with both halves owned it is the most interesting card in the deck
+  ['finalJudgment', 'pyre'],
+  ['torchlight', 'pyre'],
+  // a mark needs a collector, and a collector needs a mark
+  ['ashenEdge', 'finalJudgment'],
+  ['finalJudgment', 'ashenEdge'],
+  ['betweenStep', 'finalJudgment'],
+  // fire wants more fire
+  ['emberKiss', 'torchlight'],
+  ['torchlight', 'emberKiss'],
+  // anything that drops bodies wants the debt to keep moving
+  ['finalJudgment', 'bloodDebt'],
+  ['afterimage', 'ashenEdge'],
+  ['mirrorSteel', 'ashenEdge'],
+]
+
 function synergyFollowup(world: World): BoonId | null {
-  if (hasBoon(world, 'ashenEdge') && !hasBoon(world, 'finalJudgment')) return 'finalJudgment'
-  if (hasBoon(world, 'finalJudgment') && !hasBoon(world, 'ashenEdge')) return 'ashenEdge'
-  if (hasBoon(world, 'betweenStep') && !hasBoon(world, 'finalJudgment')) return 'finalJudgment'
-  if (hasBoon(world, 'afterimage') && !hasBoon(world, 'ashenEdge')) return 'ashenEdge'
-  if (hasBoon(world, 'mirrorSteel') && !hasBoon(world, 'ashenEdge')) return 'ashenEdge'
+  for (const [have, want] of FOLLOWUPS) {
+    if (hasBoon(world, have) && !hasBoon(world, want) && usable(world, want)) return want
+  }
   return null
+}
+
+export function deityFor(family: RewardFamily): Deity {
+  return family === 'blade' ? DEITIES.fury.id : DEITIES.hecate.id
 }
 
 export function offerReward(world: World, family: RewardFamily): void {
   const run = world.session.run
   if (!run || run.result !== 'active') return
-  // Judgment is a payoff, not a promise. Offering it before the run has any way to create Brand
-  // would make the player's first reward do literally nothing in the next room.
-  const canBrand = hasBoon(world, 'ashenEdge') || hasBoon(world, 'betweenStep')
-  const available = BOON_IDS.filter(id => !hasBoon(world, id) && (id !== 'finalJudgment' || canBrand))
-  const preferred = shuffled(world, available.filter(id => BOONS[id].family === family))
-  const others = shuffled(world, available.filter(id => BOONS[id].family !== family))
-  // A marked door is a promise, not merely a weight. During this three-reward slice at least one
-  // unowned boon from either family must remain; reserve it before a cross-family combo follow-up.
+  const available = BOON_IDS.filter(id => !hasBoon(world, id) && usable(world, id))
+  const speaker = deityFor(family)
+  // The door's mark is a promise about who is waiting, not merely a weight. At least one vow from
+  // the marked power always appears; the rest of the card may come from either.
+  const preferred = shuffled(world, available.filter(id => BOONS[id].deity === speaker))
+  const others = shuffled(world, available.filter(id => BOONS[id].deity !== speaker))
   const promised = preferred.shift()
   if (!promised) throw new Error(`no eligible ${family} boon remains for the marked reward`)
   const picked: BoonId[] = []
   const followup = synergyFollowup(world)
-  if (followup && available.includes(followup) && !picked.includes(followup)) picked.push(followup)
+  if (followup && available.includes(followup)) picked.push(followup)
   if (!picked.includes(promised)) picked.push(promised)
   for (const id of [...preferred, ...others]) if (!picked.includes(id) && picked.length < 3) picked.push(id)
-  // The slice grants only three rewards from a six-boon pool, so this is an invariant. Keeping the
-  // guard explicit makes a future content edit fail loudly instead of showing an empty card.
+  // With twelve vows and three offers a run can never exhaust the pool, so this is an invariant.
+  // Keeping the guard explicit makes a future content edit fail loudly instead of showing a blank card.
   if (picked.length < 3) throw new Error('reward pool exhausted before three choices could be offered')
   const options = picked.slice(0, 3) as [BoonId, BoonId, BoonId]
-  run.pendingReward = { family, options, focus: 0 }
+  run.pendingReward = { family, options, focus: 0, deity: speaker }
   world.roomPhase = 'reward'
   world.phaseTick = world.tick
   world.timeScale = 1
@@ -61,7 +91,7 @@ export function offerReward(world: World, family: RewardFamily): void {
   world.player.vx = world.player.vy = 0
   world.doorOpen = false
   setDoorWalkable(world.arena, false)
-  world.emit({ type: 'rewardOffered', options })
+  world.emit({ type: 'rewardOffered', options, deity: speaker })
 }
 
 export function updateReward(world: World, input: InputFrame): void {

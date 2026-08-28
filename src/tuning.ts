@@ -118,6 +118,17 @@ export const tuning = {
     transitionTicks: 8,   // 133 ms: enough for a threshold blink, never enough to break momentum
   },
 
+  // Status effects: the shared vocabulary boons compose through. Burn is deliberately modest -
+  // enemies here have 2 to 8 life, so a status that out-damages the sword would replace the sword.
+  status: {
+    burn: {
+      maxStacks: 3,
+      ticks: 60 * 3,      // the whole sentence, refreshed by a new ignition
+      interval: 24,       // ticks between bites: slow enough to read as fire, not a damage number fountain
+      damage: 1,          // per stack, per bite
+    },
+  },
+
   boons: {
     cleave: { radiusAdd: 9, arcAdd: 44, damageAdd: 0, smearAdd: 3 },
     brandMax: 3,
@@ -132,6 +143,20 @@ export const tuning = {
     echoRadius: 9,
     echoLife: 10,
     echoDamage: 1,
+    // Phlegethon's Kiss: the heavy already commits; the fire is the reason to keep committing.
+    emberKissBurn: 2,
+    // Unanswered pays for a read, so it pays properly: a second helping of the heavy's own damage
+    // on top of the swing that earned it, plus the knockback of being caught mid-word.
+    unansweredDamage: 4,
+    unansweredKnockback: 200,
+    unansweredHitstop: 7,
+    // The debt passes to whoever is close enough to inherit it - about three tiles.
+    debtRange: 56,
+    // Hecate's torch reaches a little further than her blade does.
+    torchRange: 72,
+    torchBurn: 2,
+    // The duo. Two stacks on everything the burst touches, so a branded crowd goes up at once.
+    pyreBurn: 2,
   },
 
   brute: {

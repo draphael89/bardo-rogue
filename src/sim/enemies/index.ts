@@ -4,13 +4,15 @@ import { updateCaster } from './caster'
 import { updateCharger } from './charger'
 import { updateWarden } from './warden'
 import { applyEnemyKnockback } from './common'
+import { tickStatuses } from '../status'
 
 export function updateEnemies(world: World): void {
   for (const e of world.enemies) {
     if (!e.active) continue
     e.stateTick++
     if (e.flash > 0) e.flash--
-    if (e.brandTicks > 0 && --e.brandTicks === 0) e.brand = 0
+    tickStatuses(world, e)
+    if (!e.active || e.state === 'dead') continue
     switch (e.kind) {
       case 'brute': updateBrute(world, e); break
       case 'caster': updateCaster(world, e); break

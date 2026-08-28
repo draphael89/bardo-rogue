@@ -3,7 +3,7 @@ import { createWorld } from '@/sim/scenarios'
 import { emptyInput } from '@/sim/input'
 import { stepWorld } from '@/sim/step'
 import { TILE } from '@/sim/arena'
-import { activeBoons, applyBrand, BOONS, grantBoon, hasBoon, resolveWeaponOnHit, triggerPerfectDodge } from '@/sim/boons'
+import { activeBoons, applyBrand, applyBurn, BOONS, grantBoon, hasBoon, resolveWeaponOnHit, swingReach, triggerPerfectDodge } from '@/sim/boons'
 import { damageEnemy, hurtPlayer } from '@/sim/combat'
 import { hashWorld } from '@/sim/hash'
 import { loadMeta, loadSettings, META_KEY, saveMeta, saveSettings, SETTINGS_KEY, type StorageLike } from '@/sim/storage'
@@ -419,5 +419,224 @@ describe('death attribution', () => {
     for (let i = 0; i < 40 && p.state !== 'dead'; i++) stepWorld(world, emptyInput())
     expect(p.state).toBe('dead')
     expect(world.session.run!.killedBy).toBe('caster')
+  })
+})
+
+describe('statuses', () => {
+  function armed(seed = 1) {
+    const w = prepareAndDescend(createWorld(seed, 'loop'))
+    for (const e of w.enemies) e.active = false
+    w.spawnQueue.length = 0
+    return w
+  }
+
+  it('burns a body down over time without stuttering the fight or stunning it', () => {
+    const w = armed()
+    const e = w.spawnEnemy('brute', 200, 120)!
+    e.state = 'chase'
+    applyBurn(w, e, 2)
+    expect(e.burn).toBe(2)
+    const hp0 = e.hp
+    let freezes = 0
+    let staggers = 0
+    for (let i = 0; i < tuning.status.burn.interval + 2; i++) {
+      stepWorld(w, emptyInput())
+      if (w.freeze > 0) freezes++
+      if (e.state === 'stagger') staggers++
+      w.events.length = 0
+    }
+    expect(e.hp).toBe(hp0 - tuning.status.burn.damage * 2)
+    expect(freezes).toBe(0)
+    expect(staggers).toBe(0)
+  })
+
+  it('expires on its own schedule and stops biting', () => {
+    const w = armed()
+    // A dummy, deliberately: a live brute would close, land a hit, and its hit-stop would pause the
+    // world clock the status rides on. That coupling is correct - hit-stop freezes everything - but
+    // it is not what this test is about.
+    const e = w.spawnEnemy('dummy', 200, 120)!
+    applyBurn(w, e, 1)
+    for (let i = 0; i < tuning.status.burn.ticks + 4; i++) stepWorld(w, emptyInput())
+    expect(e.burn).toBe(0)
+    const settled = e.hp
+    for (let i = 0; i < tuning.status.burn.interval * 2; i++) stepWorld(w, emptyInput())
+    expect(e.hp).toBe(settled)
+    expect(settled).toBeLessThan(e.maxHp)   // it did bite while it lasted
+  })
+
+  it('caps stacks so a crowd cannot be melted by re-ignition alone', () => {
+    const w = armed()
+    const e = w.spawnEnemy('brute', 200, 120)!
+    for (let i = 0; i < 10; i++) applyBurn(w, e, 3)
+    expect(e.burn).toBe(tuning.status.burn.maxStacks)
+  })
+
+  it('can finish a body, and the kill still reads as a kill', () => {
+    const w = armed()
+    const e = w.spawnEnemy('charger', 200, 120)!
+    e.hp = 1
+    applyBurn(w, e, 1)
+    for (let i = 0; i < tuning.status.burn.interval + 2; i++) {
+      stepWorld(w, emptyInput())
+      if (w.events.some(ev => ev.type === 'kill')) break
+      w.events.length = 0
+    }
+    expect(w.events.some(ev => ev.type === 'kill')).toBe(true)
+    expect(e.active).toBe(false)
+  })
+})
+
+describe('the vows of the Kindly One and Hecate', () => {
+  function armed(seed = 1) {
+    const w = prepareAndDescend(createWorld(seed, 'loop'))
+    for (const e of w.enemies) e.active = false
+    w.spawnQueue.length = 0
+    return w
+  }
+
+  it("Phlegethon's Kiss sets a heavy's victim alight", () => {
+    const w = armed()
+    grantBoon(w, 'emberKiss')
+    const e = w.spawnEnemy('brute', 200, 120)!
+    resolveWeaponOnHit(w, e, true, 0, 0)
+    expect(e.burn).toBe(tuning.boons.emberKissBurn)
+  })
+
+  it('Unanswered pays only for an actual interrupt', () => {
+    const w = armed()
+    grantBoon(w, 'unanswered')
+    const caught = w.spawnEnemy('brute', 200, 120)!
+    caught.hp = 99
+    const hp0 = caught.hp
+    resolveWeaponOnHit(w, caught, true, 0, 0, 'windup')
+    expect(hp0 - caught.hp).toBe(tuning.boons.unansweredDamage)
+
+    const idle = w.spawnEnemy('brute', 240, 120)!
+    idle.hp = 99
+    const idle0 = idle.hp
+    resolveWeaponOnHit(w, idle, true, 0, 0, 'chase')
+    expect(idle.hp).toBe(idle0)
+  })
+
+  it('Unanswered reads the state the target was in, not the one the blow left it in', () => {
+    const w = armed()
+    grantBoon(w, 'unanswered')
+    const e = w.spawnEnemy('caster', 200, 120)!
+    e.hp = 99
+    e.state = 'aim'
+    const hp0 = e.hp
+    // A light staggers a caster; a heavy landing on the same tick must still count the wind-up.
+    damageEnemy(w, e, 1, 0, 0, true, 0)
+    resolveWeaponOnHit(w, e, true, 0, 0, 'aim')
+    expect(hp0 - e.hp).toBeGreaterThanOrEqual(tuning.boons.unansweredDamage)
+  })
+
+  it('The Debt Passes throws a dead foe’s mark to the nearest body', () => {
+    const w = armed()
+    grantBoon(w, 'bloodDebt')
+    const dying = w.spawnEnemy('charger', 200, 120)!
+    const heir = w.spawnEnemy('brute', 200 + tuning.boons.debtRange - 8, 120)!
+    applyBrand(w, dying, 3)
+    damageEnemy(w, dying, 999, 0, 0, false, 0)
+    expect(dying.active).toBe(false)
+    expect(heir.brand).toBe(3)
+  })
+
+  it('The Debt Passes finds nobody when nobody is near enough', () => {
+    const w = armed()
+    grantBoon(w, 'bloodDebt')
+    const dying = w.spawnEnemy('charger', 60, 120)!
+    const far = w.spawnEnemy('brute', 60 + tuning.boons.debtRange + 40, 120)!
+    applyBrand(w, dying, 2)
+    damageEnemy(w, dying, 999, 0, 0, false, 0)
+    expect(far.brand).toBe(0)
+  })
+
+  it('Torchlight lights the nearest body on a perfect dodge', () => {
+    const w = armed()
+    grantBoon(w, 'torchlight')
+    const near = w.spawnEnemy('brute', w.player.x + 30, w.player.y)!
+    const far = w.spawnEnemy('brute', w.player.x + tuning.boons.torchRange + 30, w.player.y)!
+    triggerPerfectDodge(w)
+    expect(near.burn).toBe(tuning.boons.torchBurn)
+    expect(far.burn).toBe(0)
+  })
+
+  it('Crossroads makes a swing out of a roll cut a full circle, and only then', () => {
+    const w = armed()
+    grantBoon(w, 'crossroads')
+    const light = tuning.player.attack.swings[0]
+    w.player.dodgeTick = -1
+    expect(swingReach(w, light).arcDeg).toBeLessThan(360)
+    w.player.dodgeTick = 2
+    expect(swingReach(w, light).arcDeg).toBe(360)
+  })
+
+  it('Pyre ignites everything a judgment burst touches', () => {
+    const w = armed()
+    grantBoon(w, 'ashenEdge')
+    grantBoon(w, 'finalJudgment')
+    grantBoon(w, 'torchlight')
+    grantBoon(w, 'pyre')
+    const marked = w.spawnEnemy('brute', 200, 120)!
+    marked.hp = 99
+    const bystander = w.spawnEnemy('brute', 200 + tuning.boons.judgmentRadius - 6, 120)!
+    bystander.hp = 99
+    applyBrand(w, marked, 3)
+    resolveWeaponOnHit(w, marked, true, 3, 0)
+    expect(marked.burn).toBe(tuning.boons.pyreBurn)
+    expect(bystander.burn).toBe(tuning.boons.pyreBurn)
+  })
+})
+
+describe('the offer', () => {
+  function armed(seed = 1) {
+    return prepareAndDescend(createWorld(seed, 'loop'))
+  }
+
+  it('never offers a vow that would do nothing yet', () => {
+    for (let seed = 1; seed <= 30; seed++) {
+      const w = armed(seed)
+      offerReward(w, 'blade')
+      const opts = w.session.run!.pendingReward!.options
+      // Judgment collects Brand; without a way to make Brand it is a blank card.
+      expect(opts).not.toContain('finalJudgment')
+      // The duo needs both halves in hand first.
+      expect(opts).not.toContain('pyre')
+    }
+  })
+
+  it('offers the duo once both halves are held', () => {
+    const w = armed(4)
+    grantBoon(w, 'ashenEdge')
+    grantBoon(w, 'finalJudgment')
+    grantBoon(w, 'torchlight')
+    offerReward(w, 'blade')
+    expect(w.session.run!.pendingReward!.options).toContain('pyre')
+  })
+
+  it('keeps the door’s promise: the marked power always speaks', () => {
+    for (let seed = 1; seed <= 30; seed++) {
+      for (const family of ['blade', 'veil'] as const) {
+        const w = armed(seed)
+        offerReward(w, family)
+        const offer = w.session.run!.pendingReward!
+        expect(offer.deity).toBe(family === 'blade' ? 'fury' : 'hecate')
+        expect(offer.options.some(id => BOONS[id].deity === offer.deity)).toBe(true)
+      }
+    }
+  })
+
+  it('always offers three distinct vows the player does not already hold', () => {
+    for (let seed = 1; seed <= 20; seed++) {
+      const w = armed(seed)
+      grantBoon(w, 'ashenEdge')
+      grantBoon(w, 'cleave')
+      offerReward(w, 'veil')
+      const opts = w.session.run!.pendingReward!.options
+      expect(new Set(opts).size).toBe(3)
+      for (const id of opts) expect(hasBoon(w, id)).toBe(false)
+    }
   })
 })

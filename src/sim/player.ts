@@ -209,8 +209,11 @@ export function updatePlayer(world: World, input: InputFrame): void {
           e.lastHitSwingId = p.swingId
           const toward = Math.atan2(e.y - p.y, e.x - p.x)
           const brandBefore = e.brand
+          // The target's state is read BEFORE the blow lands: a hit that staggers its victim would
+          // otherwise erase the very wind-up that made it an interrupt.
+          const wasDoing = e.state
           damageEnemy(world, e, reach.damage, toward, s.knockback, s.heavy, s.hitstop)
-          resolveWeaponOnHit(world, e, s.heavy, brandBefore, toward)
+          resolveWeaponOnHit(world, e, s.heavy, brandBefore, toward, wasDoing)
         }
       }
       for (const b of world.projectiles) {

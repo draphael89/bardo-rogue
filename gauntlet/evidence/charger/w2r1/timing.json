@@ -1,0 +1,116 @@
+{
+  "round": "w2r1",
+  "source": "gauntlet/evidence/charger/w2r1/strip.png.json trace + headless state trace of charger id4, charger-swarm seed 1, 400 ticks, no bot, no input",
+  "scenario": "charger-swarm",
+  "seed": 1,
+  "enemy": "charger id4",
+  "stripWindowTicks": [
+    106,
+    128
+  ],
+  "cropBox": {
+    "x": 184,
+    "y": 128,
+    "w": 192,
+    "h": 128
+  },
+  "cropBoxChangedThisRound": true,
+  "cropBoxNote": "The wave-1 box (144,72,192,128) put the charger in the bottom-right corner and cut the lane after the arena was rebuilt by the rooms-as-data work. 184,128,192,128 centres the same subject at the same size and is fixed for every wave-2 round.",
+  "events": [
+    {
+      "tick": 106,
+      "type": "enemyWindup",
+      "id": 4,
+      "kind": "charger"
+    },
+    {
+      "tick": 122,
+      "type": "enemyAttack",
+      "id": 4,
+      "kind": "charger",
+      "angle": 2.98014778081408
+    }
+  ],
+  "transitions_id4": [
+    {
+      "tick": 1,
+      "state": "idle"
+    },
+    {
+      "tick": 20,
+      "state": "hover"
+    },
+    {
+      "tick": 106,
+      "state": "freeze"
+    },
+    {
+      "tick": 122,
+      "state": "dash"
+    },
+    {
+      "tick": 156,
+      "state": "recover"
+    },
+    {
+      "tick": 186,
+      "state": "hover"
+    },
+    {
+      "tick": 254,
+      "state": "freeze"
+    },
+    {
+      "tick": 270,
+      "state": "dash"
+    },
+    {
+      "tick": 304,
+      "state": "recover"
+    },
+    {
+      "tick": 338,
+      "state": "hover"
+    }
+  ],
+  "cycleTicks": {
+    "freeze_telegraph": 16,
+    "dash": 34,
+    "recover": 30,
+    "hover_between_charges": 68
+  },
+  "cycleMs_at60Hz": {
+    "freeze_telegraph": 267,
+    "dash": 567,
+    "recover": 500,
+    "hover_between_charges": 1133
+  },
+  "tellBudget": {
+    "note": "What the player actually gets to read, all of it inside the 16-tick freeze. Unchanged from wave 1: no sim value moved this round.",
+    "hover_armed_ring_ticks": 10,
+    "freeze_no_lane_ticks": [
+      0,
+      1
+    ],
+    "freeze_lane_grows_amber_ticks": [
+      1,
+      12
+    ],
+    "aim_locks_at_freeze_tick": 13,
+    "committed_red_ticks": [
+      13,
+      15
+    ],
+    "committed_red_ms": 50,
+    "directional_warning_ms": 200,
+    "directional_warning_note": "The amber lane states the direction from freeze tick 1 (200 ms before contact) and re-measures every tick while the sim is still tracking. The red is the commit beat, not the warning: 50 ms of it, and it cannot legally start earlier than chargerLockTick without lying about the aim."
+  },
+  "crowd": {
+    "exhibit-crowd.png": "scenario wave3, seed 1, bot kite, tick 341 - all four chargers alive and POSED into freeze at stateTick 3 / 7 / 11 / 14 on the same tick, each aimed at the player. This is the exact frame the wave-1 gap describes ('four identical red blinks with no way to tell which lane each will take'). Four lanes, four lengths, two colours, four directions.",
+    "exhibit-crowd.cmd": "pnpm strip -- --scenario wave3 --seed 1 --bot kite --from 340 --frames 1 --zoom 2 --crop 0,0,480,270 --eval \"const cs=w().enemies.filter(e=>e.active&&e.kind==='charger'); const tks=[2,6,10,13]; cs.forEach((e,i)=>{ e.state='freeze'; e.stateTick=tks[i%4]; e.vx=0; e.vy=0; e.aimAngle=Math.atan2(p().y-e.y,p().x-e.x) }); g.step(1)\"",
+    "exhibit-crowd-wave3-live.png": "scenario wave3, seed 1, bot kite, tick 491, NOT posed: charger 5 freeze:14 (locked, red), charger 6 dash:20, charger 7 freeze:1, plus two brutes and a caster bolt. What the density actually looks like in play.",
+    "exhibit-crowd-wave3-live.cmd": "pnpm strip -- --scenario wave3 --seed 1 --bot kite --from 491 --frames 1 --zoom 2 --crop 0,0,480,270",
+    "worstCaseMeasured": "wave3 seed 1 with the kite bot never puts three chargers in freeze on the same tick; two is the natural maximum. charger-swarm seeds 1-5, 1200 ticks each, idle player: also never three. So the four-tell frame has to be posed to exist, and exhibit-crowd.png poses it."
+  },
+  "scenarioNote": "The piece protocol asks for `--scenario charger`. It does not exist in src/sim/scenarios.ts and createWorld falls back to `full`, so every round so far has used `charger-swarm` (four chargers, no waves) for the single-subject strip. `--scenario wave3` does work and is used for both crowd exhibits. src/sim/scenarios.ts is not this lane's file."
+}

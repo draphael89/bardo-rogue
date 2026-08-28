@@ -16,12 +16,24 @@ import { EntityView, type EnemyFrame, type Pose } from './shared'
 //   freeze 4 / 9           a lane grows out of it toward you; on each beat it lands a rung and
 //                          trembles once. Loose and amber while it is still tracking you.
 //   freeze 13              the sim stops re-aiming (chargerLockTick). The lane IGNITES: two ticks
-//                          of white-hot wash, then it settles into a red beam with white-hot rails
-//                          and an arrowhead. Third tremble. Three beats and it is gone.
+//                          of white-hot wash, then it settles into a red beam with white-hot rails,
+//                          an arrowhead, and one white front that runs the length of it. Third
+//                          tremble. Three beats and it is gone.
 //   dash 0-1               a second, bigger flash at the head, and the lane burns away behind it.
 //
 // The lane is drawn at the true danger half-width (charger radius + player radius), so standing
 // outside the rails is genuinely safe and the telegraph never lies.
+//
+// And it is drawn as a WARNING ON THE FLOOR, never as a lid over it. Two rules hold that:
+//   * the mark paints 8 of the lane's 18 px - a 1px outline, a 2px red rail and a 1px white core on
+//     each side - and the 14 px between the rails carry nothing but a tint the floor reads through.
+//     The floor's own pattern, the mandala, and anything standing in the lane all survive.
+//   * nothing is drawn inside BODY_CLEAR of the charger's centre, because the crouch and the
+//     tremble are what "count the tremble" means and a telegraph that buries its own author has
+//     eaten the sentence it exists to state.
+// Round 1 of wave 2 came in at the opposite extreme (scorch 0.86, 3px rails, 2px cores, and a
+// 20px-long full-width white wave sliding down the lane) and the lock frame was an opaque
+// red-and-white plank in which neither the charger nor the player could be found at all.
 //
 // -------------------------------------------------------------------------------------------------
 // Why the telegraph is split across two layers
@@ -55,8 +67,19 @@ const BEATS = 3          // rungs on the lane == trembles in the crouch
 const PRE_TICKS = 10     // hover ticks of "armed" gathering before the freeze
 const BAR_STEP = 2       // px between the 2x2 blocks of a perpendicular bar (solid at this step)
 const BURN_TICKS = 8     // how long the lane takes to fade once the dash starts
-const FLASH_WIDTH = 10   // px half-width of the white pass that races down the locked lane
 const IGNITE_TICKS = 2.6 // how long the lock flash takes to fall back to the steady beam
+
+// The lane starts this far out from the charger's centre. The body is what carries "count the
+// tremble", so no part of the floor mark - not the scorch, not a rail, not the ignition star - is
+// allowed inside the silhouette that the player has to read the crouch off.
+const BODY_CLEAR = 6
+
+// How much of the lane's width the mark is allowed to paint. A telegraph is a warning written on
+// the floor: the floor, and anything standing on it, has to survive underneath. At hw = 9 the mark
+// owns pixel 11 (outline), 9-10 (red body) and 8 (white core) on each side - 8 of 18 px - and the
+// middle 14 px carry nothing but a tint.
+const RAIL_BODY = 2      // px thickness of the red rail
+const RAIL_CORE = 1      // px thickness of the white-hot core just inside it
 
 // One colour family, so four of them in a room are four instances of the same sentence and not four
 // unrelated marks. Heat counts the beats: dull ember while it is still choosing, saturated red the
@@ -66,7 +89,9 @@ const EMBER_HOT = 0xffd08a
 const RED = 0xff2410      // committed rail body
 const RED_HOT = 0xff6a24
 const WHITE = 0xffffff
-const SCORCH = 0x240e0a  // the ground the lane claims: a dark warm floor, not a blue-black hole
+const SCORCH = 0x4a1208  // the ground the lane claims: at 0.34 over the room's blue-grey floor this
+                         // lands warm, not neutral. 0x240e0a was so dark that the tint read as plain
+                         // grey concrete once the alpha came down off the old opaque 0.86.
 const EDGE = 0x08040c    // near-black outline: holds the rail's edge over both the lit floor and the dark tile
 const GLOW_T = 0xff6a14   // spill while it is still tracking you
 const GLOW_L = 0xff2c12   // spill once it has committed
@@ -278,7 +303,11 @@ function drawTelegraph(lane: Lane, e: Enemy, f: EnemyFrame): void {
   const nx = -cy, ny = cx
   const { k, beat } = laneClock(tk, LOCK)
   const grow = clamp01(k / BEATS)
-  const reach = locked ? len : Math.max(8, grow * len)
+  const reach = locked ? len : Math.max(BODY_CLEAR + 6, grow * len)
+  // every continuous stroke starts outside the body, so the crouch is never under paint
+  const d0 = Math.min(BODY_CLEAR, reach - 2)
+  const bx = ox + cx * d0, by = oy + cy * d0
+  const run = reach - d0
   const strobe = locked ? (strobeFrame(f.time) ? 1 : 0.72) : 1
   // the lock is a flash, not a colour change: two ticks of white-hot wash falling back to the beam
   const ignite = locked ? clamp01(1 - (tk - LOCK) / IGNITE_TICKS) ** 0.7 : 0
@@ -287,20 +316,24 @@ function drawTelegraph(lane: Lane, e: Enemy, f: EnemyFrame): void {
   const coreCol = locked ? WHITE : mixTint(EMBER_HOT, WHITE, 0.3)
   const glowCol = locked ? GLOW_L : GLOW_T
 
-  // 1. GROUND. The scorch: the floor the lane crosses drops ~60 luma, so the beam is a light in a
-  //    dark place even when the room around it is a lit carpet. It is exactly the danger width - no
-  //    apron, no soft skirt, because a translucent quad wider than the hitbox both lies about the
-  //    hitbox and shows its own rectangle edge.
-  stroke(lane.apronIn, ox, oy, nx, ny, 0, ang, reach + 1, hw * 2 + 2, SCORCH, locked ? 0.86 : 0.26 + 0.16 * grow)
+  // 1. GROUND. The scorch: a TINT, not a lid. It drops the floor the lane crosses so the rails have
+  //    dark to sit against, and it stops there - at 0.34 the carpet's own pattern, the mandala and
+  //    anything standing in the lane all still read straight through it. The old 0.86 turned the
+  //    lane into an opaque brown plank that erased the floor, the charger and the player at the one
+  //    tick the player has to read all three. It is exactly the danger width - no apron, no soft
+  //    skirt, because a translucent quad wider than the hitbox lies about the hitbox.
+  stroke(lane.apronIn, bx, by, nx, ny, 0, ang, run + 1, hw * 2 + 2, SCORCH, locked ? 0.34 : 0.09 + 0.09 * grow)
 
   // 2. HEAT. The bloom, hugging each rail. A lane-wide additive field just washes the whole 18x80
   //    rect into a pale slab with no structure; the light has to come from the edges.
   for (const side of [1, -1]) {
-    stroke(side > 0 ? lane.glowL : lane.glowR, ox, oy, nx, ny, side * (hw - 1), ang, reach, 6 + ignite * 3, glowCol,
-      ((locked ? 0.46 : 0.20 + 0.12 * grow) + 0.20 * ignite) * strobe)
+    stroke(side > 0 ? lane.glowL : lane.glowR, bx, by, nx, ny, side * (hw - 1), ang, run, 4 + ignite * 2, glowCol,
+      ((locked ? 0.30 : 0.13 + 0.08 * grow) + 0.14 * ignite) * strobe)
   }
   // and the ignition: two ticks in which the inside of the lane is lit, then it is a beam again
-  stroke(lane.wash, ox, oy, nx, ny, 0, ang, reach, hw * 2 + 4, mixTint(glowCol, 0xffb070, 0.4), 0.11 * ignite)
+  // and the ignition, plus a whisper of the same warmth held for the rest of the commit, so the
+  // inside of a committed lane is heat over the floor and not grey over the floor
+  stroke(lane.wash, bx, by, nx, ny, 0, ang, run, hw * 2 + 4, mixTint(glowCol, 0xffb070, 0.4), (locked ? 0.055 : 0) + 0.09 * ignite)
 
   // 3. The beam, at the true danger edge: near-black outline (ground) / red body (heat) / white-hot
   //    core (heat). The red says "committed", the white is what makes the telegraph the brightest
@@ -309,49 +342,49 @@ function drawTelegraph(lane: Lane, e: Enemy, f: EnemyFrame): void {
   //    built object, a crate lid lying on the floor, rather than as something about to happen.
   if (locked) {
     for (const side of [1, -1]) {
-      // Bands that do not overlap, so the red stays the dominant colour: for hw = 9 the outline is
-      // pixel 11, the red body is 8-10 (straddling the true danger edge at 9), the white core is
-      // 6-7, and 0-5 is dark interior. Overlapping the core over the body's inner pixels is what
-      // bleaches the beam into a white stripe with red trim.
-      stroke(side > 0 ? lane.railL : lane.railR, ox, oy, nx, ny, side * hw, ang, reach, 3, bodyCol, strobe)
-      stroke(side > 0 ? lane.coreL : lane.coreR, ox, oy, nx, ny, side * (hw - 2.5), ang, reach, 2, coreCol, 0.98 * strobe)
+      // Bands that do not overlap, so the red stays the dominant colour, and thin enough that the
+      // pair of them plus the outline claim 8 of the lane's 18 px: for hw = 9 the outline is pixel
+      // 11, the red body is 9-10 (straddling the true danger edge at 9), the white core is 8, and
+      // 0-7 is floor under a tint. Fat rails and a fat core are what turned the beam into a
+      // red-and-white slab with no game visible inside it.
+      stroke(side > 0 ? lane.railL : lane.railR, bx, by, nx, ny, side * (hw - 0.5), ang, run, RAIL_BODY, bodyCol, strobe)
+      stroke(side > 0 ? lane.coreL : lane.coreR, bx, by, nx, ny, side * (hw - 2), ang, run, RAIL_CORE, coreCol, 0.9 * strobe)
     }
   } else {
-    for (let d = 1; d <= reach; d += 3) railDot(hg, ox, oy, cx, cy, nx, ny, d, hw + 0.5, 2)
+    for (let d = d0; d <= reach; d += 3) railDot(hg, ox, oy, cx, cy, nx, ny, d, hw + 0.5, 2)
     hg.fill({ color: bodyCol, alpha: 0.95 })
-    for (let d = 1; d <= reach; d += 3) railDot(hg, ox, oy, cx, cy, nx, ny, d, hw + 0.5, 1)
+    for (let d = d0; d <= reach; d += 3) railDot(hg, ox, oy, cx, cy, nx, ny, d, hw + 0.5, 1)
     hg.fill({ color: coreCol, alpha: 0.35 + 0.35 * grow })     // one hot pixel in each dash, not a second line
   }
   // the outline sits one pixel outside the body, stepped whole-pixel so it keeps its edge
-  for (let d = 1; d <= reach; d += 1) railDot(g, ox, oy, cx, cy, nx, ny, d, hw + 2, 1)
+  for (let d = d0; d <= reach; d += 1) railDot(g, ox, oy, cx, cy, nx, ny, d, hw + 2, 1)
   g.fill({ color: EDGE, alpha: locked ? 0.95 : 0.85 })
 
   // 4. a centre track of dashes running outward. A field of dots would read as decoration; dashes
   //    that all point the same way can only read as travel.
   const flow = (f.time * 40) % 7
-  for (let d = 2 + flow; d < reach - 1; d += 7) {
+  for (let d = d0 + flow; d < reach - 1; d += 7) {
     for (let q = 0; q < 3; q++) hg.rect(Math.round(ox + cx * (d + q)), Math.round(oy + cy * (d + q)), 1, 1)
   }
-  hg.fill({ color: locked ? WHITE : EMBER_HOT, alpha: (locked ? 0.8 : 0.45) * strobe })
+  hg.fill({ color: locked ? WHITE : EMBER_HOT, alpha: (locked ? 0.38 : 0.45) * strobe })
 
-  // 5. one white wave runs the committed lane, so the lock is a direction and not just a colour
+  // 5. the lock runs one white FRONT down the lane, so the commit is a direction and not just a
+  //    colour. A front, not a wedge of 2x2 blocks: that filled the lane wall to wall for twenty
+  //    px at a time, which is a solid white bar sliding over the floor and over whoever is standing
+  //    on it. A chevron is the mark the beats are already made of, and it is two pixels thick.
   if (locked) {
     const flashD = (tk - LOCK + 0.5) * (len / Math.max(1, C.freezeTicks - LOCK))
-    for (let d = Math.max(1, flashD - FLASH_WIDTH); d <= Math.min(reach, flashD + FLASH_WIDTH); d += 1) {
-      const px = ox + cx * d, py = oy + cy * d
-      const w = 1 - Math.abs(d - flashD) / FLASH_WIDTH        // the wave is a wedge, not a block
-      for (let s = -hw + 1; s <= hw - 1; s += BAR_STEP) {
-        if (Math.abs(s) < (1 - w) * (hw - 1)) continue
-        hg.rect(Math.round(px + nx * s), Math.round(py + ny * s), 2, 2)
-      }
+    if (flashD > d0 && flashD < len + 4) {
+      for (let i = 0; i < 2; i++) chevron(hg, ox, oy, cx, cy, nx, ny, flashD - i * 2, hw - 1, 0)
+      hg.fill({ color: WHITE, alpha: 0.85 })
     }
-    hg.fill({ color: WHITE, alpha: 0.8 })
   }
 
-  // 6. gate bar under its feet: the lane leaves the charger, it does not float in front of it
-  perpBar(g, ox + cx * 2, oy + cy * 2, nx, ny, hw - 1, 1)
+  // 6. gate bar at the edge of its silhouette: the lane leaves the charger, it does not float in
+  //    front of it, and it does not cross it either.
+  perpBar(g, ox + cx * d0, oy + cy * d0, nx, ny, hw - 1, 1)
   g.fill({ color: EDGE, alpha: 0.55 })
-  perpBar(hg, ox + cx * 2, oy + cy * 2, nx, ny, hw - 1, 0)
+  perpBar(hg, ox + cx * d0, oy + cy * d0, nx, ny, hw - 1, 0)
   hg.fill({ color: locked ? mixTint(RED_HOT, WHITE, 0.5) : EMBER_HOT, alpha: (locked ? 0.9 : 0.5) * strobe })
 
   // 7. the beats. One CHEVRON lands on the lane per beat, pointing the way the charger will go, and
@@ -366,7 +399,12 @@ function drawTelegraph(lane: Lane, e: Enemy, f: EnemyFrame): void {
     if (k < i + 1) continue
     chevron(hg, ox, oy, cx, cy, nx, ny, len * (i + 1) / BEATS, hw - 2, 0)
   }
-  hg.fill({ color: locked ? WHITE : mixTint(EMBER, EMBER_HOT, 0.45), alpha: 0.95 * strobe })
+  // Once it commits, the beats step back into the red: they have finished counting, and eight
+  // white chevrons in one lane (three beats, three in the arrowhead, two in the moving front)
+  // is a scribble in which the one mark that still means something - the front - is lost.
+  hg.fill(locked
+    ? { color: mixTint(RED_HOT, WHITE, 0.3), alpha: 0.5 * strobe }
+    : { color: mixTint(EMBER, EMBER_HOT, 0.45), alpha: 0.95 * strobe })
 
   // 8. the landing itself: the chevron that just arrived flares for three ticks
   for (let i = 0; i < BEATS; i++) {
@@ -388,7 +426,7 @@ function drawTelegraph(lane: Lane, e: Enemy, f: EnemyFrame): void {
   // 10. and the lock itself is a light: an overexposed star at the charger's head, plus light
   //     thrown across the floor as a ring of whole pixels - a ring has no rectangle edge, so the
   //     spill never reads as a translucent quad pasted over the art.
-  if (ignite > 0.02) burst(hg, ox + cx * 3, oy + cy * 3, 10 + ignite * 14, 0.92 * ignite ** 0.6, WHITE, cx, cy)
+  if (ignite > 0.02) burst(hg, ox + cx * (d0 + 2), oy + cy * (d0 + 2), 7 + ignite * 9, 0.62 * ignite ** 0.6, WHITE, cx, cy)
 }
 
 // The lane is consumed behind the charger as it crosses, and what is left of it fades out. The dash
@@ -406,18 +444,19 @@ function drawBurn(lane: Lane, f: EnemyFrame): void {
   const hw = C.radius + tuning.player.radius
   const left = len - travelled
   const hx = ox + cx * travelled, hy = oy + cy * travelled
-  if (blow > 0.02) burst(hg, hx + cx * 3, hy + cy * 3, 11 + blow * 17, 0.95 * blow ** 0.6, WHITE, cx, cy)
+  if (blow > 0.02) burst(hg, hx + cx * (BODY_CLEAR + 1), hy + cy * (BODY_CLEAR + 1), 8 + blow * 11, 0.68 * blow ** 0.6, WHITE, cx, cy)
   if (left <= 2) return
-  stroke(lane.apronIn, hx, hy, nx, ny, 0, ang, left, hw * 2 + 2, SCORCH, 0.74 * fade)
+  // The unspent lane keeps the same budget as the telegraph: a tint, two thin rails, an outline.
+  stroke(lane.apronIn, hx, hy, nx, ny, 0, ang, left, hw * 2 + 2, SCORCH, 0.30 * fade)
   const burnGlow = GLOW_L
   for (const side of [1, -1]) {
-    stroke(side > 0 ? lane.glowL : lane.glowR, hx, hy, nx, ny, side * (hw - 1), ang, left, 6 + blow * 4, burnGlow,
-      (0.46 + 0.16 * blow) * fade)
+    stroke(side > 0 ? lane.glowL : lane.glowR, hx, hy, nx, ny, side * (hw - 1), ang, left, 4 + blow * 3, burnGlow,
+      (0.30 + 0.12 * blow) * fade)
   }
-  stroke(lane.wash, hx, hy, nx, ny, 0, ang, left, hw * 2 + 4, mixTint(burnGlow, 0xffb070, 0.4), 0.16 * blow * fade)
+  stroke(lane.wash, hx, hy, nx, ny, 0, ang, left, hw * 2 + 4, mixTint(burnGlow, 0xffb070, 0.4), 0.12 * blow * fade)
   for (const side of [1, -1]) {
-    stroke(side > 0 ? lane.railL : lane.railR, hx, hy, nx, ny, side * hw, ang, left, 3, mixTint(RED, RED_HOT, blow * 0.7), 0.95 * fade)
-    stroke(side > 0 ? lane.coreL : lane.coreR, hx, hy, nx, ny, side * (hw - 2.5), ang, left, 2, WHITE, 0.92 * fade)
+    stroke(side > 0 ? lane.railL : lane.railR, hx, hy, nx, ny, side * (hw - 0.5), ang, left, RAIL_BODY, mixTint(RED, RED_HOT, blow * 0.7), 0.95 * fade)
+    stroke(side > 0 ? lane.coreL : lane.coreR, hx, hy, nx, ny, side * (hw - 2), ang, left, RAIL_CORE, WHITE, 0.9 * fade)
   }
   for (let d = travelled; d <= len; d += 1) {
     const px = ox + cx * d, py = oy + cy * d

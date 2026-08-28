@@ -14,6 +14,7 @@ import { canon, luminance, type RGB } from './art/palette'
 import { compileSheet, writeSidecar, type CompileSpec } from './art/compile'
 import { makeContext, runGates, formatGates, summarise, loadPixels } from './art/gates'
 import type { SheetDef } from '../src/render/sheet'
+import { buildPrompt, generate, promptHash, request, tokenFor, type GenerateSpec, type ProviderName } from './art/generate'
 
 const argv = process.argv.slice(2)
 const cmd = argv[0]
@@ -27,7 +28,8 @@ const usage = (): never => {
   pnpm art palette
   pnpm art compile <spec.json> [--out <png>] [--no-gate]
   pnpm art gate <sheet.png> [--sidecar <json>]
-  pnpm art preview <sheet.png> [--scale 6] [--out <png>]`)
+  pnpm art preview <sheet.png> [--scale 6] [--out <png>]
+  pnpm art generate <gen-spec.json> [--provider retrodiffusion|pixellab] [--dry-run]`)
   process.exit(1)
 }
 
@@ -149,8 +151,35 @@ async function cmdPreview(): Promise<void> {
   console.log(`preview -> ${out} (${scale}x beside 1x, on canon floor value)`)
 }
 
+// --- generate ---------------------------------------------------------------------------------------
+// `--dry-run` prints the assembled prompt and the exact HTTP request without a key, so the thing that
+// actually determines quality — the prompt derived from the art bible — is reviewable on its own.
+async function cmdGenerate(): Promise<void> {
+  const specPath = argv[1]
+  if (!specPath || !existsSync(specPath)) usage()
+  const spec = JSON.parse(readFileSync(specPath, 'utf8')) as GenerateSpec
+  const provider = (flag('provider') ?? 'retrodiffusion') as ProviderName
+  const prompt = buildPrompt(spec)
+  if (flag('dry-run') !== undefined || !tokenFor(provider)) {
+    const req = request(provider, spec, '<TOKEN>')
+    console.log(`--- prompt (sha ${promptHash(prompt)}) ---\n${prompt}`)
+    console.log(`\n--- request ---\n${req.method} ${req.url}`)
+    const body = req.body as Record<string, unknown>
+    const redacted = { ...body }
+    for (const k of ['input_palette', 'color_image']) if (k in redacted) redacted[k] = '<base64 palette>'
+    console.log(JSON.stringify(redacted, null, 2))
+    if (!tokenFor(provider)) console.log(`\n(no API key in the environment — this was a dry run. Set the provider's key to generate.)`)
+    return
+  }
+  const out = await generate(provider, spec)
+  console.log(`generated ${out.files.length} candidate(s) via ${out.provider} (prompt ${out.promptHash}):`)
+  for (const f of out.files) console.log('  ' + f)
+  console.log(`\nNext: pick one, point a compile spec's "input" at it, and run pnpm art compile.`)
+}
+
 switch (cmd) {
   case 'palette': await cmdPalette(); break
+  case 'generate': await cmdGenerate(); break
   case 'compile': await cmdCompile(); break
   case 'gate': await cmdGate(); break
   case 'preview': await cmdPreview(); break

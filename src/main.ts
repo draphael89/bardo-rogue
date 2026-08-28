@@ -224,8 +224,12 @@ async function boot() {
   if (wantsTitle) { loop.paused = true; audio.setSuspended(true) }
 
   // Losing focus is a pause the player did not ask for but always wants: a tab switch should not
-  // cost health, and it should not keep making noise from behind another window.
-  document.addEventListener('visibilitychange', () => { if (document.hidden) setPaused(true) })
+  // cost health, and it should not keep making noise from behind another window. It does NOT apply
+  // while the title is up — the game is already stopped there, and adopting a user-pause would leave
+  // the player staring at the pause card the moment they dismissed the title.
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden && !presenter.title.visible) setPaused(true)
+  })
 
   // While the title is up the simulation is stopped, so nothing is sampling input: it needs its own
   // way out. Any key or click answers it, and the key that answers it does nothing else — a player

@@ -36,8 +36,11 @@ export function updateProjectiles(world: World): void {
         if (!e.active || e.state === 'dead') continue
         if (Math.hypot(e.x - b.x, e.y - b.y) > b.radius + e.radius) continue
         const brandBefore = e.brand
-        damageEnemy(world, e, b.damage, b.angle, tuning.bow.knockback, false, tuning.bow.hitstop, b.actionId)
-        resolveWeaponOnHit(world, e, false, brandBefore, b.angle)
+        // The shot is spent either way — an arrow that skips off a shield is still gone — but a
+        // turned one leaves no mark and spends no prime.
+        if (damageEnemy(world, e, b.damage, b.angle, tuning.bow.knockback, false, tuning.bow.hitstop, b.actionId)) {
+          resolveWeaponOnHit(world, e, false, brandBefore, b.angle)
+        }
         b.active = false
         break
       }

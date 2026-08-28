@@ -121,6 +121,12 @@ export function playEventSfx(a: AudioSystem, ev: SimEvent): void {
       } else if (ev.kind === 'warden') {
         a.bell(1.35, 196, 0.7, 'sfx', 0, { ...at, partials: 'plate', glideTo: 130, strike: 0.7, cap: 'tell' })
         a.play('creature', { ...at, gain: 0.4, pitch: 0.5 })
+      } else if (ev.kind === 'oathbound') {
+        // Bronze, and rising: a shield being set rather than a body winding up. It shares nothing
+        // with the Empusa's bell, because a player who has learned the roster by ear must not get
+        // the freeze-and-dash answer from a shade that is about to plant and bash.
+        a.bell(1.15, 660, 0.5, 'sfx', 0, { ...at, partials: 'bowl', glideTo: 880, strike: 0.9, cap: 'tell' })
+        a.play('impactPlate_medium', { ...at, gain: 0.34, pitch: 0.85 })
       } else {
         a.bell(1.07, 2200, 0.24, 'sfx', 0, { ...at, partials: 'plate', glideTo: 3400, strike: 0.4, cap: 'tell' })
         a.play('creature', { ...at, gain: 0.28, pitch: 1.4 })
@@ -136,6 +142,13 @@ export function playEventSfx(a: AudioSystem, ev: SimEvent): void {
         a.play('woosh', { ...at, gain: 0.9, pitch: 1.5 })
         a.bell(0.82, 3200, 0.16, 'sfx', 0, { ...at, partials: 'plate', glideTo: 2000, cap: 'strike' })
         a.swish(0.5, 120, 1.5, ev)
+      } else if (ev.kind === 'oathbound') {
+        // The bash committing. Bronze driven forward, not a blade cutting air — it is the only
+        // enemy commit in the roster that had no sound at all, so a player watching a caster across
+        // the room learned about it by taking it.
+        a.play('impactPlate_medium', { ...at, gain: 1.15, pitch: 0.72 })
+        a.play('woosh', { ...at, gain: 0.7, pitch: 0.95 })
+        a.swish(0.5, 170, 0.8, ev)
       } else if (ev.kind === 'warden') {
         a.play('woosh', { ...at, gain: 1.4, pitch: 0.55 })
         a.thump(1.05, 150, 46, 0.26, { click: 0.85 })

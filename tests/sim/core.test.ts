@@ -8,7 +8,7 @@ import { Metrics } from '@/sim/metrics'
 import { tuning } from '@/tuning'
 import { isPlayerInvulnerable } from '@/sim/combat'
 import { arcHits } from '@/sim/combat'
-import { grantBoon, hasBoon, swingReach } from '@/sim/boons'
+import { grantBoon, hasBoon, resolveWeaponOnHit, swingReach } from '@/sim/boons'
 import { ARM, grantArm } from '@/sim/weapons'
 import { damageEnemy, hurtPlayer } from '@/sim/combat'
 import { HUB_ID } from '@/sim/rooms'
@@ -973,6 +973,41 @@ describe('the Oath-Bound Hoplite', () => {
     expect(e.hp).toBe(hp0)
     expect(w.events.some(ev => ev.type === 'guardBlocked')).toBe(true)
     expect(w.events.some(ev => ev.type === 'hit')).toBe(false)
+  })
+
+  // The guard is a rule about what the blade can do to this body, so it has to turn everything the
+  // blade was carrying — not just the damage. A blow that stacked Brand and spent a perfect-dodge
+  // prime while the player was told, in sparks and in sound, that it had been refused let a player
+  // stand in front of bronze doing nothing and cash the mark with one heavy.
+  it('turns everything the blow was carrying, not only its damage', () => {
+    const w = armed()
+    grantBoon(w, 'ashenEdge')
+    const e = facing(w, w.player.x + 40, w.player.y)
+    const toward = Math.atan2(e.y - w.player.y, e.x - w.player.x)
+    w.session.run = null
+    w.player.dodgeProcTick = -1
+    for (let i = 0; i < 20; i++) {
+      const brandBefore = e.brand
+      if (damageEnemy(w, e, 2, toward, 90, false, 3)) resolveWeaponOnHit(w, e, false, brandBefore, toward)
+      e.lastHitSwingId = 0
+    }
+    expect(e.brand).toBe(0)
+  })
+
+  it('a turned blow is a whiff: the swing pays its whiff penalty', () => {
+    const w = armed()
+    const e = facing(w, w.player.x + 22, w.player.y)
+    const light = tuning.player.attack.swings[0]
+    let blocked = false, ticks = 0
+    stepWorld(w, { ...emptyInput(), attack: true, aimX: 1, aimY: 0 })
+    for (let i = 0; i < 80 && w.player.state === 'attack'; i++) {
+      stepWorld(w, { ...emptyInput(), aimX: 1, aimY: 0 })
+      if (w.events.some(ev => ev.type === 'guardBlocked')) blocked = true
+      ticks++
+    }
+    expect(blocked).toBe(true)
+    // startup + active + recovery is the connected length; a turned blow must not buy it.
+    expect(ticks).toBeGreaterThan(light.startup + light.active + light.recovery)
   })
 
   it('opens to the committed swing', () => {

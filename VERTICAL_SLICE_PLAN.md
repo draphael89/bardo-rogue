@@ -11,8 +11,13 @@
 ## STATUS — what has since been built
 
 The sections below are the plan as written. This block records what was executed against it, so the
-document does not become the next stale audit. Tests: **256 passing**; `pnpm matrix` 100/100 seeds
-resolve on both loop bots (kite 90%, naive 0%); `pnpm smoke` drives both endings through a real browser.
+document does not become the next stale audit. Tests: **264 passing**; `pnpm matrix` 100/100 seeds
+resolve on both loop bots (kite 93%, naive 0%); `pnpm smoke` drives both endings through a real
+browser, taking opposite sides of the toll on each.
+
+CI lives at `ci/github-actions.yml` rather than `.github/workflows/ci.yml`: the GitHub App that
+pushes this branch is refused on that path by both git and the REST API, so the pipeline is parked
+one `git mv` away from being live.
 
 | Plan item | State |
 |---|---|

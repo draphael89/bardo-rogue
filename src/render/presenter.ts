@@ -931,15 +931,19 @@ function drawGuard(g: Graphics, e: Enemy, alpha: number): void {
   const r = e.radius + 14
   const cy = y - 6
   const steps = 30
+  // A dark backing row under a bronze face, the same two-tone treatment every readable mark in this
+  // game uses, so it holds its edge on lit stone and on shadow alike. Two passes rather than two
+  // fills per pixel: the arc is redrawn every frame for every guarding body.
   for (let i = 0; i <= steps; i++) {
     const a = e.aimAngle - span + (span * 2 * i) / steps
-    const px = Math.round(x + Math.cos(a) * r)
-    const py = Math.round(cy + Math.sin(a) * r * 0.85)
-    // A dark backing row under a bronze face, the same two-tone treatment every readable mark in
-    // this game uses, so it holds its edge on lit stone and on shadow alike.
-    g.rect(px, py + 1, 1, 2).fill({ color: 0x120d18, alpha: 0.85 })
-    g.rect(px, py, 1, 1).fill({ color: 0xd8a45c, alpha: 0.95 })
+    g.rect(Math.round(x + Math.cos(a) * r), Math.round(cy + Math.sin(a) * r * 0.85) + 1, 1, 2)
   }
+  g.fill({ color: 0x120d18, alpha: 0.85 })
+  for (let i = 0; i <= steps; i++) {
+    const a = e.aimAngle - span + (span * 2 * i) / steps
+    g.rect(Math.round(x + Math.cos(a) * r), Math.round(cy + Math.sin(a) * r * 0.85), 1, 1)
+  }
+  g.fill({ color: 0xd8a45c, alpha: 0.95 })
 }
 
 function drawVerdict(g: Graphics, b: World['projectiles'][number], time: number): void {
@@ -962,10 +966,16 @@ function drawVerdict(g: Graphics, b: World['projectiles'][number], time: number)
 // and the NEAREST upscale doubles the smear; the octagon the HUD uses for its small rings falls apart
 // into four disconnected strokes by the time it is 26 px across, which is the size a hazard needs to
 // be. This is the same pixel discipline with the gaps closed.
+//
+// One fill for the whole ring, not one per pixel. Colour and alpha are constant across the call, and
+// every sibling helper in this file (ray, ringBand, crescent, smearBar) already batches — the pixel
+// version cloned a path and allocated a fill style ~450 times per ring, and the scales put three of
+// them on the floor at once, in a Graphics that is cleared and re-recorded every frame. Same
+// primitives, same order, identical output.
 function circlePx(g: Graphics, cx: number, cy: number, r: number, col: number, alpha: number): void {
   if (r < 1) return
   let x = r, y = 0, err = 1 - r
-  const px = (a: number, b: number) => g.rect(a, b, 1, 1).fill({ color: col, alpha })
+  const px = (a: number, b: number) => g.rect(a, b, 1, 1)
   while (x >= y) {
     px(cx + x, cy + y); px(cx - x, cy + y); px(cx + x, cy - y); px(cx - x, cy - y)
     px(cx + y, cy + x); px(cx - y, cy + x); px(cx + y, cy - x); px(cx - y, cy - x)
@@ -973,6 +983,7 @@ function circlePx(g: Graphics, cx: number, cy: number, r: number, col: number, a
     if (err < 0) err += 2 * y + 1
     else { x--; err += 2 * (y - x) + 1 }
   }
+  g.fill({ color: col, alpha })
 }
 
 function drawPrimedEdge(g: Graphics, p: World['player'], alpha: number): void {

@@ -159,8 +159,11 @@ export function swingReach(world: World, s: SwingDef): { radius: number; arcDeg:
     reach.damage += b.damageAdd
   }
   // Hecate's crossroads: a swing thrown out of a roll arrives from every direction at once. The
-  // reach is unchanged — this buys coverage, not range, so it rewards diving INTO a crowd.
-  if (hasBoon(world, 'crossroads') && world.player.dodgeTick >= 0) reach.arcDeg = 360
+  // reach is unchanged — this buys coverage, not range, so it rewards diving INTO a crowd. It reads
+  // the flag the press latched, not the live roll clock: that clock is already dead by the time a
+  // heavy out of a roll gets its blade out, so the leap — the one swing the vow is written for —
+  // was the only swing that never got the circle.
+  if (hasBoon(world, 'crossroads') && world.player.swingFromRoll) reach.arcDeg = 360
   return reach
 }
 

@@ -212,8 +212,14 @@ export function updatePlayer(world: World, input: InputFrame): void {
           // The target's state is read BEFORE the blow lands: a hit that staggers its victim would
           // otherwise erase the very wind-up that made it an interrupt.
           const wasDoing = e.state
-          damageEnemy(world, e, reach.damage, toward, s.knockback, s.heavy, s.hitstop)
-          resolveWeaponOnHit(world, e, s.heavy, brandBefore, toward, wasDoing)
+          // A turned blow carries nothing. The stamp above still lands — it is the per-swing dedupe
+          // and a blocked body must not be re-tested every active tick — but Brand, the perfect-dodge
+          // prime and the connect that cancels the whiff penalty all wait on the blade actually
+          // reaching the body.
+          if (damageEnemy(world, e, reach.damage, toward, s.knockback, s.heavy, s.hitstop)) {
+            p.swingLanded = true
+            resolveWeaponOnHit(world, e, s.heavy, brandBefore, toward, wasDoing)
+          }
         }
       }
       for (const b of world.projectiles) {
@@ -256,10 +262,11 @@ function punishBoltOwner(world: World, boltId: number, cx: number, cy: number): 
 
 // Did the swing now in flight touch anything? Enemies stamp the swing id they were last hit by, and
 // swing ids are never reused, so this needs no extra player state.
+// Did this swing actually reach something? Latched when a blow lands rather than re-derived from
+// the bodies, because `lastHitSwingId` is stamped on a body the shield turned as well as on one the
+// blade cut, and a swing that bounced off bronze has whiffed.
 function swingConnected(world: World): boolean {
-  const id = world.player.swingId
-  for (const e of world.enemies) if (e.lastHitSwingId === id) return true
-  return false
+  return world.player.swingLanded
 }
 
 function startDodge(world: World): void {
@@ -289,13 +296,18 @@ function startSwing(world: World, index: number): void {
   // Any swing consumes both requests: the one that launched it, and the one it declined. Leaving the
   // loser queued is how a game grows phantom inputs a second later.
   p.state = 'attack'; p.stateTick = 0; p.attackQueuedAt = -1; p.heavyQueuedAt = -1
+  p.swingLanded = false
   p.swingIndex = index
   p.swingAngle = p.aimAngle
   p.swingId = ++world.swingCounter
   p.facing = Math.cos(p.swingAngle) >= 0 ? 1 : -1
   const s = tuning.player.attack.swings[index]
-  // A swing thrown out of a roll is the dash attack: same blade, different sentence. Presentation
-  // and boons read this rather than re-deriving it from the roll clock.
+  // A swing thrown out of a roll is the dash attack: same blade, different sentence. Latched HERE,
+  // at the press, rather than re-derived per active tick from the roll clock — that clock dies at
+  // dodge.total (20) and the heavy's startup is 12 from an earliest cancel of 8, so a heavy out of
+  // a roll never has a live clock to read by the time its blade is out. Sampling it per tick also
+  // made a late light flicker between arcs mid-swing, in the sim and in the drawn crescent alike.
+  p.swingFromRoll = p.dodgeTick >= 0
   const dash = p.dodgeTick >= 0 && p.dodgeTick < tuning.player.dodge.travel
   world.emit({ type: 'swing', x: p.x, y: p.y, angle: p.swingAngle, swing: index, heavy: s.heavy, dash })
 }

@@ -280,19 +280,23 @@ function updateWardenEyes(v: EntityView, e: Enemy, x: number, y: number, hop: nu
 // The verdict denies a moving lane rather than a circle, so its tell is the wedge the stream will
 // sweep through: it opens from his facing to the full arc as the plant completes, and hardens to gold
 // when the aim locks. What lights up is exactly the ground the bolts will cross.
-function drawVerdictTell(g: Graphics, hi: Graphics | null, e: Enemy, x: number, y: number, tk: number): void {
+function drawVerdictTell(g: Graphics, hi: Graphics | null, e: Enemy, x: number, y: number, tk: number, scorch: number): void {
   const W = tuning.warden
   const V = W.sweep
   const s = e.state
   const windup = e.phase ? V.windup2 : V.windup
-  const q = s === 'attack' ? 1 : clamp01(tk / Math.max(1, windup))
+  // Scorch is the lane cooling after the stream has already crossed it. `tk` is then a RECOVERY
+  // clock, not a wind-up one, so the live formulas would read it as a fresh plant and draw a wedge
+  // growing outward in the pre-commit tone — an un-committed verdict, in the middle of the player's
+  // punish window. The ground he already swept is drawn at full reach, fading out.
+  const q = scorch > 0 || s === 'attack' ? 1 : clamp01(tk / Math.max(1, windup))
   const bloom = s === 'windup' ? clamp01((tk + 1) / 3) : 1
-  const committed = s === 'attack' || tk >= windup - W.commitLead + 1
+  const committed = scorch <= 0 && (s === 'attack' || tk >= windup - W.commitLead + 1)
   const span = (V.arcDeg * Math.PI) / 180
   const reach = V.range
   const cx = Math.round(x), cy = Math.round(y + tuning.player.radius + 1)
   const col = committed ? (e.phase ? 0xffe8a0 : 0xd4b060) : 0x121018
-  const alpha = (committed ? 0.85 : 0.5) * bloom
+  const alpha = (committed ? 0.85 : 0.5) * bloom * (scorch > 0 ? scorch * 0.5 : 1)
   // Whole-pixel dashes along the two edges and the leading arc: a filled wedge would cover the very
   // bodies the player is trying to read, and this is a floor plane, not a HUD element.
   const edges = [-span / 2, span / 2]
@@ -335,7 +339,7 @@ function updateWardenTell(v: EntityView, e: Enemy, x: number, y: number, tk: num
   // The floor tell is a promise about WHERE the blow lands, so it has to answer to which attack he
   // is actually committed to. Drawing the slam plate under a verdict taught the player to run out of
   // a circle that was never going to be struck - the worst lie a telegraph can tell.
-  if (e.attackId === ATTACK.verdict) { drawVerdictTell(g, hi, e, x, y, tk); return }
+  if (e.attackId === ATTACK.verdict) { drawVerdictTell(g, hi, e, x, y, tk, scorching ? 1 - tk / SCORCH_TICKS : 0); return }
   if (e.attackId === ATTACK.scales) {
     // The scales write themselves on the floor the instant he commits, and each mark carries its own
     // countdown. That IS the telegraph, and it is a fairer one than anything drawn under his feet.

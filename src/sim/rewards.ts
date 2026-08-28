@@ -19,7 +19,12 @@ function shuffled(world: World, ids: BoonId[]): BoonId[] {
 function usable(world: World, id: BoonId): boolean {
   const def = BOONS[id]
   if (def.requires?.some(req => !hasBoon(world, req))) return false
-  if (id === 'finalJudgment') return hasBoon(world, 'ashenEdge') || hasBoon(world, 'betweenStep')
+  // Everything downstream of Brand needs a way to make Brand first. Judgment SPENDS it; the Debt
+  // moves it between bodies. Offered before either source is in hand, both are cards whose whole
+  // text describes something the run cannot yet cause — the reward screen promising a behaviour the
+  // next room will not deliver.
+  const marks = hasBoon(world, 'ashenEdge') || hasBoon(world, 'betweenStep')
+  if (id === 'finalJudgment' || id === 'bloodDebt') return marks
   // A pact needs both powers at the table, which is a rule about the run rather than about one vow.
   if (id === 'pyre') return BOON_IDS.some(other => BOONS[other].deity === 'hecate' && hasBoon(world, other))
   return true

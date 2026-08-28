@@ -220,6 +220,10 @@ export const tuning = {
     slamRadius: 42, slamTicks: 4, slamDamage: 2,
     recover: 48, recover2: 32, cooldown: 18,
     staggerTicks: 10, knockbackScale: 0.22,
+    // He moves at 28 px/s and the player at 95, so a hammer he has chosen is a hammer he may never
+    // get to swing. After this long walking someone down he gives up on it and rules from where he
+    // stands — the alternative is a boss who stops attacking entirely the moment you back away.
+    gavelChaseTicks: 90,
     boltCount: 8, boltSpeed: 96, boltRadius: 3, boltLife: 84, boltDamage: 1, boltDelay: 6,
     idleTicks: 20,
     // The verdict. A long plant so the arc can be read, then a rotating stream. `arcDeg` is swept

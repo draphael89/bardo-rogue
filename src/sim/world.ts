@@ -24,6 +24,8 @@ export interface Player extends Body {
   moveAngle: number           // last non-zero movement direction
   dodgeDirX: number; dodgeDirY: number
   swingIndex: number; swingAngle: number; swingId: number
+  swingFromRoll: boolean          // this swing was thrown out of a roll — the dash attack
+  swingLanded: boolean            // this swing has reached a body; a blow a shield turned has not
   assistTargetId: number          // soft-aim hysteresis; 0 means no retained target
   controlTick: number             // advances only when the player can act; hit-stop never ages intent
   attackQueuedAt: number          // controlTick of a discrete request; -1 means none
@@ -206,7 +208,8 @@ export function makePlayer(x: number, y: number): Player {
     x, y, px: x, py: y, vx: 0, vy: 0, kbx: 0, kby: 0, radius: tuning.player.radius,
     hp: tuning.player.hp, maxHp: tuning.player.hp,
     state: 'free', stateTick: 0, facing: 1, aimAngle: 0, moveAngle: 0,
-    dodgeDirX: 1, dodgeDirY: 0, swingIndex: 0, swingAngle: 0, swingId: 0, assistTargetId: 0,
+    dodgeDirX: 1, dodgeDirY: 0, swingIndex: 0, swingAngle: 0, swingId: 0,
+    swingFromRoll: false, swingLanded: false, assistTargetId: 0,
     controlTick: 0, attackQueuedAt: -1, heavyQueuedAt: -1, dodgeQueuedAt: -1, dodgeTick: -1,
     iframes: 0, flash: 0, moveX: 0, moveY: 0, footTick: 0, deathTick: -1, god: false,
     arm: 0, armed: true, dodgeRead: 0, dodgeProcTick: -1,

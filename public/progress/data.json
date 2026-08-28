@@ -1,7 +1,7 @@
 {
   "title": "Bardo Rogue",
   "subtitle": "The Greek gate: two powers, twelve vows, fire, an elite that turns a light blade, a ferryman who is owed, and Minos",
-  "updated": "2026-08-28T21:50:00-04:00",
+  "updated": "2026-08-28T22:25:00-04:00",
   "now": "greek-gate",
   "round": 2,
   "timeline": [
@@ -544,6 +544,10 @@
     {
       "t": "21:50",
       "text": "THE TOLL. The run's one beat of quiet: pay a vessel of life for a fourth vow, or cross owed and let Minos hear about it."
+    },
+    {
+      "t": "22:25",
+      "text": "A 25-agent adversarial pass found ten real defects across the change set. All ten fixed: a boon that never fired, a shield that only half blocked, a boss that collapsed to one attack, two telegraphs that lied."
     }
   ],
   "pieces": [

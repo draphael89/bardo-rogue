@@ -76,7 +76,7 @@ export function hashWorld(world: World): number {
   num(p.x); num(p.y); num(p.px); num(p.py); num(p.vx); num(p.vy); num(p.kbx); num(p.kby)
   int(p.hp); int(p.maxHp); int(p.facing)
   num(p.aimAngle); num(p.moveAngle); num(p.dodgeDirX); num(p.dodgeDirY)
-  int(p.swingIndex); num(p.swingAngle); int(p.swingId); int(p.assistTargetId)
+  int(p.swingIndex); num(p.swingAngle); int(p.swingId); flag(p.swingFromRoll); flag(p.swingLanded); int(p.assistTargetId)
   int(p.controlTick); int(p.attackQueuedAt); int(p.heavyQueuedAt); int(p.dodgeQueuedAt); int(p.dodgeTick)
   int(p.iframes); num(p.flash); int(p.dodgeRead)
   num(p.moveX); num(p.moveY); int(p.footTick); int(p.deathTick); flag(p.god)

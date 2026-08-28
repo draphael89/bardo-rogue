@@ -579,14 +579,61 @@ describe('the vows of the Kindly One and Hecate', () => {
     expect(far.burn).toBe(0)
   })
 
-  it('Crossroads makes a swing out of a roll cut a full circle, and only then', () => {
+  // Driven through the real roll rather than by poking dodgeTick, because poking it is what hid the
+  // bug: the heavy out of a roll — "the leap", the swing the vow is written for — cannot reach its
+  // first active tick before the roll clock has already died, so a live read never fired for it.
+  function leapInto(w: ReturnType<typeof createWorld>, heavy: boolean) {
+    const p = w.player
+    const behind = w.spawnEnemy('brute', p.x - 18, p.y)!
+    behind.hp = 99
+    behind.state = 'idle'
+    stepWorld(w, { ...emptyInput(), dodge: true, moveX: 1, aimX: 1, aimY: 0 })
+    expect(p.state).toBe('dodge')
+    // Ask for the swing on the first tick the roll allows one to cancel it.
+    for (let i = 0; i < 60; i++) {
+      const at = p.state === 'dodge' && p.stateTick >= tuning.player.dodge.attackCancelFrom
+      stepWorld(w, { ...emptyInput(), aimX: 1, aimY: 0, ...(at ? (heavy ? { heavy: true } : { attack: true }) : {}) })
+      behind.hp = Math.max(behind.hp, 99 - (99 - behind.hp))
+      if (behind.hp < 99) break
+      if (p.state === 'free' && i > 30) break
+    }
+    return behind
+  }
+
+  it('Crossroads gives the leap its circle: a body behind the player is cut by a heavy out of a roll', () => {
+    const w = armed()
+    grantBoon(w, 'crossroads')
+    expect(leapInto(w, true).hp).toBeLessThan(99)
+  })
+
+  it('Crossroads still does nothing for a swing thrown from a standing start', () => {
+    const w = armed()
+    grantBoon(w, 'crossroads')
+    const p = w.player
+    const behind = w.spawnEnemy('brute', p.x - 18, p.y)!
+    behind.hp = 99
+    behind.state = 'idle'
+    for (let i = 0; i < 40; i++) stepWorld(w, { ...emptyInput(), aimX: 1, aimY: 0, attack: i === 0 })
+    expect(behind.hp).toBe(99)
+  })
+
+  it('the arc a swing out of a roll opens with is the arc it finishes with', () => {
     const w = armed()
     grantBoon(w, 'crossroads')
     const light = tuning.player.attack.swings[0]
-    w.player.dodgeTick = -1
-    expect(swingReach(w, light).arcDeg).toBeLessThan(360)
-    w.player.dodgeTick = 2
-    expect(swingReach(w, light).arcDeg).toBe(360)
+    const p = w.player
+    stepWorld(w, { ...emptyInput(), dodge: true, moveX: 1, aimX: 1, aimY: 0 })
+    let swung = false
+    const arcs: number[] = []
+    for (let i = 0; i < 40; i++) {
+      const at = !swung && p.state === 'dodge' && p.stateTick >= tuning.player.dodge.attackCancelFrom
+      stepWorld(w, { ...emptyInput(), aimX: 1, aimY: 0, ...(at ? { attack: true } : {}) })
+      if (at) swung = true
+      if (swung && p.state === 'attack') arcs.push(swingReach(w, light).arcDeg)
+    }
+    expect(arcs.length).toBeGreaterThan(4)
+    expect(new Set(arcs).size).toBe(1)
+    expect(arcs[0]).toBe(360)
   })
 
   it('Pyre ignites everything a judgment burst touches', () => {
@@ -616,11 +663,26 @@ describe('the offer', () => {
       const w = armed(seed)
       offerReward(w, 'blade')
       const opts = w.session.run!.pendingReward!.options
-      // Judgment collects Brand; without a way to make Brand it is a blank card.
+      // Everything downstream of Brand is a blank card until something can apply Brand. Judgment
+      // spends it; the Debt moves it between bodies. Neither has anything to act on yet.
       expect(opts).not.toContain('finalJudgment')
+      expect(opts).not.toContain('bloodDebt')
       // The duo needs both halves in hand first.
       expect(opts).not.toContain('pyre')
     }
+  })
+
+  it('offers the Brand carriers as soon as a source of Brand is held', () => {
+    const w = armed(4)
+    grantBoon(w, 'ashenEdge')
+    const seen = new Set<string>()
+    for (let i = 0; i < 12; i++) {
+      const probe = armed(4 + i)
+      grantBoon(probe, 'ashenEdge')
+      offerReward(probe, 'blade')
+      for (const id of probe.session.run!.pendingReward!.options) seen.add(id)
+    }
+    expect(seen.has('bloodDebt') || seen.has('finalJudgment')).toBe(true)
   })
 
   it('offers the duo once both halves are held', () => {

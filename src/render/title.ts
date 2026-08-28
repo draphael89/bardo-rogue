@@ -41,16 +41,24 @@ export class TitleOverlay {
     this.t += dtSec
     const m = world.session.meta
     const next = `${tuning.view.width}|${m.attempts}|${m.victories}`
-    // The prompt breathes on real time, so it is repainted only when the beat changes rather than
-    // every frame: the rest of the card is static and rebuilding text every frame is pure churn.
+    // The card is static; only the prompt breathes. Twice a second is not often, but this is the
+    // first screen the game ever shows and it was destroying eleven display objects and rasterising
+    // ten new text textures on every beat to recolour one label — a hitch landing exactly on the
+    // beat the eye is following. The prompt is kept and re-tinted; the card is repainted only when
+    // the card itself changes.
     const beat = Math.floor(this.t * 2) % 2
-    if (next === this.key && beat === this.beat) return
+    if (beat !== this.beat) {
+      this.beat = beat
+      if (this.prompt) this.prompt.tint = beat ? P.gold : P.bone
+    }
+    if (next === this.key) return
     this.key = next
-    this.beat = beat
     this.paint(world)
   }
 
   private beat = -1
+  // Held across repaints so the blink is a tint change, not a rebuild. Cleared by `clear()`.
+  private prompt: Text | null = null
 
   private paint(world: World): void {
     const W = tuning.view.width, H = tuning.view.height
@@ -83,8 +91,11 @@ export class TitleOverlay {
     premise2.position.set(W / 2, 150); this.add(premise2)
 
     // The prompt is the only thing on screen that moves, so it is unmistakably the thing to answer.
-    const prompt = label(returning ? 'PRESS ENTER TO DESCEND AGAIN' : 'PRESS ENTER TO DESCEND', 11, this.beat ? P.gold : P.bone)
+    // Built white so the tint reads as the authored colour rather than multiplying two of them.
+    const prompt = label(returning ? 'PRESS ENTER TO DESCEND AGAIN' : 'PRESS ENTER TO DESCEND', 11, 0xffffff)
+    prompt.tint = this.beat ? P.gold : P.bone
     prompt.position.set(W / 2, H - 74); this.add(prompt)
+    this.prompt = prompt
 
     // The title remembers you. A returning player is greeted by their own count before they touch a key.
     if (returning) {
@@ -122,6 +133,7 @@ export class TitleOverlay {
   private clear(): void {
     for (const t of this.texts) t.destroy()
     this.texts = []
+    this.prompt = null
     this.root.removeChildren()
     this.g.destroy()
     this.g = new Graphics()

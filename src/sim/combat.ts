@@ -76,11 +76,17 @@ export function clearBulletTime(world: World): void {
   world.slowTicks = 0
 }
 
-// `silent` is damage with no blow behind it: a status burning a body down. It still kills, and the
-// kill still reads, but it earns no hit-stop, no knockback, no stagger and no contact stamp — a
-// crowd on fire would otherwise stutter the whole fight and stun-lock itself on its own damage.
-export function damageEnemy(world: World, e: Enemy, damage: number, angle: number, knockback: number, heavy: boolean, hitstop: number, sourceActionId = world.player.swingId, opts?: { silent?: boolean }): void {
-  if (!e.active || e.state === 'dead') return
+/**
+ * `silent` is damage with no blow behind it: a status burning a body down. It still kills, and the
+ * kill still reads, but it earns no hit-stop, no knockback, no stagger and no contact stamp — a
+ * crowd on fire would otherwise stutter the whole fight and stun-lock itself on its own damage.
+ *
+ * Returns whether the blow LANDED. Callers need this because the rider layer above them —  Brand,
+ * the perfect-dodge prime, the whiff penalty — is not part of this function, and a shield that
+ * turns a blow has to turn everything the blow was carrying, not just its damage.
+ */
+export function damageEnemy(world: World, e: Enemy, damage: number, angle: number, knockback: number, heavy: boolean, hitstop: number, sourceActionId = world.player.swingId, opts?: { silent?: boolean }): boolean {
+  if (!e.active || e.state === 'dead') return false
   const silent = !!opts?.silent
   // The Oath-Bound's shield turns light blows that land on its face. Status damage passes: fire is
   // not something you can hold a shield against, and it is also what makes it drop the shield.
@@ -89,7 +95,7 @@ export function damageEnemy(world: World, e: Enemy, damage: number, angle: numbe
     e.kby += Math.sin(angle) * tuning.oathbound.blockKnockback
     addFreeze(world, tuning.oathbound.blockHitstop)
     world.emit({ type: 'guardBlocked', id: e.id, x: e.x, y: e.y, angle })
-    return
+    return false
   }
   e.hp -= damage
   e.flash = tuning.juice.flashTicks
@@ -116,9 +122,9 @@ export function damageEnemy(world: World, e: Enemy, damage: number, angle: numbe
     // slot is recycled.
     resolveKill(world, e)
     e.active = false
-    return
+    return true
   }
-  if (silent) return   // fire is a consequence, not a blow: no stamp, no freeze, no poise break
+  if (silent) return true   // fire is a consequence, not a blow: no stamp, no freeze, no poise break
   addFreeze(world, hitstop)
   world.emit({ type: 'hit', x: e.x, y: e.y, angle, damage, heavy, targetId: e.id, kind, killed: false, actionId })
 
@@ -148,6 +154,7 @@ export function damageEnemy(world: World, e: Enemy, damage: number, angle: numbe
     e.hitDone = false
     world.emit({ type: 'enemyStagger', id: e.id, x: e.x, y: e.y })
   }
+  return true
 }
 
 // Returns true if damage was applied. During dodge i-frames the sim records a successful dodge instead.

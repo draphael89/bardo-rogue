@@ -89,13 +89,14 @@ function speakVerdict(world: World, e: Enemy, i: number): void {
   if (bolt) world.emit({ type: 'boltFired', x: ox, y: oy, angle: a })
 }
 
-// Which case he hears next. Range decides first — the verdict is a lane and needs room to be one —
-// and the rest alternates, so no attack ever comes three times running.
+// Which case he hears next. The scales are written at the player's feet and so are legal at any
+// distance — they roll FIRST, or backing away past the lane's threshold would skip them entirely.
+// Range is then a legality filter on the remaining two, not a command: only past sweep.range is the
+// verdict the sole option, and inside it the two alternate so neither comes three times running.
 function chooseAttack(world: World, e: Enemy): number {
   const W = tuning.warden
-  const far = distToPlayer(world, e) >= W.sweep.range
-  if (far) return ATTACK.verdict
   if (e.phase && e.attackId !== ATTACK.scales && world.rng.next() < 0.45) return ATTACK.scales
+  if (distToPlayer(world, e) >= W.sweep.range) return ATTACK.verdict
   return e.attackId === ATTACK.gavel ? ATTACK.verdict : ATTACK.gavel
 }
 
@@ -107,25 +108,33 @@ export function updateWarden(world: World, e: Enemy): void {
 
   switch (e.state) {
     case 'idle':
-      if (e.stateTick >= W.idleTicks) { e.state = 'chase'; e.stateTick = 0 }
+      if (e.stateTick >= W.idleTicks) { e.state = 'chase'; e.stateTick = 0; e.attackId = chooseAttack(world, e) }
       break
     case 'chase': {
       if (p.state === 'dead') { e.vx = 0; e.vy = 0; break }
-      e.orbitAngle += W.orbitSpeed * DT * e.orbitDir
-      const r = (W.orbitMin + W.orbitMax) / 2
-      moveToward(world, e, p.x + Math.cos(e.orbitAngle) * r, p.y + Math.sin(e.orbitAngle) * r, W.speed)
+      // The case was chosen when he finished the last one (see `recover`). Chase only carries it out.
+      const gavelRange = W.orbitMax + 20
+      const chasing = e.cooldown <= 0 && e.attackId === ATTACK.gavel && distToPlayer(world, e) > gavelRange
+      // Walking someone down is not a promise he can keep against a faster body, so it is bounded.
+      // Once the walk has failed he re-hears the case from where he is, which out here is the lane.
+      if (chasing && e.stateTick > W.gavelChaseTicks) { e.attackId = chooseAttack(world, e); e.stateTick = 0 }
+      const closing = chasing && e.attackId === ATTACK.gavel
+      if (closing) {
+        // He has chosen the hammer. Backing away buys distance, not immunity: he leaves the ring and
+        // comes to you, and the approach itself is the tell that one is coming.
+        moveToward(world, e, p.x, p.y, W.speed)
+      } else {
+        e.orbitAngle += W.orbitSpeed * DT * e.orbitDir
+        const r = (W.orbitMin + W.orbitMax) / 2
+        moveToward(world, e, p.x + Math.cos(e.orbitAngle) * r, p.y + Math.sin(e.orbitAngle) * r, W.speed)
+      }
       facePlayer(world, e)
-      // The gavel needs him close; the verdict needs him far. Either way he commits from where he is.
-      if (e.cooldown <= 0) {
-        e.attackId = chooseAttack(world, e)
-        const inGavelRange = distToPlayer(world, e) <= W.orbitMax + 20
-        if (e.attackId !== ATTACK.gavel || inGavelRange) {
-          e.state = 'windup'; e.stateTick = 0
-          e.aimAngle = angleToPlayer(world, e)
-          e.hitDone = false
-          e.dashTicks = 0
-          world.emit({ type: 'enemyWindup', id: e.id, kind: 'warden', x: e.x, y: e.y })
-        }
+      if (e.cooldown <= 0 && !closing) {
+        e.state = 'windup'; e.stateTick = 0
+        e.aimAngle = angleToPlayer(world, e)
+        e.hitDone = false
+        e.dashTicks = 0
+        world.emit({ type: 'enemyWindup', id: e.id, kind: 'warden', x: e.x, y: e.y })
       }
       break
     }
@@ -184,10 +193,17 @@ export function updateWarden(world: World, e: Enemy): void {
         e.cooldown = W.cooldown
         // Flip the sweep's handedness so the next verdict reads the other way.
         e.orbitDir = e.orbitDir === 1 ? -1 : 1
+        // He decides his next case here, once, while he is still recovering from the last one — not
+        // every tick of the approach. Re-deciding each tick let a gavel that was merely out of range
+        // become a verdict on the following tick, which is how a player who simply walked backwards
+        // turned three attacks into one: he orbits at 64 and moves at 28 px/s, so any range past the
+        // gavel's bubble was theirs to hold for free. Choosing once means a hammer he has chosen is
+        // a hammer he will come and deliver.
+        e.attackId = chooseAttack(world, e)
       }
       break
     case 'stagger':
-      if (tickStagger(world, e, W.staggerTicks, 'chase')) e.cooldown = W.cooldown
+      if (tickStagger(world, e, W.staggerTicks, 'chase')) { e.cooldown = W.cooldown; e.attackId = chooseAttack(world, e) }
       break
     default:
       e.state = 'chase'

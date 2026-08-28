@@ -8,7 +8,12 @@ import { fileURLToPath } from 'node:url'
 //   1. nothing stepWorld can reach imports the save layer -- src/sim/save.ts is a pure document
 //      module that no sim code calls, which is why editing it can never move a hash;
 //   2. src/sim/ never reaches for a host: no DOM, no storage, no clock, no randomness.
-const SIM = fileURLToPath(new URL('../../src/sim', import.meta.url))
+const SRC = fileURLToPath(new URL('../../src', import.meta.url))
+const SIM = join(SRC, 'sim')
+// tuning.ts is imported by most of the sim and is just as reachable from stepWorld, so the rule has
+// to cover it too -- otherwise a host API could enter the sim's reach through the one file the test
+// was not looking at.
+const TUNING = join(SRC, 'tuning.ts')
 
 function simFiles(dir = SIM): string[] {
   return readdirSync(dir).flatMap(name => {
@@ -17,7 +22,7 @@ function simFiles(dir = SIM): string[] {
   })
 }
 
-const files = simFiles().map(path => ({ path, rel: path.slice(SIM.length + 1), src: readFileSync(path, 'utf8') }))
+const files = [...simFiles(), TUNING].map(path => ({ path, rel: path.slice(SRC.length + 1), src: readFileSync(path, 'utf8') }))
 
 describe('sim boundary', () => {
   it('finds the sim modules', () => {
@@ -29,8 +34,8 @@ describe('sim boundary', () => {
     // deliberately unreachable from stepWorld. If this ever fails, a hash change becomes possible
     // from a save edit, and CLAUDE.md's record-bots rule starts applying to this file.
     const offenders = files
-      .filter(f => f.rel !== 'save.ts')
-      .filter(f => /from '\.{1,2}\/save'|from '@\/sim\/save'/.test(f.src))
+      .filter(f => f.rel !== 'sim/save.ts')
+      .filter(f => /from\s+['"](?:\.{1,2}\/save|@\/sim\/save)['"]/.test(f.src))
       .map(f => f.rel)
     expect(offenders).toEqual([])
   })
@@ -48,8 +53,15 @@ describe('sim boundary', () => {
     ] as const
     const offenders: string[] = []
     for (const f of files) {
-      // comments explain these rules; only code is checked
-      const code = f.src.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').filter(l => !l.trim().startsWith('//')).join('\n')
+      // Comments in this repo explain these very rules ("never Math.random"), so they are stripped
+      // before matching -- block comments, whole-line comments, AND trailing ones. The negative
+      // lookbehind keeps a `://` inside a URL or string from being mistaken for a comment.
+      const code = f.src
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .split('\n')
+        .map(l => l.replace(/(?<!:)\/\/.*$/, ''))
+        .filter(l => l.trim().length > 0)
+        .join('\n')
       for (const [re, what] of BANNED) if (re.test(code)) offenders.push(`${f.rel}: ${what}`)
     }
     expect(offenders).toEqual([])

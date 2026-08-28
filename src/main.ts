@@ -64,7 +64,8 @@ async function boot() {
   // default, so composing a write from it would wipe real progress the moment V is pressed.
   let savedSave: BardoSave = loaded.save
   let savable = loaded.writable
-  if (loaded.source === 'backup') console.log('[save] the live save was unreadable; recovered from the backup copy')
+  if (noSave) console.log('[save] save=off: this session reads and writes nothing')
+  else if (loaded.source === 'backup') console.log('[save] the live save was unreadable; recovered from the backup copy')
   else if (loaded.source === 'unreadable') console.log('[save] this profile could not be read at all; nothing will be written over it')
   else if (!savable) console.log('[save] this save was written by a newer build; it will not be overwritten')
   // Two values on purpose: what the save document says, and what this session is actually rendering.

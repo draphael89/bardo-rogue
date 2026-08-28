@@ -275,6 +275,9 @@ try {
   await check('the game itself saves through the seam', 20_000, async () => {
     rmSync(join(savesDir, 'default.json'), { force: true })
     rmSync(join(savesDir, 'default~bak.json'), { force: true })
+    // Assert the FLIP, not an absolute value: a machine with Reduce Motion enabled (macOS
+    // Accessibility) boots with reduced effects already on, and V would turn it off.
+    const before = await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches)
     await page.evaluate(() => { window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyV' })) })
     const live = join(savesDir, 'default.json')
     for (let i = 0; i < 40 && !existsSync(live); i++) await new Promise(r => setTimeout(r, 100))
@@ -282,7 +285,7 @@ try {
     const doc = JSON.parse(readFileSync(live, 'utf8')) as { schemaVersion: number; revision: number; settings: { reducedEffects: boolean } }
     assert(doc.schemaVersion === 2, `unexpected schemaVersion ${doc.schemaVersion}`)
     assert(doc.revision >= 1, `revision did not advance: ${doc.revision}`)
-    assert(doc.settings.reducedEffects === true, 'the V keypress did not reach the persisted settings')
+    assert(doc.settings.reducedEffects === !before, `the V keypress did not reach the persisted settings (was ${before}, stored ${doc.settings.reducedEffects})`)
     return `envelope v${doc.schemaVersion} rev${doc.revision} written by the game`
   })
 

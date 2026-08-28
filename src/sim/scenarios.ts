@@ -14,6 +14,7 @@ export const SCENARIOS: Record<string, Scenario> = {
   wave2: { waves: [ROOM_WAVES[1]] },
   wave3: { waves: [ROOM_WAVES[2]] },
   full: { waves: ROOM_WAVES },
+  run: {},
 }
 
 export function createWorld(seed: number, scenarioName = 'full', opts: { god?: boolean } = {}): World {

@@ -65,6 +65,7 @@ export function installApi(host: {
       const w = host.getWorld()
       return {
         tick: w.tick, freeze: w.freeze, wave: { ...w.wave },
+        room: { index: w.roomIndex, name: w.roomName, doorOpen: w.doorOpen, kind: w.arena.kind },
         player: { x: +w.player.x.toFixed(1), y: +w.player.y.toFixed(1), hp: w.player.hp, state: w.player.state, stateTick: w.player.stateTick, iframes: w.player.iframes },
         enemies: w.enemies.filter(e => e.active).map(e => ({ id: e.id, kind: e.kind, x: +e.x.toFixed(1), y: +e.y.toFixed(1), hp: e.hp, state: e.state, stateTick: e.stateTick })),
         bolts: w.projectiles.filter(b => b.active).length,

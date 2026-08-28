@@ -18,8 +18,11 @@ export const T = {
   spawnMark: 60, dummy: 1, crate: 20, barrel: 20,
 } as const
 
+export type RoomKind = 'threshold' | 'crossing'
+
 export interface Prop { x: number; y: number; tile: number; sortY: number; sheet: 'room' | 'prop' }
 export interface Arena {
+  kind: RoomKind
   cols: number; rows: number
   base: Uint16Array      // background tile per cell
   overlay: Int16Array    // decor tile per cell, -1 = none (drawn on top of base, no sorting)
@@ -35,8 +38,24 @@ export interface Arena {
 export const ARENA_COLS = 26
 export const ARENA_ROWS = 15
 
-// rng here is World.visualRng: cosmetic only, and never mixed into the world hash.
-export function buildArena(rng: Rng): Arena {
+export function setDoorWalkable(a: Arena, open: boolean): void {
+  for (const dc of [-1, 0, 1] as const) {
+    const c = a.door.col + dc
+    if (c <= 0 || c >= a.cols - 1) continue
+    a.solid[a.door.row * a.cols + c] = open ? 0 : 1
+  }
+}
+
+// rng here is World.visualRng (or a derived visual stream): cosmetic only, never mixed into the world hash.
+export function buildArena(rng: Rng, kind: RoomKind = 'threshold'): Arena {
+  switch (kind) {
+    case 'crossing': return buildCrossing(rng)
+    case 'threshold': return buildThreshold(rng)
+    default: { const _e: never = kind; return _e }
+  }
+}
+
+function buildThreshold(rng: Rng): Arena {
   const cols = ARENA_COLS, rows = ARENA_ROWS
   const base = new Uint16Array(cols * rows)
   const overlay = new Int16Array(cols * rows).fill(-1)
@@ -111,10 +130,82 @@ export function buildArena(rng: Rng): Arena {
   }
 
   return {
+    kind: 'threshold',
     cols, rows, base, overlay, solid, props, door,
     playerStart: { x: 13 * TILE, y: 11.5 * TILE },
     braziers: braziers.map(b => ({ x: (b.x + 0.5) * TILE, y: (b.y + 0.5) * TILE })),
     windows: [{ x: 3 * TILE, y: 1.4 * TILE }, { x: 23 * TILE, y: 1.4 * TILE }],
+    inner: { x0: TILE, y0: 2 * TILE, x1: (cols - 1) * TILE, y1: (rows - 1) * TILE },
+  }
+}
+
+// A passage, not another copy of The Threshold. Long nave, no dais, you arrive from the south.
+function buildCrossing(rng: Rng): Arena {
+  const cols = ARENA_COLS, rows = ARENA_ROWS
+  const base = new Uint16Array(cols * rows)
+  const overlay = new Int16Array(cols * rows).fill(-1)
+  const solid = new Uint8Array(cols * rows)
+  const idx = (c: number, r: number) => r * cols + c
+  const set = (c: number, r: number, t: number, s: boolean) => { base[idx(c, r)] = t; solid[idx(c, r)] = s ? 1 : 0 }
+
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+    if (r === 0 || r === rows - 1) set(c, r, T.wallTop, true)
+    else if (c === 0) set(c, r, T.wallTopLeftEdge, true)
+    else if (c === cols - 1) set(c, r, T.wallTopRightEdge, true)
+    else if (r === 1) set(c, r, T.wallFace, true)
+    else set(c, r, rng.next() < 0.08 ? rng.pick(T.floorVar) : T.floor, false)
+  }
+
+  const braziers = [{ x: 4, y: 1 }, { x: 21, y: 1 }, { x: 0, y: 10 }, { x: 25, y: 10 }]
+  for (const b of braziers) base[idx(b.x, b.y)] = T.brazier
+  base[idx(8, 1)] = T.windowL
+  base[idx(9, 1)] = T.windowR
+  base[idx(16, 1)] = T.windowL
+  base[idx(17, 1)] = T.windowR
+  base[idx(11, 1)] = T.wallFaceB
+  base[idx(15, 1)] = T.wallFaceB
+  const door = { col: 13, row: 1 }
+  base[idx(door.col, door.row)] = T.wallFace
+  base[idx(13, rows - 1)] = T.doorOpen
+  for (const c of [6, 19] as const) {
+    base[idx(c, 0)] = T.colCap
+    base[idx(c, 1)] = T.colFace
+  }
+
+  const paint = (c: number, r: number, t: number) => {
+    if (c <= 0 || r <= 1 || c >= cols - 1 || r >= rows - 1) return
+    if (solid[idx(c, r)]) return
+    base[idx(c, r)] = t
+  }
+  for (let r = 2; r <= 12; r++) {
+    paint(12, r, T.nave)
+    paint(13, r, T.naveCenter)
+    paint(14, r, T.nave)
+  }
+  overlay[idx(10, 5)] = T.crack
+  overlay[idx(15, 11)] = T.crack
+  overlay[idx(7, 8)] = T.crack
+
+  const props: Prop[] = []
+  for (const [c, r] of [[6, 7], [19, 7]] as const) {
+    set(c, r + 1, T.pillarBase, true)
+    props.push({ x: c * TILE, y: r * TILE, tile: T.pillarTop, sortY: (r + 2) * TILE, sheet: 'room' })
+  }
+  const P = { plantA: 0, plantB: 1, plantC: 2, chair: 3, chest: 4, counter: 5 } as const
+  for (const [c, r, t] of [
+    [1, 4, P.plantC], [1, 10, P.plantA],
+    [24, 6, P.plantB], [24, 12, P.chest],
+  ] as const) {
+    solid[idx(c, r)] = 1
+    props.push({ x: c * TILE - 8, y: r * TILE - 24, tile: t, sortY: (r + 1) * TILE, sheet: 'prop' })
+  }
+
+  return {
+    kind: 'crossing',
+    cols, rows, base, overlay, solid, props, door,
+    playerStart: { x: 13 * TILE, y: 12 * TILE },
+    braziers: braziers.map(b => ({ x: (b.x + 0.5) * TILE, y: (b.y + 0.5) * TILE })),
+    windows: [{ x: 8.5 * TILE, y: 1.4 * TILE }, { x: 16.5 * TILE, y: 1.4 * TILE }],
     inner: { x0: TILE, y0: 2 * TILE, x1: (cols - 1) * TILE, y1: (rows - 1) * TILE },
   }
 }

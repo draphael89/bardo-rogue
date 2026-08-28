@@ -49,6 +49,10 @@ export const tuning = {
   spawnTelegraphTicks: 40,
   waveGapTicks: 60,
   roomClearSlowmoTicks: 12,
+  run: {
+    doorHalfW: 22,        // px: the open door is three tiles wide
+    doorEnterMaxY: 32,    // px: north wall-face row; overlapping it while the door is open enters
+  },
 
   brute: {
     hp: 8, radius: 7, speed: 48, attackRange: 26,

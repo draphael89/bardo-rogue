@@ -1,8 +1,9 @@
 import { Rng, STREAM, streamSeed } from './rng'
-import { buildArena, type Arena } from './arena'
+import { buildArena, setDoorWalkable, type Arena } from './arena'
 import type { SimEvent, EnemyKind } from './events'
 import { tuning } from '@/tuning'
 import type { WaveDef } from './waves'
+import { roomsFor, type RoomDef } from './rooms'
 
 export type PlayerState = 'free' | 'dodge' | 'attack' | 'dead'
 export type EnemyState =
@@ -77,17 +78,29 @@ export class World {
   roomClearTick = -1
   wantsRestart = false
   waveDefs: WaveDef[] | null = null
+  rooms: RoomDef[]
+  roomIndex = 0
+  roomName = 'THE THRESHOLD'
 
   constructor(seed: number, scenario: string) {
     this.seed = seed
     this.scenario = scenario
     this.rng = new Rng(streamSeed(seed, STREAM.gameplay))
     this.visualRng = new Rng(streamSeed(seed, STREAM.visual))
-    this.arena = buildArena(this.visualRng)
+    this.rooms = roomsFor(scenario)
+    const room = this.rooms[0]
+    this.roomName = room.name
+    this.arena = buildArena(this.visualRng, room.kind)
+    if (room.startDoorOpen && this.hasNextRoom()) {
+      this.doorOpen = true
+      setDoorWalkable(this.arena, true)
+    }
     this.player = makePlayer(this.arena.playerStart.x, this.arena.playerStart.y)
     for (let i = 0; i < MAX_ENEMIES; i++) this.enemies.push(makeEnemy())
     for (let i = 0; i < MAX_PROJECTILES; i++) this.projectiles.push(makeProjectile())
   }
+
+  hasNextRoom(): boolean { return this.roomIndex + 1 < this.rooms.length }
 
   emit(e: SimEvent): void { this.events.push(e) }
 

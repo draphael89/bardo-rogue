@@ -58,6 +58,39 @@ function bakeSeal(dest: Container, arena: Arena): void {
   dest.addChild(g)
 }
 
+// A path, not a plate: wine runner down the nave, brass rails, south lip where you arrived.
+function bakeCrossing(dest: Container, arena: Arena): void {
+  const g = new Graphics()
+  const x0 = 12 * TILE - 2
+  const w = 3 * TILE + 4
+  const y0 = 2 * TILE
+  const h = 11 * TILE
+  g.rect(x0 - 3, y0 + 2, w + 6, h)
+  g.fill({ color: 0x1a1218, alpha: 0.55 })
+  g.rect(x0, y0, w, h)
+  g.fill({ color: 0x3a2430, alpha: 1 })
+  g.rect(x0 + 5, y0, w - 10, h)
+  g.fill({ color: 0x2a1822, alpha: 1 })
+  g.rect(x0, y0, 3, h)
+  g.fill({ color: 0xc8b070, alpha: 1 })
+  g.rect(x0 + w - 3, y0, 3, h)
+  g.fill({ color: 0xc8b070, alpha: 1 })
+  g.rect(x0 + 1, y0, 1, h)
+  g.fill({ color: 0xf0e0b0, alpha: 0.7 })
+  g.rect(x0 + w - 2, y0, 1, h)
+  g.fill({ color: 0xf0e0b0, alpha: 0.7 })
+  const cx = (arena.cols * TILE) / 2
+  g.rect(cx - 10, y0 + h - 8, 20, 5)
+  g.fill({ color: 0xffe2a0, alpha: 0.7 })
+  g.rect(TILE, 2 * TILE, (arena.cols - 2) * TILE, 4)
+  g.fill({ color: 0x000000, alpha: 0.45 })
+  const dx = arena.door.col * TILE
+  const dy = (arena.door.row + 1) * TILE
+  g.rect(dx - 6, dy + 2, 28, 3)
+  g.fill({ color: 0xffe2a0, alpha: 0.55 })
+  dest.addChild(g)
+}
+
 function bakeVoid(atlas: Atlas, arena: Arena, arenaOffset: { x: number; y: number }): Container {
   const { width, height } = tuning.view
   const root = new Container()
@@ -96,7 +129,8 @@ export function buildTilemap(renderer: Renderer, atlas: Atlas, arena: Arena, are
     const o = arena.overlay[i]
     if (o >= 0) { const os = new Sprite(atlas.room(o)); os.position.set(col * TILE, r * TILE); c.addChild(os) }
   }
-  bakeSeal(c, arena)
+  if (arena.kind === 'crossing') bakeCrossing(c, arena)
+  else bakeSeal(c, arena)
   const shadows = new Graphics()
   for (const p of arena.props) {
     const w = p.sheet === 'prop' ? 12 : 7

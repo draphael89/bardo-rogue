@@ -1,7 +1,7 @@
 import { tuning } from '@/tuning'
 import type { World } from './world'
 import type { EnemyKind } from './events'
-import { TILE } from './arena'
+import { TILE, setDoorWalkable } from './arena'
 
 export interface SpawnDef { kind: EnemyKind; x: number; y: number } // in tiles
 export interface WaveGroup { delay: number; spawns: SpawnDef[]; whenRemainingAtMost?: number }
@@ -73,7 +73,8 @@ export function updateWaves(world: World): void {
       world.roomClearTick = world.tick
       world.timeScale = 0.2
       world.slowmoTicks = tuning.roomClearSlowmoTicks
-      world.emit({ type: 'roomClear' })
+      if (world.hasNextRoom()) setDoorWalkable(world.arena, true)
+      world.emit({ type: 'roomClear', hasNext: world.hasNextRoom() })
     } else {
       w.state = 'pending'
       w.timer = tuning.waveGapTicks

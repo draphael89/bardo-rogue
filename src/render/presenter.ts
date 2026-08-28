@@ -48,13 +48,18 @@ export class Presenter {
   private impactSweep = 1; private impactWX = 0; private impactWY = 0; private impactHeavy = false
   // hit flash on real time, not sim ticks: hit-stop must not hold a target white for its whole freeze
   private hitFlash = new Map<number, number>()
+  private propSprites: Sprite[] = []
 
   constructor(public ra: RenderApp, public atlas: Atlas, public world: World) {
     seedFx(world.seed)
     const L = ra.layers
     this.tilemap = buildTilemap(ra.app.renderer, atlas, world.arena, ra.arenaOffset)
     L.floor.addChild(this.tilemap.voidLayer, this.tilemap.sprite, this.tilemap.door)
-    for (const p of world.arena.props) L.entities.addChild(makePropSprite(atlas, p))
+    for (const p of world.arena.props) {
+      const s = makePropSprite(atlas, p)
+      this.propSprites.push(s)
+      L.entities.addChild(s)
+    }
     this.playerView = createPlayerView(atlas, L)
     this.particles = new Particles(atlas, L.fx, L.decals, L.floor)
     this.atmosphere = new Atmosphere(atlas, L.fx, world.arena)
@@ -67,6 +72,7 @@ export class Presenter {
     this.lighting = new Lighting(ra, atlas, this.particles, ra.app.renderer, world.arena)
     this.postfx = new PostFx(ra)
     this.damageNumbers = new DamageNumbers(L.fx)
+    this.tilemap.setDoorOpen(world.doorOpen)
   }
 
   // Called when the world object is replaced (restart).
@@ -79,7 +85,7 @@ export class Presenter {
     for (const m of this.spawnMarkers) m.sprite.destroy(); this.spawnMarkers = []
     this.particles.clear()
     this.hitFlash.clear()
-    this.tilemap.setDoorOpen(false)
+    this.rebuildRoom()
     this.playerView.body.tint = 0xffffff
     // juice hooks: the player body is hidden after the death shatter
     this.playerView.body.visible = this.playerView.shadow.visible = true
@@ -196,7 +202,20 @@ export class Presenter {
         case 'enemyAttack': if (ev.kind === 'brute') { this.particles.dust(ev.x, ev.y + 6, ev.angle + Math.PI, 5) } else if (ev.kind === 'charger') this.particles.dust(ev.x, ev.y + 6, ev.angle + Math.PI, 3); break
         case 'spawn': this.particles.spawnBurst(ev.x, ev.y); this.camera.addTrauma(0.08); break
         case 'waveStart': this.hud.showBanner(ev.wave === ev.total && ev.total > 1 ? 'FINAL WAVE' : `WAVE ${ev.wave}`, '', 1.3); break
-        case 'roomClear': this.camera.addTrauma(0.3); this.flash(0.6, 0xfff4d0); this.hud.showBanner('ROOM CLEARED', 'press R to run it again', 3); this.tilemap.setDoorOpen(true); this.postfx.pulse(); this.camera.punchZoom(J.zoom.roomClear); break
+        case 'roomClear':
+          this.camera.addTrauma(0.3); this.flash(0.6, 0xfff4d0)
+          this.hud.showBanner('ROOM CLEARED', ev.hasNext ? 'the door is open' : 'press R to run it again', 3)
+          this.tilemap.setDoorOpen(true); this.postfx.pulse(); this.camera.punchZoom(J.zoom.roomClear)
+          break
+        case 'roomEnter':
+          this.rebuildRoom()
+          this.flash(0.55, 0xfff4d0)
+          this.camera.addTrauma(0.22)
+          this.camera.punchZoom(J.zoom.roomClear)
+          this.postfx.pulse()
+          this.hud.showBanner(ev.name, ev.index + 1 < ev.total ? '' : 'the last chamber', 1.8)
+          this.hud.place.text = ev.name
+          break
         case 'restart': break
       }
       this.onEvent?.(ev)
@@ -269,6 +288,25 @@ export class Presenter {
     crescent(ground, cx, cy, this.impactR, thick, this.impactSnap, span, this.impactSweep, u * 0.5, step === 0, C)
     const n = Math.max(2, (this.impactHeavy ? C.heavySparks : C.sparks) - step)
     sparkCluster(air, this.impactWX, this.impactWY, this.impactA, step, n, this.impactHeavy ? C.heavyDrops : C.drops, C)
+  }
+
+  rebuildRoom(): void {
+    const L = this.ra.layers
+    this.tilemap.sprite.destroy()
+    this.tilemap.door.destroy()
+    this.tilemap.voidLayer.destroy()
+    for (const s of this.propSprites) s.destroy()
+    this.propSprites = []
+    this.tilemap = buildTilemap(this.ra.app.renderer, this.atlas, this.world.arena, this.ra.arenaOffset)
+    L.floor.addChild(this.tilemap.voidLayer, this.tilemap.sprite, this.tilemap.door)
+    for (const p of this.world.arena.props) {
+      const s = makePropSprite(this.atlas, p)
+      this.propSprites.push(s)
+      L.entities.addChild(s)
+    }
+    this.lighting.rebind(this.world.arena)
+    this.atmosphere.rebind(this.world.arena)
+    this.tilemap.setDoorOpen(this.world.doorOpen)
   }
 
   private flashAlpha = 0

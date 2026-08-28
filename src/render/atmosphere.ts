@@ -77,6 +77,21 @@ export class Atmosphere {
     parent.addChildAt(this.root, 0)
   }
 
+  rebind(arena: World['arena']): void {
+    const doorX = (arena.door.col + 0.5) * TILE
+    const doorY = (arena.door.row + 0.85) * TILE
+    this.doorGlow.position.set(doorX, doorY)
+    for (const r of this.rays) r.position.set(doorX, doorY + 1)
+    const inner = arena.inner
+    const spanX = inner.x1 - inner.x0
+    const spanY = inner.y1 - inner.y0
+    for (let i = 0; i < this.motes.length; i++) {
+      const m = this.motes[i]
+      m.x = inner.x0 + ((i * 47) % spanX)
+      m.y = inner.y0 + ((i * 31) % spanY)
+    }
+  }
+
   update(world: World, dt: number) {
     this.t += dt
     const A = tuning.juice.atmosphere
@@ -87,7 +102,7 @@ export class Atmosphere {
 
     const glowPulse = 1 + Math.sin(this.t * 2.1) * 0.08
     this.doorGlow.scale.set((A.doorGlowRadius * 2 * glowPulse) / 128)
-    this.doorGlow.alpha = A.doorGlowAlpha * fade * (0.85 + Math.sin(this.t * 3.2) * 0.15)
+    this.doorGlow.alpha = A.doorGlowAlpha * (world.doorOpen ? 2.4 : 1) * fade * (0.85 + Math.sin(this.t * 3.2) * 0.15)
 
     for (let i = 0; i < this.rays.length; i++) {
       const r = this.rays[i]

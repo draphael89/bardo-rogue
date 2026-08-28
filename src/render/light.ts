@@ -25,7 +25,7 @@ export class Lighting {
   private deathT = 0
   private pad = 32
 
-  constructor(private ra: RenderApp, atlas: Atlas, private particles: Particles, private renderer: Renderer, arena: World['arena']) {
+  constructor(private ra: RenderApp, private atlas: Atlas, private particles: Particles, private renderer: Renderer, arena: World['arena']) {
     const { width, height } = tuning.view
     const w = width + this.pad * 2, h = height + this.pad * 2
     this.rt = RenderTexture.create({ width: w, height: h, scaleMode: 'nearest' })
@@ -33,10 +33,29 @@ export class Lighting {
     this.base = new Sprite(Texture.WHITE); this.base.width = w; this.base.height = h
     this.vignette = new Sprite(atlas.light('circle')); this.vignette.anchor.set(0.5); this.vignette.blendMode = 'add'
     this.player = new Sprite(atlas.light('circle')); this.player.anchor.set(0.5); this.player.blendMode = 'add'
+    this.door = new Sprite(atlas.light('circle')); this.door.anchor.set(0.5); this.door.blendMode = 'add'
     this.scene.addChild(this.base, this.vignette)
+    this.layoutLights(arena)
+    this.scene.addChild(this.player)
+
+    this.out = new Sprite(this.rt); this.out.blendMode = 'multiply'
+    this.out.position.set(-this.pad - ra.arenaOffset.x, -this.pad - ra.arenaOffset.y)
+    ra.layers.light.addChild(this.out)
+  }
+
+  rebind(arena: World['arena']): void {
+    for (const s of this.braziers) s.destroy()
+    for (const s of this.windows) s.destroy()
+    this.braziers = []
+    this.windows = []
+    this.layoutLights(arena)
+  }
+
+  private layoutLights(arena: World['arena']): void {
+    const atlas = this.atlas
+    const ra = this.ra
     for (const b of arena.braziers) {
       const s = new Sprite(atlas.light('circle_noise')); s.anchor.set(0.5); s.blendMode = 'add'
-      // lightmap space = world space + pad + arenaOffset; light sits a little above the brazier bowl
       s.position.set(b.x + this.pad + ra.arenaOffset.x, b.y - 4 + this.pad + ra.arenaOffset.y)
       this.scene.addChild(s); this.braziers.push(s)
     }
@@ -45,21 +64,14 @@ export class Lighting {
       s.position.set(w.x + this.pad + ra.arenaOffset.x, w.y + this.pad + ra.arenaOffset.y)
       this.scene.addChild(s); this.windows.push(s)
     }
-    this.door = new Sprite(atlas.light('circle')); this.door.anchor.set(0.5); this.door.blendMode = 'add'
     this.door.position.set(
       (arena.door.col + 0.5) * 16 + this.pad + ra.arenaOffset.x,
       (arena.door.row + 0.7) * 16 + this.pad + ra.arenaOffset.y,
     )
-    this.scene.addChild(this.door)
-    this.scene.addChild(this.player)
-
+    if (!this.door.parent) this.scene.addChild(this.door)
     const arenaW = arena.cols * 16, arenaH = arena.rows * 16
     this.vignette.position.set(arenaW / 2 + this.pad + ra.arenaOffset.x, arenaH / 2 + this.pad + ra.arenaOffset.y)
     this.vignette.scale.set(arenaW * 1.35 / 128, arenaH * 1.55 / 128)
-
-    this.out = new Sprite(this.rt); this.out.blendMode = 'multiply'
-    this.out.position.set(-this.pad - ra.arenaOffset.x, -this.pad - ra.arenaOffset.y)
-    ra.layers.light.addChild(this.out)
   }
 
   update(world: World, dtSec: number, alpha = 1) {
@@ -103,7 +115,7 @@ export class Lighting {
     const doorN = noise(this.t * 7 + 11) * 0.55 + noise(this.t * 19 + 4) * 0.45
     const doorF = 1 + doorN * L.doorFlicker
     this.door.scale.set((L.doorRadius * 2 * doorF) / 128)
-    this.door.alpha = L.doorAlpha * (1 - d * 0.85)
+    this.door.alpha = L.doorAlpha * (world.doorOpen ? 1.85 : 1) * (1 - d * 0.85)
     this.door.tint = L.doorTint
 
     const px = lerp(p.px, p.x, alpha), py = lerp(p.py, p.y, alpha)

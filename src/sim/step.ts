@@ -4,6 +4,7 @@ import { capturePlayerInput, updatePlayer } from './player'
 import { updateEnemies } from './enemies'
 import { updateProjectiles } from './projectiles'
 import { updateSpawnQueue, updateWaves } from './waves'
+import { tryEnterDoor } from './rooms'
 import { separate } from './collision'
 import { isPlayerInvulnerable } from './combat'
 
@@ -26,6 +27,7 @@ export function stepWorld(world: World, input: InputFrame): void {
   if (world.slowmoTicks > 0 && --world.slowmoTicks === 0) world.timeScale = 1
 
   updatePlayer(world, input)
+  tryEnterDoor(world)
   updateEnemies(world)
   updateProjectiles(world)
   updateSpawnQueue(world)

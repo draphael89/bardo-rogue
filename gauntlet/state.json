@@ -4,7 +4,7 @@
   "arena": "game",
   "mix": "efficient",
   "stopRule": "until the user stops it",
-  "wave": 1,
+  "wave": 2,
   "status": "running",
   "evidenceLimit": "Reference exhibits are 1920x1080 gameplay stills. Motion timing is judged against the rubric's feel-chain acceptance criteria using our own tick-labelled strips, not against the bar. Every motion verdict must say so.",
   "phase0": "Repair batch run before wave 1: attack edge-trigger, camera-aware pointer, live metrics getter, widened state hash, visual/gameplay RNG stream split, pool-overflow telemetry, restart replay parity, tools/strip.ts motion exporter, ART_DIRECTION.md, per-entity views split, recalibrated balance gates.",
@@ -74,9 +74,17 @@
         "gauntlet/evidence/reference/ref-melee-03.jpg"
       ],
       "status": "open",
-      "rounds": 0,
+      "rounds": 1,
       "stalls": 0,
-      "memo": [],
+      "memo": [
+        {
+          "wave": 1,
+          "round": 1,
+          "element": "wave-1 verdicts lost",
+          "stronger_does": "n/a - infrastructure, not a gap",
+          "fix": "Re-enter at wave 2 round 1. The critic verdicts lived only in the Workflow return and died with the process, and repair R1 then changed the global colour grade (p99 178 -> 229), so every wave-1 capture is non-comparable to anything captured from now on. Wave 2 round 1 is the new baseline for this piece."
+        }
+      ],
       "latest": [],
       "history": []
     },
@@ -97,9 +105,17 @@
         "gauntlet/evidence/reference/ref-melee-03.jpg"
       ],
       "status": "open",
-      "rounds": 0,
+      "rounds": 2,
       "stalls": 0,
-      "memo": [],
+      "memo": [
+        {
+          "wave": 1,
+          "round": 2,
+          "element": "wave-1 verdicts lost",
+          "stronger_does": "n/a - infrastructure, not a gap",
+          "fix": "Re-enter at wave 2 round 1. The critic verdicts lived only in the Workflow return and died with the process, and repair R1 then changed the global colour grade (p99 178 -> 229), so every wave-1 capture is non-comparable to anything captured from now on. Wave 2 round 1 is the new baseline for this piece."
+        }
+      ],
       "latest": [],
       "history": []
     },
@@ -121,7 +137,15 @@
       "status": "open",
       "rounds": 0,
       "stalls": 0,
-      "memo": [],
+      "memo": [
+        {
+          "wave": 1,
+          "round": 0,
+          "element": "wave-1 verdicts lost",
+          "stronger_does": "n/a - infrastructure, not a gap",
+          "fix": "Re-enter at wave 2 round 1. The critic verdicts lived only in the Workflow return and died with the process, and repair R1 then changed the global colour grade (p99 178 -> 229), so every wave-1 capture is non-comparable to anything captured from now on. Wave 2 round 1 is the new baseline for this piece."
+        }
+      ],
       "latest": [],
       "history": []
     },
@@ -138,9 +162,17 @@
         "gauntlet/evidence/reference/ref-density-03.jpg"
       ],
       "status": "open",
-      "rounds": 0,
+      "rounds": 2,
       "stalls": 0,
-      "memo": [],
+      "memo": [
+        {
+          "wave": 1,
+          "round": 2,
+          "element": "wave-1 verdicts lost",
+          "stronger_does": "n/a - infrastructure, not a gap",
+          "fix": "Re-enter at wave 2 round 1. The critic verdicts lived only in the Workflow return and died with the process, and repair R1 then changed the global colour grade (p99 178 -> 229), so every wave-1 capture is non-comparable to anything captured from now on. Wave 2 round 1 is the new baseline for this piece."
+        }
+      ],
       "latest": [],
       "history": []
     },
@@ -157,9 +189,17 @@
         "gauntlet/evidence/reference/ref-density-03.jpg"
       ],
       "status": "open",
-      "rounds": 0,
+      "rounds": 3,
       "stalls": 0,
-      "memo": [],
+      "memo": [
+        {
+          "wave": 1,
+          "round": 3,
+          "element": "wave-1 verdicts lost",
+          "stronger_does": "n/a - infrastructure, not a gap",
+          "fix": "Re-enter at wave 2 round 1. The critic verdicts lived only in the Workflow return and died with the process, and repair R1 then changed the global colour grade (p99 178 -> 229), so every wave-1 capture is non-comparable to anything captured from now on. Wave 2 round 1 is the new baseline for this piece."
+        }
+      ],
       "latest": [],
       "history": []
     },
@@ -176,9 +216,17 @@
         "gauntlet/evidence/reference/ref-density-03.jpg"
       ],
       "status": "open",
-      "rounds": 0,
+      "rounds": 3,
       "stalls": 0,
-      "memo": [],
+      "memo": [
+        {
+          "wave": 1,
+          "round": 3,
+          "element": "wave-1 verdicts lost",
+          "stronger_does": "n/a - infrastructure, not a gap",
+          "fix": "Re-enter at wave 2 round 1. The critic verdicts lived only in the Workflow return and died with the process, and repair R1 then changed the global colour grade (p99 178 -> 229), so every wave-1 capture is non-comparable to anything captured from now on. Wave 2 round 1 is the new baseline for this piece."
+        }
+      ],
       "latest": [],
       "history": []
     },
@@ -194,9 +242,17 @@
         "gauntlet/evidence/reference/ref-ui-02.jpg"
       ],
       "status": "open",
-      "rounds": 0,
+      "rounds": 3,
       "stalls": 0,
-      "memo": [],
+      "memo": [
+        {
+          "wave": 1,
+          "round": 3,
+          "element": "wave-1 verdicts lost",
+          "stronger_does": "n/a - infrastructure, not a gap",
+          "fix": "Re-enter at wave 2 round 1. The critic verdicts lived only in the Workflow return and died with the process, and repair R1 then changed the global colour grade (p99 178 -> 229), so every wave-1 capture is non-comparable to anything captured from now on. Wave 2 round 1 is the new baseline for this piece."
+        }
+      ],
       "latest": [],
       "history": []
     },
@@ -214,7 +270,15 @@
       "status": "open",
       "rounds": 0,
       "stalls": 0,
-      "memo": [],
+      "memo": [
+        {
+          "wave": 1,
+          "round": 0,
+          "element": "wave-1 verdicts lost",
+          "stronger_does": "n/a - infrastructure, not a gap",
+          "fix": "Re-enter at wave 2 round 1. The critic verdicts lived only in the Workflow return and died with the process, and repair R1 then changed the global colour grade (p99 178 -> 229), so every wave-1 capture is non-comparable to anything captured from now on. Wave 2 round 1 is the new baseline for this piece."
+        }
+      ],
       "latest": [],
       "history": []
     },
@@ -231,14 +295,29 @@
         "gauntlet/evidence/reference/ref-density-03.jpg"
       ],
       "status": "open",
-      "rounds": 0,
+      "rounds": 2,
       "stalls": 0,
-      "memo": [],
+      "memo": [
+        {
+          "wave": 1,
+          "round": 2,
+          "element": "wave-1 verdicts lost",
+          "stronger_does": "n/a - infrastructure, not a gap",
+          "fix": "Re-enter at wave 2 round 1. The critic verdicts lived only in the Workflow return and died with the process, and repair R1 then changed the global colour grade (p99 178 -> 229), so every wave-1 capture is non-comparable to anything captured from now on. Wave 2 round 1 is the new baseline for this piece."
+        }
+      ],
       "latest": [],
       "history": []
     }
   },
-  "waves": [],
+  "waves": [
+    {
+      "wave": 1,
+      "note": "Ran ~1h. caster, charger and combat-hud completed all 3 rounds; brute 2; sword-swing and hit-impact partial; dodge-roll and death-card never started (third and second in their lanes). 27 agents were killed by a session rate limit, and the workflow itself died with the parent process, so no verdict survived. Two real incidents: a capture agent stashed the shared worktree at 21:07 and reverted every lane for two minutes, and two writers overlapped on hud.ts. Both are now prevented in the preamble. Boundary repair R1 landed after the wave: the colour grade was crushing the whole range by ~30%, so no lane could answer the critics' \"top of the range\" gap. p99 178 -> 229 against the reference's 232.",
+      "wins": [],
+      "parked": []
+    }
+  ],
   "phase0Findings": [
     "Attack is now a true edge on keyboard, mouse and gamepad; aim goes through the inverse world transform. 35 tests green (was 18).",
     "The RNG stream split alone fixed the variance defect two audits called the deepest fun deficit: kite/full clearSeconds spread went 5.5s -> 8.9s and damageTaken went from 4 on every seed to [2,4,1,3,3,3,4,2]. The 'solved, memorizable room' was substantially an artifact of visual arena generation burning the gameplay RNG, not a wave-design problem.",

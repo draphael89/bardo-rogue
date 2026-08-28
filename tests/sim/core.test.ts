@@ -137,3 +137,41 @@ describe('enemies', () => {
     expect(clears).toBeGreaterThanOrEqual(3)
   })
 })
+
+describe('run rooms', () => {
+  it('walking north through an open door enters the next room', () => {
+    const w = createWorld(1, 'run')
+    expect(w.roomIndex).toBe(0)
+    expect(w.doorOpen).toBe(true)
+    expect(w.arena.kind).toBe('threshold')
+    expect(w.hasNextRoom()).toBe(true)
+    let entered = false
+    for (let i = 0; i < 400 && w.roomIndex === 0; i++) {
+      stepWorld(w, { ...emptyInput(), moveY: -1, aimY: -1 })
+      if (w.events.some(e => e.type === 'roomEnter')) entered = true
+      w.events.length = 0
+    }
+    expect(entered).toBe(true)
+    expect(w.roomIndex).toBe(1)
+    expect(w.arena.kind).toBe('crossing')
+    expect(w.roomName).toBe('THE CROSSING')
+    expect(w.player.y).toBeGreaterThan(10 * 16)
+  })
+  it('one-room scenarios never leave even if the door flag is forced', () => {
+    const w = createWorld(1, 'empty')
+    w.doorOpen = true
+    for (let i = 0; i < 240; i++) stepWorld(w, { ...emptyInput(), moveY: -1 })
+    expect(w.roomIndex).toBe(0)
+    expect(w.arena.kind).toBe('threshold')
+    expect(w.player.y).toBeGreaterThan(2 * 16)
+  })
+  it('same seed + walk-through is deterministic', () => {
+    const walk = (w: ReturnType<typeof createWorld>) => {
+      for (let i = 0; i < 400; i++) stepWorld(w, { ...emptyInput(), moveY: -1, aimY: -1 })
+    }
+    const a = createWorld(3, 'run'), b = createWorld(3, 'run')
+    walk(a); walk(b)
+    expect(a.roomIndex).toBe(1)
+    expect(hashWorld(a)).toBe(hashWorld(b))
+  })
+})

@@ -516,7 +516,10 @@ export class Hud {
     if (p.state === 'dead' && p.deathTick >= 0) {
       text = 'YOU DIED'; sub = this.padMode ? 'PRESS START' : 'PRESS R'; tone = 'death'; age = now - p.deathTick
     } else if (w.state === 'done' && world.roomClearTick >= 0) {
-      text = 'ROOM CLEARED'; sub = this.padMode ? 'PRESS START TO RUN IT AGAIN' : 'PRESS R TO RUN IT AGAIN'
+      text = 'ROOM CLEARED'
+      sub = world.hasNextRoom()
+        ? 'WALK NORTH'
+        : (this.padMode ? 'PRESS START TO RUN IT AGAIN' : 'PRESS R TO RUN IT AGAIN')
       tone = 'clear'; age = now - world.roomClearTick
     } else if (this.bannerTicks > 0 && this.bannerStart >= 0 && now - this.bannerStart < this.bannerTicks) {
       text = this.bannerText; sub = this.bannerSub; tone = this.bannerTone
@@ -578,6 +581,7 @@ export class Hud {
     const dead = p.state === 'dead'
     const intro = this.bannerTicks > 0 && this.bannerStart >= 0 && now - this.bannerStart < this.bannerTicks && this.bannerTone === 'wave'
     const a = dead ? 0.25 : world.wave.state === 'done' ? 0.85 : intro ? 0.9 : 0.5
+    if (world.roomName && this.place.text !== world.roomName) this.place.text = world.roomName
     this.place.alpha = a
 
     const g = this.footG

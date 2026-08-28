@@ -101,6 +101,10 @@ export function playEventSfx(a: AudioSystem, ev: SimEvent): void {
       a.bell(0.34, 392, 3.0, 'music', 0.45)
       a.play('doorOpen_1', { gain: 0.6, delay: 1.2, bus: 'ui' })
       break
+    case 'roomEnter':
+      a.play('doorOpen_1', { gain: 0.45, bus: 'ui' })
+      a.bell(0.35, 196, 1.8)
+      break
   }
   census(a, ev)
 }

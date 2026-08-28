@@ -3,7 +3,7 @@ import { buildArena, setDoorWalkable, type Arena, type DoorMark } from './arena'
 import type { SimEvent, EnemyKind } from './events'
 import { tuning } from '@/tuning'
 import type { WaveDef } from './waves'
-import { roomsFor, type RoomDef } from './rooms'
+import { assignDoorRoles, roomsFor, type RoomDef } from './rooms'
 import { makeSessionState, type GameSessionState, type MetaStateV1, type RoomPhase } from './session'
 
 export const SLOW_FULL = 1000   // scale unit for slowRate, not a tunable
@@ -146,6 +146,7 @@ export class World {
     this.roomName = room.name
     this.roomPhase = room.kind === 'bardo' ? 'town' : room.waves?.length ? 'fighting' : room.exits?.length ? 'exits' : 'resolved'
     this.arena = buildArena(this.visualRng, room.kind)
+    assignDoorRoles(this.arena, room)
     if (room.startDoorOpen && this.hasNextRoom()) {
       this.doorOpen = true
       setDoorWalkable(this.arena, true)

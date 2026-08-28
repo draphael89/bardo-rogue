@@ -126,6 +126,19 @@ function roomHasExits(room: RoomDef): boolean {
   return (room.exits?.length ?? 0) > 0
 }
 
+/**
+ * Stamp the room graph's decisions onto the arena's masonry: which doorways are exits, and what
+ * mark each one wears. Called from every path that pairs an arena with a room — enterRoom AND the
+ * World constructor, which builds room zero itself. A door this never blesses can never open.
+ */
+export function assignDoorRoles(arena: World['arena'], room: RoomDef): void {
+  for (const door of arena.doors) {
+    const ex = room.exits?.find(x => x.dir === door.dir)
+    door.mark = ex?.mark
+    door.exit = !!ex
+  }
+}
+
 export function enterRoom(world: World, index: number, via: 'door' | 'return' = 'door', mark?: DoorMark): void {
   if (index < 0 || index >= world.rooms.length) return
   storeRunHealth(world)
@@ -134,7 +147,7 @@ export function enterRoom(world: World, index: number, via: 'door' | 'return' = 
   world.roomName = room.name
   const rng = new Rng(streamSeed(world.seed, STREAM.visual ^ ((index + 1) * 0x51ed)))
   world.arena = buildArena(rng, room.kind)
-  for (const door of world.arena.doors) door.mark = room.exits?.find(ex => ex.dir === door.dir)?.mark
+  assignDoorRoles(world.arena, room)
   world.doorOpen = !!(room.startDoorOpen && roomHasExits(room))
   setDoorWalkable(world.arena, world.doorOpen)
   world.roomClearTick = -1

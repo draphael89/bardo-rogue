@@ -26,7 +26,7 @@ export class Metrics {
         case 'arrowLoose': this.boltsFired++; break
         case 'boltCut': this.boltsCut++; break
         case 'enemyAttack': this.enemyAttacks++; break
-        case 'playerHurt': this.damageTaken++; break
+        case 'playerHurt': this.damageTaken += ev.damage; break
         case 'playerDeath': this.deaths++; this.deathTick = world.tick; break
         case 'waveClear': this.wavesCleared++; break
         case 'roomClear': this.clearTick = world.tick; break

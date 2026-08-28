@@ -133,6 +133,22 @@ describe('production vertical slice', () => {
     expect(a.doorOpen).toBe(true)
   })
 
+  it('opens only the doors that are exits: blade-path keeps its dead east doorway shut', () => {
+    const world = prepareAndDescend(createWorld(21, 'loop'))
+    forceRoomClear(world); chooseFocusedReward(world); takeDoor(world, 'east')
+    expect(world.rooms[world.roomIndex].id).toBe('blade-path')
+    forceRoomClear(world); chooseFocusedReward(world)
+    expect(world.doorOpen).toBe(true)
+    const a = world.arena
+    const north = a.doors.find(d => d.dir === 'north')!
+    const east = a.doors.find(d => d.dir === 'east')!
+    expect(north.exit).toBe(true)
+    expect(east.exit).toBe(false)
+    // The exit's tiles are walkable; the doorway that leads nowhere stays wall in collision.
+    expect(a.solid[north.row * a.cols + north.col]).toBe(0)
+    expect(a.solid[east.row * a.cols + east.col]).toBe(1)
+  })
+
   it.each(['north', 'east'] as const)('connects the %s branch through Room 3 to victory and a clean Bardo return', dir => {
     const world = prepareAndDescend(createWorld(dir === 'north' ? 21 : 22, 'loop'))
     forceRoomClear(world); chooseFocusedReward(world); takeDoor(world, dir)

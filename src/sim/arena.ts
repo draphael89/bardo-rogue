@@ -54,6 +54,13 @@ export interface ArenaDoor {
   col: number
   row: number
   mark?: DoorMark
+  /**
+   * Is this doorway an exit of the CURRENT room? Assigned by enterRoom from the room graph. An
+   * arena kind owns its masonry — a threshold hall always has both doorways — but which of them
+   * lead anywhere is the room's decision, and a door that leads nowhere must never open: an open
+   * door is a promise about what walking into it does.
+   */
+  exit?: boolean
 }
 
 export interface Prop { x: number; y: number; tile: number; sortY: number; sheet: 'room' | 'prop' }
@@ -88,19 +95,22 @@ export const ARENA_ROWS = 15
 
 export function setDoorWalkable(a: Arena, open: boolean): void {
   for (const d of a.doors) {
+    // Opening is for exits only; closing closes everything. A non-exit doorway stays wall forever.
+    const doorOpen = open && !!d.exit
+
     switch (d.dir) {
       case 'north':
         for (const dc of [-1, 0, 1] as const) {
           const c = d.col + dc
           if (c <= 0 || c >= a.cols - 1) continue
-          a.solid[d.row * a.cols + c] = open ? 0 : 1
+          a.solid[d.row * a.cols + c] = doorOpen ? 0 : 1
         }
         break
       case 'east':
         for (const dr of [-1, 0, 1] as const) {
           const r = d.row + dr
           if (r <= 1 || r >= a.rows - 1) continue
-          a.solid[r * a.cols + d.col] = open ? 0 : 1
+          a.solid[r * a.cols + d.col] = doorOpen ? 0 : 1
         }
         break
       default: { const _e: never = d.dir; return _e }

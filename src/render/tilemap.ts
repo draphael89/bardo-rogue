@@ -93,7 +93,7 @@ function paintMark(g: Graphics, mark: DoorMark): void {
   }
 }
 
-function makeDoorCluster(atlas: Atlas, d: ArenaDoor): { root: Container; setOpen: (open: boolean) => void } {
+function makeDoorCluster(atlas: Atlas, d: ArenaDoor): { root: Container; door: ArenaDoor; setOpen: (open: boolean) => void } {
   const root = new Container()
   const spr = new Sprite(atlas.room(T.doorClosed))
   const wingA = new Sprite(atlas.room(T.doorOpen))
@@ -133,6 +133,7 @@ function makeDoorCluster(atlas: Atlas, d: ArenaDoor): { root: Container; setOpen
   root.addChild(glow, spr, wingA, wingB, mark)
   return {
     root,
+    door: d,
     setOpen(open) {
       spr.texture = atlas.room(open ? T.doorOpen : T.doorClosed)
       const show = open && !!d.mark
@@ -471,7 +472,9 @@ export function buildTilemap(renderer: Renderer, atlas: Atlas, arena: Arena, are
   return {
     sprite, door, voidLayer,
     setDoorOpen(open) {
-      for (const c of clusters) c.setOpen(open)
+      // Only the doors that are exits of this room open; a doorway that leads nowhere stays shut
+      // in paint exactly as it stays shut in collision (see setDoorWalkable).
+      for (const c of clusters) c.setOpen(open && !!c.door.exit)
       gift?.sync(!!arena.offeringTaken)
       rack?.sync(!!arena.rackTaken)
     },

@@ -185,7 +185,7 @@ export function hurtPlayer(world: World, angle: number, damage: number, by: Deat
   p.kbx += Math.cos(angle) * tuning.player.hurtKnockback * 6
   p.kby += Math.sin(angle) * tuning.player.hurtKnockback * 6
   addFreeze(world, tuning.player.hurtHitstop)
-  world.emit({ type: 'playerHurt', x: p.x, y: p.y, angle, hp: p.hp })
+  world.emit({ type: 'playerHurt', x: p.x, y: p.y, angle, hp: p.hp, damage })
   if (p.hp <= 0) {
     p.state = 'dead'
     p.stateTick = 0

@@ -3,6 +3,7 @@ import { loadAtlas, loadFonts } from '@/render/atlas'
 import { Presenter } from '@/render/presenter'
 import { createWorld } from '@/sim/scenarios'
 import { stepWorld } from '@/sim/step'
+import { canReturn } from '@/sim/return'
 import type { World } from '@/sim/world'
 import type { InputFrame } from '@/sim/input'
 import { InputSystem } from '@/input'
@@ -149,7 +150,19 @@ async function boot() {
       // and the unlock listeners inside AudioSystem only hear mouse and keyboard, so a controller-
       // only player was also the one person who got a silent game.
       if (padAnyButton()) audio.tryUnlock()
-      if (presenter.title.visible && padWantsStart()) dismissTitle()
+      const titleWasUp = presenter.title.visible
+      if (titleWasUp && padWantsStart()) dismissTitle()
+      // Start is the controller's pause. During the loop's live gameplay the sim ignores the pad's
+      // legacy restart mapping entirely, so a controller-only player had NO route to the pause
+      // screen — the only listeners are keyboard P and Escape. Edge-triggered against its own
+      // previous state, and never on the frame that dismissed the title, or the same press would
+      // land the player straight in the pause card. On the death and victory screens Start keeps
+      // its existing job (confirm the return), so the toggle stands down while a return is open.
+      const startNow = padStartButton()
+      if (startNow && !padStartPrev && !titleWasUp && world.scenario === 'loop' && !canReturn(world)) {
+        setPaused(!userPaused)
+      }
+      padStartPrev = startNow
       presenter.reward.setPaused(userPaused)
       presenter.render(alpha, dt)
       overlay.update(world, loop)
@@ -161,6 +174,8 @@ async function boot() {
 
   // Start, A, X, or either shoulder — the same buttons that confirm everywhere else in the game.
   const PAD_START = [0, 2, 3, 5, 7, 9]
+  let padStartPrev = false
+  const padStartButton = (): boolean => !!firstPad()?.buttons[9]?.pressed
   const firstPad = (): Gamepad | null => {
     const pads = typeof navigator !== 'undefined' && navigator.getGamepads ? navigator.getGamepads() : []
     return (pads && pads[0]) || null

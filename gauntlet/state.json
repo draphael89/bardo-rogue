@@ -308,6 +308,36 @@
       ],
       "latest": [],
       "history": []
+    },
+    "arena": {
+      "spec": "The first room. This is the user's own live complaint: \"right now the first room looks super chaotic\". Measured, so you do not spend round 1 rediscovering it. The chaos is COMPOSITION, not lighting: the bible's centre-lift test passes (+40 L, centre 60% mean 93 vs outer ring 53), so do not reach for light values first. What is actually wrong, all of it authored in src/sim/arena.ts:112-131 --\n1. Near-perfect bilateral symmetry. Pillars at [7,5] [18,5] [7,10] [18,10] are a mirrored 2x2 grid. Furniture is two mirrored columns, c=1 and c=24, three props each. Counters at c=8 and c=16 mirror about centre 12. Measured mirror asymmetry is 32 L mean abs difference, and the composition reads as a fold. The rubric names this exact defect and it is still true.\n2. Twelve decorated objects ring a blank centre. Six 32x32 props, four pillars, two counters, all at the edges, while the play surface is one flat 9x9 `seal` slab (r 4..12, c 9..17), axis-aligned and featureless. The eye has twelve competing focal points and none of them is the fight.\n3. The play surface is the brightest, flattest, emptiest region, and the player is a small dark figure on it with almost no contrast. The most important thing in the frame has the least.\n4. Four text elements compete: the WAVE 1 banner, the WAVE 1/1 counter, the control hint bar and THE THRESHOLD plate. Not yours to delete (hud.ts is the ui lane), but compose around them.\nThis piece was PARKED for eleven rounds because every round guessed. It re-enters now for one reason only: ART_DIRECTION.md exists. Cite it by section. Its section 5 acceptance table is your gate, not taste.",
+      "owns": [
+        "src/sim/arena.ts",
+        "src/render/tilemap.ts",
+        "src/render/light.ts",
+        "src/render/atmosphere.ts",
+        "tools/make-bardo-tiles.ts"
+      ],
+      "protocol": "Still. Dev server must already be on :5173; never start a second. 1) `pnpm shot -- --scenario wave1 --seed 1 --ticks 30 --stepwise 1 --out <E>/still.png` -- the first room as the player meets it, same seed and tick every round. 2) the same frame at 4x NEAREST on the play surface as <E>/exhibit.png, the blind-comparison exhibit. 3) a busy frame, `--scenario wave3 --bot kite --ticks 500`, as <E>/busy.png: a room that reads empty must still read under seven enemies. 4) ART_DIRECTION.md section 5 measured into <E>/bible.json -- floor mean luminance (must be <= 0.30), highlight budget (fraction above 72% luminance, must be <= 8%), centre lift (centre 60% mean vs outer 20% ring, must be higher by >= 1 band), location of the top 1% of luminance (must be within 64 px of the focal object or a character), and mirror asymmetry (mean abs L difference against the frame's own mirror -- report it; near zero is the defect). NOTE src/sim/arena.ts is a SIM file: any change re-pins the replay hashes. Run `pnpm record-bots` and paste the printed hashes into tests/sim/replay.test.ts. Never hand-edit a hash. `src/render/presenter.ts` belongs to the feel lane this wave -- if you need it to change a constructor signature, stop and report.",
+      "reference": [
+        "gauntlet/evidence/reference/ref-room-01.jpg",
+        "gauntlet/evidence/reference/ref-room-02.jpg",
+        "gauntlet/evidence/reference/ref-density-01.jpg"
+      ],
+      "status": "open",
+      "rounds": 0,
+      "stalls": 0,
+      "memo": [
+        {
+          "wave": 1,
+          "round": 0,
+          "element": "un-parked",
+          "stronger_does": "n/a",
+          "fix": "Parked after 11 rounds because no art direction existed and every round guessed. ART_DIRECTION.md now exists (533 lines, sections 0-11, with an acceptance table), so per bardo-critic section 7 the piece re-enters. It also has a measured brief and measurable gates, which the 11 rounds never had."
+        }
+      ],
+      "latest": [],
+      "history": []
     }
   },
   "waves": [

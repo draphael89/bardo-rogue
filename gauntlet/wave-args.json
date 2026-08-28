@@ -1,28 +1,35 @@
 {
-  "preamble": "# Bardo Rogue \u2014 the gauntlet prompt\n\nI want you to finish Bardo Rogue, a browser action-roguelike, at the level of Enter the Gungeon's\ncombat density and pixel-art dungeon craft and Hades' melee weight and run structure. It should be\nutterly perfect: every hit lands with the full feedback chain, every enemy telegraphs, every frame\nlooks authored rather than assembled. It runs at a locked 60 fps in a normal browser. The theme is\nthe bardo, the space between death and rebirth.\n\nBreak it into the smallest pieces that can each be judged on their own and fan out sub-agents so\nevery piece gets its own builder. Pieces that touch shared state get one owner working in sequence;\nnever two agents on coupled work at the same time. The simulation in `src/sim/` is pure and\ndeterministic and must stay that way: no DOM, no pixi, no `Math.random`, no `Date`. Every gameplay\nand feel number lives in `src/tuning.ts`. Keep `pnpm typecheck` and `pnpm test` green; if you change\nthe sim, regenerate the pinned replay hashes with `pnpm record-bots` and never hand-edit one.\n\nEvery piece also gets a separate, fresh sub-agent as its critic. The critic looks only at the real\nthing \u2014 rendered screenshots, tick-labelled motion strips for anything that moves, `__game.state()`\ntraces for behaviour, and headless metrics for balance \u2014 never at code and never at the builder's\nnotes. It compares ours blind, side by side, in both orders, against real screenshots of the bar. It\nis a harsh critic whose default assumption is that it CAN tell which one is ours. \"Good for a web\ngame\" is a loss. \"Good for AI\" is a loss. It names the single biggest gap, points at the file and\nframe where it shows, and sends the piece back.\n\nNever copy the reference's art, names, characters, lore, or composition. Copying the bar's layout is\nitself a gap under Originality, not progress.\n\n/loop on every piece until its critic genuinely cannot tell which one the professionals shipped.\nAfter each wave, one fresh agent inspects the whole game and smooths the seams: one art style, one\nfeel, no joins. Keep the progress page current so I can watch it from my phone. Don't stop until\nevery critic is utterly wowed, or until I stop the run.\n",
+  "preamble": "# Bardo Rogue \u2014 the gauntlet prompt\n\nI want you to finish Bardo Rogue, a browser action-roguelike, at the level of Enter the Gungeon's\ncombat density and pixel-art dungeon craft and Hades' melee weight and run structure. It should be\nutterly perfect: every hit lands with the full feedback chain, every enemy telegraphs, every frame\nlooks authored rather than assembled. It runs at a locked 60 fps in a normal browser. The theme is\nthe bardo, the space between death and rebirth.\n\nBreak it into the smallest pieces that can each be judged on their own and fan out sub-agents so\nevery piece gets its own builder. Pieces that touch shared state get one owner working in sequence;\nnever two agents on coupled work at the same time. The simulation in `src/sim/` is pure and\ndeterministic and must stay that way: no DOM, no pixi, no `Math.random`, no `Date`. Every gameplay\nand feel number lives in `src/tuning.ts`. Keep `pnpm typecheck` and `pnpm test` green; if you change\nthe sim, regenerate the pinned replay hashes with `pnpm record-bots` and never hand-edit one.\n\nEvery piece also gets a separate, fresh sub-agent as its critic. The critic looks only at the real\nthing \u2014 rendered screenshots, tick-labelled motion strips for anything that moves, `__game.state()`\ntraces for behaviour, and headless metrics for balance \u2014 never at code and never at the builder's\nnotes. It compares ours blind, side by side, in both orders, against real screenshots of the bar. It\nis a harsh critic whose default assumption is that it CAN tell which one is ours. \"Good for a web\ngame\" is a loss. \"Good for AI\" is a loss. It names the single biggest gap, points at the file and\nframe where it shows, and sends the piece back.\n\nNever copy the reference's art, names, characters, lore, or composition. Copying the bar's layout is\nitself a gap under Originality, not progress.\n\n/loop on every piece until its critic genuinely cannot tell which one the professionals shipped.\nAfter each wave, one fresh agent inspects the whole game and smooths the seams: one art style, one\nfeel, no joins. Keep the progress page current so I can watch it from my phone. Don't stop until\nevery critic is utterly wowed, or until I stop the run.\n\nThe worktree is shared and every other lane's work in it is uncommitted. Never run `git stash`,\n`git reset --hard`, or `git checkout -- <path>` here. This is not a style rule: at 21:07 on wave 1 a\ncapture agent ran `git stash && <capture three frames> && git stash pop` to get a clean \"before\"\nbaseline, and for two minutes every lane in the run was reverted to the pre-gauntlet commit. Work\ncame back; the frames captured inside that window did not, and they showed old code while claiming\nto show new. If you need a baseline capture, make a throwaway worktree\n(`git worktree add /tmp/bardo-base <commit>`) and capture there. If you need to know what changed,\nread `git diff`.\n",
   "projectDir": "/Users/davidraphael/Desktop/bardo-rogue-web",
   "evidenceDir": "gauntlet/evidence",
   "bar": "Enter the Gungeon and Hades",
-  "wave": 1,
+  "wave": 2,
   "waveRounds": 3,
   "mix": "efficient",
   "budgetFloor": 120000,
-  "rubric": "Score all seven axes 0-5 EVERY round so round 11 stays comparable to round 1. If no axis moves for two rounds the piece is stuck by arithmetic, not by feel.\n1 Readability - one frame tells you what is happening and what will hurt you.\n2 Material and light - surfaces have weight; light has a hierarchy and a focal point.\n3 Feel chain - anticipation, contact, impact, recovery all present and proportionate.\n4 Composition - a focal point, asymmetry with intent, nothing grid-snapped by accident.\n5 Pixel integrity - grid-aligned, integer scale, no shimmer, one consistent sprite scale.\n6 Density - how much is happening per second compared with the exhibits.\n7 Originality - a fan of the stronger exhibit would not call ours a copy. Copying the other exhibit's composition is itself a gap here, never progress.\n\nEVIDENCE LIMIT, state it in your verdict: the reference exhibits are stills. Timing therefore cannot be compared against them. Judge axis 3 against the acceptance criteria below using our own tick-labelled strip and trace, and say plainly that you did.\nFeel-chain acceptance: is there an anticipation frame distinguishable from idle? Is there exactly ONE readable contact frame? Does the freeze last long enough to see and short enough not to stall? Does recovery overshoot and settle rather than snap? Does the visual peak land on the tick the trace says damage becomes possible?\n\nThings critics in this domain miss without prompting:\n- Sub-pixel effects. At 480x270 a 0.19px camera shake is not a subtle shake, it is NO shake. Compute it, do not eyeball it.\n- Silence as a bug. If an input produces no visual and no sound, that is a defect, not restraint. Diff the action strip against the idle strip.\n- Grading the still and ignoring the tick. \"The arc lives 2 ticks past contact\" is a gap; \"feels floaty\" is not.\n- Pixel-scale mismatch. Soft full-resolution gradients over hard 16px pixels read as gloss over placeholder.\n- Bilateral symmetry and grid-snapped placement. The room currently mirrors left to right down to the plant.\n- Light at the frame edges while the centre, where the eye and the fight are, is the least lit area.\n- Accepting a bot metric as evidence of fun. Bots are regression probes. They do not report delight, panic, or perceived fairness.",
+  "rubric": "Score all seven axes 0-5 EVERY round so round 11 stays comparable to round 1. If no axis moves for two rounds the piece is stuck by arithmetic, not by feel.\n1 Readability - one frame tells you what is happening and what will hurt you.\n2 Material and light - surfaces have weight; light has a hierarchy and a focal point.\n3 Feel chain - anticipation, contact, impact, recovery all present and proportionate.\n4 Composition - a focal point, asymmetry with intent, nothing grid-snapped by accident.\n5 Pixel integrity - grid-aligned, integer scale, no shimmer, one consistent sprite scale.\n6 Density - how much is happening per second compared with the exhibits.\n7 Originality - a fan of the stronger exhibit would not call ours a copy. Copying the other exhibit's composition is itself a gap here, never progress.\n\nEVIDENCE LIMIT, state it in your verdict: the reference exhibits are stills. Timing therefore cannot be compared against them. Judge axis 3 against the acceptance criteria below using our own tick-labelled strip and trace, and say plainly that you did.\nFeel-chain acceptance: is there an anticipation frame distinguishable from idle? Is there exactly ONE readable contact frame? Does the freeze last long enough to see and short enough not to stall? Does recovery overshoot and settle rather than snap? Does the visual peak land on the tick the trace says damage becomes possible?\n\nThings critics in this domain miss without prompting:\n- Sub-pixel effects. At 480x270 a 0.19px camera shake is not a subtle shake, it is NO shake. Compute it, do not eyeball it.\n- Silence as a bug. If an input produces no visual and no sound, that is a defect, not restraint. Diff the action strip against the idle strip.\n- Grading the still and ignoring the tick. \"The arc lives 2 ticks past contact\" is a gap; \"feels floaty\" is not.\n- Pixel-scale mismatch. Soft full-resolution gradients over hard 16px pixels read as gloss over placeholder.\n- Bilateral symmetry and grid-snapped placement. The room currently mirrors left to right down to the plant.\n- Light at the frame edges while the centre, where the eye and the fight are, is the least lit area.\n- Accepting a bot metric as evidence of fun. Bots are regression probes. They do not report delight, panic, or perceived fairness.\n\nNEW THIS WAVE, and it changes what a frame should look like: boundary repair R1 fixed the colour grade, which had been crushing the whole range by about 30%. Frame p99 luminance moved from 178 to 229 (the stronger exhibit sits at 232) and the palette now clamps to its authored ends rather than to 0-1. So every capture from this wave onward is BRIGHTER and higher-contrast than any wave-1 capture, and the two are not comparable. Judge this wave against the exhibits and the acceptance criteria, never against a remembered earlier round.\nKnown and already assigned, so do not spend your one gap on it: static lighting, not events, currently owns the top of the range -- a quiet empty room measures 8.7% of pixels above 72% luminance against a busy combat frame's 10.0%. That is the room's own lights, and it belongs to the arena lane.",
   "smooth": true,
   "dryRun": false,
   "lanes": [
     {
-      "id": "feel",
-      "why": "sword, dodge and impact all read and write player.ts, combat.ts, tuning.ts, presenter.ts and camera.ts. One owner, in sequence.",
+      "id": "arena",
+      "why": "the user's live complaint, and the only lane touching the room's own files; disjoint from every combat lane.",
       "pieces": [
-        "sword-swing",
+        "arena"
+      ]
+    },
+    {
+      "id": "feel",
+      "why": "dodge, hit-impact and the sword chain all write player.ts, combat.ts and tuning.ts. One owner, in sequence. dodge-roll goes FIRST this wave: it has had zero rounds across two waves because it sat third in the lane.",
+      "pieces": [
+        "dodge-roll",
         "hit-impact",
-        "dodge-roll"
+        "sword-swing"
       ]
     },
     {
       "id": "brute",
-      "why": "own sim file plus its own view module after the views split; disjoint from every other lane.",
+      "why": "own sim file plus its own view module; disjoint.",
       "pieces": [
         "brute"
       ]
@@ -43,65 +50,48 @@
     },
     {
       "id": "ui",
-      "why": "hud.ts and damageNumbers.ts are touched by nothing else this wave; two pieces share hud.ts so they run in sequence.",
+      "why": "hud.ts and damageNumbers.ts are touched by nothing else. death-card goes FIRST this wave: it has had zero rounds because combat-hud used all three.",
       "pieces": [
-        "combat-hud",
-        "death-card"
+        "death-card",
+        "combat-hud"
       ]
     },
     {
       "id": "audio",
-      "why": "src/audio is fully disjoint from every other lane.",
+      "why": "src/audio is fully disjoint.",
       "pieces": [
         "audio-bed"
       ]
     }
   ],
   "pieces": {
-    "sword-swing": {
-      "spec": "The three-hit greatsword chain: anticipation, arc, contact, recovery, and a heavy third hit that reads as a commitment. Verified leads, do not spend a round rediscovering them: the heavy is only +4 startup ticks, +2 hit-stop, +60 degrees of arc and double damage \u2014 nothing in the world commits to it, so it reads as a big light hit rather than a greatsword. Movement is zeroed for 10 ticks during heavy startup (167 ms) and is barely perceived. The crescent arc with tapered trailing edge is already the best visual in the game; build on it, do not replace it. Consider hit-confirm recovery (connecting cancels earlier than missing), whiff commitment, aim steering during early startup only, and an authored lunge curve instead of the current uniform one. Responsive does not mean uncommitted: do not make all four phases equally cancellable.",
+    "arena": {
+      "spec": "The first room. This is the user's own live complaint: \"right now the first room looks super chaotic\". Measured, so you do not spend round 1 rediscovering it. The chaos is COMPOSITION, not lighting: the bible's centre-lift test passes (+40 L, centre 60% mean 93 vs outer ring 53), so do not reach for light values first. What is actually wrong, all of it authored in src/sim/arena.ts:112-131 --\n1. Near-perfect bilateral symmetry. Pillars at [7,5] [18,5] [7,10] [18,10] are a mirrored 2x2 grid. Furniture is two mirrored columns, c=1 and c=24, three props each. Counters at c=8 and c=16 mirror about centre 12. Measured mirror asymmetry is 32 L mean abs difference, and the composition reads as a fold. The rubric names this exact defect and it is still true.\n2. Twelve decorated objects ring a blank centre. Six 32x32 props, four pillars, two counters, all at the edges, while the play surface is one flat 9x9 `seal` slab (r 4..12, c 9..17), axis-aligned and featureless. The eye has twelve competing focal points and none of them is the fight.\n3. The play surface is the brightest, flattest, emptiest region, and the player is a small dark figure on it with almost no contrast. The most important thing in the frame has the least.\n4. Four text elements compete: the WAVE 1 banner, the WAVE 1/1 counter, the control hint bar and THE THRESHOLD plate. Not yours to delete (hud.ts is the ui lane), but compose around them.\nThis piece was PARKED for eleven rounds because every round guessed. It re-enters now for one reason only: ART_DIRECTION.md exists. Cite it by section. Its section 5 acceptance table is your gate, not taste.",
       "owns": [
-        "src/sim/player.ts",
-        "src/sim/combat.ts",
-        "src/tuning.ts",
-        "src/render/views/player.ts",
-        "src/render/presenter.ts",
-        "src/render/particles.ts",
-        "src/render/camera.ts"
+        "src/sim/arena.ts",
+        "src/render/tilemap.ts",
+        "src/render/light.ts",
+        "src/render/atmosphere.ts",
+        "tools/make-bardo-tiles.ts"
       ],
-      "protocol": "Motion. Dev server must already be on :5173; never start a second. 1) `pnpm strip -- --scenario dummy --seed 1 --from the first attack press --frames 12 --every 2 --crop 176,88,128,96 --out <E>/strip.png` \u2014 tick-labelled, --stepwise discipline, NEAREST upscale only. 2) the sidecar `<E>/strip.png.json` state+event trace. 3) `pnpm poses -- --only swing --out <E>/poses.png`. 4) the single most load-bearing frame, 4x NEAREST crop, as `<E>/exhibit.png` \u2014 this is the blind-comparison exhibit and it must be the same medium as the reference. 5) startup/active/recovery tick counts read from the trace, written to `<E>/timing.json`. Same seed, same crop box, every round. DRIVE THE INPUT WITH DISCRETE PRESSES, never `--hold '{\"attack\":true}'`: the hold flag re-applies the input partial before every single step, which is mashing at 60 Hz and hides what a player's own timing produces. Attack is now a true edge (one press = one intention), so use the `--eval` hook to press once per swing at the earliest legal chain tick. A chain captured by per-tick re-pressing is a fiction.",
+      "protocol": "Still. Dev server must already be on :5173; never start a second. 1) `pnpm shot -- --scenario wave1 --seed 1 --ticks 30 --stepwise 1 --out <E>/still.png` -- the first room as the player meets it, same seed and tick every round. 2) the same frame at 4x NEAREST on the play surface as <E>/exhibit.png, the blind-comparison exhibit. 3) a busy frame, `--scenario wave3 --bot kite --ticks 500`, as <E>/busy.png: a room that reads empty must still read under seven enemies. 4) ART_DIRECTION.md section 5 measured into <E>/bible.json -- floor mean luminance (must be <= 0.30), highlight budget (fraction above 72% luminance, must be <= 8%), centre lift (centre 60% mean vs outer 20% ring, must be higher by >= 1 band), location of the top 1% of luminance (must be within 64 px of the focal object or a character), and mirror asymmetry (mean abs L difference against the frame's own mirror -- report it; near zero is the defect). NOTE src/sim/arena.ts is a SIM file: any change re-pins the replay hashes. Run `pnpm record-bots` and paste the printed hashes into tests/sim/replay.test.ts. Never hand-edit a hash. `src/render/presenter.ts` belongs to the feel lane this wave -- if you need it to change a constructor signature, stop and report.",
       "reference": [
-        "gauntlet/evidence/reference/ref-melee-01.jpg",
-        "gauntlet/evidence/reference/ref-melee-02.jpg",
-        "gauntlet/evidence/reference/ref-melee-03.jpg"
+        "gauntlet/evidence/reference/ref-room-01.jpg",
+        "gauntlet/evidence/reference/ref-room-02.jpg",
+        "gauntlet/evidence/reference/ref-density-01.jpg"
       ],
       "status": "open",
       "rounds": 0,
       "stalls": 0,
-      "memo": [],
-      "latest": [],
-      "history": []
-    },
-    "hit-impact": {
-      "spec": "The moment a hit lands: freeze, flash, knockback, reaction, camera, sound. Verified leads: the camera is SILENT on light hits, which are ~90 percent of all swings. Shake is trauma squared times shakeMax, so traumaLight 0.22 yields 0.22^2 x 4px = 0.19 internal pixels \u2014 invisible at 480x270 \u2014 and the directional kick is gated on `ev.heavy || ev.killed` (presenter.ts:80) so light hits get none at all. Separately, TWO reward channels are dead code: `dodged` (a successful i-frame dodge-through, the most skill-expressive input in the game) and `enemyStagger` are both emitted by the sim and consumed ONLY by metrics \u2014 grep confirms zero presenter and zero audio consumers. The game says nothing when the player does the hardest thing in it. The kill shatter, blood decals that outlive the fight, and the poise rule (only the heavy staggers a brute) already work; keep them.",
-      "owns": [
-        "src/sim/combat.ts",
-        "src/tuning.ts",
-        "src/render/presenter.ts",
-        "src/render/particles.ts",
-        "src/render/camera.ts",
-        "src/render/views/player.ts"
+      "memo": [
+        {
+          "wave": 1,
+          "round": 0,
+          "element": "un-parked",
+          "stronger_does": "n/a",
+          "fix": "Parked after 11 rounds because no art direction existed and every round guessed. ART_DIRECTION.md now exists (533 lines, sections 0-11, with an acceptance table), so per bardo-critic section 7 the piece re-enters. It also has a measured brief and measurable gates, which the 11 rounds never had."
+        }
       ],
-      "protocol": "Motion. Dev server must already be on :5173; never start a second. 1) `pnpm strip -- --scenario wave1 --seed 1 --from 2 ticks before first contact --frames 12 --every 2 --crop 160,80,160,110 --out <E>/strip.png` \u2014 tick-labelled, --stepwise discipline, NEAREST upscale only. 2) the sidecar `<E>/strip.png.json` state+event trace. 3) `pnpm poses -- --only kill --out <E>/poses.png`. 4) the single most load-bearing frame, 4x NEAREST crop, as `<E>/exhibit.png` \u2014 this is the blind-comparison exhibit and it must be the same medium as the reference. 5) startup/active/recovery tick counts read from the trace, written to `<E>/timing.json`. Same seed, same crop box, every round. Additionally capture an idle strip with the SAME crop as `<E>/strip-idle.png`: a light-hit strip that is indistinguishable from idle is an automatic loss. DRIVE THE INPUT WITH DISCRETE PRESSES, never `--hold '{\"attack\":true}'`: the hold flag re-applies the input partial before every single step, which is mashing at 60 Hz and hides what a player's own timing produces. Attack is now a true edge (one press = one intention), so use the `--eval` hook to press once per swing at the earliest legal chain tick. A chain captured by per-tick re-pressing is a fiction.",
-      "reference": [
-        "gauntlet/evidence/reference/ref-melee-01.jpg",
-        "gauntlet/evidence/reference/ref-melee-02.jpg",
-        "gauntlet/evidence/reference/ref-melee-03.jpg"
-      ],
-      "status": "open",
-      "rounds": 0,
-      "stalls": 0,
-      "memo": [],
       "latest": [],
       "history": []
     },
@@ -123,7 +113,78 @@
       "status": "open",
       "rounds": 0,
       "stalls": 0,
-      "memo": [],
+      "memo": [
+        {
+          "wave": 1,
+          "round": 0,
+          "element": "wave-1 verdicts lost",
+          "stronger_does": "n/a - infrastructure, not a gap",
+          "fix": "Re-enter at wave 2 round 1. The critic verdicts lived only in the Workflow return and died with the process, and repair R1 then changed the global colour grade (p99 178 -> 229), so every wave-1 capture is non-comparable to anything captured from now on. Wave 2 round 1 is the new baseline for this piece."
+        }
+      ],
+      "latest": [],
+      "history": []
+    },
+    "hit-impact": {
+      "spec": "The moment a hit lands: freeze, flash, knockback, reaction, camera, sound. Verified leads: the camera is SILENT on light hits, which are ~90 percent of all swings. Shake is trauma squared times shakeMax, so traumaLight 0.22 yields 0.22^2 x 4px = 0.19 internal pixels \u2014 invisible at 480x270 \u2014 and the directional kick is gated on `ev.heavy || ev.killed` (presenter.ts:80) so light hits get none at all. Separately, TWO reward channels are dead code: `dodged` (a successful i-frame dodge-through, the most skill-expressive input in the game) and `enemyStagger` are both emitted by the sim and consumed ONLY by metrics \u2014 grep confirms zero presenter and zero audio consumers. The game says nothing when the player does the hardest thing in it. The kill shatter, blood decals that outlive the fight, and the poise rule (only the heavy staggers a brute) already work; keep them.",
+      "owns": [
+        "src/sim/combat.ts",
+        "src/tuning.ts",
+        "src/render/presenter.ts",
+        "src/render/particles.ts",
+        "src/render/camera.ts",
+        "src/render/views/player.ts"
+      ],
+      "protocol": "Motion. Dev server must already be on :5173; never start a second. 1) `pnpm strip -- --scenario wave1 --seed 1 --from 2 ticks before first contact --frames 12 --every 2 --crop 160,80,160,110 --out <E>/strip.png` \u2014 tick-labelled, --stepwise discipline, NEAREST upscale only. 2) the sidecar `<E>/strip.png.json` state+event trace. 3) `pnpm poses -- --only kill --out <E>/poses.png`. 4) the single most load-bearing frame, 4x NEAREST crop, as `<E>/exhibit.png` \u2014 this is the blind-comparison exhibit and it must be the same medium as the reference. 5) startup/active/recovery tick counts read from the trace, written to `<E>/timing.json`. Same seed, same crop box, every round. Additionally capture an idle strip with the SAME crop as `<E>/strip-idle.png`: a light-hit strip that is indistinguishable from idle is an automatic loss. DRIVE THE INPUT WITH DISCRETE PRESSES, never `--hold '{\"attack\":true}'`: the hold flag re-applies the input partial before every single step, which is mashing at 60 Hz and hides what a player's own timing produces. Attack is now a true edge (one press = one intention), so use the `--eval` hook to press once per swing at the earliest legal chain tick. A chain captured by per-tick re-pressing is a fiction.",
+      "reference": [
+        "gauntlet/evidence/reference/ref-melee-01.jpg",
+        "gauntlet/evidence/reference/ref-melee-02.jpg",
+        "gauntlet/evidence/reference/ref-melee-03.jpg"
+      ],
+      "status": "open",
+      "rounds": 2,
+      "stalls": 0,
+      "memo": [
+        {
+          "wave": 1,
+          "round": 2,
+          "element": "wave-1 verdicts lost",
+          "stronger_does": "n/a - infrastructure, not a gap",
+          "fix": "Re-enter at wave 2 round 1. The critic verdicts lived only in the Workflow return and died with the process, and repair R1 then changed the global colour grade (p99 178 -> 229), so every wave-1 capture is non-comparable to anything captured from now on. Wave 2 round 1 is the new baseline for this piece."
+        }
+      ],
+      "latest": [],
+      "history": []
+    },
+    "sword-swing": {
+      "spec": "The three-hit greatsword chain: anticipation, arc, contact, recovery, and a heavy third hit that reads as a commitment. Verified leads, do not spend a round rediscovering them: the heavy is only +4 startup ticks, +2 hit-stop, +60 degrees of arc and double damage \u2014 nothing in the world commits to it, so it reads as a big light hit rather than a greatsword. Movement is zeroed for 10 ticks during heavy startup (167 ms) and is barely perceived. The crescent arc with tapered trailing edge is already the best visual in the game; build on it, do not replace it. Consider hit-confirm recovery (connecting cancels earlier than missing), whiff commitment, aim steering during early startup only, and an authored lunge curve instead of the current uniform one. Responsive does not mean uncommitted: do not make all four phases equally cancellable.",
+      "owns": [
+        "src/sim/player.ts",
+        "src/sim/combat.ts",
+        "src/tuning.ts",
+        "src/render/views/player.ts",
+        "src/render/presenter.ts",
+        "src/render/particles.ts",
+        "src/render/camera.ts"
+      ],
+      "protocol": "Motion. Dev server must already be on :5173; never start a second. 1) `pnpm strip -- --scenario dummy --seed 1 --from the first attack press --frames 12 --every 2 --crop 176,88,128,96 --out <E>/strip.png` \u2014 tick-labelled, --stepwise discipline, NEAREST upscale only. 2) the sidecar `<E>/strip.png.json` state+event trace. 3) `pnpm poses -- --only swing --out <E>/poses.png`. 4) the single most load-bearing frame, 4x NEAREST crop, as `<E>/exhibit.png` \u2014 this is the blind-comparison exhibit and it must be the same medium as the reference. 5) startup/active/recovery tick counts read from the trace, written to `<E>/timing.json`. Same seed, same crop box, every round. DRIVE THE INPUT WITH DISCRETE PRESSES, never `--hold '{\"attack\":true}'`: the hold flag re-applies the input partial before every single step, which is mashing at 60 Hz and hides what a player's own timing produces. Attack is now a true edge (one press = one intention), so use the `--eval` hook to press once per swing at the earliest legal chain tick. A chain captured by per-tick re-pressing is a fiction.",
+      "reference": [
+        "gauntlet/evidence/reference/ref-melee-01.jpg",
+        "gauntlet/evidence/reference/ref-melee-02.jpg",
+        "gauntlet/evidence/reference/ref-melee-03.jpg"
+      ],
+      "status": "open",
+      "rounds": 1,
+      "stalls": 0,
+      "memo": [
+        {
+          "wave": 1,
+          "round": 1,
+          "element": "wave-1 verdicts lost",
+          "stronger_does": "n/a - infrastructure, not a gap",
+          "fix": "Re-enter at wave 2 round 1. The critic verdicts lived only in the Workflow return and died with the process, and repair R1 then changed the global colour grade (p99 178 -> 229), so every wave-1 capture is non-comparable to anything captured from now on. Wave 2 round 1 is the new baseline for this piece."
+        }
+      ],
       "latest": [],
       "history": []
     },
@@ -140,9 +201,17 @@
         "gauntlet/evidence/reference/ref-density-03.jpg"
       ],
       "status": "open",
-      "rounds": 0,
+      "rounds": 2,
       "stalls": 0,
-      "memo": [],
+      "memo": [
+        {
+          "wave": 1,
+          "round": 2,
+          "element": "wave-1 verdicts lost",
+          "stronger_does": "n/a - infrastructure, not a gap",
+          "fix": "Re-enter at wave 2 round 1. The critic verdicts lived only in the Workflow return and died with the process, and repair R1 then changed the global colour grade (p99 178 -> 229), so every wave-1 capture is non-comparable to anything captured from now on. Wave 2 round 1 is the new baseline for this piece."
+        }
+      ],
       "latest": [],
       "history": []
     },
@@ -159,9 +228,17 @@
         "gauntlet/evidence/reference/ref-density-03.jpg"
       ],
       "status": "open",
-      "rounds": 0,
+      "rounds": 3,
       "stalls": 0,
-      "memo": [],
+      "memo": [
+        {
+          "wave": 1,
+          "round": 3,
+          "element": "wave-1 verdicts lost",
+          "stronger_does": "n/a - infrastructure, not a gap",
+          "fix": "Re-enter at wave 2 round 1. The critic verdicts lived only in the Workflow return and died with the process, and repair R1 then changed the global colour grade (p99 178 -> 229), so every wave-1 capture is non-comparable to anything captured from now on. Wave 2 round 1 is the new baseline for this piece."
+        }
+      ],
       "latest": [],
       "history": []
     },
@@ -178,27 +255,17 @@
         "gauntlet/evidence/reference/ref-density-03.jpg"
       ],
       "status": "open",
-      "rounds": 0,
+      "rounds": 3,
       "stalls": 0,
-      "memo": [],
-      "latest": [],
-      "history": []
-    },
-    "combat-hud": {
-      "spec": "Hearts, wave counter, banners, place-name plate, control hint \u2014 everything on screen during a fight. What exists is already decent and crisp: all text is pixel webfont at resolution 1 inside the 480x270 target. Two verified defects to fix while you are here: banner timers run on wall-clock render time rather than sim time, so banners desync from sim state under slow-motion and stepwise capture (a death capture showed 'WAVE 1' still on screen); and there are no gamepad glyphs despite gamepad input being fully wired \u2014 the hint text says 'WASD / mouse / click / space' to a controller player. Judge the HUD as an inhabited combat frame, not an empty overlay.",
-      "owns": [
-        "src/render/hud.ts",
-        "src/render/damageNumbers.ts"
+      "memo": [
+        {
+          "wave": 1,
+          "round": 3,
+          "element": "wave-1 verdicts lost",
+          "stronger_does": "n/a - infrastructure, not a gap",
+          "fix": "Re-enter at wave 2 round 1. The critic verdicts lived only in the Workflow return and died with the process, and repair R1 then changed the global colour grade (p99 178 -> 229), so every wave-1 capture is non-comparable to anything captured from now on. Wave 2 round 1 is the new baseline for this piece."
+        }
       ],
-      "protocol": "Still. `pnpm shot -- --scenario wave3 --seed 1 --ticks 500 --bot kite --stepwise 1 --out <E>/still.png` (a busy frame, not an empty room), plus a 2x NEAREST crop of the HUD corners as `<E>/crop.png` with the SAME crop box every round, plus a room-clear frame and a death frame. Same seed and ticks each round.",
-      "reference": [
-        "gauntlet/evidence/reference/ref-ui-01.jpg",
-        "gauntlet/evidence/reference/ref-ui-02.jpg"
-      ],
-      "status": "open",
-      "rounds": 0,
-      "stalls": 0,
-      "memo": [],
       "latest": [],
       "history": []
     },
@@ -216,7 +283,41 @@
       "status": "open",
       "rounds": 0,
       "stalls": 0,
-      "memo": [],
+      "memo": [
+        {
+          "wave": 1,
+          "round": 0,
+          "element": "wave-1 verdicts lost",
+          "stronger_does": "n/a - infrastructure, not a gap",
+          "fix": "Re-enter at wave 2 round 1. The critic verdicts lived only in the Workflow return and died with the process, and repair R1 then changed the global colour grade (p99 178 -> 229), so every wave-1 capture is non-comparable to anything captured from now on. Wave 2 round 1 is the new baseline for this piece."
+        }
+      ],
+      "latest": [],
+      "history": []
+    },
+    "combat-hud": {
+      "spec": "Hearts, wave counter, banners, place-name plate, control hint \u2014 everything on screen during a fight. What exists is already decent and crisp: all text is pixel webfont at resolution 1 inside the 480x270 target. Two verified defects to fix while you are here: banner timers run on wall-clock render time rather than sim time, so banners desync from sim state under slow-motion and stepwise capture (a death capture showed 'WAVE 1' still on screen); and there are no gamepad glyphs despite gamepad input being fully wired \u2014 the hint text says 'WASD / mouse / click / space' to a controller player. Judge the HUD as an inhabited combat frame, not an empty overlay.",
+      "owns": [
+        "src/render/hud.ts",
+        "src/render/damageNumbers.ts"
+      ],
+      "protocol": "Still. `pnpm shot -- --scenario wave3 --seed 1 --ticks 500 --bot kite --stepwise 1 --out <E>/still.png` (a busy frame, not an empty room), plus a 2x NEAREST crop of the HUD corners as `<E>/crop.png` with the SAME crop box every round, plus a room-clear frame and a death frame. Same seed and ticks each round.",
+      "reference": [
+        "gauntlet/evidence/reference/ref-ui-01.jpg",
+        "gauntlet/evidence/reference/ref-ui-02.jpg"
+      ],
+      "status": "open",
+      "rounds": 3,
+      "stalls": 0,
+      "memo": [
+        {
+          "wave": 1,
+          "round": 3,
+          "element": "wave-1 verdicts lost",
+          "stronger_does": "n/a - infrastructure, not a gap",
+          "fix": "Re-enter at wave 2 round 1. The critic verdicts lived only in the Workflow return and died with the process, and repair R1 then changed the global colour grade (p99 178 -> 229), so every wave-1 capture is non-comparable to anything captured from now on. Wave 2 round 1 is the new baseline for this piece."
+        }
+      ],
       "latest": [],
       "history": []
     },
@@ -233,9 +334,17 @@
         "gauntlet/evidence/reference/ref-density-03.jpg"
       ],
       "status": "open",
-      "rounds": 0,
+      "rounds": 2,
       "stalls": 0,
-      "memo": [],
+      "memo": [
+        {
+          "wave": 1,
+          "round": 2,
+          "element": "wave-1 verdicts lost",
+          "stronger_does": "n/a - infrastructure, not a gap",
+          "fix": "Re-enter at wave 2 round 1. The critic verdicts lived only in the Workflow return and died with the process, and repair R1 then changed the global colour grade (p99 178 -> 229), so every wave-1 capture is non-comparable to anything captured from now on. Wave 2 round 1 is the new baseline for this piece."
+        }
+      ],
       "latest": [],
       "history": []
     }

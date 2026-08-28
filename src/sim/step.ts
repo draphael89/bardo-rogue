@@ -29,7 +29,16 @@ export function stepWorld(world: World, input: InputFrame): void {
   // presses during hit-stop still buffer; that is what makes chaining feel responsive
   capturePlayerInput(world, input)
 
-  if (world.freeze > 0) { world.freeze--; return }
+  if (world.freeze > 0) {
+    world.freeze--
+    // Nothing moves during hit-stop, so collapse the interpolation to a no-op. The enemy/projectile
+    // snapshot lives inside the slow-motion gate below, which this early return skips: leaving px/py
+    // stale makes every frozen frame re-lerp the last tick of motion as the loop's alpha resets, so
+    // a struck body jitters backwards for the whole freeze instead of holding the impact pose.
+    for (const e of world.enemies) if (e.active) { e.px = e.x; e.py = e.y }
+    for (const b of world.projectiles) if (b.active) { b.px = b.x; b.py = b.y }
+    return
+  }
 
   if (world.slowmoTicks > 0 && --world.slowmoTicks === 0) world.timeScale = 1
   if (world.slowTicks > 0 && --world.slowTicks === 0) clearBulletTime(world)

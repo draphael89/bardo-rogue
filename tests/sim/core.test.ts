@@ -160,6 +160,37 @@ describe('dodge', () => {
   })
 })
 
+describe('hit-stop', () => {
+  it('holds every body exactly still while the sim is frozen', () => {
+    const w = createWorld(1, 'dummy')
+    const dummy = w.enemies.find(e => e.active)!
+    const p = w.player
+    p.x = dummy.x - 14; p.y = dummy.y
+    let froze = false
+    for (let t = 0; t < 30 && !froze; t++) {
+      stepWorld(w, { ...emptyInput(), attack: t === 0, aimX: 1, aimY: 0 })
+      w.events.length = 0
+      froze = w.freeze > 0
+    }
+    expect(froze, 'no hit-stop happened').toBe(true)
+
+    // px/py are the renderer's interpolation source. If they drift from x/y on a frozen tick, the
+    // loop's alpha resets every tick and the body re-runs its last motion instead of holding the pose.
+    let checked = 0
+    while (w.freeze > 0) {
+      stepWorld(w, emptyInput())
+      w.events.length = 0
+      for (const e of w.enemies) {
+        if (!e.active) continue
+        expect(e.px, `enemy ${e.id} px drifts during hit-stop`).toBeCloseTo(e.x, 9)
+        expect(e.py, `enemy ${e.id} py drifts during hit-stop`).toBeCloseTo(e.y, 9)
+      }
+      checked++
+    }
+    expect(checked).toBeGreaterThan(0)
+  })
+})
+
 describe('attack responsiveness', () => {
   const ms = (ticks: number) => Math.round(ticks * 1000 / 60)
 

@@ -10,23 +10,30 @@ import { registerSaveIpc } from './ipc-saves.cjs'
 const SCHEME = 'app'
 const HOST = 'bardo'
 const APP_ORIGIN = `${SCHEME}://${HOST}`
-const DEV_URL = process.env.BARDO_DEV_URL ?? 'http://localhost:5173'
-const MODE = process.env.BARDO_DESKTOP_MODE                 // 'dev' | 'packaged'; otherwise app.isPackaged decides
+
+// Every environment override below is a DEVELOPMENT AND TEST hook, and a packaged app ignores all of
+// them. BARDO_DESKTOP_MODE=dev on a shipped build would otherwise point the app -- carrying its
+// save-file bridge -- at an http origin, and the navigation fence, the IPC sender check and the CSP
+// all key off that same decision, so they would follow it there.
+const devHook = (name: string): string | undefined => (app.isPackaged ? undefined : process.env[name])
+
+const DEV_URL = devHook('BARDO_DEV_URL') ?? 'http://localhost:5173'
+const MODE = devHook('BARDO_DESKTOP_MODE')                  // 'dev' | 'packaged'; otherwise app.isPackaged decides
 const isDev = MODE === 'packaged' ? false : MODE === 'dev' ? true : !app.isPackaged
-const START_QUERY = process.env.BARDO_QUERY ?? ''           // '?scenario=wave1&seed=3' for the harness
+const START_QUERY = devHook('BARDO_QUERY') ?? ''            // '?scenario=wave1&seed=3' for the harness
 
 app.setName('Bardo Rogue')
 
 // Headless Linux only: this container's Electron blocklists WebGL outright without these. NEVER set
 // on the shipped mac app.
-if (process.env.BARDO_SOFTWARE_GL === '1') {
+if (devHook('BARDO_SOFTWARE_GL') === '1') {
   app.commandLine.appendSwitch('use-gl', 'angle')
   app.commandLine.appendSwitch('use-angle', 'swiftshader')
   app.commandLine.appendSwitch('enable-unsafe-swiftshader')
 }
 
 // Must happen at module top, before anything resolves a path: setPath after ready is too late.
-const userDataOverride = process.env.BARDO_USER_DATA_DIR
+const userDataOverride = devHook('BARDO_USER_DATA_DIR')
 if (userDataOverride) {
   const dir = path.resolve(userDataOverride)
   mkdirSync(dir, { recursive: true })
@@ -51,7 +58,7 @@ protocol.registerSchemesAsPrivileged([{
 // instead, so the repo's own dist/ is two levels up. First candidate that actually holds an
 // index.html wins, which keeps both paths working without a mode flag.
 const DIST = [
-  process.env.BARDO_DIST,
+  devHook('BARDO_DIST'),
   path.join(app.getAppPath(), 'dist'),
   path.resolve(__dirname, '..', '..', 'dist'),
 ].filter((d): d is string => !!d).find(d => existsSync(path.join(d, 'index.html')))
@@ -228,7 +235,7 @@ function createWindow(): BrowserWindow {
     },
   })
   if (s.maximized) w.maximize()
-  w.once('ready-to-show', () => { w.show(); if (process.env.BARDO_DEVTOOLS === '1') w.webContents.openDevTools({ mode: 'detach' }) })
+  w.once('ready-to-show', () => { w.show(); if (devHook('BARDO_DEVTOOLS') === '1') w.webContents.openDevTools({ mode: 'detach' }) })
 
   let timer: NodeJS.Timeout | null = null
   const persist = (): void => { if (timer) clearTimeout(timer); timer = setTimeout(() => saveWindowState(w), 400) }

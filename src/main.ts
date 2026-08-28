@@ -65,7 +65,11 @@ async function boot() {
   const savable = loaded.writable
   if (loaded.source === 'backup') console.log('[save] the live save was unreadable; recovered from the backup copy')
   if (!savable) console.log('[save] this save was written by a newer build; it will not be overwritten')
-  let reducedEffects = q.has('reduced') ? q.get('reduced') !== '0' : savedSave.settings.reducedEffects
+  // Two values on purpose: what the save document says, and what this session is actually rendering.
+  // `?reduced=` is a debug override of the second only -- persisting it would let a URL param
+  // permanently rewrite a player's setting the next time any autosave fires.
+  let storedReducedEffects = savedSave.settings.reducedEffects
+  let reducedEffects = q.has('reduced') ? q.get('reduced') !== '0' : storedReducedEffects
   let world: World = createWorld(seed, scenario, { god, ...(scenario === 'loop' ? { meta: savedSave.meta } : {}) })
   let userPaused = false
   let metrics = new Metrics()
@@ -114,7 +118,7 @@ async function boot() {
   }
   const persist = () => {
     if (!savable) return
-    savedSave = bumpRevision({ ...savedSave, settings: { version: 1, reducedEffects } })
+    savedSave = bumpRevision({ ...savedSave, settings: { version: 1, reducedEffects: storedReducedEffects } })
     queued = serializeSave(savedSave)      // only the newest payload survives; older ones are stale by definition
     drain()
   }
@@ -224,6 +228,7 @@ async function boot() {
     if (world.session.run) { presenter.hud.showBanner('A RUN IS UNDERWAY', 'return to the bardo first', 2.2); return }
     savedSave = parsed.save
     reducedEffects = savedSave.settings.reducedEffects
+    storedReducedEffects = reducedEffects
     presenter.setReducedEffects(reducedEffects)
     persist()
     userPaused = false; loop.paused = false
@@ -238,6 +243,7 @@ async function boot() {
     if ((e.code === 'Escape' || e.code === 'KeyP') && !e.repeat) { e.preventDefault(); userPaused = !userPaused; loop.paused = userPaused }
     if (e.code === 'KeyV' && !e.repeat) {
       reducedEffects = !reducedEffects
+      storedReducedEffects = reducedEffects        // an explicit player choice, so it is the one that persists
       presenter.setReducedEffects(reducedEffects)
       persist()
     }

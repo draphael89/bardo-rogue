@@ -1,0 +1,46 @@
+GIMP Palette
+Name: bardo.canon
+Columns: 8
+#
+  4   3  10	well
+  8   7  14	void
+ 12   8  22	wellHi
+ 10  12  18	mortar
+ 12  14  22	grout
+ 14  18  44	sky
+ 18  20  28	seal0
+ 42  14  28	purple0
+ 38  26  22	woodLo
+ 28  36  52	slate0
+ 38  38  46	iron
+ 78  28  46	purple1
+ 60  42  34	wood
+ 46  58  78	slate1
+ 52  60  76	nave0
+118  46  64	purple2
+ 92  66  48	woodHi
+176  48  16	emberLo
+ 76  76  86	ironHi
+ 66  80 102	slate2
+ 90  78  66	boneLo
+ 92  80  58	naveWarm
+ 72  82  98	nave1
+158  70  88	purple3
+ 88 102 124	slate3
+ 94 104 118	nave2
+140 112  64	goldDim
+118 126 142	brickLo
+144 128 108	boneDim
+118 132 154	slateHi
+255 122  24	ember
+148 156 172	brick
+212 176  96	gold
+208 192 168	bone
+188 194 208	brickHi
+255 186  96	sill
+176 196 255	star
+255 204  86	emberHi
+240 208 128	goldHot
+210 216 226	cope
+255 226 160	goldStar
+236 240 246	copeHi

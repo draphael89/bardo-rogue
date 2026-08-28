@@ -7,6 +7,7 @@ import { TILE, ARENA_COLS, ARENA_ROWS } from '@/sim/arena'
 import { lerp, clamp01, easeOutCubic, lerpAngle } from '../anim'
 import { BRUTE_COMMIT_LEAD as COMMIT_LEAD } from '@/sim/enemies/brute'
 import { EntityView, HALF_PI, type EnemyFrame, type Pose } from './shared'
+import type { Sheet } from '../sheet'
 
 // ONE CLOCK.
 // From the tick the brute plants (enemyWindup) to the tick the hammer touches you (playerHurt) is
@@ -30,42 +31,24 @@ const CONTACT_LEAD = 1     // attack stateTick on which the sim's arc first test
 const WINDUP_RISE = 7      // px the body climbs across the wind-up — monotone, and the shadow shrinks with it
 const RUNG_GAP = 7         // px between the marching rungs: three of them span 14px of "time to arrival"
 
-const BRUTE = {
-  idle: 0, chase: 1, windupEarly: 2, windupCommit: 3,
-  release: 4, contact: 5, recover: 6, hurt: 7,
-} as const
-
-// Generated cells preserve the drawing, not a uniform registration point. These pivots locate the
-// planted foot under the simulation body; without them the low contact/recovery poses jump upward.
-const BRUTE_PIVOT: readonly (readonly [number, number])[] = [
-  [18, 46], [28, 46], [23, 46], [25, 46],
-  [18, 46], [19, 46], [18, 46], [18, 46],
-]
-// Authored texture coordinates of the square maul head. The tell uses this physical point for its
-// charge and falling motes; retaining the hidden legacy weapon's transform makes the glow float.
-const BRUTE_HEAD: Readonly<Partial<Record<number, readonly [number, number]>>> = {
-  [BRUTE.windupEarly]: [15, 8],
-  [BRUTE.windupCommit]: [19, 7],
-  [BRUTE.release]: [43, 40],
-  [BRUTE.contact]: [43, 42],
-}
-type BruteArt = { frames: Texture[]; whites: Texture[] }
-const bruteArt = new WeakMap<EntityView, BruteArt>()
+// Frame names, per-pose foot pivots, and the maul-head socket all live in the sheet's sidecar
+// (`public/assets/sprites/bardo_brute.json`). The pivots matter: generated cells preserve the
+// drawing, not a uniform registration point, so without them the low contact and recovery poses jump
+// upward. The `maulHead` socket is the physical point the tell hangs its emissive charge and falling
+// motes on; drive it from the hidden legacy weapon's transform instead and the glow floats.
+const bruteArt = new WeakMap<EntityView, Sheet>()
 
 export function bindBruteArt(v: EntityView, atlas: Atlas): void {
-  bruteArt.set(v, {
-    frames: Array.from({ length: 8 }, (_, i) => atlas.brute(i)),
-    whites: Array.from({ length: 8 }, (_, i) => atlas.bruteWhite(i)),
-  })
+  bruteArt.set(v, atlas.sheet('bardo_brute'))
 }
 
-export function bruteFrameIndex(e: Enemy): number {
-  if (e.flash > 0 || e.state === 'stagger') return BRUTE.hurt
-  if (e.state === 'windup') return e.stateTick < Math.ceil(tuning.brute.windup * 0.55) ? BRUTE.windupEarly : BRUTE.windupCommit
-  if (e.state === 'attack') return e.stateTick <= tuning.brute.lungeTicks ? BRUTE.release : BRUTE.contact
-  if (e.state === 'recover') return BRUTE.recover
-  if (e.state === 'chase' && Math.hypot(e.vx, e.vy) > 5) return BRUTE.chase
-  return BRUTE.idle
+export function bruteFrameName(e: Enemy): string {
+  if (e.flash > 0 || e.state === 'stagger') return 'hurt'
+  if (e.state === 'windup') return e.stateTick < Math.ceil(tuning.brute.windup * 0.55) ? 'windupEarly' : 'windupCommit'
+  if (e.state === 'attack') return e.stateTick <= tuning.brute.lungeTicks ? 'release' : 'contact'
+  if (e.state === 'recover') return 'recover'
+  if (e.state === 'chase' && Math.hypot(e.vx, e.vy) > 5) return 'chase'
+  return 'idle'
 }
 
 function tellSpan(): number { return tuning.brute.windup + tuning.brute.lungeTicks + CONTACT_LEAD }
@@ -111,17 +94,18 @@ export function updateBruteView(v: EntityView, e: Enemy, f: EnemyFrame, out: Pos
     rot = -e.facing * 0.5 + Math.sin(time * 55) * 0.05; sx = 0.9; sy = 1.1
   } else sy = 1 + Math.sin(time * 3) * 0.03
   const art = bruteArt.get(v)
-  const frame = art ? bruteFrameIndex(e) : -1
   updateBruteWeapon(v, e, f.x, f.y, f.alpha, hop)
   if (art) {
-    v.bindBody(art.frames[frame], art.whites[frame])
-    v.body.anchor.set(BRUTE_PIVOT[frame][0] / 48, BRUTE_PIVOT[frame][1] / 48)
+    const frame = art.frame(bruteFrameName(e))
+    v.bindBody(frame.texture, frame.white)
+    v.body.anchor.set(frame.anchorX, frame.anchorY)
     if (v.weapon) v.weapon.visible = false
-    const authoredHead = BRUTE_HEAD[frame]
+    const authoredHead = frame.sockets.maulHead
     if (authoredHead) {
       const feetY = f.y + e.radius + 1
-      head.x = Math.round(f.x + (authoredHead[0] - BRUTE_PIVOT[frame][0]) * e.facing)
-      head.y = Math.round(feetY + authoredHead[1] - BRUTE_PIVOT[frame][1])
+      const cell = art.def.cell
+      head.x = Math.round(f.x + (authoredHead[0] - frame.anchorX * cell) * e.facing)
+      head.y = Math.round(feetY + authoredHead[1] - frame.anchorY * cell)
     }
     // Each semantic frame already contains body, hands, and maul. The old transforms would bend the
     // complete drawing back into a puppet and move the contact pose away from the real hit tick.

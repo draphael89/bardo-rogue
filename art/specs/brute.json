@@ -1,0 +1,157 @@
+{
+  "id": "actor.brute",
+  "kind": "character",
+  "input": "art/source/bardo_brute_alpha_v1.png",
+  "output": "public/assets/sprites/bardo_brute.png",
+  "sidecar": "public/assets/sprites/bardo_brute.json",
+  "cell": 48,
+  "cols": 4,
+  "rows": 2,
+  "maxColors": 16,
+  "palette": [
+    "mortar",
+    "slate0",
+    "iron",
+    "ironHi",
+    "slate3",
+    "slateHi",
+    "brick",
+    "purple0",
+    "purple1",
+    "purple2",
+    "purple3",
+    "boneLo",
+    "boneDim",
+    "bone",
+    "ember",
+    "wood"
+  ],
+  "paletteNote": "Sixteen canon colours. First pass put emberLo in this ramp and the wine apron drifted to fire-red: a lifted dark wine lands nearer a strong red than a dark purple, so the Brute read as burning rather than aproned. Wine now owns a full four-step ramp (purple0..3) and ember is kept as a single slot for the mask slit - the only heat he owns, and SS6.7 reserves it for the committed attack. No gold: gold marks a threshold (SS8.2.2) and he is not one.",
+  "facing": "east",
+  "mirror": true,
+  "fit": "pose",
+  "margin": 2,
+  "chromaKey": true,
+  "coverage": 0.5,
+  "valueLift": {
+    "targetMean": 0.27
+  },
+  "valueLiftNote": "The Brute compiled at mean luminance 0.126 against a rendered floor of 0.130 - Weber -0.03, literally darker than the stone he stands on, which is the wave-2 defect that made enemies vanish mid-fight. Lifted in OKLab so the wine apron and iron shoulder keep their chroma and only their lighting changes. Swept 0.25/0.27/0.30 against the gates and by eye: 0.25 lands Weber exactly on the 1.00 threshold with no margin, 0.30 clears it but bleaches the upper mass toward bone and the iron stops reading as iron. 0.27 is the one that buys legibility without spending the material.",
+  "salience": {
+    "minShare": 0.22,
+    "minDelta": 0.16
+  },
+  "note": "The generated sheet is square regardless of its 4x2 grid, so cells are twice as tall as wide; 'pose' fit crops each silhouette before fitting so the Brute is not vertically compressed. Pivots locate the planted foot under the simulation body \u2014 generated cells preserve the drawing, not a uniform registration point. maulHead sockets are where the tell hangs its emissive charge and falling motes; without them the glow floats off the weapon.",
+  "frames": [
+    {
+      "name": "idle",
+      "i": 0,
+      "pivot": [
+        18,
+        46
+      ]
+    },
+    {
+      "name": "chase",
+      "i": 1,
+      "pivot": [
+        28,
+        46
+      ]
+    },
+    {
+      "name": "windupEarly",
+      "i": 2,
+      "pivot": [
+        23,
+        46
+      ],
+      "sockets": {
+        "maulHead": [
+          15,
+          8
+        ]
+      }
+    },
+    {
+      "name": "windupCommit",
+      "i": 3,
+      "pivot": [
+        25,
+        46
+      ],
+      "sockets": {
+        "maulHead": [
+          19,
+          7
+        ]
+      }
+    },
+    {
+      "name": "release",
+      "i": 4,
+      "pivot": [
+        18,
+        46
+      ],
+      "sockets": {
+        "maulHead": [
+          43,
+          40
+        ]
+      }
+    },
+    {
+      "name": "contact",
+      "i": 5,
+      "pivot": [
+        19,
+        46
+      ],
+      "sockets": {
+        "maulHead": [
+          43,
+          42
+        ]
+      }
+    },
+    {
+      "name": "recover",
+      "i": 6,
+      "pivot": [
+        18,
+        46
+      ]
+    },
+    {
+      "name": "hurt",
+      "i": 7,
+      "pivot": [
+        18,
+        46
+      ]
+    }
+  ],
+  "clips": {
+    "attack": {
+      "frames": [
+        "windupEarly",
+        "windupCommit",
+        "release",
+        "contact",
+        "recover"
+      ],
+      "timing": "sim",
+      "sim": {
+        "ref": "brute",
+        "contact": "contact"
+      }
+    }
+  },
+  "provenance": {
+    "provider": "openai",
+    "model": "gpt-image (built-in tool)",
+    "approvedReference": "art/source/bardo_brute_alpha_v1.png",
+    "promptHash": "see art/bardo-combat-sprites.md"
+  }
+}

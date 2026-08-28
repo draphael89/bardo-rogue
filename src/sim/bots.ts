@@ -4,6 +4,7 @@ import { emptyInput, type InputFrame } from './input'
 import { tuning } from '@/tuning'
 import { hasLineOfSight, overlapsSolid } from './collision'
 import { WARDEN_PATTERN, wardenWindup } from './enemies/warden'
+import { wardenLaneThreatensPoint, wardenProjectileAngle, wardenProjectileContract } from './enemies/warden-contract'
 
 export type Bot = (world: World) => InputFrame
 export type BotName = 'idle' | 'naive-melee' | 'kite' | 'slice-naive' | 'slice-kite'
@@ -97,6 +98,19 @@ function aimAt(inp: InputFrame, world: World, e: Enemy): number {
   return d
 }
 
+function wardenProjectileThreatensPlayer(world: World, e: Enemy): boolean {
+  const pattern = e.pattern === WARDEN_PATTERN.ring ? 'ring' : e.pattern === WARDEN_PATTERN.fan ? 'fan' : null
+  if (!pattern) return false
+  const contract = wardenProjectileContract(pattern, e.actionPhase)
+  for (let volley = 0; volley < contract.volleys; volley++) {
+    for (let i = 0; i < contract.count; i++) {
+      const angle = wardenProjectileAngle(contract, e.aimAngle, e.patternCursor, i, volley)
+      if (wardenLaneThreatensPoint(world.arena, e.x, e.y, angle, contract, world.player.x, world.player.y)) return true
+    }
+  }
+  return false
+}
+
 // Walks at the nearest enemy and mashes attack. Dodges only when a brute is mid-windup nearby.
 function naiveMelee(world: World): InputFrame {
   const inp = emptyInput()
@@ -123,22 +137,33 @@ function kite(world: World): InputFrame {
   const threat = world.enemies.some(x => {
     if (!x.active || x.state === 'dead') return false
     if (x.state !== 'windup' && x.state !== 'freeze') return false
-    if (x.kind === 'warden' && x.pattern !== WARDEN_PATTERN.slam) return false
-    const reach = x.kind === 'warden' ? tuning.warden.slamRadius + 8 : 48
-    if (Math.hypot(x.x - p.x, x.y - p.y) >= reach) return false
+    if (x.kind === 'warden') {
+      const late = x.stateTick > wardenWindup(x) - 10
+      if (!late) return false
+      if (x.pattern === WARDEN_PATTERN.ring || x.pattern === WARDEN_PATTERN.fan) {
+        return wardenProjectileThreatensPlayer(world, x)
+      }
+      return Math.hypot(x.x - p.x, x.y - p.y) < tuning.warden.slamRadius + tuning.player.radius
+    }
+    if (Math.hypot(x.x - p.x, x.y - p.y) >= 48) return false
     // Land the Warden roll inside the newly authored full-travel i-frame window. The old fixed
     // tick 20 launched too early for the 36-tick tell and was already in landing when the slam hit.
-    const late = x.kind === 'brute' ? 12 : x.kind === 'warden' ? wardenWindup(x) - 10 : 10
+    const late = x.kind === 'brute' ? 12 : 10
     return x.stateTick > late
   })
-  const incomingBolt = world.projectiles.some(b => b.active && Math.hypot(b.x - p.x, b.y - p.y) < 22)
+  const incomingBolt = world.projectiles.find(b => b.active && b.team === 0
+    && Math.hypot(b.x - p.x, b.y - p.y) < 22
+    && (p.x - b.x) * b.vx + (p.y - b.y) * b.vy > 0)
   if ((threat || incomingBolt) && p.state !== 'dodge') {
     inp.dodge = true
     // Prefer the old left-hand sidestep, but do not ask the collision regression probe to roll into
     // a pillar when the equally valid opposite lane is open. This keeps the bot measuring combat
     // decisions instead of an obsolete corner-pop escape.
-    const left = { x: -inp.aimY, y: inp.aimX }
-    const right = { x: inp.aimY, y: -inp.aimX }
+    const boltSpeed = incomingBolt ? Math.hypot(incomingBolt.vx, incomingBolt.vy) || 1 : 1
+    const axisX = incomingBolt ? incomingBolt.vx / boltSpeed : inp.aimX
+    const axisY = incomingBolt ? incomingBolt.vy / boltSpeed : inp.aimY
+    const left = { x: -axisY, y: axisX }
+    const right = { x: axisY, y: -axisX }
     const room = (d: { x: number; y: number }) => {
       let clear = 0
       for (let n = 8; n <= tuning.player.dodge.distance; n += 8) {

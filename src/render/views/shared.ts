@@ -1,5 +1,7 @@
 import { Container, Sprite, Texture } from 'pixi.js'
 import type { Atlas } from '../atlas'
+import type { ContactClass } from '../contact'
+import type { EnemyKind } from '@/sim/events'
 
 // Kenney Tiny Dungeon indices (atlas.tile / atlas.white, 12 columns).
 export const SPRITE = { player: 96, brute: 109, caster: 84, charger: 122, dummy: 54, warden: 109 } as const
@@ -13,6 +15,9 @@ export class EntityView {
   squash = 0
   redFlash = 0
   hitAngle = 0             // latest contact direction; persists through the full held flinch
+  hitClass: ContactClass = 'body'
+  hitKind: EnemyKind = 'dummy'
+  hitHeavy = false
   private normalTex; private whiteTex
   constructor(atlas: Atlas, tile: number, weaponTile: number | null, layers: { entities: Container; shadows: Container }) {
     this.normalTex = atlas.tile(tile); this.whiteTex = atlas.white(tile)

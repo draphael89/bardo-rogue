@@ -4,7 +4,7 @@ import { emptyInput } from '@/sim/input'
 import { stepWorld } from '@/sim/step'
 import { TILE } from '@/sim/arena'
 import { activeBoons, applyBrand, BOONS, grantBoon, hasBoon, resolveWeaponOnHit, triggerPerfectDodge } from '@/sim/boons'
-import { damageEnemy, hurtPlayer } from '@/sim/combat'
+import { damageEnemyForTest, hurtPlayer } from '@/sim/combat'
 import { hashWorld } from '@/sim/hash'
 import { loadMeta, loadSettings, META_KEY, saveMeta, saveSettings, SETTINGS_KEY, type StorageLike } from '@/sim/storage'
 import { tuning } from '@/tuning'
@@ -254,7 +254,7 @@ describe('boon interactions', () => {
     expect(marked.brand).toBe(3)
     const hp = nearby.hp
     const brand = marked.brand
-    damageEnemy(world, marked, 1, 0, 0, true, 0)
+    damageEnemyForTest(world, marked, 1, 0, 0, true, 0)
     resolveWeaponOnHit(world, marked, true, brand, 0)
     expect(marked.brand).toBe(0)
     expect(nearby.hp).toBe(hp - brand * tuning.boons.judgmentDamage)
@@ -269,7 +269,7 @@ describe('boon interactions', () => {
     grantBoon(world, 'finalJudgment')
     triggerPerfectDodge(world)
     const nearbyHp = nearby.hp
-    damageEnemy(world, marked, 1, 0, 0, true, 0)
+    damageEnemyForTest(world, marked, 1, 0, 0, true, 0)
     resolveWeaponOnHit(world, marked, true, 0, 0)
     expect(world.session.run?.primedBrand).toBe(false)
     expect(marked.brand).toBe(0)

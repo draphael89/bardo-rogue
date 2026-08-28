@@ -24,6 +24,8 @@ export function returnToHub(world: World): void {
   p.flash = 0
   p.dodgeRead = 0
   p.dodgeProcTick = -1
+  p.reversalTicks = 0
+  p.reversalActionId = -1
   p.vx = p.vy = 0
   p.kbx = p.kby = 0
   p.controlTick = 0

@@ -2,7 +2,7 @@ import { tuning, DT } from '@/tuning'
 import type { Player, World } from './world'
 import type { InputFrame } from './input'
 import { hasLineOfSight, moveWithWalls } from './collision'
-import { arcHits, damageEnemy, addFreeze, addBulletTime, swingProgress, swingStep } from './combat'
+import { arcHits, damageEnemy, addFreeze, addBulletTime, clearBulletTime, swingProgress, swingStep } from './combat'
 import { hasBoon, resolveWeaponOnHit, swingReach } from './boons'
 import { ARM, armOf } from './weapons'
 import { bowMoveScale, bowSteer, looseArrow, startDraw } from './bow'
@@ -212,6 +212,12 @@ export function updatePlayer(world: World, input: InputFrame): void {
     const s = P.attack.swings[p.swingIndex]
     const k = p.stateTick - s.startup
     if (k >= 0 && k < s.active) {
+      // The answer, not merely the button press, closes the perfect-dodge breath. Startup remains
+      // readable and unsafe; the hostile clock returns on the first live blade tick, hit or whiff.
+      if (k === 0 && p.reversalActionId === p.swingId) {
+        clearBulletTime(world)
+        p.reversalActionId = -1
+      }
       // the live sector runs from the swing's start edge to wherever the blade has reached this tick
       const reach = swingReach(world, s)
       const spanDeg = reach.arcDeg * swingProgress(s, k)
@@ -230,6 +236,7 @@ export function updatePlayer(world: World, input: InputFrame): void {
             direction: toward,
             sweep: s.sweep,
             cleave: !s.heavy && hasBoon(world, 'cleave'),
+            contactDepth: Math.hypot(e.x - p.x, e.y - p.y) / Math.max(1, reach.radius),
           })
           resolveWeaponOnHit(world, e, s.heavy, brandBefore, toward, p.swingId)
         }
@@ -260,6 +267,9 @@ export function updatePlayer(world: World, input: InputFrame): void {
       }
     }
   }
+  // Age the opening after transitions so all twenty advertised player-clock ticks are actionable.
+  // Hit-stop never reaches updatePlayer and therefore never consumes one.
+  if (p.reversalTicks > 0) p.reversalTicks--
 }
 
 // A cut bolt costs its caster: it is dragged toward the cut and opened up. Only the owner pays, and
@@ -275,7 +285,14 @@ function punishBoltOwner(world: World, boltId: number, cx: number, cy: number): 
 
 function startDodge(world: World): void {
   const p = world.player
+  // Cancelling a Reversal draw is a choice too; it cannot preserve the slow world for a free escape.
+  if (p.state === 'attack' && p.reversalActionId === p.swingId) {
+    clearBulletTime(world)
+    p.reversalActionId = -1
+  }
   p.state = 'dodge'; p.stateTick = 0; p.dodgeTick = 0; p.dodgeQueuedAt = -1; p.dodgeRead = 0
+  // Choosing another escape relinquishes the opening earned by the previous read.
+  p.reversalTicks = 0
   p.bladeActionConnected = false
   if (Math.abs(p.dodgeDirX) > 0.2) p.facing = p.dodgeDirX >= 0 ? 1 : -1   // head-first along the roll
   // the direction was latched at the press (capturePlayerInput) and is never re-read here
@@ -283,9 +300,21 @@ function startDodge(world: World): void {
 }
 
 function beginAttack(world: World): void {
-  if (!world.player.armed) return
+  const p = world.player
+  if (!p.armed) return
+  const reversal = p.reversalTicks > 0
   if (armOf(world) === ARM.bow) startDraw(world)
   else startSwing(world, 0)
+  if (reversal) {
+    p.reversalTicks = 0
+    p.reversalActionId = p.swingId
+    // The dodge created the breath; the follow-up belongs to the player. The live blade/loosed
+    // arrow closes it, so startup remains a legible setup rather than a hidden fixed combo script.
+    world.emit({
+      type: 'reversal', x: p.x, y: p.y, angle: p.swingAngle, actionId: p.swingId,
+      weapon: armOf(world) === ARM.bow ? 'bow' : 'blade',
+    })
+  }
 }
 
 function startSwing(world: World, index: number): void {

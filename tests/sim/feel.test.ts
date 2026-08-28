@@ -76,6 +76,86 @@ describe('dodge feel', () => {
     expect(safeTicks).toEqual(Array.from({ length: d.travel }, (_, i) => i))
   })
 
+  it('never makes an ordinary roll-cancel blade active during dodge safety', () => {
+    const w = createWorld(1, 'empty')
+    const d = tuning.player.dodge
+    const s = tuning.player.attack.swings[0]
+    let firstActiveDodgeTick = -1
+    let firstActiveWasSafe = true
+    for (let t = 0; t < d.total; t++) {
+      stepWorld(w, { ...emptyInput(), dodge: t === 0, attack: t === d.attackCancelFrom, moveX: 1 })
+      if (w.player.state === 'attack' && w.player.stateTick === s.startup) {
+        firstActiveDodgeTick = w.player.dodgeTick
+        firstActiveWasSafe = isPlayerDodgeInvulnerable(w)
+        break
+      }
+      w.events.length = 0
+    }
+    expect(firstActiveDodgeTick).toBe(d.travel)
+    expect(firstActiveWasSafe).toBe(false)
+  })
+
+  it('turns a true pass-through into a player-ended Reversal window', () => {
+    const w = createWorld(2, 'empty')
+    const p = w.player
+    const d = tuning.player.dodge
+    stepWorld(w, { ...emptyInput(), dodge: true, moveX: 1 })
+    expect(hurtPlayer(w, 0, 1)).toBe(false)
+    expect(p.reversalTicks).toBe(d.reversalWindow)
+    expect(w.slowTicks).toBe(tuning.bullet.ticks)
+
+    while (p.stateTick < d.attackCancelFrom - 1) {
+      w.events.length = 0
+      stepWorld(w, emptyInput())
+    }
+    w.events.length = 0
+    stepWorld(w, { ...emptyInput(), attack: true, aimX: 1 })
+
+    const reversal = w.events.find(e => e.type === 'reversal')
+    expect(reversal?.type).toBe('reversal')
+    if (reversal?.type !== 'reversal') return
+    expect(reversal.actionId).toBe(p.swingId)
+    expect(p.reversalActionId).toBe(p.swingId)
+    expect(p.reversalTicks).toBe(0)
+    expect(w.slowTicks).toBeGreaterThan(0)
+    while (p.stateTick < tuning.player.attack.swings[0].startup) {
+      w.events.length = 0
+      stepWorld(w, emptyInput())
+    }
+    expect(w.slowTicks).toBe(0)
+    expect(w.slowRate).toBe(1000)
+  })
+
+  it('cannot preserve Reversal slow-motion by cancelling a bow draw', () => {
+    const w = createWorld(3, 'bow')
+    const p = w.player
+    const d = tuning.player.dodge
+    stepWorld(w, { ...emptyInput(), dodge: true, moveX: 1 })
+    hurtPlayer(w, 0, 1)
+    while (p.stateTick < d.attackCancelFrom - 1) stepWorld(w, emptyInput())
+    stepWorld(w, { ...emptyInput(), attack: true, aimX: 1 })
+    expect(p.reversalActionId).toBe(p.swingId)
+    while (p.stateTick < tuning.bow.dodgeCancelFrom - 1) stepWorld(w, emptyInput())
+    stepWorld(w, { ...emptyInput(), dodge: true, moveX: -1 })
+    expect(p.state).toBe('dodge')
+    expect(w.slowTicks).toBe(0)
+    expect(w.slowRate).toBe(1000)
+  })
+
+  it('keeps every advertised Reversal player tick actionable and expires immediately after', () => {
+    const accepted = createWorld(7, 'empty')
+    accepted.player.reversalTicks = tuning.player.dodge.reversalWindow
+    for (let i = 0; i < tuning.player.dodge.reversalWindow - 1; i++) stepWorld(accepted, emptyInput())
+    stepWorld(accepted, { ...emptyInput(), attack: true })
+    expect(accepted.events.some(e => e.type === 'reversal')).toBe(true)
+
+    const expired = createWorld(8, 'empty')
+    expired.player.reversalTicks = tuning.player.dodge.reversalWindow
+    for (let i = 0; i < tuning.player.dodge.reversalWindow; i++) stepWorld(expired, emptyInput())
+    stepWorld(expired, { ...emptyInput(), attack: true })
+    expect(expired.events.some(e => e.type === 'reversal')).toBe(false)
+  })
+
   it('does not swing if the cancel is asked one tick too early — it waits', () => {
     const w = createWorld(1, 'empty')
     const from = tuning.player.dodge.attackCancelFrom
@@ -111,6 +191,51 @@ describe('dodge feel', () => {
     expect(p.hp).toBe(hp)
     expect(p.dodgeProcTick).toBe(-1)
     expect(w.events.some(e => e.type === 'dodged')).toBe(false)
+  })
+
+  it('does not turn residual hurt immunity during travel into a perfect read', () => {
+    const w = createWorld(4, 'empty')
+    const p = w.player
+    p.iframes = tuning.player.hurtIFrames
+    stepWorld(w, { ...emptyInput(), dodge: true, moveX: 1 })
+    w.events.length = 0
+
+    expect(hurtPlayer(w, 0, 1)).toBe(false)
+    expect(p.dodgeRead).toBe(0)
+    expect(p.reversalTicks).toBe(0)
+    expect(w.events.some(e => e.type === 'dodged' || e.type === 'reversal')).toBe(false)
+  })
+
+  it('promotes an already-started late roll counter when the threat crosses its startup', () => {
+    const w = createWorld(5, 'empty')
+    const p = w.player
+    const d = tuning.player.dodge
+    stepWorld(w, { ...emptyInput(), dodge: true, moveX: 1 })
+    while (p.stateTick < d.attackCancelFrom - 1) stepWorld(w, emptyInput())
+    stepWorld(w, { ...emptyInput(), attack: true, aimX: 1 })
+    expect(p.state).toBe('attack')
+    expect(isPlayerDodgeInvulnerable(w)).toBe(true)
+    w.events.length = 0
+
+    expect(hurtPlayer(w, 0, 1)).toBe(false)
+    expect(p.reversalActionId).toBe(p.swingId)
+    expect(p.reversalTicks).toBe(0)
+    expect(w.events.some(e => e.type === 'reversal' && e.actionId === p.swingId)).toBe(true)
+  })
+
+  it('promotes an already-started bow counter with the same identity', () => {
+    const w = createWorld(6, 'bow')
+    const p = w.player
+    const d = tuning.player.dodge
+    stepWorld(w, { ...emptyInput(), dodge: true, moveX: 1 })
+    while (p.stateTick < d.attackCancelFrom - 1) stepWorld(w, emptyInput())
+    stepWorld(w, { ...emptyInput(), attack: true, aimX: 1 })
+    w.events.length = 0
+
+    hurtPlayer(w, 0, 1)
+    const reversal = w.events.find(e => e.type === 'reversal')
+    expect(p.reversalActionId).toBe(p.swingId)
+    expect(reversal?.type === 'reversal' && reversal.weapon).toBe('bow')
   })
 })
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ActionFeedbackGate } from '@/render/feedback'
-import { impactStampForHit } from '@/render/contact'
+import { contactClassForHit, contactKillKey, enemyReactionTransform, grazeFeedbackGeometry, impactStampForHit, recognizedContactKills } from '@/render/contact'
 import { createWorld } from '@/sim/scenarios'
 import { emptyInput } from '@/sim/input'
 import { stepWorld } from '@/sim/step'
@@ -39,6 +39,7 @@ describe('immutable contact provenance', () => {
     expect(impactStampForHit(hit)).toEqual(before)
     expect(before.cx).toBe(originX)
     expect(before.source).toBe(kind)
+    expect(before.contactClass).toBe('pierce')
   })
 
   it('snapshots a cleaving blade origin and sweep at the contact tick', () => {
@@ -62,6 +63,76 @@ describe('immutable contact provenance', () => {
     expect(stamp.source).toBe('blade')
     expect(stamp.cx).toBe(hit.originX)
     expect(stamp.cy).toBe(hit.originY)
+    expect(contactClassForHit(hit)).toBe(hit.contactDepth >= tuning.juice.hit.contact.edgeFrom ? 'edge' : 'body')
+  })
+
+  it('separates guard, blade body, blade edge, pierce, and burst without changing damage', () => {
+    const base = {
+      type: 'hit' as const, x: 20, y: 10, angle: 0, damage: 2, attemptedDamage: 2,
+      mitigatedDamage: 0, guarded: false, heavy: false, targetId: 1, kind: 'brute' as const,
+      killed: false, actionId: 1, source: 'blade' as const, originX: 0, originY: 10,
+      direction: 0, sweep: 1, cleave: false, contactDepth: 0.4,
+    }
+    expect(contactClassForHit(base)).toBe('body')
+    expect(contactClassForHit({ ...base, contactDepth: 0.9 })).toBe('edge')
+    expect(contactClassForHit({ ...base, guarded: true })).toBe('guard')
+    expect(contactClassForHit({ ...base, source: 'arrow' })).toBe('pierce')
+    expect(contactClassForHit({ ...base, source: 'judgment' })).toBe('burst')
+    expect(base.damage).toBe(2)
+  })
+
+  it('keeps the floor wake on the threat lane while moving only the air scratch off the actor', () => {
+    const above = grazeFeedbackGeometry({ type: 'graze', x: 100, y: 100, nearX: 100, nearY: 89, angle: 0, source: 'projectile' })
+    const below = grazeFeedbackGeometry({ type: 'graze', x: 100, y: 100, nearX: 100, nearY: 111, angle: 0, source: 'projectile' })
+    expect(above).toMatchObject({ wakeX: 100, wakeY: 89 })
+    expect(below).toMatchObject({ wakeX: 100, wakeY: 111 })
+    expect(above.scratchY).toBe(100)
+    expect(below.scratchY).toBe(100)
+    expect(above.scratchX).not.toBe(below.scratchX)
+    expect(above.drawWake).toBe(true)
+    expect(grazeFeedbackGeometry({ ...above, type: 'graze', x: 100, y: 100, nearX: 100, nearY: 89, angle: 0, source: 'radial' }).drawWake).toBe(false)
+  })
+
+  it('recognizes only the target actually killed at the blade edge', () => {
+    const hit = (targetId: number, killed: boolean, contactDepth: number) => ({
+      type: 'hit' as const, x: targetId * 10, y: 10, angle: 0, damage: 2, attemptedDamage: 2,
+      mitigatedDamage: 0, guarded: false, heavy: false, targetId, kind: 'brute' as const,
+      killed, actionId: 44, source: 'blade' as const, originX: 0, originY: 10,
+      direction: 0, sweep: 1, cleave: false, contactDepth,
+    })
+    const bodyKill = hit(1, true, 0.4)
+    const edgeHit = hit(2, false, 0.9)
+    const edgeKill = hit(3, true, 0.9)
+    for (const events of [[bodyKill, edgeHit, edgeKill], [edgeKill, edgeHit, bodyKill]]) {
+      const recognized = recognizedContactKills(events)
+      expect(recognized.has(contactKillKey(44, 1))).toBe(false)
+      expect(recognized.has(contactKillKey(44, 2))).toBe(false)
+      expect(recognized.has(contactKillKey(44, 3))).toBe(true)
+    }
+  })
+
+  it('keeps a later edge-kill accent independent from the ordinary per-action kill gate', () => {
+    const bodyFirst = new ActionFeedbackGate()
+    expect(bodyFirst.takeKill(44)).toBe(true)
+    expect(bodyFirst.takeAccent(44)).toBe(true)
+    expect(bodyFirst.takeAccent(44)).toBe(false)
+
+    const edgeFirst = new ActionFeedbackGate()
+    expect(edgeFirst.takeAccent(44)).toBe(true)
+    expect(edgeFirst.takeKill(44)).toBe(true)
+    expect(edgeFirst.takeAccent(44)).toBe(false)
+  })
+
+  it('keeps body and weapon translation coherent while restraining weapon lean', () => {
+    const burst = enemyReactionTransform({ ratio: 1, hitClass: 'burst', hitKind: 'caster', hitHeavy: false, hitAngle: 0.4 })
+    expect(burst.lift).toBe(2)
+    expect(burst.weaponLean).toBeCloseTo(burst.bodyLean * 0.6)
+    expect(burst.dx).toBe(Math.round(Math.cos(0.4) * tuning.juice.hit.bodyKick * 0.92 * 1.08))
+    expect(burst.dy).toBe(Math.round(Math.sin(0.4) * tuning.juice.hit.bodyKick * 0.92 * 1.08 * 0.7))
+
+    const guard = enemyReactionTransform({ ratio: 1, hitClass: 'guard', hitKind: 'warden', hitHeavy: true, hitAngle: 0 })
+    const edge = enemyReactionTransform({ ratio: 1, hitClass: 'edge', hitKind: 'warden', hitHeavy: false, hitAngle: 0 })
+    expect(Math.abs(guard.bodyLean)).toBeLessThan(Math.abs(edge.bodyLean))
   })
 
   it('attributes Judgment and bolt backlash to their local causes, not the current swing', () => {

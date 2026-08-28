@@ -132,6 +132,7 @@ export function resolveWeaponOnHit(
         direction: hitAngle,
         sweep: 0,
         cleave: false,
+        contactDepth: Math.hypot(target.x - originX, target.y - originY) / Math.max(1, radius),
       })
     }
   }

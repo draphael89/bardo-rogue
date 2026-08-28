@@ -60,6 +60,7 @@ export function backlash(world: World, e: Enemy, cx: number, cy: number, sourceA
     direction: toCut + Math.PI,
     sweep: 0,
     cleave: false,
+    contactDepth: 1,
   })
   if (!e.active || e.state === 'dead') return
   e.hitDone = true          // marks this stagger as backlash (longer window; the view reads it too)

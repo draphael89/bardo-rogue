@@ -451,6 +451,12 @@ function rollPose(stateTick: number): { key: string; leanDeg: number; hop: numbe
 function attackPose(p: Player): { key: string; leanDeg: number; hop: number } {
   const s = tuning.player.attack.swings[p.swingIndex]
   const tk = p.stateTick
+  if (p.reversalActionId === p.swingId && p.swingIndex === 0 && tk === 0 && Math.abs(p.dodgeDirX) > 0.45) {
+    // A lateral counter borrows the roll's authored extension for one frame before coiling. That is
+    // the missing motion match between the last tuck and the sword pose; vertical sheets keep their
+    // own viewpoint and use the rotational bridge below instead.
+    return { key: 'extend', leanDeg: 10, hop: 0 }
+  }
   if (tk < s.startup) {
     return s.heavy
       ? { key: 'heavyCoil', leanDeg: -14, hop: -2 }
@@ -565,6 +571,14 @@ export function updatePlayerView(v: EntityView, p: Player, world: World, alpha: 
       // authored frame: do not squash it. Lean names the heading the way the roll does.
       rot = deg(pose.leanDeg) * dirSign
       hop = pose.hop
+      if (p.reversalActionId === p.swingId && p.swingIndex === 0) {
+        // Continue the roll's brake into the answer for two startup ticks. Simulation translation
+        // and startup remain untouched; this merely avoids a tuck -> upright-coil pose pop.
+        const bridge = 1 - Math.min(1, (p.stateTick + alpha) / 2)
+        const rollSign = (p.dodgeDirX >= 0 ? 1 : -1) * p.facing
+        rot += deg(10 + 18 * Math.abs(p.dodgeDirY)) * rollSign * bridge
+        hop += bridge
+      }
     } else {
       const s = P.attack.swings[p.swingIndex]
       const tk = p.stateTick + alpha

@@ -50,7 +50,8 @@ export const tuning = {
       landMoveExp: 1.2,     // steering eases in across the landing
       landMoveMin: 0.28,    // first landing tick still has ~27 px/s — a step, not a plant
       wallSlideMinForwardRatio: 0.25, // a 30°+ glance slides; less forward progress meets the wall and lands
-      attackCancelFrom: 8,  // late travel: the swing's own startup covers the rest of the roll
+      attackCancelFrom: 9,  // late travel: light contact begins only after authored i-frames end
+      reversalWindow: 20,   // a true pass-through leaves a short player-clock opening to answer
       buffer: 12,           // maximum age of a discrete request on the player's unfrozen control clock (200 ms)
     },
     attack: {
@@ -96,6 +97,7 @@ export const tuning = {
 
   hitstop: { killBonus: 2, max: 12, boltCut: 3 },
   knockbackDecayTicks: 8,
+  wallSlamMinSpeed: 100, // only committed knockback can author a stone punctuation; no extra damage
 
   // Combat slow-motion. The player and the input poll stay welded to 60 Hz; only enemies and
   // projectiles run on the stretched clock, so your own swing is full speed while the world crawls.
@@ -177,7 +179,9 @@ export const tuning = {
     fanWindup: 30, fanWindup2: 24, fanRecover: 40, fanRecover2: 28,
     fanCount: 3, fanCount2: 5, fanSpreadDeg: 44,
     fanSpeed: 118, fanSpeed2: 128, fanLife: 96,
-    fanAttackTicks: 4, fanVolleyGap: 8, fanVolleys2: 2,
+    // Phase two answers the first spread with a visibly swept return. The sign alternates with the
+    // deterministic pattern cycle, so neither side of the arena becomes a permanent safe habit.
+    fanAttackTicks: 4, fanVolleyGap: 8, fanVolleys2: 2, fanVolleySweepDeg: 18,
     idleTicks: 20,
   },
 
@@ -217,7 +221,9 @@ export const tuning = {
       blessedHitFlashSec: 0.08,
       heavySparks: 16,
       guarded: {
-        screenScale: 0.38, squashTicks: 2, hitFlashSec: 0.017,
+        // An intact veil answers at the contact point. Keep only a trace of screen acknowledgement;
+        // the full camera sentence belongs to a real opening or a kill.
+        screenScale: 0.12, squashTicks: 2, hitFlashSec: 0.017,
         sparks: 3, sparkHot: 0xe8edf0, spark: 0x8798a3,
       },
       // The contact stamp. Two authored shapes, no soft sprites: a crescent of whole pixels UNDER both
@@ -225,6 +231,7 @@ export const tuning = {
       // Six tones in total — an alpha-blended bloom adds forty and reads as a smear, not a shape.
       contact: {
         stepSec: 0.022,          // real-time step between tiers; the hit-stop holds tier 0
+        edgeFrom: 0.72,          // outer blade third gets a sharper contact/reaction class, no damage bonus
         tiers: 3, heavyTiers: 4,
         snapSteps: 16,           // the crescent only ever points one of 16 ways, like an authored sprite
         spanDeg: 74, heavySpanDeg: 104,
@@ -263,6 +270,13 @@ export const tuning = {
       rim: 0xffffff,            // ONE tick of full brightness on the player's silhouette...
       rimTint: 0xa8dcff,        // ...then the cold tone, for the two ticks the mark takes to die
       rimTicks: 3,
+    },
+    // Spending a perfect-dodge opening turns the cold survival mark back toward the sword's amber.
+    // It is intentionally local and short: this is recognition, not another screen-wide reward.
+    reversal: {
+      stepSec: 0.022, tiers: 4, back: 10, front: 15, spread: 4,
+      cold: 0x9fd8ff, seam: 0xf5f0dd, hot: 0xffb34d,
+      zoom: 1.018, trauma: 0.045,
     },
     graze: {
       stepSec: 0.028, tiers: 3, len: 7,

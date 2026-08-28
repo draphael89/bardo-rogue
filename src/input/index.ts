@@ -5,6 +5,7 @@ import { tuning } from '@/tuning'
 import type { World } from '@/sim/world'
 import { hasLineOfSight } from '@/sim/collision'
 import type { RenderApp } from '@/render/app'
+import { ControllerRearm, RetainedExplicitAim } from './ownership'
 
 // Gamepad buttons read as edges. Every index here must be sampled through edge() every tick or its padPrev
 // goes stale and it fires twice.
@@ -14,6 +15,12 @@ const PAD_RESTART = [9]           // start
 const PAD_CHOICE_LEFT = 14
 const PAD_CHOICE_RIGHT = 15
 const PAD_EDGE = new Set([...PAD_ATTACK, ...PAD_DODGE, ...PAD_RESTART, PAD_CHOICE_LEFT, PAD_CHOICE_RIGHT])
+
+function modalInput(world: World): boolean {
+  return world.roomPhase === 'reward'
+    || world.player.state === 'dead'
+    || (world.roomPhase === 'resolved' && !!world.session.run && world.session.run.result !== 'active')
+}
 
 // Keyboard + mouse + gamepad -> one InputFrame per sim tick. Presses between ticks are latched so nothing is dropped.
 export class InputSystem {
@@ -25,6 +32,9 @@ export class InputSystem {
   private mousePressed = false
   private mouseHeld = false
   private padPrev: boolean[] = []
+  private controllerRearm = new ControllerRearm(16)
+  private retainedExplicitAim = new RetainedExplicitAim()
+  private lastModal: boolean | null = null
   private cursorScreen = new Point()
   private cursorWorld = new Point()
   override: InputFrame | null = null   // debug API can force a frame
@@ -43,16 +53,45 @@ export class InputSystem {
     window.addEventListener('blur', () => {
       this.down.clear(); this.pressed.clear()
       this.mousePressed = false; this.mouseHeld = false
+      this.mouseOwnsAim = false
+      this.lockedTargetId = null
+      this.retainedExplicitAim.clear()
+      this.controllerRearm.disarmAll()
     })
     const c = ra.app.canvas
-    c.addEventListener('mousemove', e => { this.mouseX = e.clientX; this.mouseY = e.clientY; this.mouseSeen = true; this.mouseOwnsAim = true })
-    c.addEventListener('mousedown', e => { if (e.button === 0) { this.mousePressed = true; this.mouseHeld = true; this.mouseOwnsAim = true } })
+    c.addEventListener('mousemove', e => {
+      this.mouseX = e.clientX; this.mouseY = e.clientY; this.mouseSeen = true; this.mouseOwnsAim = true
+      this.retainedExplicitAim.clear()
+    })
+    c.addEventListener('mousedown', e => {
+      if (e.button === 0) {
+        this.mousePressed = true; this.mouseHeld = true; this.mouseOwnsAim = true
+        this.retainedExplicitAim.clear()
+      }
+    })
     window.addEventListener('mouseup', e => { if (e.button === 0) this.mouseHeld = false })
     c.addEventListener('contextmenu', e => e.preventDefault())
   }
 
   sample(world: World): InputFrame {
-    if (this.override) { const f = { ...this.override }; this.override = { ...this.override, attack: false, dodge: false, restart: false, choiceDelta: 0, confirm: false }; this.pressed.clear(); this.mousePressed = false; this.lockedTargetId = null; return f }
+    const modal = modalInput(world)
+    if (this.lastModal === null) this.lastModal = modal
+    else if (modal !== this.lastModal) {
+      // Only controls already active before the boundary need a physical release. A genuinely fresh
+      // press on the first reward/death tick must still be allowed to confirm.
+      this.controllerRearm.disarmActive()
+      this.retainedExplicitAim.clear()
+      this.mouseOwnsAim = false
+      this.lockedTargetId = null
+      this.lastModal = modal
+    }
+    if (this.override) {
+      const f = { ...this.override }
+      this.override = { ...this.override, attack: false, dodge: false, restart: false, choiceDelta: 0, confirm: false }
+      this.pressed.clear(); this.mousePressed = false; this.lockedTargetId = null
+      this.retainedExplicitAim.clear(); this.controllerRearm.disarmAll()
+      return f
+    }
     const f = emptyInput()
     const d = this.down
     // A complete keydown/keyup pair can occur between two 60 Hz samples. `pressed` latches that
@@ -89,12 +128,15 @@ export class InputSystem {
     let dodge = this.pressed.has('Space') || this.pressed.has('ShiftLeft') || this.pressed.has('KeyK') || this.pressed.has('KeyX')
     let restart = this.pressed.has('KeyR')
 
-    // gamepad
+    // gamepad. Raw physical state is sampled first; focus/modal rearm decides which channels may
+    // reach gameplay. The gate is sampled even with no pad so a disconnect counts as neutral.
     let padAimX = 0, padAimY = 0
     let padChoiceDelta: -1 | 0 | 1 = 0
     let padAttackEdge = false
     const pads = typeof navigator !== 'undefined' && navigator.getGamepads ? navigator.getGamepads() : []
     const pad = pads && pads[0]
+    let rawPadMoveX = 0, rawPadMoveY = 0, rawPadAimX = 0, rawPadAimY = 0
+    const rawButtons = Array.from({ length: 16 }, () => false)
     if (pad) {
       // radial deadzone on the vector, rescaled from the deadzone edge; per-axis clipping snaps diagonals to the axes
       const dz = (x: number, y: number, t: number): [number, number] => {
@@ -105,10 +147,19 @@ export class InputSystem {
       }
       const [lx, ly] = dz(pad.axes[0] ?? 0, pad.axes[1] ?? 0, 0.25)
       const [rx, ry] = dz(pad.axes[2] ?? 0, pad.axes[3] ?? 0, 0.3)
-      if (lx || ly) { mx = lx; my = ly }
-      padAimX = rx; padAimY = ry
-      if (rx || ry) { this.mouseOwnsAim = false; mouseAimX = 0; mouseAimY = 0 }
-      const b = (i: number) => !!pad.buttons[i]?.pressed
+      rawPadMoveX = lx; rawPadMoveY = ly; rawPadAimX = rx; rawPadAimY = ry
+      for (let i = 0; i < rawButtons.length; i++) rawButtons[i] = !!pad.buttons[i]?.pressed
+    }
+    const allowedPad = this.controllerRearm.sample({
+      moveActive: !!(rawPadMoveX || rawPadMoveY),
+      aimActive: !!(rawPadAimX || rawPadAimY),
+      buttons: rawButtons,
+    })
+    if (allowedPad.move) { mx = rawPadMoveX; my = rawPadMoveY }
+    if (allowedPad.aim) { padAimX = rawPadAimX; padAimY = rawPadAimY }
+    if (padAimX || padAimY) { this.mouseOwnsAim = false; mouseAimX = 0; mouseAimY = 0 }
+    if (pad) {
+      const b = (i: number) => !!allowedPad.buttons[i]
       const edge = (i: number) => { const now = b(i); const was = this.padPrev[i] ?? false; this.padPrev[i] = now; return now && !was }
       // no short-circuit: every listed button must be sampled or padPrev goes stale and it double-fires next tick
       const anyEdge = (ids: readonly number[]) => { let hit = false; for (const i of ids) if (edge(i)) hit = true; return hit }
@@ -126,7 +177,8 @@ export class InputSystem {
     if (ml > 1) { mx /= ml; my /= ml }
     f.moveX = mx; f.moveY = my
     let lockX = 0, lockY = 0
-    if (keyActive('KeyQ')) {
+    const lockHeld = !modal && keyActive('KeyQ')
+    if (lockHeld) {
       const p = world.player
       const lock = aimLockTarget(
         p.x, p.y,
@@ -143,10 +195,31 @@ export class InputSystem {
       if (lock) { lockX = lock.x; lockY = lock.y; this.lockedTargetId = lock.id ?? null }
       else this.lockedTargetId = null
     } else this.lockedTargetId = null
+
+    let retainedX = 0, retainedY = 0, retainedSoft = true
+    if (modal) {
+      // Aim during a modal is not a future combat instruction. The controller gate above still
+      // records its raw state so a held stick must return neutral before it can own aim on exit.
+      this.retainedExplicitAim.clear()
+      this.mouseOwnsAim = false
+    } else {
+      // A precise pointer or an explicit target identity supersedes any released directional aim.
+      // Active arrows/right stick then acquire a fresh retained direction in normal priority order.
+      if (lockHeld || mouseAimX || mouseAimY) this.retainedExplicitAim.clear()
+      const retained = (padAimX || padAimY)
+        ? this.retainedExplicitAim.acquire(padAimX, padAimY, false, mx, my)
+        : (arrowX || arrowY)
+          ? this.retainedExplicitAim.acquire(arrowX, arrowY, true, mx, my)
+          : this.retainedExplicitAim.release(mx, my)
+      if (retained) {
+        retainedX = retained.x; retainedY = retained.y; retainedSoft = retained.soft
+      }
+    }
     const aim = resolveAim({
       padAimX, padAimY, arrowX, arrowY,
       mouseX: mouseAimX, mouseY: mouseAimY,
       lockX, lockY,
+      retainedX, retainedY, retainedSoft,
       moveX: mx, moveY: my,
       lastAimX: this.lastAim.x, lastAimY: this.lastAim.y,
     })

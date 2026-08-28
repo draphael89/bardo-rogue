@@ -42,6 +42,17 @@ describe('hashWorld covers the whole sim state', () => {
     b.player.bladeActionConnected = true
     expect(hashWorld(a)).not.toBe(hashWorld(b))
   })
+
+  it('sees both the live Reversal window and its pending action identity', () => {
+    const stock = createWorld(1, 'empty')
+    const window = createWorld(1, 'empty')
+    const action = createWorld(1, 'empty')
+    window.player.reversalTicks = 1
+    action.player.reversalActionId = 7
+    expect(hashWorld(stock)).not.toBe(hashWorld(window))
+    expect(hashWorld(stock)).not.toBe(hashWorld(action))
+    expect(hashWorld(window)).not.toBe(hashWorld(action))
+  })
 })
 
 describe('rng streams', () => {

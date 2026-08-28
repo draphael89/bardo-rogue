@@ -1,9 +1,12 @@
 import { Graphics, Texture, type Container } from 'pixi.js'
 import type { Enemy } from '@/sim/world'
 import type { Arena } from '@/sim/arena'
-import { raycastSolidDistance } from '@/sim/collision'
 import { tuning } from '@/tuning'
 import { WARDEN_PATTERN, wardenAttackTicks, wardenRecover, wardenWindup } from '@/sim/enemies/warden'
+import {
+  wardenProjectileAngle, wardenProjectileContract, wardenThreatReach,
+  type WardenProjectileContract,
+} from '@/sim/enemies/warden-contract'
 import { clamp01, lerp } from '../anim'
 import { isDangerPointVisible } from '../terrain'
 import { EntityView, type EnemyFrame, type Pose } from './shared'
@@ -378,7 +381,7 @@ function updateWardenTell(v: EntityView, e: Enemy, x: number, y: number, tk: num
   const R = W.slamRadius + tuning.player.radius
   const front = Math.max(4, Math.round(R * (scorching ? 1 : q)))
   const committed = s === 'attack' || (s === 'windup' && tk >= wardenWindup(e) - W.commitLead + 1)
-  const plateA = (scorching ? 0.18 * fade : lerp(0.18, 0.38, q)) * bloom
+  const plateA = (scorching ? 0.18 * fade : lerp(0.27, 0.42, q)) * bloom
   const plateCol = e.phase ? 0x3a1420 : 0x121018
   const rimCol = s === 'attack' ? (e.phase ? 0xffe8a0 : 0xfff4d8) : (e.phase ? 0xff7a18 : 0xd4b060)
   const dark = 0x120d18
@@ -393,24 +396,70 @@ function updateWardenTell(v: EntityView, e: Enemy, x: number, y: number, tk: num
       octagon(hi, cx, cy, front, dark, 0.8, false, arena, x, y, foot, tuning.player.radius)
       octagon(hi, cx, cy, front, rimCol, 1, false, arena, x, y, foot, tuning.player.radius)
     }
-  } else if (hi) hi.visible = false
+  } else {
+    // The old near-black opening hid the Warden's most immediate attack until commitment. A broken
+    // amber edge names danger from the first readable body lift, while the closed hot rim remains
+    // reserved for the actual lock.
+    octagon(g, cx, cy, front, e.phase ? 0xc85b24 : 0xc49a48,
+      (0.38 + q * 0.22) * Math.max(0.7, bloom), true,
+      arena, x, y, foot, tuning.player.radius)
+    if (hi) hi.visible = false
+  }
 }
 
-function dottedRay(g: Graphics, arena: Arena, originX: number, originY: number,
-                   x: number, y: number, foot: number, angle: number, from: number, to: number,
-                   color: number, alpha: number, solid: boolean): void {
-  const step = solid ? 2 : 5
-  const width = solid ? 2 : 1
-  const reach = raycastSolidDistance(arena, originX, originY, angle, to)
-  if (reach < from) return
+// The near field is the commitment the player must solve now. The complete remaining path stays
+// visible as increasingly sparse one-pixel dashes: exact enough to make cover/range truthful, quiet
+// enough that ten phase-two lanes do not turn the floor into an opaque fan.
+function threatLane(g: Graphics, hi: Graphics | null, arena: Arena, e: Enemy,
+                    x: number, y: number, foot: number, angle: number,
+                    contract: WardenProjectileContract, q: number, committed: boolean,
+                    color: number, alpha: number, secondary = false): void {
+  const from = e.radius + 7
+  const reach = wardenThreatReach(arena, e.x, e.y, angle, contract)
+  if (reach < from || q <= 0) return
   const ca = Math.cos(angle), sa = Math.sin(angle)
-  for (let d = from; d <= reach; d += step) {
+
+  const proximalEnd = Math.min(reach, tuning.warden.slamRadius + 24)
+  const proximalShown = lerp(from, proximalEnd, q)
+  const nearStep = committed && !secondary ? 2 : 5
+  const nearWidth = committed && !secondary ? 2 : 1
+  for (let d = from; d <= proximalShown; d += nearStep) {
     const px = Math.round(x + ca * d), py = Math.round(y + sa * d)
-    for (let w = 0; w < width; w++) {
-      if (isDangerPointVisible(arena, originX, originY, px + w, py - foot)) g.rect(px + w, py, 1, 1)
+    if (isDangerPointVisible(arena, e.x, e.y, px, py - foot)) {
+      g.rect(px, py, nearWidth, 1)
     }
   }
-  g.fill({ color, alpha })
+  g.fill({ color, alpha: alpha * (secondary ? 0.72 : 1) })
+
+  // Reveal the long promise early, but only as breath between marks. Segment length and frequency
+  // taper with distance; the endpoint remains exact even when the projectile dies in open floor.
+  if (q > 0.18 && reach > proximalEnd + 1) {
+    let d = proximalEnd + 4
+    let dash = 3
+    while (d < reach) {
+      const t = (d - proximalEnd) / Math.max(1, reach - proximalEnd)
+      dash = t < 0.42 ? 3 : t < 0.76 ? 2 : 1
+      const end = Math.min(reach, d + dash)
+      for (let at = d; at <= end; at++) {
+        const px = Math.round(x + ca * at), py = Math.round(y + sa * at)
+        if (isDangerPointVisible(arena, e.x, e.y, px, py - foot)) g.rect(px, py, 1, 1)
+      }
+      d += dash + 6 + Math.floor(t * 5)
+    }
+    // A single terminal pixel makes maximum range and wall clipping inspectable without a HUD cap.
+    const ex = Math.round(x + ca * reach), ey = Math.round(y + sa * reach)
+    if (isDangerPointVisible(arena, e.x, e.y, ex, ey - foot)) g.rect(ex, ey, 1, 1)
+    g.fill({ color, alpha: alpha * (secondary ? 0.30 : 0.40) * clamp01((q - 0.18) / 0.42) })
+  }
+
+  if (committed && hi) {
+    const hotFrom = Math.max(from, proximalShown - 7)
+    for (let d = hotFrom; d <= proximalShown; d += 2) {
+      const px = Math.round(x + ca * d), py = Math.round(y + sa * d)
+      if (isDangerPointVisible(arena, e.x, e.y, px, py - foot)) hi.rect(px, py, 1, 1)
+    }
+    hi.fill({ color: secondary ? 0xe6c6ff : 0xfff4d8, alpha: secondary ? 0.72 : 0.96 })
+  }
 }
 
 // Outward danger: spokes are the projectile paths and the empty wedges between them are real exits.
@@ -419,17 +468,13 @@ function drawRingTell(g: Graphics, hi: Graphics | null, e: Enemy, x: number, y: 
   const W = tuning.warden
   const q = tellProgress(e, tk)
   const committed = e.state === 'attack' || tk >= wardenWindup(e) - W.commitLead + 1
-  const count = e.actionPhase ? W.boltCount2 : W.boltCount
-  const offset = e.aimAngle + (e.patternCursor & 1 ? Math.PI / count : 0)
-  const reach = lerp(e.radius + 8, W.slamRadius + 24, q)
+  const contract = wardenProjectileContract('ring', e.actionPhase)
   if (hi) hi.visible = committed
   octagon(g, x, y, Math.round(10 + q * 8), 0x120d18, 0.72, false)
-  for (let i = 0; i < count; i++) {
-    const a = offset + (Math.PI * 2 * i) / count
-    dottedRay(g, arena, e.x, e.y, x, y, foot, a, e.radius + 7, reach,
-      committed ? 0xff7a18 : 0x8a6038, committed ? 0.85 : 0.55, committed)
-    if (committed && hi) dottedRay(hi, arena, e.x, e.y, x, y, foot, a,
-      Math.max(e.radius + 7, reach - 6), reach, 0xfff4d8, 0.95, true)
+  for (let i = 0; i < contract.count; i++) {
+    const a = wardenProjectileAngle(contract, e.aimAngle, e.patternCursor, i)
+    threatLane(g, hi, arena, e, x, y, foot, a, contract, q, committed,
+      committed ? 0xff7a18 : 0x9a6d3c, committed ? 0.88 : 0.62)
   }
 }
 
@@ -439,18 +484,19 @@ function drawFanTell(g: Graphics, hi: Graphics | null, e: Enemy, x: number, y: n
   const W = tuning.warden
   const q = tellProgress(e, tk)
   const committed = e.state === 'attack' || tk >= wardenWindup(e) - W.commitLead + 1
-  const count = e.actionPhase ? W.fanCount2 : W.fanCount
-  const spread = W.fanSpreadDeg * Math.PI / 180
-  const reach = Math.max(W.slamRadius, e.targetY + 12) * q
+  const contract = wardenProjectileContract('fan', e.actionPhase)
   if (hi) hi.visible = committed
-  for (let i = 0; i < count; i++) {
-    const u = count === 1 ? 0.5 : i / (count - 1)
-    const a = e.aimAngle + (u - 0.5) * spread
-    const rayReach = Math.max(e.radius + 8, reach)
-    dottedRay(g, arena, e.x, e.y, x, y, foot, a, e.radius + 7, rayReach,
-      committed ? 0xff7a18 : 0x8a6038, committed ? 0.9 : 0.58, committed)
-    if (committed && hi) dottedRay(hi, arena, e.x, e.y, x, y, foot, a,
-      Math.max(e.radius + 7, reach - 7), rayReach, 0xfff4d8, 1, true)
+  for (let volley = 0; volley < contract.volleys; volley++) {
+    const released = e.state === 'attack' && e.patternStep > volley
+    const reveal = volley === 0 ? q : clamp01((q - 0.34) / 0.66)
+    const returnLane = volley > 0
+    const laneCommitted = committed && !released
+    const laneAlpha = released ? 0.18 : returnLane ? 0.66 : committed ? 0.92 : 0.62
+    for (let i = 0; i < contract.count; i++) {
+      const a = wardenProjectileAngle(contract, e.aimAngle, e.patternCursor, i, volley)
+      threatLane(g, hi, arena, e, x, y, foot, a, contract, reveal, laneCommitted,
+        returnLane ? 0xc878ff : committed ? 0xff7a18 : 0x9a6d3c, laneAlpha, returnLane)
+    }
   }
   octagon(g, x, y, Math.round(7 + q * 4), 0x120d18, 0.75, false)
 }

@@ -101,6 +101,11 @@ export function playEventSfx(a: AudioSystem, ev: SimEvent, listener?: Readonly<{
       // an attack passed through the i-frames: the near miss is the reward, never varied
       a.play('woosh4', { gain: 1.2, pitch: 0.55, pitchVar: 0, lead: true }); a.swish(1.2, 220, 0.6, undefined, true)
       break
+    case 'reversal':
+      // A narrow cold-to-warm seam: audible recognition without stacking another attack whoosh.
+      a.bell(0.34, 1320, 0.16, 'sfx', 0, { ...at, partials: 'tone', glideTo: 660, strike: 0.18, cap: 'strike' })
+      a.play('swordMetal', { ...at, gain: 0.18, pitch: ev.weapon === 'blade' ? 1.45 : 1.75 })
+      break
     case 'graze':
       // A small high breath, intentionally below the low, long perfect-dodge confirmation.
       a.play('woosh4', { gain: 0.34, pitch: 1.55, pitchVar: 0, lead: true })
@@ -175,6 +180,10 @@ export function playEventSfx(a: AudioSystem, ev: SimEvent, listener?: Readonly<{
       break
     case 'enemyStagger':
       a.play('impactPlate_medium', { ...at, gain: 0.4, pitch: 1.35 })
+      break
+    case 'enemyWallSlam':
+      a.play('swordStone1', { ...at, gain: 0.44, pitch: ev.kind === 'brute' ? 0.72 : 0.9 })
+      a.play('impactGeneric_light', { ...at, gain: 0.28, pitch: 0.68 })
       break
     case 'spawnTelegraph':
       // something is arriving where you are standing: a tell, and priced like one
@@ -275,7 +284,7 @@ export function playEventSfx(a: AudioSystem, ev: SimEvent, listener?: Readonly<{
  * position directly to playEventSfx, because enemy cues must not wait for a footstep to move ears. */
 function listen(a: AudioSystem, ev: SimEvent): void {
   switch (ev.type) {
-    case 'footstep': case 'swing': case 'dodge': case 'dodgeWall': case 'dodgeEnd': case 'dodged': case 'graze':
+    case 'footstep': case 'swing': case 'dodge': case 'dodgeWall': case 'dodgeEnd': case 'dodged': case 'reversal': case 'graze':
     case 'draw': case 'arrowLoose': case 'weaponPrepared': case 'boonChosen':
     case 'playerHurt': case 'playerDeath': case 'returned': a.setListener(ev.x, ev.y)
   }

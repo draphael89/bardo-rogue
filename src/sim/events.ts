@@ -24,9 +24,13 @@ export interface HitEvent {
   readonly direction: number
   readonly sweep: number
   readonly cleave: boolean
+  // 0 = hilt/body-side of an authored reach, 1 = outer edge. It changes presentation anatomy only;
+  // damage and collision have already resolved before this immutable snapshot exists.
+  readonly contactDepth: number
 }
 
 export type WardenAttackPattern = 'slam' | 'ring' | 'fan'
+export type GrazeSource = 'projectile' | 'radial' | 'arc' | 'dash'
 
 type EnemyAttackBase = {
   readonly type: 'enemyAttack'
@@ -53,6 +57,7 @@ export type SimEvent =
   | { type: 'enemyWindup'; id: number; kind: EnemyKind; x: number; y: number }
   | EnemyAttackEvent
   | { type: 'enemyStagger'; id: number; x: number; y: number }
+  | { type: 'enemyWallSlam'; id: number; kind: EnemyKind; x: number; y: number; angle: number; actionId: number }
   | { type: 'enemyPhase'; id: number; kind: EnemyKind; x: number; y: number; phase: number }
   | { type: 'boltFired'; x: number; y: number; angle: number }
   | { type: 'boltCut'; x: number; y: number }
@@ -79,7 +84,8 @@ export type SimEvent =
   | { type: 'arrowHitWall'; x: number; y: number }
   | { type: 'friendlyProjectileEnded'; kind: 'mirror' | 'echo'; x: number; y: number }
   | { type: 'dodged'; x: number; y: number }
-  | { type: 'graze'; x: number; y: number; nearX: number; nearY: number; angle: number }
+  | { type: 'reversal'; x: number; y: number; angle: number; actionId: number; weapon: ArmId }
+  | { type: 'graze'; x: number; y: number; nearX: number; nearY: number; angle: number; source: GrazeSource }
   | { type: 'restart' }
   // a pooled slot was unavailable and the spawn/shot was dropped; the sim never fails silently
   | { type: 'poolOverflow'; pool: 'enemy'; kind: EnemyKind; x: number; y: number }

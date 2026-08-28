@@ -41,6 +41,8 @@ export interface Player extends Body {
   armed: boolean              // town starts unarmed; debug scenarios keep the historical armed default
   dodgeRead: number           // 0 stock; 1 this roll already grazed; 2 this roll already announced a pass-through
   dodgeProcTick: number       // exact tick of a successful i-frame read; boon triggers consume this edge
+  reversalTicks: number       // live player-clock window earned by a true pass-through; hit-stop never ages it
+  reversalActionId: number    // action that spent the last window; presentation may bridge its authored pose
 }
 
 export interface Enemy extends Body {
@@ -66,6 +68,8 @@ export interface Enemy extends Body {
   poseTick: number              // semantic enemy animation clock; advances only with the hostile world
   brand: number                 // 0..3 stacks from Ashen Edge
   brandTicks: number            // status expiry; refreshed whenever Brand is applied
+  knockbackHeavy: boolean       // current shove came from a committed contact and may punctuate on stone
+  knockbackActionId: number     // immutable action identity for that possible wall contact
 }
 
 export type ProjectileKind = 'bolt' | 'arrow' | 'mirror' | 'echo'
@@ -201,7 +205,7 @@ export function makePlayer(x: number, y: number): Player {
     dodgeDirX: 1, dodgeDirY: 0, swingIndex: 0, swingAngle: 0, swingId: 0, bladeActionConnected: false, assistTargetId: 0,
     controlTick: 0, attackQueuedAt: -1, dodgeQueuedAt: -1, dodgeTick: -1,
     iframes: 0, flash: 0, moveX: 0, moveY: 0, footTick: 0, deathTick: -1, god: false,
-    arm: 0, armed: true, dodgeRead: 0, dodgeProcTick: -1,
+    arm: 0, armed: true, dodgeRead: 0, dodgeProcTick: -1, reversalTicks: 0, reversalActionId: -1,
   }
 }
 
@@ -212,6 +216,7 @@ export function makeEnemy(): Enemy {
     lastHitSwingId: -1, flash: 0, hitDone: false, orbitAngle: 0, orbitDir: 1, hoverTicks: 0, cooldown: 0, dashTicks: 0, spawnTick: 0,
     phase: 0, phasePending: false, actionPhase: 0, pattern: 0, patternCursor: 0, patternStep: 0, poseTick: 0,
     brand: 0, brandTicks: 0,
+    knockbackHeavy: false, knockbackActionId: 0,
   }
 }
 

@@ -8,7 +8,7 @@ function hit(overrides: Partial<HitEvent> = {}): HitEvent {
     type: 'hit', x: 80, y: 40, angle: 0, damage: 2, attemptedDamage: 5,
     mitigatedDamage: 3, guarded: true, heavy: true, targetId: 7, kind: 'warden',
     killed: false, actionId: 3, source: 'blade', originX: 60, originY: 40,
-    direction: 0, sweep: 1, cleave: false, ...overrides,
+    direction: 0, sweep: 1, cleave: false, contactDepth: 0.8, ...overrides,
   }
 }
 

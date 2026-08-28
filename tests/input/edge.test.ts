@@ -30,6 +30,7 @@ interface PadButton { pressed: boolean }
 interface FakePad { axes: number[]; buttons: PadButton[] }
 
 function key(code: string, repeat = false) { return { code, repeat, preventDefault() { /* noop */ } } }
+const aimDeg = (f: { aimX: number; aimY: number }) => Math.round(Math.atan2(f.aimY, f.aimX) * 180 / Math.PI)
 
 function harness(pad?: FakePad) {
   const win = new FakeTarget()
@@ -196,11 +197,48 @@ describe('modal input', () => {
     pad.buttons[2]!.pressed = true
     expect(h.input.sample(w).confirm).toBe(true)
   })
+
+  it('requires sticks and buttons held through a modal to release before they can drive combat again', () => {
+    const pad: FakePad = { axes: [1, 0, -1, 0], buttons: Array.from({ length: 16 }, () => ({ pressed: false })) }
+    const h = harness(pad)
+    const w = createWorld(1, 'empty')
+    pad.buttons[2]!.pressed = true
+    const combat = h.input.sample(w)
+    expect(combat.moveX).toBe(1)
+    expect(combat.aimX).toBe(-1)
+    expect(combat.attack).toBe(true)
+
+    // The same physical holds cannot become a menu confirm on entry.
+    w.roomPhase = 'reward'
+    const entered = h.input.sample(w)
+    expect(entered.confirm).toBe(false)
+    expect(entered.moveX).toBe(0)
+
+    // Release once in the modal, then make fresh menu input. It is accepted normally.
+    pad.axes.fill(0); pad.buttons[2]!.pressed = false
+    expect(h.input.sample(w).confirm).toBe(false)
+    pad.axes[0] = 1; pad.axes[2] = -1; pad.buttons[2]!.pressed = true
+    expect(h.input.sample(w).confirm).toBe(true)
+
+    // Holds active in the menu cannot leak out through the other side of the boundary either.
+    w.roomPhase = 'fighting'
+    const exited = h.input.sample(w)
+    expect(exited.moveX).toBe(0)
+    expect(exited.attack).toBe(false)
+    expect(exited.attackHeld).toBe(false)
+
+    pad.axes.fill(0); pad.buttons[2]!.pressed = false
+    h.input.sample(w)
+    pad.axes[0] = -1; pad.axes[3] = -1; pad.buttons[2]!.pressed = true
+    const rearmed = h.input.sample(w)
+    expect(rearmed.moveX).toBe(-1)
+    expect(aimDeg(rearmed)).toBe(-90)
+    expect(rearmed.attack).toBe(true)
+    expect(rearmed.attackHeld).toBe(true)
+  })
 })
 
 describe('keyboard aim', () => {
-  const aimDeg = (f: { aimX: number; aimY: number }) => Math.round(Math.atan2(f.aimY, f.aimX) * 180 / Math.PI)
-
   it('preserves a complete WASD or arrow tap between simulation samples', () => {
     const h = harness()
     const w = createWorld(1, 'empty')
@@ -296,6 +334,25 @@ describe('keyboard aim', () => {
     expect(mouse.aimSoft).toBe(false)
   })
 
+  it('retains released arrow aim while prior movement continues, then yields to a deliberate turn', () => {
+    const h = harness()
+    const w = createWorld(1, 'empty')
+    h.win.fire('keydown', key('KeyD'))
+    h.win.fire('keydown', key('ArrowLeft'))
+    expect(aimDeg(h.input.sample(w))).toBe(180)
+
+    h.win.fire('keyup', key('ArrowLeft'))
+    const continued = h.input.sample(w)
+    expect(continued.moveX).toBe(1)
+    expect(aimDeg(continued)).toBe(180)
+    expect(continued.aimSoft).toBe(true)
+
+    h.win.fire('keydown', key('KeyW'))
+    const turned = h.input.sample(w)
+    expect(aimDeg(turned)).toBe(-45)
+    expect(turned.aimSoft).toBe(true)
+  })
+
   it('returns right-stick aim to left-stick movement on release without reviving a stale cursor', () => {
     const pad: FakePad = { axes: [0, 0, 0, 0], buttons: Array.from({ length: 16 }, () => ({ pressed: false })) }
     const h = harness(pad)
@@ -313,6 +370,46 @@ describe('keyboard aim', () => {
     expect(aimDeg(h.input.sample(w))).toBe(0)
     h.canvas.fire('mousemove', { clientX: p.x, clientY: p.y + 40 })
     expect(aimDeg(h.input.sample(w))).toBe(90)
+  })
+
+  it('retains released right-stick aim while the left stick continues, preserving analog precision', () => {
+    const pad: FakePad = { axes: [1, 0, -1, 0], buttons: Array.from({ length: 16 }, () => ({ pressed: false })) }
+    const h = harness(pad)
+    const w = createWorld(1, 'empty')
+    expect(aimDeg(h.input.sample(w))).toBe(180)
+    pad.axes[2] = 0
+    const continued = h.input.sample(w)
+    expect(continued.moveX).toBe(1)
+    expect(aimDeg(continued)).toBe(180)
+    expect(continued.aimSoft).toBe(false)
+
+    pad.axes[0] = 0; pad.axes[1] = -1
+    const turned = h.input.sample(w)
+    expect(aimDeg(turned)).toBe(-90)
+    expect(turned.aimSoft).toBe(true)
+  })
+
+  it('lets Q clear retained directional ownership instead of restoring it on release', () => {
+    const h = harness()
+    const w = createWorld(1, 'dummy')
+    w.arena.solid.fill(0)
+    const target = w.enemies.find(e => e.active)!
+    for (const e of w.enemies) e.active = false
+    Object.assign(w.player, { x: 100, y: 100 })
+    Object.assign(target, { active: true, state: 'idle', x: 60, y: 100 })
+    h.win.fire('keydown', key('KeyD'))
+    h.win.fire('keydown', key('ArrowLeft'))
+    h.input.sample(w)
+    h.win.fire('keyup', key('ArrowLeft'))
+    expect(aimDeg(h.input.sample(w))).toBe(180)
+
+    h.win.fire('keydown', key('KeyQ'))
+    expect(aimDeg(h.input.sample(w))).toBe(180)
+    expect(h.input.hardLockTargetId).toBe(target.id)
+    h.win.fire('keyup', key('KeyQ'))
+    const movement = h.input.sample(w)
+    expect(aimDeg(movement)).toBe(0)
+    expect(movement.aimSoft).toBe(true)
   })
 
   it('lets the mouse outrank movement once it has actually moved', () => {
@@ -372,6 +469,43 @@ describe('keyboard aim', () => {
     pad.axes[3] = 0
     expect(aimDeg(h.input.sample(w))).toBe(0)
     expect(h.input.hardLockTargetId).toBe(target.id)
+  })
+})
+
+describe('controller focus rearm', () => {
+  it('does not inherit movement, aim, attack, or dodge held across blur', () => {
+    const pad: FakePad = { axes: [-1, 0, 0, -1], buttons: Array.from({ length: 16 }, () => ({ pressed: false })) }
+    pad.buttons[0]!.pressed = true
+    pad.buttons[2]!.pressed = true
+    const h = harness(pad)
+    const w = createWorld(1, 'empty')
+    const before = h.input.sample(w)
+    expect(before.moveX).toBe(-1)
+    expect(aimDeg(before)).toBe(-90)
+    expect(before.attack).toBe(true)
+    expect(before.attackHeld).toBe(true)
+    expect(before.dodge).toBe(true)
+
+    h.win.fire('blur')
+    // A fresh keyboard direction proves the still-held right stick is not silently retaining aim.
+    h.win.fire('keydown', key('KeyD'))
+    const held = h.input.sample(w)
+    expect(held.moveX).toBe(1)
+    expect(aimDeg(held)).toBe(0)
+    expect(held.attack).toBe(false)
+    expect(held.attackHeld).toBe(false)
+    expect(held.dodge).toBe(false)
+
+    h.win.fire('keyup', key('KeyD'))
+    pad.axes.fill(0); pad.buttons[0]!.pressed = false; pad.buttons[2]!.pressed = false
+    h.input.sample(w)
+    pad.axes[0] = 1; pad.axes[2] = -1; pad.buttons[0]!.pressed = true; pad.buttons[2]!.pressed = true
+    const rearmed = h.input.sample(w)
+    expect(rearmed.moveX).toBe(1)
+    expect(aimDeg(rearmed)).toBe(180)
+    expect(rearmed.attack).toBe(true)
+    expect(rearmed.attackHeld).toBe(true)
+    expect(rearmed.dodge).toBe(true)
   })
 })
 

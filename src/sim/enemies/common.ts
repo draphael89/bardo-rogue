@@ -89,7 +89,33 @@ export function moveAlong(world: World, e: Enemy, angle: number, speed: number):
 
 export function applyEnemyKnockback(world: World, e: Enemy): void {
   if (e.kbx === 0 && e.kby === 0) return
-  moveWithWalls(world.arena, e, e.kbx * DT, e.kby * DT, e.radius)
+  const speed = Math.hypot(e.kbx, e.kby)
+  const hit = moveWithWalls(world.arena, e, e.kbx * DT, e.kby * DT, e.radius)
+  // Only momentum driven into the contacted face can punctuate. A fast tangential slide with a
+  // one-pixel normal component is a scrape, even if the total shove was a committed heavy.
+  const blockedSpeed = Math.hypot(hit.hitX ? e.kbx : 0, hit.hitY ? e.kby : 0)
+  if (e.knockbackHeavy && blockedSpeed >= tuning.wallSlamMinSpeed && (hit.hitX || hit.hitY)) {
+    // The collision spends the authored shove once. It adds recognition, not hidden damage: the wall
+    // cannot become a mandatory DPS exploit or make edge-of-room balance unknowable.
+    const actionId = e.knockbackActionId
+    e.knockbackHeavy = false
+    e.knockbackActionId = 0
+    // Contact belongs to the wall normal, not the original diagonal shove. A corner owns both
+    // blocked axes; a flat face owns exactly one, so sparks and camera answer at the real surface.
+    const normalX = hit.hitX ? Math.sign(e.kbx) : 0
+    const normalY = hit.hitY ? Math.sign(e.kby) : 0
+    const normalAngle = Math.atan2(normalY, normalX)
+    if (hit.hitX) e.kbx = 0
+    if (hit.hitY) e.kby = 0
+    world.emit({
+      type: 'enemyWallSlam', id: e.id, kind: e.kind,
+      x: e.x + Math.cos(normalAngle) * e.radius, y: e.y + Math.sin(normalAngle) * e.radius,
+      angle: normalAngle, actionId,
+    })
+  } else if (speed < tuning.wallSlamMinSpeed) {
+    e.knockbackHeavy = false
+    e.knockbackActionId = 0
+  }
   const decay = 1 - 1 / tuning.knockbackDecayTicks
   e.kbx *= decay; e.kby *= decay
   if (Math.abs(e.kbx) < 1 && Math.abs(e.kby) < 1) { e.kbx = 0; e.kby = 0 }
@@ -125,7 +151,9 @@ export function enemyRadialAttack(world: World, e: Enemy, radius: number, damage
     hurtPlayer(world, Math.atan2(p.y - e.y, p.x - e.x), damage)
     return true
   }
-  if (clear && d <= radius + p.radius + tuning.bullet.grazePx) noteNearMiss(world, Math.atan2(p.y - e.y, p.x - e.x))
+  if (clear && d <= radius + p.radius + tuning.bullet.grazePx) {
+    noteNearMiss(world, Math.atan2(p.y - e.y, p.x - e.x), e.x, e.y, 'radial')
+  }
   return false
 }
 
@@ -138,7 +166,7 @@ export function enemyArcAttack(world: World, e: Enemy, radius: number, arcDeg: n
     return true
   }
   if (clear && arcHits(e.x, e.y, e.aimAngle, radius, arcDeg, p.x, p.y, p.radius + tuning.bullet.grazePx)) {
-    noteNearMiss(world, e.aimAngle)
+    noteNearMiss(world, e.aimAngle, e.x, e.y, 'arc')
   }
   return false
 }

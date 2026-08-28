@@ -29,6 +29,7 @@ export function updateProjectiles(world: World): void {
           direction: b.angle,
           sweep: 0,
           cleave: false,
+          contactDepth: 1,
         })
         resolveWeaponOnHit(world, e, false, brandBefore, b.angle, b.actionId)
         b.active = false
@@ -47,7 +48,7 @@ export function updateProjectiles(world: World): void {
       hurtPlayer(world, b.angle, b.damage)
       b.active = false
     } else if (d <= hitR + tuning.bullet.grazePx) {
-      noteNearMiss(world, b.angle, b.x, b.y)
+      noteNearMiss(world, b.angle, b.x, b.y, 'projectile')
     }
   }
 }

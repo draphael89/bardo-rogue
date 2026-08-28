@@ -4,6 +4,7 @@ import { stepWorld } from '@/sim/step'
 import { emptyInput } from '@/sim/input'
 import { hasLineOfSight, moveWithWalls, overlapsSolid, raycastSolidDistance, separate } from '@/sim/collision'
 import { makeBot } from '@/sim/bots'
+import { TILE } from '@/sim/arena'
 
 // Walk the player left until it is flush against a solid.
 function pinToLeftWall(w: ReturnType<typeof createWorld>): void {
@@ -156,5 +157,85 @@ describe('authoritative terrain rays', () => {
     }
     expect(hasLineOfSight(w.arena, ...pairs[0])).toBe(false)
     expect(hasLineOfSight(w.arena, ...pairs[1])).toBe(true)
+  })
+
+  it('stays symmetric and exact across a deterministic bounded terrain fuzz', () => {
+    const w = createWorld(0x51a7, 'empty')
+    const a = w.arena
+    let state = 0x9e3779b9
+    const random = () => {
+      state = (Math.imul(state, 1664525) + 1013904223) >>> 0
+      return state / 0x1_0000_0000
+    }
+
+    // A reproducible obstacle field exercises faces, gaps, and corner approaches without making
+    // the test depend on a room-art revision. The outer ring remains solid, like every real arena.
+    a.solid.fill(0)
+    for (let row = 0; row < a.rows; row++) for (let col = 0; col < a.cols; col++) {
+      const boundary = row === 0 || col === 0 || row === a.rows - 1 || col === a.cols - 1
+      if (boundary || (row > 1 && row < a.rows - 1 && random() < 0.14)) a.solid[row * a.cols + col] = 1
+    }
+
+    const pointSolid = (x: number, y: number) => {
+      const col = Math.floor(x / TILE), row = Math.floor(y / TILE)
+      return col < 0 || row < 0 || col >= a.cols || row >= a.rows || a.solid[row * a.cols + col] === 1
+    }
+    const clearPoint = (radius = 0): [number, number] => {
+      for (let attempt = 0; attempt < 2000; attempt++) {
+        const x = radius + 1 + random() * (a.cols * TILE - 2 * (radius + 1))
+        const y = radius + 1 + random() * (a.rows * TILE - 2 * (radius + 1))
+        if (radius > 0 ? !overlapsSolid(a, x, y, radius) : !pointSolid(x, y)) return [x, y]
+      }
+      throw new Error(`fuzz could not find a clear point for radius ${radius}`)
+    }
+
+    let asymmetric = ''
+    for (let i = 0; i < 5000 && !asymmetric; i++) {
+      const [x0, y0] = clearPoint(), [x1, y1] = clearPoint()
+      const forward = hasLineOfSight(a, x0, y0, x1, y1)
+      const reverse = hasLineOfSight(a, x1, y1, x0, y0)
+      if (forward !== reverse) asymmetric = `pair ${i}: (${x0},${y0}) -> (${x1},${y1}) = ${forward}/${reverse}`
+    }
+    expect(asymmetric, asymmetric).toBe('')
+
+    // A dense point oracle is intentionally simple and independent of the DDA. Its first blocked
+    // sample may lie at most one sample beyond the exact entry, never before it.
+    const sampleStep = 0.05
+    let pointMismatch = ''
+    for (let i = 0; i < 512 && !pointMismatch; i++) {
+      const [ox, oy] = clearPoint()
+      const angle = random() * Math.PI * 2
+      const max = 16 + random() * 160
+      const dx = Math.cos(angle), dy = Math.sin(angle)
+      const exact = raycastSolidDistance(a, ox, oy, angle, max)
+      let dense = max
+      for (let d = sampleStep; d < max; d += sampleStep) {
+        if (pointSolid(ox + dx * d, oy + dy * d)) { dense = d; break }
+      }
+      if (exact > dense + 1e-6 || dense - exact > sampleStep + 1e-5) {
+        pointMismatch = `ray ${i}: exact=${exact}, dense=${dense}, angle=${angle}, origin=(${ox},${oy})`
+      }
+    }
+    expect(pointMismatch, pointMismatch).toBe('')
+
+    // Circle rays must return the strict tangent: immediately before it is clear; immediately after
+    // it overlaps. This also checks arena-boundary contacts, not just authored solid tiles.
+    let circleMismatch = ''
+    const epsilon = 0.001
+    for (let i = 0; i < 1024 && !circleMismatch; i++) {
+      const radius = 2 + random() * 5
+      const [ox, oy] = clearPoint(radius)
+      const angle = random() * Math.PI * 2
+      const max = 16 + random() * 180
+      const dx = Math.cos(angle), dy = Math.sin(angle)
+      const reach = raycastSolidDistance(a, ox, oy, angle, max, radius)
+      const before = Math.max(0, reach - epsilon)
+      if (overlapsSolid(a, ox + dx * before, oy + dy * before, radius)) {
+        circleMismatch = `circle ${i} overlaps before reach ${reach}`
+      } else if (reach < max - epsilon && !overlapsSolid(a, ox + dx * (reach + epsilon), oy + dy * (reach + epsilon), radius)) {
+        circleMismatch = `circle ${i} stays clear after reach ${reach}`
+      }
+    }
+    expect(circleMismatch, circleMismatch).toBe('')
   })
 })

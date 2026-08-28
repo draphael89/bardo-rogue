@@ -10,7 +10,7 @@ import { isPlayerInvulnerable } from '@/sim/combat'
 import { arcHits } from '@/sim/combat'
 import { grantBoon, hasBoon, swingReach } from '@/sim/boons'
 import { ARM, grantArm } from '@/sim/weapons'
-import { damageEnemy, hurtPlayer } from '@/sim/combat'
+import { damageEnemyForTest, hurtPlayer } from '@/sim/combat'
 import { HUB_ID } from '@/sim/rooms'
 
 function run(world: ReturnType<typeof createWorld>, ticks: number, bot = makeBot('idle'), metrics?: Metrics) {
@@ -729,15 +729,15 @@ describe('warden', () => {
     const w = createWorld(1, 'empty')
     const e = plantWarden(w, -80)
     e.state = 'recover'
-    damageEnemy(w, e, 1, 0, 10, false, 0)
+    damageEnemyForTest(w, e, 1, 0, 10, false, 0)
     expect(e.state).toBe('recover')
 
-    damageEnemy(w, e, 1, 0, 10, true, 0)
+    damageEnemyForTest(w, e, 1, 0, 10, true, 0)
     expect(e.state).toBe('stagger')
 
     e.state = 'windup'
     e.stateTick = 8
-    damageEnemy(w, e, 1, 0, 10, true, 0)
+    damageEnemyForTest(w, e, 1, 0, 10, true, 0)
     expect(e.state).toBe('windup')
   })
 

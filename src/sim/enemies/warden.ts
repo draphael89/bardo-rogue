@@ -2,6 +2,7 @@ import { DT, tuning } from '@/tuning'
 import type { World, Enemy } from '../world'
 import type { WardenAttackPattern } from '../events'
 import { angleToPlayer, distToPlayer, moveToward, facePlayer, enemyRadialAttack, tickStagger, hasPlayerLineOfSight } from './common'
+import { wardenProjectileAngle, wardenProjectileContract, type WardenProjectileContract } from './warden-contract'
 
 // Numeric and append-only: pattern identity is part of the deterministic enemy snapshot.
 export const WARDEN_PATTERN = { slam: 0, ring: 1, fan: 2 } as const
@@ -35,7 +36,8 @@ export function wardenAttackTicks(e: Enemy): number {
   const W = tuning.warden
   if (e.pattern === WARDEN_PATTERN.ring) return W.ringAttackTicks
   if (e.pattern === WARDEN_PATTERN.fan) {
-    return W.fanAttackTicks + (wardenActionPhase(e) > 0 ? (W.fanVolleys2 - 1) * W.fanVolleyGap : 0)
+    const volleys = wardenProjectileContract('fan', wardenActionPhase(e)).volleys
+    return W.fanAttackTicks + (volleys - 1) * W.fanVolleyGap
   }
   return W.slamTicks
 }
@@ -67,33 +69,24 @@ function selectPattern(e: Enemy): void {
   e.actionPhase = e.phase
 }
 
-function fireBolt(world: World, e: Enemy, angle: number, speed: number, life: number): void {
-  const W = tuning.warden
-  const ox = e.x + Math.cos(angle) * (e.radius + 4)
-  const oy = e.y + Math.sin(angle) * (e.radius + 4)
-  const bolt = world.fireProjectile(ox, oy, angle, speed, W.boltRadius, life, 0, W.boltDamage)
+function fireBolt(world: World, e: Enemy, angle: number, contract: WardenProjectileContract): void {
+  const ox = e.x + Math.cos(angle) * contract.spawnOffset
+  const oy = e.y + Math.sin(angle) * contract.spawnOffset
+  const bolt = world.fireProjectile(ox, oy, angle, contract.speed, contract.boltRadius, contract.lifeTicks, 0, tuning.warden.boltDamage)
   if (bolt) world.emit({ type: 'boltFired', x: ox, y: oy, angle })
 }
 
 function looseRing(world: World, e: Enemy): void {
-  const W = tuning.warden
-  const p2 = wardenActionPhase(e) > 0
-  const count = p2 ? W.boltCount2 : W.boltCount
-  const speed = p2 ? W.boltSpeed2 : W.boltSpeed
-  // The latched aim rotates the gaps from cycle to cycle without any random draw.
-  const offset = e.aimAngle + (e.patternCursor & 1 ? Math.PI / count : 0)
-  for (let i = 0; i < count; i++) fireBolt(world, e, offset + (Math.PI * 2 * i) / count, speed, W.boltLife)
+  const contract = wardenProjectileContract('ring', wardenActionPhase(e))
+  for (let i = 0; i < contract.count; i++) {
+    fireBolt(world, e, wardenProjectileAngle(contract, e.aimAngle, e.patternCursor, i), contract)
+  }
 }
 
-function looseFan(world: World, e: Enemy): void {
-  const W = tuning.warden
-  const p2 = wardenActionPhase(e) > 0
-  const count = p2 ? W.fanCount2 : W.fanCount
-  const speed = p2 ? W.fanSpeed2 : W.fanSpeed
-  const spread = W.fanSpreadDeg * Math.PI / 180
-  for (let i = 0; i < count; i++) {
-    const u = count === 1 ? 0.5 : i / (count - 1)
-    fireBolt(world, e, e.aimAngle + (u - 0.5) * spread, speed, W.fanLife)
+function looseFan(world: World, e: Enemy, volley: number): void {
+  const contract = wardenProjectileContract('fan', wardenActionPhase(e))
+  for (let i = 0; i < contract.count; i++) {
+    fireBolt(world, e, wardenProjectileAngle(contract, e.aimAngle, e.patternCursor, i, volley), contract)
   }
 }
 
@@ -107,9 +100,9 @@ function updateAttack(world: World, e: Enemy): void {
   } else if (e.pattern === WARDEN_PATTERN.ring) {
     if (e.patternStep === 0 && e.stateTick > 0) { looseRing(world, e); e.patternStep = 1 }
   } else {
-    const volleys = wardenActionPhase(e) > 0 ? W.fanVolleys2 : 1
+    const volleys = wardenProjectileContract('fan', wardenActionPhase(e)).volleys
     while (e.patternStep < volleys && e.stateTick >= 1 + e.patternStep * W.fanVolleyGap) {
-      looseFan(world, e)
+      looseFan(world, e, e.patternStep)
       e.patternStep++
     }
   }

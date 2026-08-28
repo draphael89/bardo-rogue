@@ -1,6 +1,7 @@
 import { tuning } from '@/tuning'
 import type { World } from './world'
 import { angleDiff, deg } from './math'
+import { clearBulletTime } from './combat'
 
 export function startDraw(world: World): void {
   const p = world.player
@@ -17,6 +18,10 @@ export function startDraw(world: World): void {
 
 export function looseArrow(world: World): void {
   const p = world.player
+  if (p.reversalActionId === p.swingId) {
+    clearBulletTime(world)
+    p.reversalActionId = -1
+  }
   const B = tuning.bow
   const x = p.x + Math.cos(p.swingAngle) * B.muzzle
   const y = p.y + Math.sin(p.swingAngle) * B.muzzle

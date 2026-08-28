@@ -65,6 +65,8 @@ export function hashWorld(world: World): number {
   int(p.swingIndex); num(p.swingAngle); int(p.swingId); flag(p.bladeActionConnected); int(p.assistTargetId)
   int(p.controlTick); int(p.attackQueuedAt); int(p.dodgeQueuedAt); int(p.dodgeTick)
   int(p.iframes); num(p.flash); int(p.dodgeRead)
+  // Preserve the historical byte stream for worlds that never earn this opt-in mechanic.
+  if (p.reversalTicks || p.reversalActionId !== -1) { int(p.reversalTicks); int(p.reversalActionId) }
   num(p.moveX); num(p.moveY); int(p.footTick); int(p.deathTick); flag(p.god)
   if (p.arm) byte(p.arm)
   if (!p.armed) flag(false)
@@ -86,6 +88,7 @@ export function hashWorld(world: World): number {
     // poseTick is a cosmetic clock, like visualRng above: deterministic presentation state, but it
     // cannot affect an outcome and therefore is deliberately outside the gameplay hash contract.
     if (e.brand) { byte(e.brand); int(e.brandTicks) }
+    if (e.knockbackHeavy) { flag(true); int(e.knockbackActionId) }
   }
 
   let bolts = 0

@@ -8,7 +8,7 @@ import { chargerLockTick } from '@/sim/enemies/charger'
 import { WARDEN_PATTERN, wardenAttackTicks, wardenWindup } from '@/sim/enemies/warden'
 import type { EnemyState, World } from '@/sim/world'
 import { tuning } from '@/tuning'
-import { damageEnemy } from '@/sim/combat'
+import { damageEnemyForTest } from '@/sim/combat'
 
 function warden(world = createWorld(1, 'empty')) {
   world.arena.solid.fill(0)
@@ -21,7 +21,7 @@ describe('Warden timing truth and mastery', () => {
   it('snapshots guarded, mitigated, and applied damage before state can move on', () => {
     const guarded = warden()
     guarded.e.state = 'chase'
-    damageEnemy(guarded.world, guarded.e, 5, 0, 0, false, 0)
+    damageEnemyForTest(guarded.world, guarded.e, 5, 0, 0, false, 0)
     const blocked = guarded.world.events.find(x => x.type === 'hit')
     expect(blocked?.type === 'hit' && blocked).toMatchObject({
       guarded: true, attemptedDamage: 5, mitigatedDamage: 3, damage: 2,
@@ -29,7 +29,7 @@ describe('Warden timing truth and mastery', () => {
 
     const exposed = warden()
     exposed.e.state = 'recover'
-    damageEnemy(exposed.world, exposed.e, 5, 0, 0, false, 0)
+    damageEnemyForTest(exposed.world, exposed.e, 5, 0, 0, false, 0)
     const open = exposed.world.events.find(x => x.type === 'hit')
     expect(open?.type === 'hit' && open).toMatchObject({
       guarded: false, attemptedDamage: 5, mitigatedDamage: 0, damage: 5,
@@ -39,13 +39,13 @@ describe('Warden timing truth and mastery', () => {
   it('punctuates the veil as a short refusal, not a heavy-hit opening', () => {
     const guarded = warden()
     guarded.e.state = 'chase'
-    damageEnemy(guarded.world, guarded.e, 4, 0, 100, true, 8)
+    damageEnemyForTest(guarded.world, guarded.e, 4, 0, 100, true, 8)
     expect(guarded.world.freeze).toBe(tuning.warden.guardHitstop)
     expect(guarded.world.slowTicks).toBe(0)
 
     const exposed = warden()
     exposed.e.state = 'recover'
-    damageEnemy(exposed.world, exposed.e, 4, 0, 100, true, 8)
+    damageEnemyForTest(exposed.world, exposed.e, 4, 0, 100, true, 8)
     expect(exposed.world.freeze).toBe(8)
     expect(exposed.world.slowTicks).toBe(tuning.bullet.heavyTicks)
     expect(exposed.world.slowRate).toBe(tuning.bullet.heavyRate)

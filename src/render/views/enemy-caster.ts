@@ -294,8 +294,11 @@ export function drawAimLine(g: Graphics, e: Enemy, alpha: number): void {
       for (const side of [1, -1]) {
         const px = Math.round(ox + ca * d + nx * drift * side)
         const py = Math.round(oy + sa * d + ny * drift * side)
+        // every dash is hi-lo: a lit leading pixel over a dark trailing one, so a dark telegraph
+        // still reads as energy. Flat all-dark dashes read as specks of dirt on the floor.
         g.rect(px, py + 1, 2, 2).fill({ color: COL_UNDER })
-        g.rect(px, py, 2, 1).fill({ color: t < 0.28 ? COL_NODE : COL_SEARCH })
+        g.rect(px, py, 2, 1).fill({ color: COL_SEARCH })
+        g.rect(Math.round(px + ca), Math.round(py + sa), 1, 1).fill({ color: t < 0.5 ? COL_HOT : COL_NODE })
       }
     }
     muzzleCharge(g, ox, oy, 1 + Math.round(s), s > 0.5)

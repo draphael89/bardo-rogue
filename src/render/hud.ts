@@ -23,7 +23,7 @@ const C = {
   ember: 0xff7a18, emberHi: 0xffcc56, emberLo: 0xb03010,
   // the lit ramp for a vessel of life: body L~171, core L~224. A spent socket peaks at iron (L~38), so full
   // vs empty is a ~5x luminance step AND a hue step, not the 1.6x wash it used to be.
-  wick: 0xff9a30, wickHot: 0xffe090, wickWhite: 0xfff6e2,
+  wick: 0xff9a30, wickHot: 0xffd24a, wickWhite: 0xfff6e2,
   boneLo: 0x5a4e42, boneDim: 0x90806c, bone: 0xd0c0a8, cope: 0xd2d8e2,
   purple0: 0x2a0e1c, purple1: 0x4e1c2e, purple2: 0x762e40, purple3: 0x9e4658,
 }
@@ -41,7 +41,7 @@ const TONES: Record<Tone, ToneDef> = {
 
 const BANNER_Y = 44, BAND_H = 28, OPEN = 8, CLOSE = 10   // the card sits clear of the corner panels
 const FEET = 6                                       // player.radius + 1: the row the sprite's feet stand on
-const CROWN_UP = 15                                  // rows above the player pixel: clears a 16px sprite's head by 5
+const CROWN_UP = 20                                  // rows above the player pixel: the crown clears the sprite's head by ~4
 const HEART_X = 8, HEART_Y = 6, STEP = 9            // flame pitch in unscaled px; the rig is drawn at 2x
 const HURT_SHAKE = [1, -1, 1, 0, -1, 1, 0, 0]       // authored 8-tick rig shake, never a random jitter
 
@@ -59,8 +59,8 @@ const FLAME = [
   '.XXXXX.',
 ]
 const CORE = [
-  '.......', '.......', '.......', '...C...', '..CCC..',
-  '.CCCCC.', '.CCCCC.', '.CCCCC.', '..CCC..',
+  '.......', '.......', '.......', '.......', '.......',
+  '...C...', '..CCC..', '..CCC..', '...C...',
 ]
 const FW = 7, FH = 9
 const inFlame = (x: number, y: number) => x >= 0 && y >= 0 && x < FW && y < FH && FLAME[y][x] === 'X'
@@ -269,14 +269,17 @@ export class Hud {
 
   // --- the life crown: the health read, on the body -------------------------------------------------------------
   // A survival readout in the far corner of the screen is a readout you never look at: during a fight your eyes
-  // are locked on your own body and the thing about to hit it. So the count of lives lives ON the player — five
-  // wicks in a shallow arc 8 px over the head — and the corner panel demotes to a redundant reference.
+  // are locked on your own body and on the thing about to hit it, 268 px away from the corner panel. So the
+  // count of lives lives ON the player — five cups in a shallow arc over the head, a flame in each one you
+  // still have — and the corner panel demotes to a redundant reference.
   //
-  // Two hard rules hold it together:
+  // Three rules hold it together:
   //   1. ZERO idle motion. Nothing here moves, breathes or flickers while you are unhurt, so any movement in
   //      this cluster means one thing: you just took a hit.
-  //   2. A lit wick and a spent socket separate by value AND by hue — L~180 warm against L~35 neutral — so the
-  //      count survives a dim corner, a bright slab, and the death grade.
+  //   2. All five cups are always drawn. The cups are the denominator and the player's identity mark; only the
+  //      flames come and go.
+  //   3. Lit and empty separate by value AND by hue: a warm flame at L~180 in a cup whose empty interior is
+  //      L~10, so the count survives a dim corner, a lit slab, and the death grade.
   private updateCrown(p: World['player'], at: { x: number; y: number } | null, hurtAge: number) {
     const g = this.crownG
     g.clear()
@@ -286,49 +289,47 @@ export class Hud {
     const PITCH = 4, ARC = [1, 0, -1, 0, 1]
     const x0 = at.x - Math.round((n * PITCH - 1) / 2)
     const baseY = at.y - CROWN_UP
-    // a void bed under the whole cluster, cut at the corners: the wicks need their own dark to burn against,
-    // and per-pip beds keep it reading as five objects instead of one HUD bar stuck to the sprite
+    const slot = (i: number) => ({ x: x0 + i * PITCH, y: baseY + (ARC[i] ?? 0) })
+
+    // Pass 1, the bed: a void plate per cup. The wicks need their own dark to burn against, and separate beds
+    // keep the cluster reading as five objects instead of one HUD bar stuck to the sprite.
+    for (let i = 0; i < n; i++) { const s = slot(i); g.rect(s.x - 1, s.y - 1, 5, 6).fill({ color: C.void, alpha: 0.62 }) }
+    // Pass 2, the cups: five bone lips, ALWAYS all five, lit or not. They are the denominator — without them a
+    // player at 3 hp reads as three loose sparks sitting off to one side of his own head — and they are the
+    // player's identity mark: bone is issued to the player and to nothing else in the room, so one glance at a
+    // room of eight bodies finds the one wearing a row of bone.
+    for (let i = 0; i < n; i++) this.pipCup(g, slot(i).x, slot(i).y)
+    // Pass 3, the flames.
     for (let i = 0; i < n; i++) {
-      const cx = x0 + i * PITCH, cy = baseY + (ARC[i] ?? 0)
-      g.rect(cx - 1, cy - 1, 5, 6).fill({ color: C.void, alpha: 0.62 })
-    }
-    for (let i = 0; i < n; i++) {
-      const cx = x0 + i * PITCH, cy = baseY + (ARC[i] ?? 0)
-      if (i < p.hp) { this.pipLit(g, cx, cy); continue }
-      // the wick you just lost: punch to 1.4x, bleach to bone, hold one tick, then fall out over six
-      if (i === p.hp && hurtAge >= 0 && hurtAge <= 8) {
-        if (hurtAge <= 1) this.pipBlock(g, cx - 1, cy - 1, 5, 6, 0xffffff, 1)        // punch: 1.4x, bleached
-        else if (hurtAge === 2) this.pipBlock(g, cx - 1, cy - 1, 5, 6, C.bone, 1)    // one tick of hold
-        else {
-          const t = hurtAge - 3                              // 0..5: the wick falls out of its socket
-          const w = t < 2 ? 3 : t < 4 ? 2 : 1
-          const a = [1, 0.8, 0.6, 0.45, 0.28, 0.14][t]
-          this.pipBlock(g, cx + (t < 4 ? 0 : 1), cy + 1 + t, w, t < 3 ? 3 : 2, t < 3 ? C.bone : C.boneLo, a)
-        }
-        if (hurtAge >= 3) this.pipSocket(g, cx, cy, 0.6)
-        continue
+      const s = slot(i)
+      if (i < p.hp) { this.pipFlame(g, s.x, s.y); continue }
+      if (i !== p.hp || hurtAge < 0 || hurtAge > 8) continue
+      // the wick you just lost: punch to 1.4x, bleach to bone, hold one tick, then fall out of the cup over six
+      if (hurtAge <= 1) g.rect(s.x - 1, s.y - 1, 5, 6).fill(0xffffff)
+      else if (hurtAge === 2) g.rect(s.x - 1, s.y - 1, 5, 6).fill(C.bone)
+      else {
+        const t = hurtAge - 3                              // 0..5
+        const w = t < 2 ? 3 : t < 4 ? 2 : 1
+        const a = [1, 0.8, 0.6, 0.45, 0.28, 0.14][t]
+        g.rect(s.x + (t < 4 ? 0 : 1), s.y + t, w, t < 3 ? 3 : 2).fill({ color: t < 3 ? C.bone : C.boneLo, alpha: a })
       }
-      this.pipSocket(g, cx, cy, 1)
     }
   }
 
-  // lit: a 3x4 candle — white tip, hot core, warm body, a dark base it stands in. Mean L ~180.
-  private pipLit(g: Graphics, x: number, y: number) {
+  // the cup: a bone lip on two iron walls, with a void shadow line under it. Drawn for every slot, every frame,
+  // in exactly one pose — a health readout must have zero idle motion, so that all motion means damage.
+  private pipCup(g: Graphics, x: number, y: number) {
+    g.rect(x, y + 2, 1, 1).fill(C.ironHi)
+    g.rect(x + 2, y + 2, 1, 1).fill(C.ironHi)
+    g.rect(x, y + 3, 3, 1).fill(C.bone)
+    g.rect(x, y + 4, 3, 1).fill({ color: C.void, alpha: 0.8 })
+  }
+  // the flame: white tip, hot core, warm body. Mean L ~180 against the cup's empty interior at L~10 — a 5x
+  // value step and a hue step, so full and empty can never be confused.
+  private pipFlame(g: Graphics, x: number, y: number) {
     g.rect(x + 1, y, 1, 1).fill(C.wickWhite)
     g.rect(x, y + 1, 3, 2).fill(C.wick)
     g.rect(x + 1, y + 1, 1, 2).fill(C.wickHot)
-    g.rect(x, y + 3, 3, 1).fill(C.emberLo)
-  }
-  // spent: an empty socket. Cold and dark — but never invisible, because five slots that read as three lit
-  // pips and nothing else is a count with no denominator.
-  private pipSocket(g: Graphics, x: number, y: number, alpha: number) {
-    g.rect(x, y + 1, 3, 2).fill({ color: C.void, alpha: 0.9 * alpha })
-    g.rect(x, y + 1, 1, 1).fill({ color: C.iron, alpha })
-    g.rect(x + 2, y + 1, 1, 1).fill({ color: C.iron, alpha })
-    g.rect(x, y + 3, 3, 1).fill({ color: C.ironHi, alpha })
-  }
-  private pipBlock(g: Graphics, x: number, y: number, w: number, h: number, col: number, alpha: number) {
-    g.rect(x, y, w, h).fill({ color: col, alpha })
   }
 
   // --- the damage event: light, at the body ----------------------------------------------------------------------
@@ -353,23 +354,27 @@ export class Hud {
     }
     if (!at) return
 
-    // 2. the body emits. A hard ring ON the silhouette's edge, so the figure stays legible inside its own
-    //    flare, plus four square spikes: this is the top of the value range, spent on the event.
+    // 2. the body emits. The frame's colour grade (src/render/postfx.ts) clamps every pixel near L200, so this
+    //    event cannot win on peak value — it wins on AREA and on shape. A double shockwave stepping outward
+    //    from the player's own outline over four ticks: two hard white rings, then bone, then gone. It never
+    //    fills the middle, so the figure stays legible inside its own flare.
     const cx = at.x, cy = at.y
     if (hurtAge <= 1) {
-      ring(g, cx, cy, 9, 0xffffff, 1)
-      ring(g, cx, cy, 12, C.wickWhite, 0.5)
+      const r = hurtAge === 0 ? 8 : 10
+      ring(g, cx, cy, r, 0xffffff, 1)
+      ring(g, cx, cy, r - 1, 0xffffff, 1)
+      ring(g, cx, cy, r + 4, C.wickWhite, hurtAge === 0 ? 0.6 : 0.4)
+      // four square spikes, square to the frame: light thrown off the body, not another crescent
       for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
-        g.rect(cx + dx * 10 - (dy ? 1 : 0), cy + dy * 10 - (dx ? 1 : 0), dy ? 3 : 6, dx ? 3 : 6).fill(0xffffff)
+        g.rect(cx + dx * (r + 1) - (dy ? 1 : 0), cy + dy * (r + 1) - (dx ? 1 : 0), dy ? 3 : 5, dx ? 3 : 5).fill(0xffffff)
       }
     } else {
       const r = hurtAge === 2 ? 13 : 16
-      ring(g, cx, cy, r, C.bone, hurtAge === 2 ? 0.7 : 0.35)
-      ring(g, cx, cy, r - 1, 0xff6a3a, hurtAge === 2 ? 0.5 : 0.22)
+      ring(g, cx, cy, r, C.bone, hurtAge === 2 ? 0.8 : 0.4)
+      ring(g, cx, cy, r - 1, 0xff6a3a, hurtAge === 2 ? 0.55 : 0.25)
     }
   }
 
-  // --- life: five flames on a panel ---------------------------------------------------------------------------
   private updateLife(p: World['player'], now: number, hurtAge: number) {
     const shake = hurtAge >= 0 && hurtAge < HURT_SHAKE.length ? HURT_SHAKE[hurtAge] : 0
     const n = tuning.player.hp
@@ -413,17 +418,42 @@ export class Hud {
       // the flame you just lost flares white-hot, gutters, then leaves smoke climbing off the wick
       const dying = !lit && i === p.hp && hurtAge >= 0 && hurtAge < 8
       // the shape varies by index so the row is not five identical stamps; it does NOT vary by time
-      if (lit) this.drawFlame(g, x, 0, C.ember, C.wick, C.wickHot, i % 3)
+      if (lit) { this.haloFlame(g, x, 0); this.drawFlame(g, x, 0, C.ember, C.wick, C.wickHot, i % 3) }
       else if (dying) {
         const hot = hurtAge < 4
         this.drawFlame(g, x, 0, hot ? C.wickWhite : C.emberLo, hot ? C.wickWhite : C.emberLo, hot ? 0xffffff : C.ember, i % 3)
-      } else this.drawFlame(g, x, 0, C.iron, C.mortar, 0, 0, 6)   // spent: a cold ash mound, dark against the scrim
+      } else this.drawFlame(g, x, 0, C.ironHi, C.mortar, 0, 0, 6)   // spent: an empty socket - grey lip, black inside
       if (!lit && i === p.hp && hurtAge >= 6 && hurtAge < 34) {
         const t = hurtAge - 6
         const sy = -Math.floor(t / 4)
         const sx = [0, 1, 1, 0, -1, -1, 0, 1][Math.floor(t / 4) % 8]
         g.rect(x + 3 + sx, sy, 1, 1).fill(t < 12 ? C.boneLo : t < 20 ? C.iron : C.mortar)
         if (t > 6) g.rect(x + 3 - sx, sy + 2, 1, 1).fill(t < 20 ? C.iron : C.mortar)
+      }
+    }
+  }
+
+  // A lit vessel lights the plate around it. Two dilation rings of ember at low alpha: the cell stays bright
+  // (it is the survival readout) while the flame keeps its own saturated fire colours.
+  private haloFlame(g: Graphics, ox: number, oy: number) {
+    for (let ring = 1; ring <= 1; ring++) {
+      const a = 0.3
+      for (let y = 0; y < FH + ring; y++) {          // y >= 0: the glow never spills over the plate's top edge
+        for (let x = -ring; x < FW + ring; x++) {
+          if (inFlame(x, y)) continue
+          let near = false
+          for (let dy = -ring; dy <= ring && !near; dy++) for (let dx = -ring; dx <= ring; dx++) {
+            if (Math.abs(dx) + Math.abs(dy) > ring) continue
+            if (inFlame(x + dx, y + dy)) { near = true; break }
+          }
+          if (!near) continue
+          if (ring === 2) {
+            let inner = false
+            for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (inFlame(x + dx, y + dy)) inner = true
+            if (inner) continue
+          }
+          g.rect(ox + x, oy + y, 1, 1).fill({ color: C.ember, alpha: a })
+        }
       }
     }
   }

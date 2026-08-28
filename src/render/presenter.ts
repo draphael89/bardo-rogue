@@ -27,6 +27,9 @@ export class Presenter {
   hud: Hud
   particles: Particles
   fxGraphics = new Graphics()
+  // Contact shapes live BELOW the fighters. A crescent big enough to read is bigger than the gap
+  // between two bodies, so the only way it never eats a silhouette is to draw under both of them.
+  groundFx = new Graphics()
   time = 0
   flashOverlay: Sprite
   onEvent: ((ev: SimEvent) => void) | null = null
@@ -40,7 +43,9 @@ export class Presenter {
   // contact reaction on real time, so it plays out *inside* the hit-stop instead of waiting for it
   private recoilX = 0; private recoilY = 0
   private dodgedGlow = 0; private dodgedLit = false
-  private impactT = -1; private impactX = 0; private impactY = 0; private impactA = 0; private impactHeavy = false
+  // the contact stamp: an arc radius/orientation about the player, plus the wound it was struck on
+  private impactT = -1; private impactR = 0; private impactA = 0; private impactSnap = 0
+  private impactSweep = 1; private impactWX = 0; private impactWY = 0; private impactHeavy = false
   // hit flash on real time, not sim ticks: hit-stop must not hold a target white for its whole freeze
   private hitFlash = new Map<number, number>()
 
@@ -54,6 +59,7 @@ export class Presenter {
     this.particles = new Particles(atlas, L.fx, L.decals, L.floor)
     this.atmosphere = new Atmosphere(atlas, L.fx, world.arena)
     L.fx.addChild(this.fxGraphics)
+    L.shadows.addChild(this.groundFx)
     this.hud = new Hud(atlas, L.hud)
     this.flashOverlay = new Sprite(Texture.WHITE); this.flashOverlay.width = tuning.view.width; this.flashOverlay.height = tuning.view.height
     this.flashOverlay.alpha = 0; L.hud.addChild(this.flashOverlay)
@@ -93,12 +99,22 @@ export class Presenter {
           const v = this.enemyViews.get(ev.targetId)
           if (v) v.squash = J.squashTicks
           this.hitFlash.set(ev.targetId, J.hitFlashSec)
-          // the accent sits on the contact edge, between blade and body: the target's own white flash
-          // is the brightest thing on screen, and anything drawn on top of it has no contrast at all
-          const cx = ev.x - Math.cos(ev.angle) * H.contactBack, cy = ev.y - Math.sin(ev.angle) * H.contactBack * 0.8
-          this.particles.cut(cx, cy, ev.angle, ev.heavy)
-          this.impactT = 0; this.impactX = cx; this.impactY = cy; this.impactA = ev.angle; this.impactHeavy = ev.heavy
-          this.particles.hitSparks(cx, cy, ev.angle, ev.heavy ? H.heavySparks : H.lightSparks, ev.kind === 'brute' ? 0xffe9a0 : 0xfff6d8)
+          // The contact shape: an arc on the floor plane that passes the target, snapped to one of a
+          // fixed set of directions so the still reads as an authored sprite and not a free rotation.
+          // Nothing soft, nothing additive, nothing on top of either body.
+          const C = H.contact
+          const p = this.world.player
+          const fx = ev.x - p.x, fy = (ev.y - p.y) / 0.9
+          const stepA = (Math.PI * 2) / C.snapSteps
+          this.impactT = 0
+          this.impactA = Math.atan2(fy, fx)
+          this.impactSnap = Math.round(this.impactA / stepA) * stepA
+          this.impactR = Math.hypot(fx, fy) + (ev.heavy ? C.heavyOut : C.out)
+          this.impactSweep = tuning.player.attack.swings[p.swingIndex].sweep
+          // the wound, not the target's centre: a couple of px back along the blow, on the near edge
+          this.impactWX = ev.x - Math.cos(this.impactA) * 3
+          this.impactWY = ev.y - Math.sin(this.impactA) * 3 * 0.9
+          this.impactHeavy = ev.heavy
           // EVERY hit moves the camera. Light hits are ~90% of all contact, so a light hit the camera
           // ignores is a game that says nothing almost every time you connect.
           this.camera.addTrauma(ev.heavy ? J.traumaHeavy : J.traumaLight)
@@ -109,13 +125,11 @@ export class Presenter {
           this.recoilX -= Math.cos(ev.angle) * H.recoil * (ev.heavy ? 1.8 : 1)
           this.recoilY -= Math.sin(ev.angle) * H.recoil * (ev.heavy ? 1.8 : 1) * 0.7
           if (ev.killed) this.camera.addTrauma(J.traumaKill)
-          // juice hooks
+          // juice hooks. Only the greatsword throws grit: the soft smoke in that wave is what turned a
+          // light contact into a pale smudge, and the light hit now says it with hard shapes instead.
           if (ev.heavy) {
             this.postfx.pulse()
-            // the cut itself throws grit along the line the blade travelled
-            this.particles.slashWave(cx, cy, ev.angle, 0.7, J.swing.waveParticles)
-          } else {
-            this.particles.slashWave(cx, cy, ev.angle, 0.5, H.lightWave)
+            this.particles.slashWave(this.impactWX, this.impactWY, ev.angle, 0.7, J.swing.waveParticles)
           }
           if (J.damageNumbers) this.damageNumbers.show(ev.x, ev.y, ev.damage, ev.heavy)
           break
@@ -233,30 +247,28 @@ export class Presenter {
     }
   }
 
-  // The contact stamp: three hard values (four for the greatsword), stepped on REAL time so the
-  // hit-stop holds the peak instead of eating it. Dark rim, hot core, spikes longest along the blade.
-  private drawImpact(g: Graphics, dtSec: number) {
+  // The contact stamp, stepped on REAL time so the hit-stop holds tier 0 instead of eating it.
+  // Two shapes, six tones, every edge on a whole pixel:
+  //   ground: one tapered crescent, dark-rimmed, snapped to 16 directions, UNDER both fighters
+  //   air:    a spark cluster and blood specks on the wound — small hard marks, so the target's
+  //           silhouette survives them, and the eye lands on where the damage went in
+  private drawContact(ground: Graphics, air: Graphics, dtSec: number) {
     if (this.impactT < 0) return
-    const H = tuning.juice.hit, S = H.star
-    const tiers = this.impactHeavy ? S.heavyTiers : S.tiers
-    const step = Math.floor(this.impactT / S.stepSec)
+    const C = tuning.juice.hit.contact
+    const tiers = this.impactHeavy ? C.heavyTiers : C.tiers
+    const step = Math.floor(this.impactT / C.stepSec)
     this.impactT += dtSec
     if (step >= tiers) { this.impactT = -1; return }
-    const k = (this.impactHeavy ? 1.7 : 1) * (1 - (step / tiers) * 0.55)
-    const cx = Math.round(this.impactX), cy = Math.round(this.impactY)
-    const col = H.starTiers[Math.min(step, H.starTiers.length - 1)]
-    const core = S.core * k
-    // 1. a dithered dark ring: the frame cannot be dark everywhere, but it can be dark exactly where
-    //    the target's white flash and this stamp need headroom. Without it both wash into a pale floor.
-    darkRing(g, cx, cy, core + S.rim, S.darkR * k, S.darkAlpha * (1 - step / tiers))
-    // 2. spikes stand SQUARE to the blade, so they cannot be read as more of the crescent
-    for (let i = 0; i < 4; i++) {
-      const len = (i % 2 === 0 ? S.spikeSide : S.spikeLong) * k
-      ray(g, cx, cy, this.impactA + i * Math.PI / 2, core * 0.6, len, S.width, col)
-    }
-    // 3. solid rim, then the core: two hard values, no gradient
-    ellipseRows(g, cx, cy, core + S.rim, (core + S.rim) * 0.8, tuning.juice.arc.rimColor, 0.9)
-    ellipseRows(g, cx, cy, core, core * 0.8, col, 1)
+    const u = step / tiers
+    // anchored to the player's DRAWN body, so the arc rides the contact recoil with him
+    const b = this.playerView.body
+    const cx = b.position.x, cy = b.position.y - tuning.player.radius - 1
+    const thick = (this.impactHeavy ? C.heavyThick : C.thick) * (1 - u * 0.45)
+    const span = (this.impactHeavy ? C.heavySpanDeg : C.spanDeg) * Math.PI / 180
+    // the tail chases the leading edge across the tiers: motion, without ever unsnapping the shape
+    crescent(ground, cx, cy, this.impactR, thick, this.impactSnap, span, this.impactSweep, u * 0.5, step === 0, C)
+    const n = Math.max(2, (this.impactHeavy ? C.heavySparks : C.sparks) - step)
+    sparkCluster(air, this.impactWX, this.impactWY, this.impactA, step, n, this.impactHeavy ? C.heavyDrops : C.drops, C)
   }
 
   private flashAlpha = 0
@@ -305,9 +317,10 @@ export class Presenter {
 
     // per-frame vector fx
     this.fxGraphics.clear()
+    this.groundFx.clear()
     for (const e of w.enemies) if (e.active && e.kind === 'caster' && e.state === 'aim') drawAimLine(this.fxGraphics, e, alpha)
     drawSwingArc(this.fxGraphics, p, alpha, w)
-    this.drawImpact(this.fxGraphics, dtSec)
+    this.drawContact(this.groundFx, this.fxGraphics, dtSec)
 
     this.particles.update(dtSec)
     this.atmosphere.update(w, dtSec)
@@ -331,19 +344,70 @@ export class Presenter {
   }
 }
 
-// Integer pixel rows. A vector ellipse at 480x270 lands on half pixels and the NEAREST upscale
-// doubles the smear; rows keep every edge on a whole pixel.
-function ellipseRows(g: Graphics, cx: number, cy: number, rx: number, ry: number, color: number, alpha: number): void {
-  const RY = Math.round(ry)
-  if (rx < 1 || RY < 1) return
+// ---- authored contact shapes -------------------------------------------------------------------
+// Everything below emits 1px rects only. A vector shape at 480x270 lands on half pixels and the
+// NEAREST upscale doubles the smear; whole-pixel rows keep every edge hard, and a fixed handful of
+// flat colours keeps a contact frame from adding forty near-white tones to the image.
+
+const SPANS: number[][] = [[], [], []]   // scratch: rim / steel / core rects, reused every frame
+
+// One tapered crescent on the floor plane, centred on the swinger. Thickness runs from a point at the
+// tail to a blunt leading end, so the still says which way the blade went. `hot` paints the leading
+// half of the band with the core tone; `tail` cuts the shape off from behind as the tiers advance.
+function crescent(g: Graphics, cx: number, cy: number, r: number, thick: number, a: number, span: number, sweep: number, tail: number, hot: boolean, C: typeof tuning.juice.hit.contact): void {
+  if (r < 2 || thick < 1) return
+  const half = thick / 2 + 1.5
+  const R = Math.ceil(r + half), RY = Math.ceil(R * 0.9)
+  const end = 1.4 / (r * span)              // ~1px of arc, in t units: the shape's end caps
+  for (const s of SPANS) s.length = 0
   for (let dy = -RY; dy <= RY; dy++) {
-    const t = 1 - (dy * dy) / (ry * ry)
-    if (t <= 0) continue
-    const hw = Math.round(rx * Math.sqrt(t))
-    if (hw < 1) continue
-    g.rect(cx - hw, cy + dy, hw * 2 + 1, 1)
+    const fy = dy / 0.9
+    for (let dx = -R; dx <= R; dx++) {
+      const rr = Math.hypot(dx, fy)
+      const d = rr - r
+      if (d < -half || d > half) continue
+      // t: 0 at the tail of the arc, 1 at the leading edge
+      let t = ((Math.atan2(fy, dx) - (a - sweep * span)) * sweep) % (Math.PI * 2)
+      if (t > Math.PI) t -= Math.PI * 2; else if (t < -Math.PI) t += Math.PI * 2
+      t /= span
+      if (t < tail - end || t > 1 + end) continue
+      const tt = (Math.min(1, Math.max(tail, t)) - tail) / (1 - tail)
+      const th = thick * (0.14 + 0.86 * tt) / 2
+      const ad = Math.abs(d)
+      if (ad > th + 1) continue
+      const capped = t < tail || t > 1
+      const band = capped || ad > th ? 0 : hot && tt > 0.5 && ad <= th - 1 ? 2 : 1
+      SPANS[band].push(cx + dx, cy + dy)
+    }
   }
-  g.fill({ color, alpha })
+  const cols = [C.rim, C.steel, C.core]
+  for (let i = 0; i < 3; i++) {
+    const pts = SPANS[i]
+    if (!pts.length) continue
+    for (let k = 0; k < pts.length; k += 2) g.rect(pts[k], pts[k + 1], 1, 1)
+    g.fill({ color: cols[i], alpha: 1 })
+  }
+}
+
+// The wound: sparks fanned along the blow and blood specks thrown past it. Warm and red against a
+// grey-blue arc, and small enough that they mark the target instead of covering it.
+function sparkCluster(g: Graphics, x: number, y: number, a: number, step: number, n: number, drops: number, C: typeof tuning.juice.hit.contact): void {
+  const spread = C.sparkSpreadDeg * Math.PI / 180
+  const base = 2 + step * C.sparkStepPx
+  for (let i = 0; i < n; i++) {
+    const f = n === 1 ? 0.5 : i / (n - 1)
+    const ang = a + (f - 0.5) * spread
+    const d0 = base + (i & 1 ? 2 : 0)
+    ray(g, x, y, ang, d0, d0 + 2, i & 1 ? 1 : 2, i & 1 ? C.spark : C.sparkHot)
+  }
+  for (let i = 0; i < drops; i++) {
+    const f = drops === 1 ? 0.5 : i / (drops - 1)
+    const ang = a + (f - 0.5) * spread * 1.5
+    const d = 4 + step * (C.sparkStepPx + 1)
+    const px = Math.round(x + Math.cos(ang) * d), py = Math.round(y + Math.sin(ang) * d * 0.9 + step * step * 0.7)
+    g.rect(px, py, 2, 1)
+  }
+  if (drops > 0) g.fill({ color: C.blood, alpha: 1 })
 }
 
 // One tapered spike of whole pixels, from radius r0 to r1 along `a`. The 0.85 flattens it into the
@@ -357,22 +421,4 @@ function ray(g: Graphics, cx: number, cy: number, a: number, r0: number, r1: num
     g.rect(Math.round(cx + dx * r), Math.round(cy + dy * r) - (w >> 1), 1, w)
   }
   g.fill({ color, alpha: 1 })
-}
-
-// A dithered dark band between two radii. Dither, not alpha: at 480x270 a flat translucent wash
-// reads as fog, while a checker of dark pixels reads as the floor falling away.
-function darkRing(g: Graphics, cx: number, cy: number, r0: number, r1: number, alpha: number): void {
-  if (alpha <= 0.02 || r1 <= r0) return
-  const R = Math.round(r1), RY = Math.round(r1 * 0.8)
-  for (let dy = -RY; dy <= RY; dy++) {
-    for (let dx = -R; dx <= R; dx++) {
-      const d = (dx * dx) / (r1 * r1) + (dy * dy) / (r1 * 0.8 * r1 * 0.8)
-      if (d > 1) continue
-      const din = (dx * dx) / (r0 * r0) + (dy * dy) / (r0 * 0.8 * r0 * 0.8)
-      if (din < 1) continue
-      if (((cx + dx + cy + dy) & 1) === 0) continue
-      g.rect(cx + dx, cy + dy, 1, 1)
-    }
-  }
-  g.fill({ color: 0x08040a, alpha })
 }

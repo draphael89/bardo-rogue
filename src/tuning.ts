@@ -69,7 +69,8 @@ export const tuning = {
     shakeMax: 4, shakeRotMaxDeg: 0.5, shakeDecay: 1.6,
     traumaLight: 0.40, traumaHeavy: 0.58, traumaHurt: 0.6, traumaKill: 0.22,
     flashTicks: 4, squashTicks: 6,
-    hitFlashSec: 0.05,      // enemy white-flash on real time: hit-stop must not hold a target white for its whole freeze
+    hitFlashSec: 0.034,     // enemy white-flash on real time: two frames. Longer and the target is a
+                            // featureless white blob for most of the hit-stop.
     lookahead: 4, lookaheadLerp: 0.08,
     aberrationTicks: 3,
     aberrationStrength: 2,  // screen px of red/blue split at the pulse peak
@@ -82,16 +83,25 @@ export const tuning = {
       lightZoom: 1.018,                     // punch-in on a light hit (the heavy uses zoom.heavyHit)
       lightFlash: 0.11, heavyFlash: 0.20, flashTint: 0xfff0d0,
       recoil: 2.2, recoilDecay: 12,         // px the player's own body jolts back, and its decay rate
-      lightSparks: 10, heavySparks: 16,
-      lightWave: 4,                         // grit thrown along a light contact (heavy uses swing.waveParticles)
-      // The contact stamp: hard pixel values, no interpolation. Soft additive blobs cannot make a
-      // contact frame at 480x270 over a pale floor; a shape with a dark rim can.
-      star: { stepSec: 0.022, tiers: 3, heavyTiers: 4, core: 4, spikeLong: 11, spikeSide: 7, width: 3, rim: 2, darkR: 9, darkAlpha: 0.7 },
-      // amber from the first frame: the target's own flash is pure white, so the stamp has to be a
-      // different colour or the two merge into one white mass
-      starTiers: [0xffeec0, 0xffb85c, 0xe07828, 0xa04c18],
-      contactBack: 11,                       // px back along the blow: the accent belongs on the contact
-                                            // EDGE, not on the target's centre, where its white flash eats it
+      heavySparks: 16,
+      // The contact stamp. Two authored shapes, no soft sprites: a crescent of whole pixels UNDER both
+      // fighters (so neither silhouette is ever touched) and a chromatic spark cluster ON the wound.
+      // Six tones in total — an alpha-blended bloom adds forty and reads as a smear, not a shape.
+      contact: {
+        stepSec: 0.022,          // real-time step between tiers; the hit-stop holds tier 0
+        tiers: 3, heavyTiers: 4,
+        snapSteps: 16,           // the crescent only ever points one of 16 ways, like an authored sprite
+        spanDeg: 74, heavySpanDeg: 104,
+        thick: 5, heavyThick: 9, // px across the fat leading end; the tail runs out to a point
+        out: 3, heavyOut: 4,     // px the arc sits beyond the contact, so it passes the target
+        rim: 0x120d18,           // 1px dark contrast rim: without it pale steel dies on a pale floor
+        steel: 0xbfd0ea,
+        core: 0xfff8ec,          // hot leading half, tier 0 only
+        sparks: 5, heavySparks: 8,
+        sparkSpreadDeg: 46, sparkStepPx: 4,
+        sparkHot: 0xffeeb0, spark: 0xffa832,
+        drops: 3, heavyDrops: 5, blood: 0xb62a26,   // the wound itself, thrown past the target
+      },
     },
     // A successful i-frame dodge-through is the hardest input in the game. It is the only cold-coloured
     // feedback in the fight, so it can never be mistaken for a hit or for damage taken.

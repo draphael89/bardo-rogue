@@ -127,15 +127,9 @@ export class Particles {
     }
   }
 
-  // The cut mark: a crescent thrown square to the blade at the contact point. This is the frame the
-  // player reads as "that landed", so it is bright, brief, and oriented.
-  cut(x: number, y: number, angle: number, heavy: boolean) {
-    const c = this.spawn(this.atlas.particle(heavy ? 'slash_02' : 'slash_03'), x, y, {
-      maxLife: heavy ? 0.13 : 0.07, scale0: heavy ? 15 : 8, scale1: heavy ? 28 : 15,
-      tint: 0xfffaf0, blend: 'add', alpha0: 1, alpha1: 0,
-    })
-    if (c) c.s.rotation = angle + Math.PI / 2
-  }
+  // The cut mark used to be a soft additive slash sprite stamped between the fighters. At 480x270 an
+  // alpha-ramped bloom covers both silhouettes and says nothing about direction, so the contact shape
+  // is now authored out of whole pixels in presenter.drawContact instead.
 
   spawnBurst(x: number, y: number) {
     this.spawn(this.atlas.particle('circle_03'), x, y, { maxLife: 0.3, scale0: 4, scale1: 30, tint: 0xfff0c0, blend: 'add', alpha0: 0.9, alpha1: 0 })

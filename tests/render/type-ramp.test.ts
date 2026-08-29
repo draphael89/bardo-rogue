@@ -1,3 +1,5 @@
+import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { TYPE } from '@/render/type'
 
@@ -69,5 +71,35 @@ describe('the overlay type ramp', () => {
     for (const [tier, spec] of Object.entries(TYPE)) {
       expect(spec.tracking % 1, `TYPE.${tier} tracking must be a whole number`).toBe(0)
     }
+  })
+})
+
+// The ramp covers every overlay, but the HUD, the damage numbers and the debug overlay build their
+// Text objects directly and never see it. Two of those were broken the same way the overlays were —
+// the room name at Kenney Mini 10, the banner at Blocks 24 — so the rule is checked against the
+// source rather than only against the table.
+function sourceFiles(dir: string): string[] {
+  return readdirSync(dir).flatMap(name => {
+    const path = join(dir, name)
+    return statSync(path).isDirectory() ? sourceFiles(path) : path.endsWith('.ts') ? [path] : []
+  })
+}
+
+describe('type declared outside the ramp', () => {
+  it('also only uses sizes each face is drawn for', () => {
+    const found: string[] = []
+    for (const file of sourceFiles('src')) {
+      const src = readFileSync(file, 'utf8')
+      for (const m of src.matchAll(/fontFamily: '([^']+)',\s*fontSize: (\d+)/g)) {
+        const [, family, size] = m
+        const gcd = GCD[family]
+        expect(gcd, `${file} uses an unmeasured face "${family}"`).toBeDefined()
+        const smallestLegal = UNITS_PER_EM / gcd
+        if (Number(size) % smallestLegal !== 0) {
+          found.push(`${file}: ${family} at ${size}px (needs a multiple of ${smallestLegal})`)
+        }
+      }
+    }
+    expect(found, 'off-grid type outside the ramp').toEqual([])
   })
 })

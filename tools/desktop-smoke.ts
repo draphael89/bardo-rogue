@@ -39,6 +39,7 @@ const baseEnv: Record<string, string> = {}
 for (const [k, v] of Object.entries(process.env)) if (v !== undefined) baseEnv[k] = v
 const userData = mkdtempSync(join(tmpdir(), 'bardo-smoke-'))
 const savesDir = join(userData, 'saves')
+const importFile = join(userData, 'import.json')
 
 function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
   let t: NodeJS.Timeout | undefined
@@ -88,6 +89,7 @@ async function launch(): Promise<{ app: ElectronApplication; page: Page }> {
       // Every write takes 250ms, so the quit-race check genuinely races a write that is still in
       // flight when the close begins -- without this, a fast disk makes that check pass vacuously.
       BARDO_TEST_SLOW_WRITE_MS: '250',
+      BARDO_TEST_IMPORT_FILE: importFile,
     },
     timeout: 60_000,
   }), 60_000, 'electron.launch')
@@ -119,11 +121,17 @@ async function close(a: ElectronApplication): Promise<void> {
 
 const saveA = serializeSave(bumpRevision(defaultSave({ profileId: 'default' })))
 const saveB = serializeSave(bumpRevision(bumpRevision(defaultSave({ profileId: 'default' }))))
+const importedSave = serializeSave({
+  ...defaultSave({ profileId: 'default' }),
+  meta: { version: 1, attempts: 42, victories: 6, unlockedWeapons: ['blade'] },
+})
 const CORRUPT = '{"schemaVersion": 2, "meta"'
+const CORRUPT_BACKUP = '{"schemaVersion": 2, "settings"'
 let nodeHash = 0, appHash = 0, ticks = 0
 let surface: unknown = null
 
 try {
+  writeFileSync(importFile, importedSave, 'utf8')
   const l1 = await launch()
   const page = l1.page
 
@@ -309,12 +317,46 @@ try {
     return `envelope v${doc.schemaVersion} rev${doc.revision} written by the game`
   })
 
-  await check('a quit does not race the last pending save', 30_000, async () => {
+  await check('import is acknowledged only after its coalesced write is durable', 20_000, async () => {
+    await page.evaluate(() => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Escape' }))
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyI' }))
+    })
+    await new Promise(r => setTimeout(r, 75))
+    const early = await page.evaluate(() => {
+      const p = (window as unknown as { __game: { presenter: { hud: { bannerText: string } } } }).__game.presenter
+      return p.hud.bannerText
+    })
+    assert(early !== 'SAVE IMPORTED', 'the import claimed success before the delayed filesystem write completed')
+    const live = join(savesDir, 'default.json')
+    for (let i = 0; i < 80; i++) {
+      if (existsSync(live)) {
+        const doc = JSON.parse(readFileSync(live, 'utf8')) as { meta: { attempts: number } }
+        if (doc.meta.attempts === 42) break
+      }
+      await new Promise(r => setTimeout(r, 50))
+    }
+    const doc = JSON.parse(readFileSync(live, 'utf8')) as { revision: number; meta: { attempts: number; victories: number } }
+    const finalBanner = await page.evaluate(() => {
+      const p = (window as unknown as { __game: { presenter: { hud: { bannerText: string } } } }).__game.presenter
+      return p.hud.bannerText
+    })
+    assert(doc.meta.attempts === 42 && doc.meta.victories === 6, 'the imported document was not durable')
+    assert(finalBanner === 'SAVE IMPORTED', `durable import was not acknowledged, banner=${finalBanner}`)
+    return `revision ${doc.revision}, success followed the durable write`
+  })
+
+  await check('reset clears the quit guard and quit does not race the last pending save', 30_000, async () => {
     // Press V and close IMMEDIATELY: the write is still queued in the renderer or in flight on disk
     // when the close begins. The host's close path must hold the window until it lands -- before
     // that flush existed, this exact sequence lost the newest update.
     const doc1 = JSON.parse(readFileSync(join(savesDir, 'default.json'), 'utf8')) as { revision: number; settings: { reducedEffects: boolean } }
-    await page.evaluate(() => { window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyV' })) })
+    await page.evaluate(() => {
+      const desktop = (window as unknown as { bardoDesktop: { setRunActive(active: boolean): void } }).bardoDesktop
+      desktop.setRunActive(true)                    // establish the stale state this regression left behind
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'F2' })) // record() resets the world and must publish false
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyV' }))
+    })
     await close(l1.app)                       // no wait for the file: the close itself must flush it
     const doc2 = JSON.parse(readFileSync(join(savesDir, 'default.json'), 'utf8')) as { revision: number; settings: { reducedEffects: boolean } }
     assert(doc2.revision === doc1.revision + 1, `the pending write was lost: revision ${doc1.revision} -> ${doc2.revision}`)
@@ -359,12 +401,30 @@ try {
   })
   await close(l3.app)
 
-  // The error array collects renderer warnings and page errors across ALL THREE launches, but until
+  // Both slots can be damaged independently. The desktop bridge must propagate that fact for each
+  // one, and the store must preserve both byte strings before the game starts fresh.
+  writeFileSync(join(savesDir, 'default.json'), CORRUPT, 'utf8')
+  writeFileSync(join(savesDir, 'default~bak.json'), CORRUPT_BACKUP, 'utf8')
+  const l4 = await launch()
+  await check('live and backup corruption are both preserved and reported as damage', 40_000, async () => {
+    await l4.page.waitForFunction(() => !!(window as unknown as { __game?: unknown }).__game, null, { timeout: 40_000 })
+    const keptLive = join(savesDir, 'default~corrupt-1.json')
+    const keptBackup = join(savesDir, 'default~corrupt-2.json')
+    for (let i = 0; i < 60 && (!existsSync(keptLive) || !existsSync(keptBackup)); i++) await new Promise(r => setTimeout(r, 100))
+    assert(existsSync(keptLive) && readFileSync(keptLive, 'utf8') === CORRUPT, 'the second damaged live file was not preserved')
+    assert(existsSync(keptBackup) && readFileSync(keptBackup, 'utf8') === CORRUPT_BACKUP, 'the damaged backup file was not preserved')
+    const meta = await l4.page.evaluate(() => (window as unknown as { __game: { world: { session: { meta: { attempts: number } } } } }).__game.world.session.meta)
+    assert(meta.attempts === 0, `two damaged copies should start a visible fresh profile, got ${meta.attempts} attempts`)
+    return `both damaged generations preserved at ${keptLive} and ${keptBackup}`
+  })
+  await close(l4.app)
+
+  // The error array collects renderer warnings and page errors across ALL FOUR launches, but until
   // here it was only asserted during the first boot -- a throw during recovery or relaunch would ride
   // along in the JSON under ok:true. Nothing after boot may log an error and still pass.
   await check('no errors across any launch', 5_000, async () => {
     assert(errors.length === 0, `late errors: ${errors.slice(0, 3).join(' | ')}`)
-    return 'clean across 3 launches'
+    return 'clean across 4 launches'
   })
 
   clearTimeout(watchdog)

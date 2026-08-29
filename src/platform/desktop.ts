@@ -1,10 +1,10 @@
 // The desktop host, as the seam sees it. This file and index.ts are the only places in src/ that
 // know the word `bardoDesktop`; the game itself never branches on which host it is running in.
-import type { Platform, SaveStore } from './index'
+import type { Platform, SaveRead, SaveStore } from './index'
 import { prefersReducedMotion } from './dom'
 
 // Structural types only: src/ never imports from desktop/.
-type ReadReply = { ok: true; data: string | null; preserved?: string } | { ok: false; error: string }
+type ReadReply = { ok: true; data: string | null; corrupt?: true; preserved?: string } | { ok: false; error: string }
 type WriteReply = { ok: true; bytes: number } | { ok: false; error: string }
 type PlainReply = { ok: true } | { ok: false; error: string }
 
@@ -42,11 +42,11 @@ export function isDesktopBridge(v: unknown): v is DesktopBridge {
 function desktopSaveStore(bridge: DesktopBridge): SaveStore {
   // A refusal or a transport failure REJECTS -- only a definitely-absent save resolves null. The
   // recovery layer relies on that distinction to decide whether writing is safe at all.
-  const readVia = async (fn: (id: string) => Promise<ReadReply>, id: string): Promise<string | null> => {
+  const readVia = async (fn: (id: string) => Promise<ReadReply>, id: string): Promise<SaveRead> => {
     const r = await fn(id)
     if (!r.ok) throw new Error(`save read refused: ${r.error}`)
     if (r.preserved) console.log(`[save] a damaged save was moved aside: ${r.preserved}`)
-    return r.data
+    return r.corrupt ? { corrupt: true } : r.data
   }
   return {
     read: id => readVia(bridge.saves.read.bind(bridge.saves), id),

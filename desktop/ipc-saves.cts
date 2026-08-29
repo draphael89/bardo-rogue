@@ -55,7 +55,8 @@ export function registerSaveIpc(dir: string, opts: SaveIpcOptions) {
   })
 
   handle(SAVE_CHANNELS.readBackup, ['profileId'], async p => ({
-    ok: true as const, data: await store.readBackup(p.profileId as string),
+    ok: true as const,
+    ...await store.readBackup(p.profileId as string),
   }))
 
   handle(SAVE_CHANNELS.write, ['profileId', 'data'], async p => {

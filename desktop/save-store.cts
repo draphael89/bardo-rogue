@@ -91,7 +91,7 @@ export interface SaveStoreOptions {
   verify?: boolean            // read back and compare; on in debug and test builds
   testWriteDelayMs?: number   // test lever: makes the quit-race smoke actually race the write
 }
-export interface ReadResult { data: string | null; preserved?: string }
+export interface ReadResult { data: string | null; corrupt?: true; preserved?: string }
 
 export function createSaveStore(dir: string, opts: SaveStoreOptions = {}) {
   let seq = 0
@@ -157,14 +157,17 @@ export function createSaveStore(dir: string, opts: SaveStoreOptions = {}) {
     if (cur.state === 'unreadable') throw new Error(`save file could not be read: ${p.current}`)
     if (cur.state === 'missing') return { data: null }
     const preserved = await preserveCorrupt(p.current, p.corrupt)
-    return { data: null, ...(preserved ? { preserved } : {}) }
+    return { data: null, corrupt: true, ...(preserved ? { preserved } : {}) }
   }
 
-  async function readBackupNow(id: string): Promise<string | null> {
+  async function readBackupNow(id: string): Promise<ReadResult> {
     const p = savePaths(dir, id); assertInside(dir, p.backup)
     const bak = await probe(p.backup)
     if (bak.state === 'unreadable') throw new Error(`backup save could not be read: ${p.backup}`)
-    return bak.state === 'ok' ? bak.data : null
+    if (bak.state === 'ok') return { data: bak.data }
+    if (bak.state === 'missing') return { data: null }
+    const preserved = await preserveCorrupt(p.backup, p.corrupt)
+    return { data: null, corrupt: true, ...(preserved ? { preserved } : {}) }
   }
 
   async function deleteNow(id: string): Promise<void> {

@@ -99,6 +99,18 @@ describe('loadSave recovery', () => {
     expect(storage.getItem(backupKey(ID))).toBe('{broken')  // ...and the corrupt blob is kept, not erased
   })
 
+  it('recovers read-only without writing before ownership is acquired', async () => {
+    const storage = new MemoryStorage()
+    const good = serializeSave(withMeta(12, 3))
+    storage.setItem(saveKey(ID), '{broken')
+    storage.setItem(backupKey(ID), good)
+    const loaded = await loadSave(createStorageSaveStore(storage), ID, { repair: false })
+    expect(loaded.source).toBe('backup')
+    expect(loaded.save.meta.attempts).toBe(12)
+    expect(storage.getItem(saveKey(ID))).toBe('{broken')
+    expect(storage.getItem(backupKey(ID))).toBe(good)
+  })
+
   it('reports both copies corrupt as damage, never as a first boot', async () => {
     // The player HAD progress; starting fresh silently would leave them to discover the loss alone.
     // main.ts banners this source; the bytes stay where they are until the first autosave rotates
@@ -180,39 +192,37 @@ describe('recovery cannot destroy the only good copy', () => {
 })
 
 describe('profile ownership lock', () => {
-  const NOW = 1_000_000
-  it('grants a fresh profile and blocks a second owner while the heartbeat is live', () => {
-    const storage = new MemoryStorage()
-    const a = claimProfileLock(storage, ID, 'tab-a', () => NOW)
-    expect(a.claimed).toBe(true)
-    expect(claimProfileLock(storage, ID, 'tab-b', () => NOW + 5_000).claimed).toBe(false)
+  class MemoryLocks {
+    held = new Set<string>()
+    requested: string[] = []
+    async request(
+      name: string,
+      _options: { mode: 'exclusive'; ifAvailable: true },
+      callback: (lock: object | null) => Promise<void>,
+    ): Promise<void> {
+      this.requested.push(name)
+      if (this.held.has(name)) { await callback(null); return }
+      this.held.add(name)
+      try { await callback({ name }) } finally { this.held.delete(name) }
+    }
+  }
+
+  it('atomically grants one tab, reports the other busy, and releases with the document', async () => {
+    const locks = new MemoryLocks()
+    let release = () => {}
+    const hold = new Promise<void>(resolve => { release = resolve })
+    expect(await claimProfileLock(locks, ID, hold)).toBe('acquired')
+    expect(locks.requested).toEqual([lockKey(ID)])
+    expect(await claimProfileLock(locks, ID, Promise.resolve())).toBe('busy')
+    release()
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(await claimProfileLock(locks, ID, Promise.resolve())).toBe('acquired')
   })
 
-  it('lets a new tab take over once the heartbeat has gone stale', () => {
-    const storage = new MemoryStorage()
-    claimProfileLock(storage, ID, 'tab-a', () => NOW)
-    expect(claimProfileLock(storage, ID, 'tab-b', () => NOW + 60_000).claimed).toBe(true)
-  })
-
-  it('release clears only its own lock', () => {
-    const storage = new MemoryStorage()
-    const a = claimProfileLock(storage, ID, 'tab-a', () => NOW)
-    const b = claimProfileLock(storage, ID, 'tab-b', () => NOW + 60_000)   // took over from stale a
-    a.release()
-    expect(storage.getItem(lockKey(ID))).not.toBeNull()   // b's lock survives a's release
-    b.release()
-    expect(storage.getItem(lockKey(ID))).toBeNull()
-  })
-
-  it('re-claiming by the same owner refreshes rather than fails', () => {
-    const storage = new MemoryStorage()
-    claimProfileLock(storage, ID, 'tab-a', () => NOW)
-    expect(claimProfileLock(storage, ID, 'tab-a', () => NOW + 5_000).claimed).toBe(true)
-  })
-
-  it('never throws when storage is missing or hostile', () => {
-    expect(claimProfileLock(undefined, ID, 'tab-a').claimed).toBe(false)
-    expect(claimProfileLock(new HostileStorage(), ID, 'tab-a').claimed).toBe(false)
+  it('reports unavailable instead of falling back to a non-atomic heartbeat', async () => {
+    expect(await claimProfileLock(undefined, ID, Promise.resolve())).toBe('unavailable')
+    const throwing = { request: () => { throw new Error('locks disabled') } }
+    expect(await claimProfileLock(throwing, ID, Promise.resolve())).toBe('unavailable')
   })
 })
 
@@ -391,6 +401,27 @@ describe('desktop adapter', () => {
   it('still reports a genuinely absent save as null', async () => {
     const store = createDesktopPlatform(bridge({})).saves
     await expect(store.read(ID)).resolves.toBeNull()
+  })
+
+  it('propagates live corruption so recovery can distinguish it from an absent profile', async () => {
+    const good = serializeSave(withMeta(8, 2))
+    const platform = createDesktopPlatform(bridge({
+      read: async () => ({ ok: true, data: null, corrupt: true, preserved: '/saves/default~corrupt.json' }),
+      readBackup: async () => ({ ok: true, data: good }),
+    }))
+    const loaded = await loadSave(platform.saves, ID, { repair: false })
+    expect(loaded.source).toBe('backup')
+    expect(loaded.save.meta.attempts).toBe(8)
+  })
+
+  it('propagates backup corruption so two damaged slots never look like first boot', async () => {
+    const platform = createDesktopPlatform(bridge({
+      read: async () => ({ ok: true, data: null, corrupt: true }),
+      readBackup: async () => ({ ok: true, data: null, corrupt: true, preserved: '/saves/default~corrupt-1.json' }),
+    }))
+    const loaded = await loadSave(platform.saves, ID, { repair: false })
+    expect(loaded.source).toBe('damaged')
+    expect(loaded.writable).toBe(true)
   })
 })
 

@@ -15,7 +15,14 @@ const VIDEO = /\.(mp4|mov|webm|mkv|avi)$/i
 // Runtime files the game loads by HARDCODED path (src/render/atlas.ts), so the manifest check
 // cannot protect them: `pnpm assets` regenerating the manifest never mentions them, and without
 // this list their deletion would pass the gate and boot to a missing-texture failure.
-const HARDCODED_RUNTIME = ['assets/sprites/bardo_hero.png', 'assets/sprites/bardo_brute.png']
+const AUTHORED_SHEETS = [
+  'bardo_hero', 'bardo_hero_north', 'bardo_hero_north_roll',
+  'bardo_hero_south', 'bardo_hero_south_roll', 'bardo_brute',
+]
+const HARDCODED_RUNTIME = AUTHORED_SHEETS.flatMap(name => [
+  `assets/sprites/${name}.png`,
+  `assets/sprites/${name}.json`,
+])
 const REQUIRED = ['index.html', 'assets/manifest.json', ...HARDCODED_RUNTIME]
 // The bundle's own artifacts live flat in assets/ and carry Vite's 8-char content hash
 // (index-CjDo0xU0.js). Requiring the hash, not just the extension, keeps a stray debug.js dropped

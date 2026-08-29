@@ -49,7 +49,7 @@ describe('sim boundary', () => {
       [/\bMath\.random\b/, 'Math.random'],
       [/\bnew Date\b|\bDate\.now\b/, 'Date'],
       [/\bperformance\.now\b/, 'performance.now'],
-      [/from 'pixi\.js'/, 'pixi.js'],
+      [/from\s+['"]pixi\.js['"]/, 'pixi.js'],
     ] as const
     const offenders: string[] = []
     for (const f of files) {

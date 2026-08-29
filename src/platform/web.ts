@@ -1,6 +1,6 @@
 import { META_KEY, SETTINGS_KEY, type StorageLike } from '@/sim/storage'
 import { migrateLegacySave, serializeSave } from '@/sim/save'
-import { PROFILE_ID, type DetectOptions, type Platform, type SaveStore } from './index'
+import { PROFILE_ID, type Platform, type SaveOwnership, type SaveStore } from './index'
 import { downloadText, pickTextFile, prefersReducedMotion } from './dom'
 
 export const saveKey = (profileId: string) => `bardo-rogue.save.${profileId}`
@@ -84,66 +84,64 @@ function safeLocalStorage(): StorageLike | undefined {
 }
 
 export const lockKey = (profileId: string) => `bardo-rogue.lock.${profileId}`
-const LOCK_TTL_MS = 10_000
-const LOCK_REFRESH_MS = 4_000
 
-interface LockDoc { owner: string; ts: number }
-
-function readLock(storage: StorageLike, key: string): LockDoc | null {
-  try {
-    const raw = storage.getItem(key)
-    if (!raw) return null
-    const v = JSON.parse(raw) as Partial<LockDoc>
-    return typeof v.owner === 'string' && typeof v.ts === 'number' ? { owner: v.owner, ts: v.ts } : null
-  } catch { return null }
+interface LockManagerLike {
+  request(
+    name: string,
+    options: { mode: 'exclusive'; ifAvailable: true },
+    callback: (lock: object | null) => Promise<void>,
+  ): Promise<void>
 }
 
-// Claim write ownership of a profile for this session. The storage event only tells a tab about a
-// foreign write AFTER it happened, so post-hoc watching alone leaves a window -- a second tab that
-// boots and saves before the first event arrives -- where two whole-document writers clobber each
-// other. A heartbeat lock closes it: the second tab discovers at BOOT that someone else owns the
-// profile and starts read-only. localStorage has no atomic claim, so the write is verified by
-// reading it back, which shrinks the remaining race from seconds to the gap between two statements.
+function safeLockManager(): LockManagerLike | undefined {
+  try {
+    return typeof navigator === 'undefined' ? undefined : navigator.locks as unknown as LockManagerLike | undefined
+  } catch { return undefined }
+}
+
+// Web Locks are atomic, browser-owned and released when the document dies. The unresolved `hold`
+// promise keeps the callback -- and therefore the exclusive lock -- alive for this page's lifetime.
+// `ifAvailable` is important: boot must discover a competing tab immediately, not hang behind it.
 export function claimProfileLock(
-  storage: StorageLike | undefined, profileId: string, owner: string, now: () => number = Date.now,
-): { claimed: boolean; release(): void; refresh(): void } {
-  const none = { claimed: false, release: () => {}, refresh: () => {} }
-  if (!storage) return none
-  const key = lockKey(profileId)
-  try {
-    const held = readLock(storage, key)
-    if (held && held.owner !== owner && now() - held.ts < LOCK_TTL_MS) return none   // live and someone else's
-    storage.setItem(key, JSON.stringify({ owner, ts: now() } satisfies LockDoc))
-    if (readLock(storage, key)?.owner !== owner) return none                         // lost the last-write race
-  } catch { return none }
-  return {
-    claimed: true,
-    refresh: () => { try { storage.setItem(key, JSON.stringify({ owner, ts: now() } satisfies LockDoc)) } catch { /* an expired heartbeat only means another tab may take over */ } },
-    release: () => { try { if (readLock(storage, key)?.owner === owner) storage.removeItem(key) } catch { /* stale locks expire on their own */ } },
-  }
+  locks: LockManagerLike | undefined,
+  profileId: string,
+  hold: Promise<void>,
+): Promise<SaveOwnership> {
+  if (!locks) return Promise.resolve('unavailable')
+  return new Promise(resolve => {
+    let answered = false
+    const answer = (status: SaveOwnership) => { if (!answered) { answered = true; resolve(status) } }
+    try {
+      void locks.request(lockKey(profileId), { mode: 'exclusive', ifAvailable: true }, async lock => {
+        if (!lock) { answer('busy'); return }
+        answer('acquired')
+        await hold
+      }).catch(() => answer('unavailable'))
+    } catch { answer('unavailable') }
+  })
 }
 
-export function createWebPlatform(opts: DetectOptions = {}): Platform {
+export function createWebPlatform(): Platform {
   const storage = safeLocalStorage()
-  if (opts.migrateLegacy !== false) migrateLegacyKeys(storage, PROFILE_ID, prefersReducedMotion())
-  let picker: HTMLInputElement | null = null
-  let heartbeat: ReturnType<typeof setInterval> | null = null
+  let invalidated = false
+  let invalidate: () => void = () => {}
   return {
     kind: 'web',
     saves: createWebSaveStore(storage, prefersReducedMotion()),
-    claimSaves: profileId => {
-      // randomUUID exists only in secure contexts, and vite.config's `host: true` exists precisely so
-      // the game can be opened over plain http from another device -- where a throw here would kill
-      // boot before window.__game appears. The fallback needs only per-tab uniqueness, not crypto.
-      const owner = (typeof crypto !== 'undefined' && crypto.randomUUID)
-        ? crypto.randomUUID()
-        : `tab-${Math.random().toString(36).slice(2)}-${Date.now().toString(36)}`
-      const lock = claimProfileLock(storage, profileId, owner)
-      if (!lock.claimed) return false
-      heartbeat = setInterval(() => lock.refresh(), LOCK_REFRESH_MS)
-      // pagehide, not beforeunload: it also fires when a tab is frozen into the back/forward cache.
-      window.addEventListener('pagehide', () => { if (heartbeat) clearInterval(heartbeat); lock.release() })
-      return true
+    claimSaves: async profileId => {
+      let release = () => {}
+      const hold = new Promise<void>(resolve => { release = resolve })
+      const status = await claimProfileLock(safeLockManager(), profileId, hold)
+      if (status === 'acquired') {
+        // A page in the back/forward cache is not allowed to keep authority over bytes it can no
+        // longer observe. If it returns, it stays read-only; reclaiming would authorise stale state.
+        window.addEventListener('pagehide', () => {
+          invalidated = true
+          release()
+          invalidate()
+        }, { once: true })
+      }
+      return status
     },
     persistHint: () => {
       // Fire-and-forget and deliberately silent: some browsers prompt, some decide heuristically, some
@@ -169,6 +167,8 @@ export function createWebPlatform(opts: DetectOptions = {}): Platform {
     // memory -- so the honest move is to stop writing and say so, rather than overwrite silently.
     watchForeignWrites: cb => {
       if (typeof window === 'undefined') return
+      invalidate = cb
+      if (invalidated) cb()
       window.addEventListener('storage', e => { if (e.key === saveKey(PROFILE_ID) && e.newValue !== null) cb() })
     },
     exportFile: downloadText,

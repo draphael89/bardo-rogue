@@ -230,6 +230,13 @@ ipcMain.handle('bardo:file:export', async (e, payload: unknown) => {
 ipcMain.handle('bardo:file:import', async e => {
   const w = trusted(e)
   if (!w) return null
+  const testFile = devHook('BARDO_TEST_IMPORT_FILE')
+  if (testFile) {
+    try {
+      if ((await stat(testFile)).size > MAX_EXPORT_BYTES) return null
+      return await readFile(testFile, 'utf8')
+    } catch { return null }
+  }
   const { canceled, filePaths } = await dialog.showOpenDialog(w, {
     title: 'Import save', properties: ['openFile'], filters: [{ name: 'Bardo save', extensions: ['json'] }],
   })

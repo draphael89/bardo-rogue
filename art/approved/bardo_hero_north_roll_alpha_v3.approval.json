@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "id": "actor.hero.north.roll.v3",
+  "file": "bardo_hero_north_roll_alpha_v3.png",
+  "sha256": "3ec850e2f63f817f33a2dccdada2ea5bdccf5e346283ca5ab04b6c4570569fd8",
+  "approvedAt": "2026-08-29T11:35:45.272Z",
+  "approvedBy": "purecromulence@gmail.com",
+  "note": "Approved in chat 2026-08-29 during the lane reconciliation: the shipped master from the merged PR #7 line, reviewed in pose sheets and gameplay captures."
+}

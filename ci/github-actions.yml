@@ -1,15 +1,24 @@
 # GitHub Actions pipeline for this repository — NOT ACTIVE WHERE IT SITS.
 #
 # This file belongs at .github/workflows/ci.yml. It lives here because the GitHub App that pushes
-# this branch has no `workflows` permission and cannot create or update anything under
-# .github/workflows/ over git or over the REST API, so a branch containing it cannot be pushed
-# at all. Rather than lose the pipeline, it is parked here verbatim.
+# this branch has no `workflows` permission: a push creating or updating anything under
+# .github/workflows/ is rejected outright (verified again on 2026-08-29 — the move was made, the
+# push was refused, the file was parked back). Rather than lose the pipeline, it is parked verbatim.
 #
 # To turn it on:  git mv ci/github-actions.yml .github/workflows/ci.yml && git commit && git push
 # Or grant the Claude GitHub App the `workflows` scope and move it back in one commit.
+# Activating it is a two-file change: tests/docs.test.ts pins the parked state and HARNESS.md
+# describes the gates as manual, so both flip in the same commit or `pnpm test` goes red.
+#
+# Every gate below was run locally on 2026-08-29 against this branch and passed: pnpm typecheck,
+# pnpm test (610), pnpm build, and pnpm matrix -- --seeds 1-100 (kite 70%, naive 0%, both in band).
 #
 # pnpm/action-setup reads its pnpm version from package.json's `packageManager` field, which this
 # repo pins; without one the action fails at setup, so keep that field when bumping pnpm.
+#
+# The art pipeline reaches CI through `pnpm test`: the gates run over every shipped sheet, and
+# tests/art/reproducibility.test.ts recompiles each spec into a temp directory and hashes it
+# against what is committed, so a hand-edited asset or a stale sidecar fails the build.
 #
 name: ci
 

@@ -8,13 +8,15 @@
 // Compiled output goes to public/assets. Candidates never do — they live in .art-cache/ until a human
 // approves them into art/approved/.
 import { mkdirSync, readFileSync, writeFileSync, existsSync, copyFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { dirname, basename, join } from 'node:path'
 import sharp from 'sharp'
 import { canon, luminance, type RGB } from './art/palette'
-import { compileSheet, writeSidecar, type CompileSpec } from './art/compile'
+import { compileSheet, validateClipRefs, writeSidecar, type CompileSpec } from './art/compile'
 import { makeContext, runGates, formatGates, summarise, loadPixels } from './art/gates'
-import type { SheetDef } from '../src/render/sheet'
-import { buildPrompt, generate, promptHash, requests, referenceImages, tokenFor, type GenerateSpec, type ProviderName } from './art/generate'
+import { isProductionPath, verifyApproval, writeReceipt } from './art/approve'
+import { validateSheetDef, type SheetDef } from '../src/render/sheet'
+import { buildPrompt, generate, parseProvider, promptHash, requests, resolveReferences, tokenFor, type GenerateSpec } from './art/generate'
 
 const argv = process.argv.slice(2)
 const cmd = argv[0]
@@ -26,10 +28,11 @@ const flag = (name: string, dflt?: string): string | undefined => {
 const usage = (): never => {
   console.error(`usage:
   pnpm art palette
-  pnpm art compile <spec.json> [--out <png>] [--no-gate]
+  pnpm art compile <spec.json> [--out <png>]
   pnpm art gate <sheet.png> [--sidecar <json>]
+  pnpm art approve <art/approved/master.png> --id <identity.vN> --by <who> [--note <why>]
   pnpm art preview <sheet.png> [--scale 6] [--out <png>]
-  pnpm art generate <gen-spec.json> [--provider retrodiffusion|pixellab] [--dry-run]`)
+  pnpm art generate <gen-spec.json> [--provider retrodiffusion|pixellab] [--live]`)
   process.exit(1)
 }
 
@@ -84,35 +87,65 @@ async function cmdCompile(): Promise<void> {
   const destPng = spec.output
   const destSidecar = spec.sidecar ?? destPng.replace(/\.png$/, '.json')
 
+  // The staging redirect below rewrites spec.output before compileSheet sees it, so the compiler's
+  // own boundary check would see a cache path. Hold the human checkpoint against the DECLARED
+  // destination here; compileSheet still guards programmatic callers that aim at production paths.
+  if (isProductionPath(destPng)) verifyApproval(spec.provenance?.approvedSource ?? spec.provenance?.approvedReference, specPath)
+
   // Compile into the cache and PROMOTE only after the gates pass. Writing the declared destination
   // first means a rejected candidate has already replaced the last good production asset by the time
-  // the command exits nonzero — which is the opposite of what the rejection message promises, and
-  // breaks the lifecycle rule at the top of this file.
-  const stage = join('.art-cache/staging', basename(destPng))
-  mkdirSync(dirname(stage), { recursive: true })
+  // the command exits nonzero — the opposite of what the rejection message promises. The staging path
+  // carries the asset id and source hash so two compiles cannot collide on a shared basename.
+  const sourceTag = createHash('sha256').update(readFileSync(spec.input)).digest('hex').slice(0, 8)
+  const stageDir = join('.art-cache/staging', `${spec.id}-${sourceTag}`)
+  const stage = join(stageDir, basename(destPng))
+  const stageSidecar = join(stageDir, basename(destSidecar))
+  mkdirSync(stageDir, { recursive: true })
   spec.output = stage
   const { def, report } = await compileSheet(spec, specPath)
+  writeSidecar(stageSidecar, def)
 
   const ctx = await makeContext(def, report)
   const gates = runGates(ctx)
-  const { pass, failed, warned } = summarise(gates)
+  const waivers = def.waivers ?? []
+  const { pass, failed, waived } = summarise(gates, waivers)
   mkdirSync('.art-cache/reports', { recursive: true })
-  writeFileSync(`.art-cache/reports/${basename(spec.output, '.png')}.json`,
+  writeFileSync(join('.art-cache/reports', `${spec.id}-${sourceTag}.json`),
     JSON.stringify({ report, gates }, null, 2) + '\n')
 
   console.log(`compiled ${spec.id}: ${report.atlas.width}x${report.atlas.height}, ${report.atlas.colors} colours, ${report.atlas.indexed ? 'indexed' : 'RGBA'}`)
   console.log(`  source ${report.source.width}x${report.source.height} sha ${report.source.hash}`)
-  console.log(formatGates(gates))
-  if (!pass && flag('no-gate') === undefined) {
-    console.error(`\nBUILD REJECTED: ${failed.length} hard gate failure(s).`)
+  console.log(formatGates(gates, waivers))
+  if (!pass) {
+    console.error(`\nBUILD REJECTED: ${failed.length} blocking finding(s).`)
     console.error(`The candidate is at ${stage} for inspection. ${destPng} is untouched.`)
     process.exit(2)
   }
+  // Both halves were fully prepared in staging before either destination is touched — and BOTH
+  // destination directories exist before either copy runs. Creating only the PNG's parent left a
+  // spec whose sidecar lives elsewhere landing its image and then throwing on the sidecar: exactly
+  // the half-promoted asset this staging dance exists to prevent.
   mkdirSync(dirname(destPng), { recursive: true })
+  mkdirSync(dirname(destSidecar), { recursive: true })
   copyFileSync(stage, destPng)
-  writeSidecar(destSidecar, def)
+  copyFileSync(stageSidecar, destSidecar)
   console.log(`  promoted -> ${destPng} + ${destSidecar}`)
-  if (warned.length) console.log(`(${warned.length} warnings — judged, not blocking)`)
+  if (waived.length) console.log(`(${waived.length} finding(s) carried under checked-in waivers)`)
+}
+
+// --- approve ----------------------------------------------------------------------------------------
+// Records a HUMAN approval decision as a hash-verified receipt. An agent never runs this on its own
+// initiative: the command exists so a person's yes has somewhere durable to land.
+function cmdApprove(): void {
+  const file = argv[1]
+  const id = flag('id')
+  const by = flag('by')
+  if (!file || !existsSync(file) || !id || !by) {
+    console.error('usage: pnpm art approve <art/approved/master.png> --id <identity.vN> --by <who> [--note <why>]')
+    process.exit(1)
+  }
+  const receipt = writeReceipt(file, id, by, flag('note'))
+  console.log(`approved ${file} as ${receipt.id} (sha ${receipt.sha256.slice(0, 12)}…) by ${receipt.approvedBy}`)
 }
 
 // --- gate -------------------------------------------------------------------------------------------
@@ -121,6 +154,10 @@ async function cmdGate(): Promise<void> {
   if (!png || !existsSync(png)) usage()
   const sidecarPath = flag('sidecar') ?? png.replace(/\.png$/, '.json')
   const def = JSON.parse(readFileSync(sidecarPath, 'utf8')) as SheetDef
+  // A sidecar is input here, not something this command just built — validate the contract and the
+  // tuning links before trusting a single number in it.
+  validateSheetDef(def, sidecarPath)
+  validateClipRefs(def, sidecarPath)
   const { width, height } = await loadPixels(png)
   const distinct = new Set<string>()
   let partialAlpha = 0
@@ -130,19 +167,33 @@ async function cmdGate(): Promise<void> {
     if (data[i + 3] < 255) partialAlpha++
     distinct.add('#' + [data[i], data[i + 1], data[i + 2]].map(v => v.toString(16).padStart(2, '0')).join('').toUpperCase())
   }
-  const canonHex = new Set(Object.values(canon().colors).map(c => c.hex))
+  // Enforce the SELECTED ramp when the sidecar records one: a colour from someone else's ramp is
+  // palette drift even though it is canonical. A sidecar is untrusted input here, so a ramp naming
+  // a colour canon no longer has is REPORTED as the drift it is — dereferencing it blind crashed
+  // the one command whose job is to detect exactly that.
+  const colors = canon().colors
+  if (def.ramp) {
+    const unknown = def.ramp.filter(n => !colors[n])
+    if (unknown.length) {
+      console.error(`  FAIL  ramp — ${sidecarPath} names ${unknown.map(n => `"${n}"`).join(', ')}, which canon no longer defines. The palette moved under this sheet; recompile it.`)
+      process.exit(2)
+    }
+  }
+  const allowed = def.ramp
+    ? new Set(def.ramp.map(n => colors[n].hex))
+    : new Set(Object.values(colors).map(c => c.hex))
   const report = {
     spec: sidecarPath, input: png, output: png, sidecar: sidecarPath,
     source: { width, height, hash: '' },
     atlas: { cell: def.cell, cols: def.cols, rows: def.rows, width, height, colors: distinct.size, partialAlpha, indexed: false },
     palette: [...distinct].sort(),
-    offPalette: [...distinct].filter(h => !canonHex.has(h)).sort(),
+    offPalette: [...distinct].filter(h => !allowed.has(h)).sort(),
     frames: [],
   }
   const ctx = await makeContext(def, report as never)
   const gates = runGates(ctx)
-  console.log(formatGates(gates))
-  if (!summarise(gates).pass) process.exit(2)
+  console.log(formatGates(gates, def.waivers ?? []))
+  if (!summarise(gates, def.waivers ?? []).pass) process.exit(2)
 }
 
 // --- preview ----------------------------------------------------------------------------------------
@@ -167,19 +218,22 @@ async function cmdPreview(): Promise<void> {
 }
 
 // --- generate ---------------------------------------------------------------------------------------
-// `--dry-run` prints the assembled prompt and the exact HTTP request without a key, so the thing that
+// Dry-run is the DEFAULT: it prints the assembled prompt and the exact HTTP request, so the thing that
 // actually determines quality — the prompt derived from the art bible — is reviewable on its own.
+// A chargeable call happens only under an explicit --live, never because a key happened to be set.
 async function cmdGenerate(): Promise<void> {
   const specPath = argv[1]
   if (!specPath || !existsSync(specPath)) usage()
   const spec = JSON.parse(readFileSync(specPath, 'utf8')) as GenerateSpec
-  const provider = (flag('provider') ?? 'retrodiffusion') as ProviderName
+  const provider = parseProvider(flag('provider') ?? 'retrodiffusion')
   const prompt = buildPrompt(spec)
-  if (flag('dry-run') !== undefined || !tokenFor(provider)) {
+  const live = flag('live') !== undefined
+  if (!live || !tokenFor(provider)) {
     const reqs = await requests(provider, spec, '<TOKEN>')
-    const refs = await referenceImages(spec.references)
+    const refs = resolveReferences(spec.references, provider === 'pixellab' ? Infinity : 4)
     console.log(`--- prompt (sha ${promptHash(prompt)}) ---\n${prompt}`)
     console.log(`\n--- style references: ${refs.length} resolved from ${JSON.stringify(spec.references ?? [])} ---`)
+    for (const r of refs) console.log(`  ${r.file}  sha256 ${r.hash.slice(0, 16)}`)
     console.log(`\n--- ${reqs.length} request(s) ---\n${reqs[0].method} ${reqs[0].url}`)
     const redacted = { ...(reqs[0].body as Record<string, unknown>) }
     for (const k of ['input_palette', 'color_image', 'reference_images', 'style_image']) {
@@ -187,12 +241,14 @@ async function cmdGenerate(): Promise<void> {
     }
     console.log(JSON.stringify(redacted, null, 2))
     if (reqs.length > 1) console.log(`(${reqs.length - 1} further identical request(s) with incremented seeds — this provider returns one image per call)`)
-    if (!tokenFor(provider)) console.log(`\n(no API key in the environment — this was a dry run. Set the provider's key to generate.)`)
+    if (!tokenFor(provider)) console.log(`\n(no API key in the environment — this was a dry run. Set the provider's key and pass --live to generate.)`)
+    else console.log(`\n(dry run. Pass --live to send these requests — they are paid calls.)`)
     return
   }
   const out = await generate(provider, spec)
   console.log(`generated ${out.files.length} candidate(s) via ${out.provider} (prompt ${out.promptHash}):`)
   for (const f of out.files) console.log('  ' + f)
+  console.log(`manifest: ${out.manifest}`)
   console.log(`\nNext: pick one, point a compile spec's "input" at it, and run pnpm art compile.`)
 }
 
@@ -200,6 +256,7 @@ switch (cmd) {
   case 'palette': await cmdPalette(); break
   case 'generate': await cmdGenerate(); break
   case 'compile': await cmdCompile(); break
+  case 'approve': cmdApprove(); break
   case 'gate': await cmdGate(); break
   case 'preview': await cmdPreview(); break
   default: usage()

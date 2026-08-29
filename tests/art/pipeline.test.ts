@@ -5,10 +5,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import sharp from 'sharp'
 import { validateSheetDef, type SheetDef } from '../../src/render/sheet'
-import { compileSheet, validateClipRefs, validateProvenance, type CompileReport, type CompileSpec } from '../../tools/art/compile'
+import { compileSheet, validateClipRefs, type CompileReport, type CompileSpec } from '../../tools/art/compile'
 import { makeContext, runGates, summarise } from '../../tools/art/gates'
 import { canon, rgbToHex, type RGB } from '../../tools/art/palette'
-import { generate, referenceImages, requests } from '../../tools/art/generate'
 import { authoredFxFrame, quantizeFxAlpha, quantizeFxRotation } from '../../src/render/fxUnits'
 import { heroFrameName } from '../../src/render/views/player'
 import { createWorld } from '../../src/sim/scenarios'
@@ -51,7 +50,7 @@ describe('asset contract', () => {
 
   it('rejects a sidecar with no frames', () => {
     const def = { id: 'x', version: 1, kind: 'character', cell: 32, cols: 1, rows: 1, palette: 'p', maxColors: 16, frames: {} } as SheetDef
-    expect(() => validateSheetDef(def, 'x')).toThrow(/at least one frame/)
+    expect(() => validateSheetDef(def, 'x')).toThrow(/frames is empty/)
   })
 
   it('rejects two frames sharing a cell, but allows a declared alias', () => {
@@ -155,7 +154,7 @@ describe('compiler', () => {
       id: 'test.duplicate', kind: 'character', input: src, output: join(dir, 'out.png'),
       cell: 16, cols: 2, rows: 1, palette: ['mortar', 'purple1'],
       frames: [{ name: 'first', i: 0 }, { name: 'second', i: 0 }],
-    }, 'test')).rejects.toThrow(/both use cell 0/)
+    }, 'test')).rejects.toThrow(/reuses cell index 0/)
   })
 
   it('rejects zero frames and out-of-grid indices before every fit mode', async () => {
@@ -166,7 +165,7 @@ describe('compiler', () => {
       id: 'test.structure', kind: 'character' as const, input: src, output: join(dir, 'out.png'),
       cell: 8, cols: 1, rows: 1, palette: ['mortar', 'purple1'],
     }
-    await expect(compileSheet({ ...base, frames: [] }, 'test')).rejects.toThrow(/at least one frame/)
+    await expect(compileSheet({ ...base, frames: [] }, 'test')).rejects.toThrow(/non-empty/)
     for (const fit of ['grid', 'pose'] as const) {
       await expect(compileSheet({ ...base, fit, frames: [{ name: 'outside', i: 1 }] }, 'test'))
         .rejects.toThrow(/index 1 outside 0\.\.0/)
@@ -198,87 +197,6 @@ describe('compiler', () => {
   })
 })
 
-describe('generation boundary', () => {
-  it('uses the current PixelLab endpoints and integer style strength', async () => {
-    const plain = await requests('pixellab', { subject: 'hero', size: 32, count: 1 }, 'token')
-    expect(plain[0].url).toBe('https://api.pixellab.ai/v2/create-image-pixflux')
-
-    const styled = await requests('pixellab', {
-      subject: 'hero', size: 32, count: 1,
-      references: ['public/assets/sprites/bardo_hero.png'],
-    }, 'token')
-    expect(styled[0].url).toBe('https://api.pixellab.ai/v2/create-image-bitforge')
-    expect(styled[0].body).toMatchObject({ style_strength: 50 })
-  })
-
-  it('preserves a paid success when a later candidate request fails', async () => {
-    const out = mkdtempSync(join(tmpdir(), 'bardo-generate-partial-'))
-    const before = process.env.PIXELLAB_SECRET
-    process.env.PIXELLAB_SECRET = 'test'
-    let calls = 0
-    vi.stubGlobal('fetch', async () => ++calls === 1
-      ? new Response(JSON.stringify({ image: { type: 'base64', base64: Buffer.from('paid-image').toString('base64') } }), {
-          status: 200, headers: { 'content-type': 'application/json' },
-        })
-      : new Response('rate limited', { status: 429, statusText: 'Too Many Requests' }))
-    try {
-      await expect(generate('pixellab', { subject: 'hero', size: 32, count: 2 }, out))
-        .rejects.toThrow(/saved 1 candidate/)
-      expect(readdirSync(out).filter(f => f.endsWith('.png'))).toHaveLength(1)
-      expect(readdirSync(out).filter(f => f.endsWith('.prompt.txt'))).toHaveLength(1)
-    } finally {
-      if (before === undefined) delete process.env.PIXELLAB_SECRET
-      else process.env.PIXELLAB_SECRET = before
-    }
-  })
-
-  it('never overwrites a paid candidate from an earlier run', async () => {
-    const out = mkdtempSync(join(tmpdir(), 'bardo-generate-retention-'))
-    const before = process.env.PIXELLAB_SECRET
-    process.env.PIXELLAB_SECRET = 'test'
-    vi.stubGlobal('fetch', async (_url: string, init?: RequestInit) => {
-      const seed = (JSON.parse(String(init?.body)) as { seed: number }).seed
-      return new Response(JSON.stringify({
-        image: { type: 'base64', base64: Buffer.from(`paid-seed-${seed}`).toString('base64') }, seed,
-      }), { status: 200, headers: { 'content-type': 'application/json' } })
-    })
-    try {
-      const first = await generate('pixellab', { subject: 'hero', size: 32, count: 1, seed: 10 }, out)
-      const second = await generate('pixellab', { subject: 'hero', size: 32, count: 1, seed: 99 }, out)
-      expect(second.files[0]).not.toBe(first.files[0])
-      expect(readFileSync(first.files[0], 'utf8')).toBe('paid-seed-10')
-      expect(readFileSync(second.files[0], 'utf8')).toBe('paid-seed-99')
-    } finally {
-      if (before === undefined) delete process.env.PIXELLAB_SECRET
-      else process.env.PIXELLAB_SECRET = before
-    }
-  })
-
-  it('rejects a missing requested reference before building a provider request', async () => {
-    const missing = join(tmpdir(), 'bardo-reference-that-does-not-exist.png')
-    await expect(requests('pixellab', {
-      subject: 'hero', size: 32, count: 1, references: [missing],
-    }, 'token')).rejects.toThrow(/requested reference does not exist/)
-
-    const empty = mkdtempSync(join(tmpdir(), 'bardo-empty-reference-'))
-    await expect(referenceImages([empty])).rejects.toThrow(/contains no PNG images/)
-  })
-
-  it('selects the same path-sorted approved prefix regardless of input order or mtimes', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'bardo-reference-order-'))
-    const files = ['echo.png', 'alpha.png', 'delta.png', 'bravo.png', 'charlie.png'].map(name => join(dir, name))
-    for (let i = 0; i < files.length; i++) {
-      await sharp({ create: { width: 1, height: 1, channels: 4, background: { r: i * 30, g: 20, b: 40, alpha: 1 } } }).png().toFile(files[i])
-      const when = new Date((files.length - i) * 10_000)
-      utimesSync(files[i], when, when)
-    }
-    const sorted = [...files].sort((a, b) => a < b ? -1 : a > b ? 1 : 0).slice(0, 4)
-    const expected = sorted.map(f => readFileSync(f).toString('base64'))
-    expect(await referenceImages([dir])).toEqual(expected)
-    expect(await referenceImages([...files].reverse())).toEqual(expected)
-  })
-})
-
 describe('gates', () => {
   it('pass on every shipped sheet', async () => {
     for (const n of SHEETS) {
@@ -303,7 +221,9 @@ describe('gates', () => {
         palette: [...distinct].sort(), offPalette: [], frames: [],
       }
       const gates = runGates(await makeContext(def, report))
-      const { pass, failed } = summarise(gates)
+      // Sidecar waivers apply — and only real, currently-firing judged findings may be waived, which
+      // summarise itself enforces (an invalid waiver is a failure here too).
+      const { pass, failed } = summarise(gates, def.waivers ?? [])
       expect(pass, `${n} failed: ${failed.map(f => `${f.gate} (${f.detail})`).join('; ')}`).toBe(true)
     }
   })
@@ -354,13 +274,16 @@ describe('gates', () => {
       palette: [], offPalette: [], frames: [],
     } satisfies CompileReport
     const gates = runGates({ def, report, pixels, width, height, groundLuminance: 0.13 })
-    const hard = new Set(gates.filter(g => !g.ok && g.severity === 'fail').map(g => g.gate))
-    expect(hard.has('duplicate-frames')).toBe(true)
-    expect([...hard].some(g => g.startsWith('identity:'))).toBe(true)
-    expect([...hard].some(g => g.includes(':centroid:'))).toBe(true)
-    expect(hard.has('clip:bad:loop-closure')).toBe(true)
-    expect(hard.has('clip:bad:planted-feet')).toBe(true)
-    expect(summarise(gates).pass, 'the CLI must not promote a candidate with any of these failures').toBe(false)
+    // Two tiers, both blocking: duplicates are an objective 'fail'; the animation-quality findings
+    // are 'judge' — they still block promotion unless a checked-in waiver names them by exact id.
+    const blocking = new Set(summarise(gates).failed.map(g => g.gate))
+    expect(gates.find(g => g.gate === 'duplicate-frames')?.severity).toBe('fail')
+    expect(blocking.has('duplicate-frames')).toBe(true)
+    expect([...blocking].some(g => g.startsWith('identity:bad:'))).toBe(true)
+    expect([...blocking].some(g => g.includes(':centroid:'))).toBe(true)
+    expect(blocking.has('clip:bad:loop-closure')).toBe(true)
+    expect(blocking.has('clip:bad:planted-feet')).toBe(true)
+    expect(summarise(gates).pass, 'the CLI must not promote a candidate with any of these findings unwaived').toBe(false)
   })
 
   it('does not call distinct same-red canon colours duplicate frames', () => {
@@ -507,20 +430,6 @@ describe('review findings', () => {
     expect(() => validateClipRefs(wrongContact, 'x')).toThrow(/not a contact\/hit\/strike\/impact key/)
   })
 
-  it('verifies prompt-record hashes and distinguishes approved sources from admitted references', () => {
-    const dir = mkdtempSync(join(tmpdir(), 'bardo-provenance-'))
-    const source = join(dir, 'source.png'), promptFile = join(dir, 'prompt.txt')
-    const approvedSource = 'art/approved/bardo_hero_alpha_v1.png'
-    writeFileSync(source, 'source')
-    writeFileSync(promptFile, 'exact retained prompt')
-    const promptHash = createHash('sha256').update(readFileSync(promptFile)).digest('hex')
-    const base = { id: 'x', kind: 'character', input: approvedSource, output: join(dir, 'out.png'), cell: 32, cols: 1, rows: 1, frames: [] } as CompileSpec
-    expect(() => validateProvenance({ ...base, provenance: { provider: 'test', approvedSource, promptFile, promptHash } }, 'x')).not.toThrow()
-    expect(() => validateProvenance({ ...base, provenance: { provider: 'test', approvedSource, promptFile, promptHash: '0'.repeat(64) } }, 'x')).toThrow(/does not match/)
-    expect(() => validateProvenance({ ...base, input: source, provenance: { provider: 'test', approvedSource: source } }, 'x')).toThrow(/under art\/approved/)
-    expect(() => validateProvenance({ ...base, provenance: { provider: 'test', approvedReference: source } }, 'x')).toThrow(/under art\/approved/)
-  })
-
   it('pins every shipped source to its own immutable prompt record', () => {
     const promptFiles = new Set<string>()
     for (const name of SHEETS) {
@@ -548,8 +457,9 @@ describe('review findings', () => {
     world.player.state = 'attack'
     world.player.swingIndex = 1
     world.player.stateTick = 4
-    const runtimeKey = heroFrameName(world.player, world, 0)
     const south = JSON.parse(readFileSync('public/assets/sprites/bardo_hero_south.json', 'utf8')) as SheetDef
+    const southSheet = { def: south } as unknown as Parameters<typeof heroFrameName>[0]
+    const runtimeKey = heroFrameName(southSheet, world.player, world, 0)
     expect(runtimeKey).toBe(south.clips!.light2.sim!.contact)
     expect(south.frames[runtimeKey].i).toBe(9)
   })

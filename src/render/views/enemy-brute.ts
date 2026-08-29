@@ -18,6 +18,7 @@ function cfgOf(e: Enemy) { return e.kind === 'oathbound' ? tuning.oathbound : tu
 function leadOf(e: Enemy): number { return e.kind === 'oathbound' ? OATH_COMMIT_LEAD : COMMIT_LEAD }
 import { EntityView, HALF_PI, type EnemyFrame, type Pose } from './shared'
 import type { Sheet } from '../sheet'
+import { bruteAttackClipFrame } from '../clipSelect'
 
 // ONE CLOCK.
 // From the tick the brute plants (enemyWindup) to the tick the hammer touches you (playerHurt) is
@@ -52,11 +53,15 @@ export function bindBruteArt(v: EntityView, atlas: Atlas): void {
   bruteArt.set(v, atlas.sheet('bardo_brute'))
 }
 
-export function bruteFrameName(e: Enemy): string {
+export function bruteFrameName(sheet: Sheet, e: Enemy): string {
   if (e.flash > 0 || e.state === 'stagger') return 'hurt'
-  if (e.state === 'windup') return e.stateTick < Math.ceil(cfgOf(e).windup * 0.55) ? 'windupEarly' : 'windupCommit'
-  if (e.state === 'attack') return e.stateTick <= cfgOf(e).lungeTicks ? 'release' : 'contact'
-  if (e.state === 'recover') return 'recover'
+  if (e.state === 'windup' || e.state === 'attack' || e.state === 'recover') {
+    // Names from the sidecar's attack clip, boundaries from the BODY'S OWN tuning block — the
+    // Oath-Bound winds up over 24 ticks, not the brute's 20, and the commit frame must flip on its
+    // clock. The asserted contact frame takes over exactly where the sim's arc first tests
+    // (stateTick > lungeTicks).
+    return bruteAttackClipFrame(sheet.def.clips!.attack, cfgOf(e), e.state, e.stateTick)
+  }
   if (e.state === 'chase' && Math.hypot(e.vx, e.vy) > 5) return 'chase'
   return 'idle'
 }
@@ -114,7 +119,7 @@ export function updateBruteView(v: EntityView, e: Enemy, f: EnemyFrame, out: Pos
   const art = bruteArt.get(v)
   updateBruteWeapon(v, e, f.x, f.y, f.alpha, hop)
   if (art) {
-    const frame = art.frame(bruteFrameName(e))
+    const frame = art.frame(bruteFrameName(art, e))
     v.bindBody(frame.texture, frame.white)
     v.body.anchor.set(frame.anchorX, frame.anchorY)
     if (v.weapon) v.weapon.visible = false

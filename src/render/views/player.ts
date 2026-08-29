@@ -11,6 +11,7 @@ import type { Sheet } from '../sheet'
 import { ARM, armOf } from '@/sim/weapons'
 import { restoreSword, updateBow } from './bow'
 import { nearestHeroDirection, stableHeroDirection, verticalDodgeFrame, type HeroDirection } from '../heroDirection'
+import { dodgeClipFrame, rollClipFrame, swingClipFrame, tickClipFrame } from '../clipSelect'
 
 const deg = (d: number): number => d * Math.PI / 180
 
@@ -20,7 +21,6 @@ const deg = (d: number): number => d * Math.PI / 180
 // (`public/assets/sprites/bardo_hero.json`, compiled by `pnpm art compile art/specs/hero.json`) —
 // the renderer names a pose and the contract answers with the drawing and where its feet are.
 const VERTICAL_ROLL_HOP = [0, 1, 2, 0] as const
-const VERTICAL_ROLL_FRAME = ['dive', 'tuck', 'apex', 'extend'] as const
 type HeroSheet = { sheet: Sheet; roll?: Sheet }
 type PlayerArt = { stock: Texture; stockWhite: Texture; hero: Record<HeroDirection, HeroSheet> }
 const playerArt = new WeakMap<EntityView, PlayerArt>()
@@ -28,22 +28,43 @@ type ClipSelection = { key: string; direction: HeroDirection; stateTick: number 
 const clipSelection = new WeakMap<EntityView, ClipSelection>()
 const freeDirection = new WeakMap<EntityView, HeroDirection>()
 
-export function heroFrameName(p: Player, world: World, time: number): string {
+// Clip names in play order: swings[i] maps to SWING_CLIPS[i] in every hero sidecar.
+const SWING_CLIPS = ['light1', 'light2', 'heavy'] as const
+
+/**
+ * Fail at load, not mid-combat.
+ *
+ * Frame selection reads these clips by name, so a sidecar missing one loads clean, passes the
+ * generic gates, and then throws the first time the player moves, dodges or swings. The vocabulary
+ * a hero sheet must carry is a real contract; assert it once where the sheets are bound.
+ */
+function requireHeroClips(sheet: Sheet): Sheet {
+  for (const name of ['run', 'dodge', ...SWING_CLIPS]) {
+    if (!sheet.def.clips?.[name]) throw new Error(`sheet ${sheet.def.id}: a hero sheet must declare the "${name}" clip — the renderer selects frames by that name`)
+  }
+  return sheet
+}
+
+function requireRollClip(sheet: Sheet): Sheet {
+  const roll = sheet.def.clips?.roll
+  if (!roll) throw new Error(`sheet ${sheet.def.id}: a roll sheet must declare the "roll" clip`)
+  if (roll.frames.length < 4) throw new Error(`sheet ${sheet.def.id}: the "roll" clip needs four airborne phases, not ${roll.frames.length}`)
+  return sheet
+}
+
+export function heroFrameName(sheet: Sheet, p: Player, world: World, time: number): string {
+  const clips = sheet.def.clips!
   if (p.state === 'dead') return 'dead'
   if (p.state === 'hurt' || p.flash > 0) return 'hurt'
-  if (p.state === 'free') return Math.hypot(p.vx, p.vy) > 10 ? (Math.floor(time * 9) & 1 ? 'runA' : 'runB') : 'idle'
-  if (p.state === 'dodge') return p.stateTick < 3 ? 'dodgeStart' : p.stateTick < tuning.player.dodge.travel ? 'dodgeTravel' : 'dodgeLand'
+  if (p.state === 'free') return Math.hypot(p.vx, p.vy) > 10 ? tickClipFrame(clips.run, time) : 'idle'
+  if (p.state === 'dodge') return dodgeClipFrame(clips.dodge, tuning.player.dodge, p.stateTick)
   if (p.state !== 'attack' || armOf(world) !== ARM.blade) return 'idle'
   // Timing comes from tuning, never from the sheet: the frame is a function of where stateTick sits
   // in this swing's own startup/active windows, so the contact drawing cannot drift off the hitbox.
-  const s = tuning.player.attack.swings[p.swingIndex]
-  const phase = p.stateTick < s.startup ? 'Start' : p.stateTick < s.startup + s.active ? 'Contact' : 'Recover'
-  if (p.swingIndex === 0) return 'light1' + phase
-  if (p.swingIndex === 1) return 'light2' + phase
-  // The sheet deliberately bookends the heavy with its planted frame (`heavyRecover` is an alias of
-  // `heavyStart`): contact releases into the same heavy-specific stance rather than borrowing the
-  // second light attack's recovery.
-  return 'heavy' + phase
+  // The NAMES come from the SELECTED sheet's clip, so the sidecar's contact assertion is the
+  // selection itself — including the south sheet's swapped light2 cells and the heavy's deliberate
+  // bookend (heavyRecover aliases heavyStart), with no per-direction special case.
+  return swingClipFrame(clips[SWING_CLIPS[p.swingIndex]], tuning.player.attack.swings[p.swingIndex], p.stateTick)
 }
 
 function authoredDirectionFor(v: EntityView, p: Player, bladeEquipped: boolean): HeroDirection | null {
@@ -85,9 +106,9 @@ export function createPlayerView(atlas: Atlas, layers: { entities: Container; sh
   const art: PlayerArt = {
     stock: atlas.tile(SPRITE.player), stockWhite: atlas.white(SPRITE.player),
     hero: {
-      side: { sheet: atlas.sheet('bardo_hero') },
-      north: { sheet: atlas.sheet('bardo_hero_north'), roll: atlas.sheet('bardo_hero_north_roll') },
-      south: { sheet: atlas.sheet('bardo_hero_south'), roll: atlas.sheet('bardo_hero_south_roll') },
+      side: { sheet: requireHeroClips(atlas.sheet('bardo_hero')) },
+      north: { sheet: requireHeroClips(atlas.sheet('bardo_hero_north')), roll: requireRollClip(atlas.sheet('bardo_hero_north_roll')) },
+      south: { sheet: requireHeroClips(atlas.sheet('bardo_hero_south')), roll: requireRollClip(atlas.sheet('bardo_hero_south_roll')) },
     },
   }
   playerArt.set(v, art)
@@ -462,11 +483,11 @@ export function updatePlayerView(v: EntityView, p: Player, world: World, alpha: 
 
   b.tint = 0xffffff
   if (art && heroDirection) {
-    const frameName = heroFrameName(p, world, time)
     const hero = art.hero[heroDirection]
+    const frameName = heroFrameName(hero.sheet, p, world, time)
     verticalRollFrame = verticalDodgeFrame(heroDirection, p.stateTick, P.dodge.travel)
     if (p.state === 'dodge' && verticalRollFrame >= 0 && hero.roll) {
-      const frame = hero.roll.frame(VERTICAL_ROLL_FRAME[verticalRollFrame])
+      const frame = hero.roll.frame(rollClipFrame(hero.roll.def.clips!.roll, verticalRollFrame))
       v.bindBody(frame.texture, frame.white)
       b.anchor.set(frame.anchorX, frame.anchorY)
       if (verticalRollFrame === 1 || verticalRollFrame === 2) {

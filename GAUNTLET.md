@@ -1,5 +1,13 @@
 # Bardo Rogue: Gauntlet Loop
 
+> **STATUS (2026-08-28): retired as the standing directive.** The gauntlet froze at wave 3 with nine
+> of ten pieces parked on the same missing input — authored art — while PRs #6–#9 shipped through the
+> PR loop (plan -> build -> multi-agent adversarial review -> merge), which `CLAUDE.md` now names the
+> standing directive. This file stays as the design record of the loop. The blind-critique protocol
+> (`.claude/skills/bardo-critic`) lives on solely as the realm-art acceptance gate: three exhibits
+> (a combat room, the utility node, the Hall of Minos), per `VERTICAL_SLICE_PLAN.md` §G.5.
+> Parked-piece dispositions: `public/progress/data.json`.
+
 Build a web-based roguelike action RPG / bullet hell at the level of Enter the Gungeon and Hades. Beautiful, electric, and perfect in every part: combat feel, enemy behavior, bosses, bullet patterns, atmosphere, art, sound, music, UI, run structure, and anything else you can think of. A complete run: rooms, floors, bosses, weapons and items, death and return. It must run in a normal browser at a locked 60 fps. Working title: Bardo Rogue. The bardo, the space between death and rebirth, is the theme.
 
 **The bar is the real games.** For every piece, find actual Enter the Gungeon and Hades footage of the same moment (official press kits, wiki GIFs, frame-by-frame breakdowns) and judge ours next to it, blind. Pick whichever of the two is the fairer comparison for that piece. Reference only: never copy their art, names, characters, or lore.

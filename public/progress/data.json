@@ -1,8 +1,8 @@
 {
   "title": "Bardo Rogue",
   "subtitle": "The Greek gate: two powers, twelve vows, fire, an elite that turns a light blade, a ferryman who is owed, and Minos",
-  "updated": "2026-08-28T23:35:00-04:00",
-  "now": "greek-gate",
+  "updated": "2026-08-28T23:14-04:00",
+  "now": "phase-0",
   "round": 2,
   "timeline": [
     {
@@ -556,6 +556,10 @@
     {
       "t": "23:35",
       "text": "An eight-angle code review of the controller-pause commit: the sealed doorway still glowed 'open' in two more renderers, the death-screen Start press paused the game on arrival, and damageTaken counted vessels the player never had. All eight findings fixed; doorOpens() is now the one place the open-door rule lives."
+    },
+    {
+      "t": "23:14",
+      "text": "Plan of record refreshed at 6852aa0 (Revision 3): the PR loop is the standing directive, the gauntlet is retired with a disposition on every parked piece, the PixelLab cycle deliberately lapses, and the remainder runs as PRs 1-7. Phase 0 begins: death-card build + beat, volume sliders, abandon, pad pause, reward prompt fixes, playtest build."
     }
   ],
   "pieces": [
@@ -608,7 +612,8 @@
       "gap": "Authored follow-through: a body and a physical blade the crescent is the wake of. Two still rounds lost on the same family. Re-enter behind painted swing poses. Under-fighter smear, hole, hot tip, and warm heavy blade stay.",
       "before": "shots/swing-w2r1-ours.jpg",
       "after": "shots/swing-w2r2-ours.jpg",
-      "ref": "ref/swing-0.jpg"
+      "ref": "ref/swing-0.jpg",
+      "disposition": "Absorbed into the realm-art phase (PR 6): authored clip iteration under ART_DIRECTION §11 gates."
     },
     {
       "id": "hit-impact",
@@ -623,7 +628,8 @@
       "gap": "Authored hit pose: a crumpled silhouette that keeps its outline, plus a wound burst on flesh. Two still rounds lost on the same gap. Re-enter behind painted contact frames. Freeze-hold, flinch, and the pixel cut stay in the tree.",
       "before": "shots/hit-r2-crop.png",
       "after": "shots/hit-r3-crop.png",
-      "ref": "ref/hades-0.jpg"
+      "ref": "ref/hades-0.jpg",
+      "disposition": "Absorbed into the realm-art phase (PR 6): impact reads land with the authored clip pass."
     },
     {
       "id": "dodge-roll",
@@ -638,7 +644,8 @@
       "gap": "Authored roll-through: a tumbling silhouette the hazard bloom swallows, plus plant dust. Two occupancy rounds lost after the slam-as-hit exhibit was retired. Re-enter behind painted through-frames. Dive-through-occupy, one-shot dodged, and no screen pulse stay.",
       "before": "shots/dodge-r3-ours.jpg",
       "after": "shots/dodge-r4-ours.jpg",
-      "ref": "ref/roll-0.jpg"
+      "ref": "ref/roll-0.jpg",
+      "disposition": "Absorbed into the realm-art phase (PR 6): roll poses join the authored clip pass."
     },
     {
       "id": "brute",
@@ -653,7 +660,8 @@
       "gap": "Authored windup mass: a body that can break the stone. Four looks — one pick-win, three splits on painted giant vs keep-out pie. Same family as the warden. Re-enter behind painted brute frames. The pie, charge, bead, and cracks stay.",
       "before": "shots/brute-w2r6-ours.jpg",
       "after": "shots/brute-w2r9-ours.jpg",
-      "ref": "ref/tell-0.jpg"
+      "ref": "ref/tell-0.jpg",
+      "disposition": "Recast as the Fallen Hoplite in the realm-art phase (PR 6); the PR #5 authored set is its base."
     },
     {
       "id": "caster",
@@ -668,7 +676,8 @@
       "gap": "Authored staff and a fat sight that owns the floor. Four looks: pick-win, split, loss, split. Thick reads as a hit; thin reads as overlay. Re-enter behind painted caster frames. Solid lock, stop-on-body, brighter sight, staff scale, detached bolt stay.",
       "before": "shots/caster-w2r7-ours.jpg",
       "after": "shots/caster-w2r10-ours.jpg",
-      "ref": "ref/aim-0.jpg"
+      "ref": "ref/aim-0.jpg",
+      "disposition": "Recast as the Lampad in the realm-art phase (PR 6); Kenney tile 84 until then."
     },
     {
       "id": "charger",
@@ -683,7 +692,8 @@
       "gap": "Painted floor wound that grows out of the body. Rails, stain-quad, and tile fills all read as a pasted rectangle. Re-enter behind authored stone. Tile stain, grout, lock burst, dash wake stay.",
       "before": "shots/charger-w2r6-ours.jpg",
       "after": "shots/charger-w2r8-ours.jpg",
-      "ref": "ref/dash-0.jpg"
+      "ref": "ref/dash-0.jpg",
+      "disposition": "Recast as the Empusa in the realm-art phase (PR 6); Kenney tile 122 until then."
     },
     {
       "id": "combat-hud",
@@ -698,7 +708,8 @@
       "gap": "Authored HUD stamps: hearts plus a blade that is ours. Two losses on Gungeon weapon-and-ammo chrome. We will not invent a gun. Empty outlines, LEFT N, mercy groove stay.",
       "before": "shots/hud-w2r1-ours.jpg",
       "after": "shots/hud-w2r2-ours.jpg",
-      "ref": "ref/hud-0.jpg"
+      "ref": "ref/hud-0.jpg",
+      "disposition": "Art gap absorbed into the realm-art phase (PR 6); shell polish lands in PR 7."
     },
     {
       "id": "death-card",
@@ -713,7 +724,8 @@
       "gap": "Authored fallen pose and a carved stele. Two no-wow wins after a split; Graphics plaque over a standing heap. Fight chrome off, left stele, TAKEN BY, wine well, star-sky arch stay.",
       "before": "shots/death-w2r4-ours.jpg",
       "after": "shots/death-w2r6-ours.jpg",
-      "ref": "ref/death-0.jpg"
+      "ref": "ref/death-0.jpg",
+      "disposition": "Phase 0 (PR 1) adds the build and a minimum reveal beat; the remaining art gap goes to PR 6."
     },
     {
       "id": "audio-bed",
@@ -728,14 +740,16 @@
       "gap": "Authored combat stems and recorded swing takes. Two losses on player-commit lift in a stacked mix. Buses, bed, announcer-off, crowd, lead stay.",
       "before": "shots/audio-w2r5-gates.png",
       "after": "shots/audio-w2r6-gates.png",
-      "ref": null
+      "ref": null,
+      "disposition": "Stays parked by its own note; realm and boss music land on the existing buses in PR 6."
     },
     {
       "id": "arena-first-look",
       "status": "parked",
       "title": "PARKED after 11 losses. Re-enters only behind the art bible and an authored asset kit.",
       "name": "The Threshold",
-      "rounds": 11
+      "rounds": 11,
+      "disposition": "Absorbed into the realm-art phase (PR 6): ART_DIRECTION §9 Greek entry first, two-loss stop rule."
     },
     {
       "id": "run",
@@ -765,7 +779,8 @@
       "gap": "Carved exit gates with living destination emblems. Three rounds of TypeScript seals lost; same family as The Threshold. Re-enter only behind authored door art.",
       "before": "shots/choice-r1-clear.png",
       "after": "shots/choice-r3-settled.png",
-      "ref": "ref/choice-0.jpg"
+      "ref": "ref/choice-0.jpg",
+      "disposition": "Art gap absorbed into PR 6; the exits-phase map overlay (PR 3) reframes the moment."
     },
     {
       "id": "offering",
@@ -780,7 +795,8 @@
       "gap": "Authored sealed life token (rim, well, stamp with mass). Seven rounds of TypeScript hearts lost or split; same family as The Threshold and the door seals. Re-enter only behind authored token art.",
       "before": "shots/offering-r1-approach.png",
       "after": "shots/offering-r7-approach.png",
-      "ref": "ref/gift-0.jpg"
+      "ref": "ref/gift-0.jpg",
+      "disposition": "The production route has no offering; the economy phase (PR 4) reintroduces heal/+vessel via the shop node."
     },
     {
       "id": "boons",
@@ -795,7 +811,8 @@
       "gap": "Authored layered cut: core, rim, afterimage, and debris through a body. Three rounds of a TypeScript smear lost or split; same family as The Threshold. Re-enter behind authored slash art.",
       "before": "shots/boons-r1-vanilla.png",
       "after": "shots/boons-r3-exhibit.png",
-      "ref": "ref/boon-0.jpg"
+      "ref": "ref/boon-0.jpg",
+      "disposition": "Deity framing shipped in PR #9; the remaining art gap is absorbed into PR 6."
     },
     {
       "id": "arm",
@@ -810,7 +827,8 @@
       "gap": "Authored release: a lunging body, a glowing shot with mass, and light on the stone. Two rounds of a TypeScript fan lost; same family as the blessed smear. Re-enter behind authored bow and arrow art.",
       "before": "shots/arm-r1-draw.png",
       "after": "shots/arm-r2-loose.png",
-      "ref": "ref/arm-0.jpg"
+      "ref": "ref/arm-0.jpg",
+      "disposition": "The bow stays a debug probe per plan §M; a second production weapon headlines the next milestone."
     },
     {
       "id": "warden",
@@ -825,7 +843,8 @@
       "gap": "Authored windup: a body whose raised weapon and mass are the tell. Two rounds of a scaled hood and a floor ring lost on the same gap. Re-enter only behind painted boss frames.",
       "before": "shots/warden-r1-windup.png",
       "after": "shots/warden-r2-windup.png",
-      "ref": "ref/warden-0.jpg"
+      "ref": "ref/warden-0.jpg",
+      "disposition": "Minos shipped in PR #9; the remaining art gap (authored clips) is absorbed into PR 6."
     },
     {
       "id": "return",
@@ -840,7 +859,8 @@
       "gap": "Authored attempt gate and a death that leaves the fight (a body, not a form over a stance). Two still rounds lost on the same door-look as Two doors; sequence split with no wow. Re-enter only behind authored hub art.",
       "before": "shots/return-r1-death.png",
       "after": "shots/return-r2-hub.png",
-      "ref": "ref/return-0.jpg"
+      "ref": "ref/return-0.jpg",
+      "disposition": "Art gap absorbed into PR 6; PR 1 adds summary symmetry and the minimum beat."
     },
     {
       "id": "combat-feel",
@@ -858,7 +878,8 @@
       "id": "ci-instruments",
       "status": "parked",
       "title": "Manual golden-path browser smoke, seeded acceptance matrix, and doc tests; CI workflow template parked pending authorization",
-      "rounds": 1
+      "rounds": 1,
+      "disposition": "User-gated: the GitHub App needs workflows permission; the pipeline is parked at ci/github-actions.yml, one git mv from live."
     },
     {
       "id": "pause-audio",

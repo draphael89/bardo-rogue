@@ -34,9 +34,60 @@ one `git mv` away from being live.
 | Task 10 — shell | **Partly done.** A title screen held over the living hub, and the HUD's missing single chrome toggle. Settings, credits and abandon-run are not built. |
 | Tasks 3–6, 9 | **Not started.** Rooms-as-data, the generated route and map, node-boundary save, the obol/Remembrance economy, and the bow. These remain the next milestone, in the order given below. |
 
+### Revision 3 (2026-08-28, audited at `6852aa0`)
+
+A fresh three-track audit (sim, presentation, tooling) re-verified this block against `main` and locked
+four decisions with the user. The suite at `6852aa0` measures **512 passing tests in 32 files**
+(`pnpm test`, 2026-08-28 — the "275 passing" above was already stale when written); `pnpm matrix`
+holds the hard no-strand gate at 100/100 seeds (kite 93% wins, naive 0%).
+
+**Fresh findings, queued into the revised ordering below:** the death card omits the build the victory
+card shows, and both cards accept confirm on tick 1 before the staged reveal (no minimum beat); the
+reward screen's prompts hardcode keyboard wording on a gamepad (the HUD hint row is device-aware; the
+prompts are not) and it lacks the rite screen's same-frame nudge/commit guard (`rites.ts:81-86`); the
+pause card's three actions are keyboard-only; `audio.ts`'s `setLevel()` is correct and has zero
+callers (no volume control ships); R and Start are dead mid-run (no abandon).
+
+**Decisions of record:**
+1. **Process.** The PR loop (plan → build → multi-agent adversarial review → fix → merge) is the
+   standing directive; the gauntlet is retired (banner in `GAUNTLET.md`, dispositions in
+   `public/progress/data.json`). The blind-critique protocol survives only as the realm-art
+   acceptance gate (three exhibits, §G.5).
+2. **Art budget.** The PixelLab cycle expiring 2026-09-04 deliberately lapses unspent. Generation
+   happens next cycle, inside the realm phase — `ART_DIRECTION.md` §9 Greek entry first, then the
+   ASSET-KIT order discipline, integration timeboxed with a two-loss stop rule.
+3. **Seed-1 first run.** A brand-new profile's first-ever run being universal (URL seed 1, attempt 1)
+   is kept as an authored decision: it is a tunable onboarding and comparable playtest telemetry.
+   Attempt-keying already fixed reload staleness. When the route generator lands, a test asserts the
+   attempt-0 route is a valid teaching route.
+4. **The toll is not the utility node.** Charon's Landing keeps THE TOLL as the fixed pre-boss beat in
+   every generated route; the utility node (shop XOR *The Unburied*, never both) is a separate
+   mid-route role. *The Unburied* joins `rites.ts` as its second consumer (the debt target
+   generalizes from "the boss room" to "the next room"); the shop is a node handler, not a rite. The
+   toll's price stays vessels, never obols, and is re-tuned once the shop sells healing.
+
+**Revised remainder ordering** (supersedes the §N ordering; §N's task specs remain the definitions).
+Replay-hash re-pins happen per-PR in one dedicated tail commit, never batched; the matrix gate must be
+green on both sides of every re-pin.
+
+| PR | Scope | Depends | Re-pins |
+|---|---|---|---|
+| 1 | Phase 0: death-card build + minimum beat, device-aware reward prompts + commit guard, volume sliders (`SettingsStateV2`), run-abandon, pad-operable pause card, playtest build (telemetry bundle, verb-flag profiles, tagged deploy, `PLAYTEST.md`), process/decision docs | — | 0 (hard bar) |
+| 2 | Rooms-as-data: `RoomSpec` + layout registry; the mooring vignette as second consumer; 1–2 combat-layout variants | 1 | 0 (bit-for-bit bar) |
+| 3 | Generated route (7-node canonical / 6-node variant: entry → combat branch → utility → combat → elite → Landing+toll → Minos) + exits-phase map overlay, pad-navigable; attempt-0 teaching-route test | 2 | 1 |
+| 4 | Economy: obols + Remembrances, shop node (heal / +max HP / boon), *The Unburied* as second rite, toll re-tune, the Smith (barks, Remembrance counter, vessel + reroll unlocks, `MetaStateV2` + migration, `storage.ts` clamp removed) | 3 | 1 |
+| 5 | Node-boundary save/resume filling the reserved `RunCheckpoint` slot; title Continue wiring deferred to PR 7 | 4 | 0 (hard bar) |
+| 6 | Greek realm: §9 entry → next-cycle generation → integration, realm/boss music on the existing buses, flame vents, two encounter modifiers; blind critique on exactly three exhibits | 3 (+4) | 0 for dressing |
+| 7 | Shell completion + hardening + acceptance: title menu (Descend/Continue/Settings/Credits), settings screen, ARIA basics, golden screenshots, both golden paths in CI, save-corruption drill, cultural/writing review, final human acceptance vs §E's 90+ | all; CI active | 0 |
+
+The human fun gate (Task 2's other half) runs in parallel from PR 1's pinned deploy — the user
+recruits 5–8 testers × 3 runs; findings merge as a tuning-only PR whenever ≥5 bundles exist. CI
+activation is user-gated (the GitHub App needs `workflows` permission) and wanted before PR 2. §M
+deferrals are unchanged.
+
 This document is the unified plan requested by the game-loop audit (Appendix B) and the vertical-slice addendum: one verdict, one gap analysis, one rank-ordered list of what to do next. All claims were re-verified against the current tree, not carried forward from earlier audits.
 
-**Evidence base for this audit:** full read of `src/sim/` (all 30 files), the entry point, input, tuning, and the render/audio surfaces; `pnpm typecheck` green; `pnpm test` green (**184 tests, 14 files**); fresh headless runs of the production loop (`slice-kite` seeds 1–60, `slice-naive` seeds 1–20); five Playwright screenshots along the golden path (Bardo, Threshold fight, Veiled Crossing fight, reward offer, Warden fight), reproducible via:
+**Evidence base for this audit** (historical, gathered at `4d44311`; at `6852aa0` the suite measures 512 tests in 32 files): full read of `src/sim/` (all 30 files), the entry point, input, tuning, and the render/audio surfaces; `pnpm typecheck` green; `pnpm test` green (**184 tests, 14 files**); fresh headless runs of the production loop (`slice-kite` seeds 1–60, `slice-naive` seeds 1–20); five Playwright screenshots along the golden path (Bardo, Threshold fight, Veiled Crossing fight, reward offer, Warden fight), reproducible via:
 
 ```bash
 pnpm sim -- --scenario loop --bot slice-kite --seeds 1-60 --ticks 18000
@@ -449,6 +500,10 @@ Compelling, and not this milestone. Each waits for a named trigger:
 ---
 
 ## N. The Next 10 Tasks
+
+> **Ordering superseded** by the Revision 3 table in the STATUS block (2026-08-28): tasks 1, 2
+> (prototype half), 7, and the boss shipped in PR #9; the remainder runs as PRs 1–7 there. The task
+> specs below remain the definitions of record.
 
 In exact priority order. Each is scoped to be one implementation task/PR. Format per task: **what · why · systems · impact/complexity · depends on · type · done when**.
 

@@ -501,7 +501,7 @@ export class Presenter {
           this.tilemap.setDoorOpen(this.world.doorOpen)
           break
         case 'smithSpoke':
-          this.hud.showBanner('THE SMITH', ev.line.toLowerCase(), 2.4)
+          this.hud.showBanner('THE SMITH', ev.line, 2.4)
           break
         case 'rerollUnlocked':
           this.flash(0.32, 0xd4b060)
@@ -543,7 +543,7 @@ export class Presenter {
           this.particles.ring(ev.x, ev.y, def.family === 'blade' ? 0xff9a30 : 0xb888ff)
           this.postfx.pulse()
           this.tilemap.setDoorOpen(this.world.doorOpen)
-          this.hud.showBanner(def.name, def.vow.toLowerCase(), 1.8)
+          this.hud.showBanner(def.name, def.vow, 1.8)
           break
         }
         case 'brandApplied':

@@ -48,6 +48,16 @@ and `.cta-note--touch` (CSS `pointer: coarse`) says it louder on a phone.
 
 ## Deploy (Cloudflare Pages)
 
+```
+pnpm site:deploy
+```
+
+**The Pages project `playbardo` is direct upload, not Git-connected.** Merging to `main` deploys
+nothing; `pnpm site:deploy` is the only thing that ships. It builds (every gate included) and then
+uploads `site/dist` to the production branch, `main`. One-time setup per machine: `npx wrangler login`.
+
+If the project is ever reconnected to GitHub, these are its settings:
+
 - Build command: `pnpm site:build`
 - Output directory: `site/dist`
 - `_headers` ships immutable caching for hashed `/img`, `/fonts`, `/assets`, and an hour for

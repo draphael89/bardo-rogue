@@ -39,8 +39,8 @@ one `git mv` away from being live.
 A fresh three-track audit (sim, presentation, tooling) re-verified this block against `main` and locked
 four decisions with the user. The suite at `6852aa0` measures **512 passing tests in 32 files**
 (`pnpm test`, 2026-08-28 — the "275 passing" above was already stale when written); `pnpm matrix`
-holds the hard no-strand gate at 100/100 seeds (measured 2026-08-28 post-recalibration: kite 70%
-wins, 37.5–49.8 s clears; naive 0% — both inside the soft band).
+holds the hard no-strand gate at 100/100 seeds (measured 2026-08-29 after rebasing onto the modal
+arm gate: kite 73% wins, 39.8–52.3 s clears; naive 0% — both inside the soft band).
 
 **Fresh findings, queued into the revised ordering below:** the death card omits the build the victory
 card shows, and both cards accept confirm on tick 1 before the staged reveal (no minimum beat); the
@@ -55,7 +55,12 @@ callers (no volume control ships); R and Start are dead mid-run (no abandon).
    `public/progress/data.json`). The blind-critique protocol survives only as the realm-art
    acceptance gate (three exhibits, §G.5).
 2. **Art budget.** The PixelLab cycle expiring 2026-09-04 deliberately lapses unspent. Generation
-   happens next cycle, inside the realm phase — `ART_DIRECTION.md` §9 Greek entry first, then the
+   happens next cycle, inside the realm phase. **Unresolved and owned by PR 6:** the art bible does
+   not merely lack a Greek entry, it *deliberately defers Greek* — "the realm that would read as a
+   Hades copy, and we win nothing by inviting that comparison first" (`ART_DIRECTION.md` §9) — while
+   the shipped game is Acheron, Lethe, Asphodel, Charon, Minos and Hecate throughout. Either the
+   bible's realm order or the realm we built has to move; do not start generating art until that is
+   settled. Then the §9 Greek entry first, followed by the
    ASSET-KIT order discipline, integration timeboxed with a two-loss stop rule.
 3. **Seed-1 first run.** A brand-new profile's first-ever run being universal (URL seed 1, attempt 1)
    is kept as an authored decision: it is a tunable onboarding and comparable playtest telemetry.
@@ -332,7 +337,7 @@ Ordering reflects dependency and player value. Phases 0–1 are gates, not featu
 
 ### Phase 5 — Realm identity (Greek)
 - **Objective:** the run reads as *a place*: the five named spaces, palette/material/audio package, enemy recasts, the Oath-Bound elite, two encounter modifiers.
-- **Why now:** content lands on the Phase 2 spine and Phase 4 systems; art identity is the historically slowest loop (the gauntlet's 11-round arena stall) so it gets its own phase with timeboxes and the `ART_DIRECTION.md` §11 gates. **Add a Greek section to `ART_DIRECTION.md` §9 first** — the bible sketches Duat/Niflheim/Mictlan but not the realm we chose to build.
+- **Why now:** content lands on the Phase 2 spine and Phase 4 systems; art identity is the historically slowest loop (the gauntlet's 11-round arena stall) so it gets its own phase with timeboxes and the `ART_DIRECTION.md` §11 gates. **Settle the realm contradiction first** — §9 sketches Duat/Niflheim/Mictlan and explicitly defers Greek as the one realm that would invite a Hades comparison, yet Greek is the realm that shipped. Resolve that, then write the §9 entry for whichever way it lands.
 - **Acceptance:** players identify the realm without reading its title; blind-critique protocol on three exhibits (a combat room, the utility node, the boss arena); the teaching-loop rule holds (the elite is met alone before it joins formations); both modifiers reachable and bot-completable.
 - **Out of scope:** second realm; signature set pieces beyond the Hall of Minos.
 

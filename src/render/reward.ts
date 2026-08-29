@@ -183,14 +183,18 @@ export class RewardOverlay {
   private paintPause(): void {
     const W = tuning.view.width, H = tuning.view.height
     this.g.rect(0, 0, W, H).fill({ color: P.void, alpha: 0.76 })
-    this.g.roundRect(W / 2 - 120, 68, 240, 134, 3).fill({ color: P.face, alpha: 0.98 }).stroke({ color: P.gold, width: 2 })
+    // The card grew 134 -> 152 and moved up 6 to seat the save line, keeping the 28/21 top and bottom
+    // padding it already had. The new line is static, so the repaint key above needs no new input.
+    this.g.roundRect(W / 2 - 120, 62, 240, 152, 3).fill({ color: P.face, alpha: 0.98 }).stroke({ color: P.gold, width: 2 })
     const over = label('BETWEEN BREATHS', 11, P.gold)
-    over.position.set(W / 2, 96); this.add(over)
+    over.position.set(W / 2, 90); this.add(over)
     const title = label('PAUSED', 22, P.bone)
-    title.position.set(W / 2, 126); this.add(title)
+    title.position.set(W / 2, 120); this.add(title)
     const effects = label(`V  ·  REDUCED EFFECTS ${this.reducedEffects ? 'ON' : 'OFF'}`, 10, this.reducedEffects ? P.gold : P.dim)
-    effects.position.set(W / 2, 158); this.add(effects)
+    effects.position.set(W / 2, 152); this.add(effects)
+    const saves = label('E EXPORT SAVE  ·  I IMPORT SAVE', 10, P.dim)
+    saves.position.set(W / 2, 170); this.add(saves)
     const act = label('PRESS P OR ESCAPE TO RETURN', 10, P.dim)
-    act.position.set(W / 2, 181); this.add(act)
+    act.position.set(W / 2, 193); this.add(act)
   }
 }

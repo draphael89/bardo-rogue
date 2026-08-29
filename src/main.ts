@@ -18,8 +18,10 @@ import { decodeReplay, isEncodedReplay, quantizeFrame, replayToJson, type Replay
 import { Recorder } from '@/input/recorder'
 import { tuning } from '@/tuning'
 import { Text } from 'pixi.js'
-import { loadMeta, loadSettings, saveMeta, saveSettings } from '@/sim/storage'
 import { defaultMetaState, type MetaStateV1 } from '@/sim/session'
+import { bumpRevision, defaultSave, serializeSave, parseSave, type BardoSave } from '@/sim/save'
+import { detectPlatform, PROFILE_ID } from '@/platform'
+import { loadSave, saveFilename } from '@/platform/saveFile'
 
 async function boot() {
   const q = new URLSearchParams(location.search)
@@ -48,13 +50,45 @@ async function boot() {
   audio.muted = mute
   audio.load(manifest.audio) // not awaited: the game starts silent-then-sound rather than waiting
 
-  const browserStorage = typeof localStorage === 'undefined' ? undefined : localStorage
-  const preferredReducedEffects = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches
-  const storedSettings = loadSettings(browserStorage, preferredReducedEffects)
-  let reducedEffects = q.has('reduced') ? q.get('reduced') !== '0' : storedSettings.reducedEffects
-  let world: World = createWorld(seed, scenario, { god, ...(scenario === 'loop' ? { meta: loadMeta(browserStorage) } : {}) })
+  // `?save=off` runs the game against a fresh profile and writes nothing -- not even the one-time
+  // legacy storage upgrade. Evidence captures use it so a machine that has actually played -- attempts
+  // counted, reduced effects persisted -- cannot tint a screenshot or move a `loop` hash (hashWorld
+  // folds session.meta into that scenario's hash).
+  const noSave = q.get('save') === 'off'
+  const platform = detectPlatform()
+  // Claim before loadSave: recovery may re-arm the live slot from a backup, which is a write just as
+  // surely as an autosave. Browsers without Web Locks stay read-only; a localStorage heartbeat is
+  // not atomic and therefore cannot authorise whole-document writes safely.
+  const ownership = noSave ? 'unavailable' : await platform.claimSaves?.(PROFILE_ID) ?? 'acquired'
+  const ownsProfile = ownership === 'acquired'
+  const loaded = noSave
+    ? { save: defaultSave({ profileId: PROFILE_ID }), writable: false, source: 'default' as const }
+    : await loadSave(platform.saves, PROFILE_ID, {
+      preferredReducedEffects: platform.prefersReducedMotion(),
+      repair: ownsProfile,
+    })
+  // The authoritative save document. Held here rather than read back out of the world at write time:
+  // the envelope carries meta AND settings, and a non-`loop` world's session.meta is the zeroed
+  // default, so composing a write from it would wipe real progress the moment V is pressed.
+  let savedSave: BardoSave = loaded.save
+  let savable = loaded.writable && ownsProfile
+  if (noSave) console.log('[save] save=off: this session reads and writes nothing')
+  else if (ownership === 'busy') console.log('[save] another tab owns this profile; this session will not write')
+  else if (ownership === 'unavailable') console.log('[save] exclusive browser save locking is unavailable; this session will not write')
+  else if (loaded.preservationFailed) console.log('[save] damaged bytes could not be preserved; this session will not write')
+  else if (loaded.source === 'damaged') console.log('[save] the save was damaged and no backup was usable; a fresh profile started, the damaged bytes are kept')
+  else if (loaded.source === 'backup') console.log('[save] the live save was unreadable; recovered from the backup copy')
+  else if (loaded.source === 'unreadable') console.log('[save] this profile could not be read at all; nothing will be written over it')
+  else if (!savable) console.log('[save] this save was written by a newer build; it will not be overwritten')
+  // Two values on purpose: what the save document says, and what this session is actually rendering.
+  // `?reduced=` is a debug override of the second only -- persisting it would let a URL param
+  // permanently rewrite a player's setting the next time any autosave fires.
+  let storedReducedEffects = savedSave.settings.reducedEffects
+  let reducedEffects = q.has('reduced') ? q.get('reduced') !== '0' : storedReducedEffects
+  let world: World = createWorld(seed, scenario, { god, ...(scenario === 'loop' ? { meta: savedSave.meta } : {}) })
   // Spatial audio starts with the player's actual spawn, before the first enemy tell can arrive.
   audio.setListener(world.player.x, world.player.y)
+  platform.setRunActive(world.session.run !== null)
   let userPaused = false
   let metrics = new Metrics()
   const presenter = new Presenter(ra, atlas, world)
@@ -81,11 +115,62 @@ async function boot() {
     const meta = sc === 'loop' ? (suppliedMeta ? opts.meta : world.scenario === 'loop' ? world.session.meta : undefined) : undefined
     world = createWorld(s, sc, { ...opts, ...(meta ? { meta } : {}) })
     audio.setListener(world.player.x, world.player.y)
+    platform.setRunActive(world.session.run !== null)
     metrics = new Metrics()
     replayFrames = null
     if (recorder.recording) { recorder.stop(); console.log('[replay] recording stopped by restart') }
     presenter.bindWorld(world)
     presenter.handleEvents([{ type: 'restart' }])
+  }
+
+  // One write path for the whole envelope, refused outright for a save this build cannot represent.
+  // Writes are coalesced into a single slot and chained: two in flight at once (V pressed on the same
+  // frame as a `returned` event) could each rotate the live copy into the backup, leaving both slots
+  // holding the new revision and the previous-known-good gone. The chain always ends in a catch --
+  // an unhandled rejection here would surface as a page error and fail every evidence capture.
+  interface PendingWrite { payload: string; settle: Array<(ok: boolean) => void> }
+  let writing: Promise<void> | null = null
+  let queued: PendingWrite | null = null
+  let writeFailed = false
+  let suppressedPersistShown = false
+  const drain = (): void => {
+    if (writing || queued === null) return
+    const pending = queued
+    queued = null
+    platform.setSaving?.(true)             // so a desktop quit waits for this write instead of racing it
+    writing = platform.saves.write(PROFILE_ID, pending.payload)
+      .then(() => { for (const settle of pending.settle) settle(true) })
+      .catch(err => {
+        for (const settle of pending.settle) settle(false)
+        console.log(`[save] write failed: ${String(err)}`)
+        // Say it once, in the game, rather than only in a console nobody has open. A player whose
+        // disk is full or whose save directory is unwritable otherwise loses a whole session's
+        // progress without a single hint that anything went wrong.
+        if (!writeFailed) { writeFailed = true; presenter.hud.showBanner('PROGRESS NOT SAVING', 'this run will not be recorded', 3.0) }
+      })
+      .then(() => {
+        writing = null
+        if (queued === null) platform.setSaving?.(false)
+        drain()
+      })
+  }
+  const persist = (): Promise<boolean> => {
+    if (!savable) {
+      // The write is suppressed by design (a newer build's save, or a profile we could not read).
+      // The boot banner said why once; this says WHEN it starts costing something -- at the first
+      // moment the player earned a save that is not going to happen.
+      if (!noSave && !suppressedPersistShown) { suppressedPersistShown = true; presenter.hud.showBanner('PROGRESS NOT SAVING', 'this profile cannot be written', 3.0) }
+      return Promise.resolve(false)
+    }
+    savedSave = bumpRevision({ ...savedSave, settings: { version: 1, reducedEffects: storedReducedEffects } })
+    const payload = serializeSave(savedSave)
+    return new Promise(resolve => {
+      if (queued) {
+        queued.payload = payload          // only the newest payload survives; older ones are stale by definition
+        queued.settle.push(resolve)        // but every caller waits for that newest payload to become durable
+      } else queued = { payload, settle: [resolve] }
+      drain()
+    })
   }
 
   const tick = () => {
@@ -103,8 +188,15 @@ async function boot() {
     stepWorld(world, frame)
     metrics.consume(world, world.events)
     presenter.handleEvents(world.events)
+    // tests/sim/harness.test.ts hand-copies this ordering to prove the browser and headless agree
+    // across a mid-replay restart. Keep the save write here -- after the events are handled, before
+    // they are cleared -- and keep it read-only against `world`.
     if (world.scenario === 'loop' && world.events.some(ev => ev.type === 'runStarted' || ev.type === 'runWon' || ev.type === 'returned')) {
-      saveMeta(world.session.meta, browserStorage)
+      // An explicit copy: reset() builds a NEW meta object, so holding the live one would leave this
+      // pointing at a dead object and persist stale counters.
+      savedSave = { ...savedSave, meta: { ...world.session.meta, unlockedWeapons: [...world.session.meta.unlockedWeapons] } }
+      void persist()
+      platform.setRunActive(world.session.run !== null)   // so a desktop quit can ask before binning a run
     }
     world.events.length = 0
     if (world.wantsRestart) {
@@ -168,32 +260,89 @@ async function boot() {
     download: name => { if (recorder.recording) stopRecord(); recorder.download(name) },
   })
 
-  // Fullscreen is the only lever that actually enlarges the stage. The target is drawn at an INTEGER
-  // scale in physical pixels, so the room's size on screen steps rather than slides: a 713px-tall
-  // viewport caps it at 5, and 6 needs 810 (270 * 6 / dpr 2). Fullscreen buys exactly that, which is
-  // a 20% larger room, and it costs nothing in crispness because the scale stays a whole number.
-  // Re-running resize() after the change lets the view re-fit to the new aspect.
-  const toggleFullscreen = async () => {
-    try {
-      if (document.fullscreenElement) await document.exitFullscreen()
-      else await document.documentElement.requestFullscreen({ navigationUI: 'hide' })
-    } catch { /* the browser refused; nothing to recover, the game keeps running windowed */ }
-  }
+  // Re-running resize() after a fullscreen change lets the view re-fit to the new aspect. The
+  // fullscreen call itself lives in src/platform (it is the host's job); this is the renderer's.
   document.addEventListener('fullscreenchange', () => ra.resize())
+
+  const exportSave = async () => {
+    // Nothing was read, so there is nothing to export: serialising the in-memory defaults here would
+    // hand the player a zeroed file labelled as their backup of the inaccessible profile.
+    if (loaded.source === 'unreadable') { presenter.hud.showBanner('NOTHING TO EXPORT', 'the save could not be read', 2.4); return }
+    // For a save from a newer build, export the bytes as they were READ: re-serialising would emit a
+    // schemaVersion-2 document with the newer build's fields quietly dropped, which is indistinguishable
+    // from a real one.
+    // The call has to happen inside the keydown the browser is still processing (the download click
+    // needs that gesture), so it is started before anything is awaited.
+    const written = await platform.exportFile(loaded.raw ?? serializeSave(savedSave), saveFilename(new Date()))
+    if (!written) { presenter.hud.showBanner('SAVE NOT EXPORTED', 'nothing was written', 2.0); return }
+    presenter.hud.showBanner('SAVE EXPORTED', savable ? 'CHECK YOUR DOWNLOADS' : 'EXPORTED AS FOUND', 2.0)
+  }
+  let importing = false
+  const importSave = async () => {
+    if (importing) return
+    importing = true
+    try {
+      const text = await platform.importFile()
+      if (text === null) return
+      const parsed = parseSave(text, { profileId: PROFILE_ID })
+      if (parsed.kind === 'future') { presenter.hud.showBanner('SAVE NOT READ', 'it came from a newer build', 2.2); return }
+      // Only a document this build actually read counts. 'empty' is the dangerous one: an empty or
+      // whitespace-only file parses to a DEFAULT save, and accepting it would write zeroed counters
+      // over real progress while the banner cheerfully said SAVE IMPORTED.
+      if (parsed.kind !== 'ok' && parsed.kind !== 'migrated') { presenter.hud.showBanner('SAVE NOT READ', 'that file is not a bardo save', 2.2); return }
+      if (!savable) { presenter.hud.showBanner('PROFILE IS READ ONLY', 'this session must not overwrite it', 2.4); return }
+      // A live run holds sim state no import can reconcile; refuse rather than half-apply it.
+      if (world.session.run) { presenter.hud.showBanner('A RUN IS UNDERWAY', 'return to the bardo first', 2.2); return }
+      const priorSave = savedSave
+      const priorStoredReducedEffects = storedReducedEffects
+      savedSave = parsed.save
+      storedReducedEffects = savedSave.settings.reducedEffects
+      // The imported counters and success banner are applied only after the coalesced writer says
+      // the exact logical update is durable. A refused disk write therefore cannot look successful.
+      if (!await persist()) {
+        savedSave = priorSave
+        storedReducedEffects = priorStoredReducedEffects
+        presenter.hud.showBanner('SAVE NOT IMPORTED', 'the file could not be written', 2.4)
+        return
+      }
+      reducedEffects = savedSave.settings.reducedEffects
+      presenter.setReducedEffects(reducedEffects)
+      userPaused = false; loop.paused = false
+      // reset() rebuilds the world with the imported meta and rebinds the presenter. Deliberately not a
+      // reload: that would drop ?bot=/?seed=, destroy window.__game mid-evaluate and break an attached
+      // Playwright page.
+      if (world.scenario === 'loop') reset(cur.seed, cur.scenario, { god: cur.god, meta: savedSave.meta })
+      presenter.hud.showBanner('SAVE IMPORTED', `${savedSave.meta.attempts} ATTEMPTS · ${savedSave.meta.victories} VICTORIES`, 2.2)
+    } finally { importing = false }
+  }
 
   window.addEventListener('keydown', e => {
     if ((e.code === 'Escape' || e.code === 'KeyP') && !e.repeat) { e.preventDefault(); userPaused = !userPaused; loop.paused = userPaused }
-    if (e.code === 'KeyV' && !e.repeat) {
+    if (e.code === 'KeyV' && !e.repeat && !importing) {
       reducedEffects = !reducedEffects
+      storedReducedEffects = reducedEffects        // an explicit player choice, so it is the one that persists
       presenter.setReducedEffects(reducedEffects)
-      saveSettings({ version: 1, reducedEffects }, browserStorage)
+      void persist()
     }
     if (e.code === 'F1') { e.preventDefault(); overlay.toggle() }
     if (e.code === 'F2') { e.preventDefault(); record() }
     if (e.code === 'F3') { e.preventDefault(); if (recorder.recording) stopRecord(); recorder.download() }
-    if (e.code === 'KeyF' && !e.repeat) { e.preventDefault(); void toggleFullscreen() }
+    if (e.code === 'KeyF' && !e.repeat) { e.preventDefault(); void platform.fullscreen() }
+    // Save management is reachable only from the pause screen, so it can never fire mid-fight.
+    if (userPaused && !importing && e.code === 'KeyE' && !e.repeat) { e.preventDefault(); void exportSave() }
+    if (userPaused && !importing && e.code === 'KeyI' && !e.repeat) { e.preventDefault(); void importSave() }
   })
+  if (!noSave) {
+    platform.watchForeignWrites?.(() => {
+      if (!savable) return
+      savable = false
+      console.log('[save] save ownership was invalidated; this session will stop writing')
+      presenter.hud.showBanner('SAVE OWNERSHIP LOST', 'progress here will not be saved', 3.0)
+    })
+  }
+
   loop.start()
+  if (!noSave) platform.persistHint()   // after first paint: a permission prompt must never land on a black screen
   if (scenario === 'run') presenter.hud.showBanner(world.roomName, 'clear the room', 1.8)
   else if (scenario === 'loop') presenter.hud.showBanner(world.roomName, '', 1.5)
   else if (scenario === 'full' || scenario === 'empty') presenter.hud.showBanner('THE THRESHOLD', '', 1.5)
@@ -202,6 +351,19 @@ async function boot() {
   else if (scenario === 'bow') presenter.hud.showBanner('THE THRESHOLD', 'the string is taut', 1.8)
   else if (scenario === 'boss') presenter.hud.showBanner('THE WARDEN', 'the first judge', 1.8)
   else presenter.hud.showBanner(scenario.toUpperCase(), '', 1.2)
+
+  // A profile that will not be saved, or one that had to be rescued, is told to the PLAYER at boot,
+  // not just the console -- overriding the room banner in exactly the rare case where the warning
+  // matters more than the room name. save=off skips it, so evidence captures stay clean.
+  if (!noSave) {
+    if (ownership === 'busy') presenter.hud.showBanner('ANOTHER TAB IS PLAYING', 'progress here will not be saved', 3.5)
+    else if (ownership === 'unavailable') presenter.hud.showBanner('PROGRESS NOT SAVING', 'exclusive browser locking is unavailable', 3.5)
+    else if (loaded.source === 'unreadable') presenter.hud.showBanner('SAVE COULD NOT BE READ', 'playing without saving, nothing will be overwritten', 3.5)
+    else if (loaded.preservationFailed) presenter.hud.showBanner('SAVE WAS DAMAGED', 'playing read-only; damaged bytes could not be preserved', 3.5)
+    else if (!savable) presenter.hud.showBanner('SAVE FROM A NEWER BUILD', 'playing without saving, nothing will be overwritten', 3.5)
+    else if (loaded.source === 'damaged') presenter.hud.showBanner('SAVE WAS DAMAGED', 'a fresh start; the damaged file is kept', 3.5)
+    else if (loaded.source === 'backup') presenter.hud.showBanner('SAVE RESTORED', 'recovered from the backup copy', 3.0)
+  }
 }
 
 boot().catch(err => { console.error(err); document.body.innerHTML = `<pre style="color:#f88;padding:16px">${String(err?.stack ?? err)}</pre>` })

@@ -17,11 +17,16 @@ Standing directive for agents working here: `GAUNTLET.md` (build/critic loop, co
 - Visual changes: `pnpm poses` (pose sheet of ~30 key frames) and/or `pnpm shot -- --scenario wave1 --bot naive-melee --ticks 500`, then Read the PNG.
 - Balance changes: `pnpm sim -- --scenario full --bot kite --seeds 1-8` and compare against the targets in the plan (skilled clear 60–120 s, idle dies in wave 1).
 - The dev server is usually already running on :5173; check before starting another.
-- Any change in `src/sim/` or `src/tuning.ts` breaks the pinned hashes in `tests/sim/replay.test.ts`. If intended: `pnpm record-bots`, paste the printed hashes into the test. Never hand-edit a hash.
+- Platform changes (`src/platform/`, `desktop/`): `pnpm desktop:build && pnpm smoke:desktop` — 23 hosting checks including replay-hash parity between the packaged app and `pnpm sim`. Never needed for a gameplay change.
+- Any change to what `stepWorld` or `createWorld` can reach (most of `src/sim/`, and `src/tuning.ts`) breaks the pinned hashes in `tests/sim/replay.test.ts`. If intended: `pnpm record-bots`, paste the printed hashes into the test. Never hand-edit a hash, and never run `record-bots` to make a failure go away — it would launder real drift into the fixtures. `src/sim/save.ts` and `src/sim/storage.ts` are pure document code that the sim never calls (`tests/sim/boundary.test.ts` asserts it), so editing them must NOT change a hash.
 - `pnpm shot`/`pnpm poses` never start Vite; use `--stepwise 1` for a deterministic frame (free-run overshoots by up to 4 ticks).
+
+## Platform
+The browser is the development target and stays first-class; `desktop/` is a thin Electron host around the same build. `src/sim/` and `src/render/` never learn which host they are in — everything host-specific goes behind `src/platform/`. Saves are one versioned JSON envelope (`src/sim/save.ts`), stored in localStorage on the web and in `userData/saves` on the desktop. The full rationale, phases and the Steam path: `PLATFORM_STRATEGY.md`.
 
 ## Assets
 `public/assets/` is committed and holds **compiled output only**. Never edit a generated file; change the tool.
+A release build copies ONLY `public/assets` (publicDir is off for `command === 'build'`), so anything else added under `public/` will not ship; `tools/check-build.ts` fails the build if a required file or a manifest-named asset is missing, or if evidence, a video or an oversized payload got in.
 
 The art pipeline (`docs/ART_PIPELINE_AUDIT.md` for why, `ART_DIRECTION.md` §12 for how):
 

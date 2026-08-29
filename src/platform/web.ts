@@ -1,0 +1,172 @@
+import { META_KEY, SETTINGS_KEY, type StorageLike } from '@/sim/storage'
+import { migrateLegacySave, serializeSave } from '@/sim/save'
+import { PROFILE_ID, type Platform, type SaveOwnership, type SaveStore } from './index'
+import { downloadText, pickTextFile, prefersReducedMotion } from './dom'
+
+export const saveKey = (profileId: string) => `bardo-rogue.save.${profileId}`
+export const backupKey = (profileId: string) => `${saveKey(profileId)}.bak`
+export const invalidatesSaveOwnership = (profileId: string, key: string | null): boolean =>
+  key === null || key === saveKey(profileId) || key === backupKey(profileId)
+
+// Exported and parameterised on StorageLike on purpose: this is the half of the web adapter that can
+// be tested in node, with the same kind of in-memory storage the sim tests already use.
+//
+// Same contract as the desktop store: a read resolves null ONLY for definitely-absent, and every
+// other failure REJECTS. A quota that refuses the write must not crash a run -- but the way it
+// avoids that is by rejecting into main.ts's write chain, whose catch shows PROGRESS NOT SAVING,
+// not by reporting the write as done. Swallowing here was how the one warning the player gets
+// stayed unreachable on the web while firing on the desktop.
+export function createStorageSaveStore(storage: StorageLike | undefined): SaveStore {
+  const get = (k: string): string | null => {
+    if (!storage) throw new Error('storage unavailable')
+    return storage.getItem(k) ?? null      // a throwing getter propagates: unreadable is not absent
+  }
+  const set = (k: string, v: string): void => {
+    if (!storage) throw new Error('storage unavailable')
+    storage.setItem(k, v)                  // quota or blocked storage propagates into the write chain
+  }
+  return {
+    read: async id => get(saveKey(id)),
+    readBackup: async id => get(backupKey(id)),
+    write: async (id, data) => {
+      // The LIVE slot commits first, so at every step at least one slot holds the newest good
+      // generation. The old order -- rotate, then replace -- had a losing sequence during recovery:
+      // with corrupt bytes live and the only good copy in the backup, the rotation overwrote that
+      // good backup with the corrupt bytes, and if the live write then threw (quota), both slots
+      // were corrupt and the good generation existed nowhere on disk.
+      const prev = get(saveKey(id))
+      set(saveKey(id), data)                                           // primary commit: throws = write failed
+      try { if (prev !== null && prev !== data) set(backupKey(id), prev) } catch { /* preservation is best-effort; the newest data is already durable */ }
+    },
+    delete: async id => { if (!storage) throw new Error('storage unavailable'); storage.removeItem(saveKey(id)); storage.removeItem(backupKey(id)) },
+  }
+}
+
+// The store the web platform actually uses: the raw storage store, plus an in-memory legacy
+// fallback on the read path. No eager write-through happens here: ownership is claimed above this
+// layer before the first normal persist writes the migrated envelope.
+export function createWebSaveStore(storage: StorageLike | undefined, preferredReducedEffects = false): SaveStore {
+  const raw = createStorageSaveStore(storage)
+  return {
+    ...raw,
+    read: async id => {
+      const envelope = await raw.read(id)
+      if (envelope !== null) return envelope
+      const legacy = migrateLegacySave(storage?.getItem(META_KEY), storage?.getItem(SETTINGS_KEY), { profileId: id, preferredReducedEffects })
+      return legacy ? serializeSave(legacy) : null
+    },
+  }
+}
+
+// Reading `localStorage` can THROW, not merely be undefined: Chromium raises SecurityError when site
+// data is blocked. This runs synchronously inside boot(), so an uncaught throw here means no
+// window.__game at all -- which reaches an agent as an opaque 15s waitForFunction timeout.
+function safeLocalStorage(): StorageLike | undefined {
+  try { return typeof localStorage === 'undefined' ? undefined : localStorage } catch { return undefined }
+}
+
+export const lockKey = (profileId: string) => `bardo-rogue.lock.${profileId}`
+
+interface LockManagerLike {
+  request(
+    name: string,
+    options: { mode: 'exclusive'; ifAvailable: true },
+    callback: (lock: object | null) => Promise<void>,
+  ): Promise<void>
+}
+
+function safeLockManager(): LockManagerLike | undefined {
+  try {
+    return typeof navigator === 'undefined' ? undefined : navigator.locks as unknown as LockManagerLike | undefined
+  } catch { return undefined }
+}
+
+// Web Locks are atomic, browser-owned and released when the document dies. The unresolved `hold`
+// promise keeps the callback -- and therefore the exclusive lock -- alive for this page's lifetime.
+// `ifAvailable` is important: boot must discover a competing tab immediately, not hang behind it.
+export function claimProfileLock(
+  locks: LockManagerLike | undefined,
+  profileId: string,
+  hold: Promise<void>,
+): Promise<SaveOwnership> {
+  if (!locks) return Promise.resolve('unavailable')
+  return new Promise(resolve => {
+    let answered = false
+    const answer = (status: SaveOwnership) => { if (!answered) { answered = true; resolve(status) } }
+    try {
+      void locks.request(lockKey(profileId), { mode: 'exclusive', ifAvailable: true }, async lock => {
+        if (!lock) { answer('busy'); return }
+        answer('acquired')
+        await hold
+      }).catch(() => answer('unavailable'))
+    } catch { answer('unavailable') }
+  })
+}
+
+export function createWebPlatform(): Platform {
+  const storage = safeLocalStorage()
+  let invalidated = false
+  let invalidate: () => void = () => {}
+  let releaseOwnership: () => void = () => {}
+  let watchedProfileId = PROFILE_ID
+  const revokeOwnership = (): void => {
+    if (invalidated) return
+    invalidated = true
+    releaseOwnership()
+    invalidate()
+  }
+  return {
+    kind: 'web',
+    saves: createWebSaveStore(storage, prefersReducedMotion()),
+    claimSaves: async profileId => {
+      let release = () => {}
+      const hold = new Promise<void>(resolve => { release = resolve })
+      const status = await claimProfileLock(safeLockManager(), profileId, hold)
+      if (status === 'acquired') {
+        watchedProfileId = profileId
+        let released = false
+        releaseOwnership = () => {
+          if (released) return
+          released = true
+          release()
+        }
+        // A page in the back/forward cache is not allowed to keep authority over bytes it can no
+        // longer observe. If it returns, it stays read-only; reclaiming would authorise stale state.
+        window.addEventListener('pagehide', revokeOwnership, { once: true })
+      }
+      return status
+    },
+    persistHint: () => {
+      // Fire-and-forget and deliberately silent: some browsers prompt, some decide heuristically, some
+      // have no such API. Never awaited (boot must not wait behind a permission dialog) and never
+      // logged -- tools/shot.ts collects console warnings as evidence failures.
+      try { void navigator.storage?.persist?.().catch(() => {}) } catch { /* no navigator.storage at all */ }
+    },
+    prefersReducedMotion,
+    // Fullscreen is the only lever that actually enlarges the stage. The target is drawn at an INTEGER
+    // scale in physical pixels, so the room's size on screen steps rather than slides: a 713px-tall
+    // viewport caps it at 5, and 6 needs 810 (270 * 6 / dpr 2). Fullscreen buys exactly that, which is
+    // a 20% larger room, and it costs nothing in crispness because the scale stays a whole number.
+    fullscreen: async on => {
+      const want = on ?? !document.fullscreenElement
+      try {
+        if (!want) await document.exitFullscreen()
+        else await document.documentElement.requestFullscreen({ navigationUI: 'hide' })
+      } catch { /* the browser refused; nothing to recover, the game keeps running windowed */ }
+    },
+    setRunActive: () => { /* a browser tab has no quit to guard */ },
+    // A foreign set, delete, or clear all invalidate this tab's in-memory whole document. Stop
+    // writing and release the lock: otherwise deleting a save in another tab is silently undone by
+    // this tab's next autosave, and no other tab can safely become the new owner.
+    watchForeignWrites: cb => {
+      if (typeof window === 'undefined') return
+      invalidate = cb
+      if (invalidated) cb()
+      window.addEventListener('storage', e => {
+        if (invalidatesSaveOwnership(watchedProfileId, e.key)) revokeOwnership()
+      })
+    },
+    exportFile: downloadText,
+    importFile: pickTextFile,
+  }
+}

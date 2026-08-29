@@ -457,8 +457,9 @@ describe('review findings', () => {
     world.player.state = 'attack'
     world.player.swingIndex = 1
     world.player.stateTick = 4
-    const runtimeKey = heroFrameName(world.player, world, 0)
     const south = JSON.parse(readFileSync('public/assets/sprites/bardo_hero_south.json', 'utf8')) as SheetDef
+    const southSheet = { def: south } as unknown as Parameters<typeof heroFrameName>[0]
+    const runtimeKey = heroFrameName(southSheet, world.player, world, 0)
     expect(runtimeKey).toBe(south.clips!.light2.sim!.contact)
     expect(south.frames[runtimeKey].i).toBe(9)
   })

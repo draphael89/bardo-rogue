@@ -65,3 +65,13 @@ export function tickClipFrame(clip: SheetClip, timeSeconds: number): string {
   }
   return clip.frames[0]
 }
+
+/**
+ * The four-frame vertical roll clip [dive, tuck, apex, extend], indexed by the phase split the
+ * direction module computes (verticalDodgeFrame's 0..3). Names come from the clip so the roll joins
+ * the same contract as every other authored clip: rename a frame in the sheet and the runtime
+ * follows the sidecar, not a hardcoded array.
+ */
+export function rollClipFrame(clip: SheetClip, phase: number): string {
+  return clip.frames[Math.max(0, Math.min(clip.frames.length - 1, phase))]
+}

@@ -10,25 +10,31 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { tuning } from '../../src/tuning'
-import { swingClipFrame, dodgeClipFrame, bruteAttackClipFrame, tickClipFrame, DODGE_START_TICKS } from '../../src/render/clipSelect'
+import { swingClipFrame, dodgeClipFrame, bruteAttackClipFrame, tickClipFrame, rollClipFrame, DODGE_START_TICKS } from '../../src/render/clipSelect'
 import { validateClipRefs } from '../../tools/art/compile'
 import type { SheetDef } from '../../src/render/sheet'
 
 const hero = JSON.parse(readFileSync('public/assets/sprites/bardo_hero.json', 'utf8')) as SheetDef
 const brute = JSON.parse(readFileSync('public/assets/sprites/bardo_brute.json', 'utf8')) as SheetDef
+const HERO_SHEETS = ['bardo_hero', 'bardo_hero_north', 'bardo_hero_south'].map(n =>
+  [n, JSON.parse(readFileSync(`public/assets/sprites/${n}.json`, 'utf8')) as SheetDef] as const)
 
 describe('player swings', () => {
+  // Every direction's sheet carries the same clip contract; the boundaries must hold on each — the
+  // south sheet's swapped light2 cells resolve through its own sidecar with no special case.
   const cases = [['light1', 0], ['light2', 1], ['heavy', 2]] as const
-  for (const [clipName, i] of cases) {
-    const clip = hero.clips![clipName]
-    const w = tuning.player.attack.swings[i]
-    it(`${clipName}: tick startup-1 is not contact; tick startup IS the asserted contact`, () => {
-      expect(swingClipFrame(clip, w, w.startup - 1)).not.toBe(clip.sim!.contact)
-      expect(swingClipFrame(clip, w, w.startup - 1)).toBe(clip.frames[0])
-      expect(swingClipFrame(clip, w, w.startup)).toBe(clip.sim!.contact)
-      expect(swingClipFrame(clip, w, w.startup + w.active - 1)).toBe(clip.sim!.contact)
-      expect(swingClipFrame(clip, w, w.startup + w.active)).toBe(clip.frames[clip.frames.length - 1])
-    })
+  for (const [sheetName, sheet] of HERO_SHEETS) {
+    for (const [clipName, i] of cases) {
+      const clip = sheet.clips![clipName]
+      const w = tuning.player.attack.swings[i]
+      it(`${sheetName}/${clipName}: tick startup-1 is not contact; tick startup IS the asserted contact`, () => {
+        expect(swingClipFrame(clip, w, w.startup - 1)).not.toBe(clip.sim!.contact)
+        expect(swingClipFrame(clip, w, w.startup - 1)).toBe(clip.frames[0])
+        expect(swingClipFrame(clip, w, w.startup)).toBe(clip.sim!.contact)
+        expect(swingClipFrame(clip, w, w.startup + w.active - 1)).toBe(clip.sim!.contact)
+        expect(swingClipFrame(clip, w, w.startup + w.active)).toBe(clip.frames[clip.frames.length - 1])
+      })
+    }
   }
   it('the heavy recovers into its own planted bookend, through the alias', () => {
     const clip = hero.clips!.heavy
@@ -88,5 +94,31 @@ describe('a wrong-but-existing contact fails the build', () => {
     const w = tuning.player.attack.swings[0]
     // The selection faithfully shows the wrong frame — on screen, in every strip, on the damage tick.
     expect(swingClipFrame(clip, w, w.startup)).toBe('light1Recover')
+  })
+})
+
+describe('the vertical roll clip', () => {
+  for (const n of ['bardo_hero_north_roll', 'bardo_hero_south_roll']) {
+    const roll = JSON.parse(readFileSync(`public/assets/sprites/${n}.json`, 'utf8')) as SheetDef
+    it(`${n}: four airborne phases come from the sidecar, and the clip is declared airborne`, () => {
+      const clip = roll.clips!.roll
+      expect(clip.frames).toHaveLength(4)
+      expect(clip.grounded).toBe(false)   // the pivot spread here IS the lift; the gate must not read it as sliding
+      expect([0, 1, 2, 3].map(i => rollClipFrame(clip, i))).toEqual(clip.frames)
+      expect(rollClipFrame(clip, 7)).toBe(clip.frames[3])   // clamped, never out of range
+    })
+  }
+})
+
+describe('the Oath-Bound elite runs on its own clock', () => {
+  it('windup commits at 55% of the OATHBOUND windup, two ticks after the brute would', () => {
+    const clip = brute.clips!.attack
+    const b = tuning.brute, o = tuning.oathbound
+    const bruteSplit = Math.ceil(b.windup * 0.55)
+    const oathSplit = Math.ceil(o.windup * 0.55)
+    expect(oathSplit).toBeGreaterThan(bruteSplit)
+    // On the brute's clock this tick is already committed; on the Oath-Bound's it is still early.
+    expect(bruteAttackClipFrame(clip, b, 'windup', bruteSplit)).toBe(clip.frames[1])
+    expect(bruteAttackClipFrame(clip, o, 'windup', bruteSplit)).toBe(clip.frames[0])
   })
 })

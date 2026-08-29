@@ -23,6 +23,22 @@ function fadeToBlack(t: number): number {
   return (v << 16) | (v << 8) | v
 }
 
+/** What the shell knows and the pause card paints. The shell owns the state; this class only draws. */
+export interface PauseMenuState {
+  focus: number
+  volumes: { master: number; music: number; sfx: number }
+  reduced: boolean
+  runActive: boolean
+  hold: number   // 0..1 abandon hold progress
+}
+
+/** Row order is shared between the shell's input handling and the painter via this one list. */
+export function pauseRowKinds(runActive: boolean): Array<'resume' | 'master' | 'music' | 'sfx' | 'reduced' | 'abandon'> {
+  return runActive
+    ? ['resume', 'master', 'music', 'sfx', 'reduced', 'abandon']
+    : ['resume', 'master', 'music', 'sfx', 'reduced']
+}
+
 export class RewardOverlay {
   root = new Container()
   // The veil is its own layer so it can thicken over the room while the cards are still arriving.
@@ -47,6 +63,8 @@ export class RewardOverlay {
   private paused = false
   private suppressed = false
   private reducedEffects = false
+  private padActive = false
+  private pauseMenu: PauseMenuState = { focus: 0, volumes: { master: 1, music: 1, sfx: 1 }, reduced: false, runActive: false, hold: 0 }
 
   constructor(layer: Container) {
     this.root.visible = false
@@ -64,6 +82,11 @@ export class RewardOverlay {
   setReducedEffects(reduced: boolean): void {
     if (this.reducedEffects !== reduced) { this.reducedEffects = reduced; this.key = '' }
   }
+  /** Presence of a connected pad flips every prompt's wording; the shell passes its per-frame snapshot. */
+  setPadActive(pad: boolean): void {
+    if (this.padActive !== pad) { this.padActive = pad; this.key = '' }
+  }
+  setPauseMenu(state: PauseMenuState): void { this.pauseMenu = state }
 
   update(world: World): void {
     if (this.suppressed) {
@@ -80,8 +103,9 @@ export class RewardOverlay {
     this.updateMeta(world)
     this.updateBuild(world)
     if (!this.root.visible) return
+    const m = this.pauseMenu
     const nextKey = this.paused
-      ? `pause|${this.reducedEffects ? 1 : 0}|${tuning.view.width}`
+      ? `pause|${m.focus}|${m.volumes.master.toFixed(2)}|${m.volumes.music.toFixed(2)}|${m.volumes.sfx.toFixed(2)}|${m.reduced ? 1 : 0}|${m.runActive ? 1 : 0}|${m.hold.toFixed(2)}|${this.padActive ? 1 : 0}|${tuning.view.width}`
       : rite
       ? `rite|${rite.id}|${rite.focus}|${tuning.view.width}`
       : offer
@@ -265,7 +289,9 @@ export class RewardOverlay {
       placeCentered(cost, x + cardW / 2, y + 43); add(cost)
       for (const line of wrappedCentered(choice.detail, 'body', selected ? P.bone : P.dim, cardW - 28, x + cardW / 2, y + 56)) add(line)
     })
-    const act = label('A / D OR ARROWS TO CHOOSE   ·   ENTER / ATTACK TO ANSWER', 'meta', accent)
+    const act = label(this.padActive
+      ? 'D-PAD TO CHOOSE   ·   A TO ANSWER'
+      : 'A / D OR ARROWS TO CHOOSE   ·   ENTER / ATTACK TO ANSWER', 'meta', accent)
     placeCentered(act, W / 2, H - 16); this.add(act)
     this.act = act
   }
@@ -324,7 +350,9 @@ export class RewardOverlay {
         placeCentered(from, x + cardW / 2, y + cardH - 10); add(from)
       }
     })
-    const act = label('A / D OR ARROWS TO CHOOSE   ·   ENTER / ATTACK TO CLAIM', 'meta', P.gold)
+    const act = label(this.padActive
+      ? 'D-PAD TO CHOOSE   ·   A TO CLAIM'
+      : 'A / D OR ARROWS TO CHOOSE   ·   ENTER / ATTACK TO CLAIM', 'meta', P.gold)
     placeCentered(act, W / 2, H - 16); this.add(act)
     this.act = act
   }
@@ -344,25 +372,71 @@ export class RewardOverlay {
     const stats = label(`${run.depth} CHAMBERS   ·   ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`, 'meta', P.dim)
     placeCentered(stats, W / 2, 120); this.add(stats)
     for (const line of wrappedCentered(run.boons.map(b => BOONS[b.id].name).join('\n'), 'body', P.bone, 280, W / 2, 148)) this.add(line)
-    const act = label('PRESS ENTER / ATTACK TO WAKE IN THE BARDO', 'meta', P.gold)
+    const act = label(this.padActive
+      ? 'PRESS A TO WAKE IN THE BARDO'
+      : 'PRESS ENTER / ATTACK TO WAKE IN THE BARDO', 'meta', P.gold)
     placeCentered(act, W / 2, 205); this.add(act)
   }
 
+  // The pause card became a small operable menu: resume, three volume sliders, the effects toggle,
+  // and (mid-run) a held abandon. The shell owns focus, values and the hold clock; this paints them.
   private paintPause(): void {
     const W = tuning.view.width, H = tuning.view.height
+    const m = this.pauseMenu
+    const rows = pauseRowKinds(m.runActive)
     this.scrim.rect(0, 0, W, H).fill({ color: P.void, alpha: 0.76 })
-    // The card grew 134 -> 152 and moved up 6 to seat the save line, keeping the 28/21 top and bottom
-    // padding it already had. The new line is static, so the repaint key above needs no new input.
-    this.g.roundRect(W / 2 - 120, 62, 240, 152, 3).fill({ color: P.face, alpha: 0.98 }).stroke({ color: P.gold, width: 2 })
+    const cardW = 300   // wide enough for the keyboard footer line; the sliders breathe too
+    const cardH = 64 + rows.length * 17 + 40
+    const cardX = Math.floor(W / 2 - cardW / 2)
+    const cardY = Math.floor((H - cardH) / 2)
+    this.g.roundRect(cardX, cardY, cardW, cardH, 3).fill({ color: P.face, alpha: 0.98 }).stroke({ color: P.gold, width: 2 })
     const over = label('BETWEEN BREATHS', 'meta', P.gold)
-    placeCentered(over, W / 2, 90); this.add(over)
+    placeCentered(over, W / 2, cardY + 22); this.add(over)
     const title = label('PAUSED', 'head', P.bone)
-    placeCentered(title, W / 2, 120); this.add(title)
-    const effects = label(`V  ·  REDUCED EFFECTS ${this.reducedEffects ? 'ON' : 'OFF'}`, 'meta', this.reducedEffects ? P.gold : P.dim)
-    placeCentered(effects, W / 2, 152); this.add(effects)
-    const saves = label('E EXPORT SAVE  ·  I IMPORT SAVE', 'meta', P.dim)
-    placeCentered(saves, W / 2, 170); this.add(saves)
-    const act = label('P / ESCAPE / START TO RETURN', 'meta', P.dim)
-    placeCentered(act, W / 2, 193); this.add(act)
+    placeCentered(title, W / 2, cardY + 44); this.add(title)
+
+    const rowX = cardX + 18
+    const rowW = cardW - 36
+    const barW = 96
+    let y = cardY + 66
+    rows.forEach((kind, i) => {
+      const focused = i === m.focus
+      if (focused) {
+        this.g.rect(rowX - 6, y - 7, rowW + 12, 15).fill({ color: P.faceHi, alpha: 0.9 })
+        this.g.rect(rowX - 8, y - 7, 2, 15).fill({ color: P.gold })
+      }
+      const tone = focused ? P.bone : P.dim
+      if (kind === 'resume') {
+        const t = label('RESUME', 'meta', tone)
+        placeLeft(t, rowX, y); this.add(t)
+      } else if (kind === 'reduced') {
+        const t = label('REDUCED EFFECTS', 'meta', tone)
+        placeLeft(t, rowX, y); this.add(t)
+        const v = label(m.reduced ? 'ON' : 'OFF', 'meta', m.reduced ? P.gold : tone)
+        placeRight(v, rowX + rowW, y); this.add(v)
+      } else if (kind === 'abandon') {
+        // The hold fills the row from the left in the same red the game already uses for a price.
+        if (m.hold > 0) this.g.rect(rowX - 6, y - 7, Math.floor((rowW + 12) * Math.min(1, m.hold)), 15).fill({ color: P.red, alpha: 0.45 })
+        const t = label(m.hold > 0 ? 'HOLD TO ABANDON...' : 'ABANDON RUN', 'meta', focused ? P.red : tone)
+        placeLeft(t, rowX, y); this.add(t)
+      } else {
+        const name = kind === 'master' ? 'MASTER' : kind === 'music' ? 'MUSIC' : 'SFX'
+        const vol = m.volumes[kind]
+        const t = label(name, 'meta', tone)
+        placeLeft(t, rowX, y); this.add(t)
+        const barX = rowX + rowW - barW
+        this.g.rect(barX, y - 3, barW, 6).fill({ color: P.void, alpha: 0.85 })
+        if (vol > 0) this.g.rect(barX, y - 3, Math.max(1, Math.round(barW * vol)), 6).fill({ color: focused ? P.gold : 0x8a8794 })
+      }
+      y += 17
+    })
+
+    y += 4
+    const saves = label('V EFFECTS  ·  E EXPORT SAVE  ·  I IMPORT SAVE', 'meta', P.dim)
+    placeCentered(saves, W / 2, y); this.add(saves)
+    const act = label(this.padActive
+      ? 'D-PAD MOVE  ·  A SELECT  ·  START RESUME'
+      : 'ARROWS MOVE  ·  ENTER SELECT  ·  ESC RESUME', 'meta', P.dim)
+    placeCentered(act, W / 2, y + 14); this.add(act)
   }
 }

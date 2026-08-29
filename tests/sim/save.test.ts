@@ -11,15 +11,22 @@ const LEGACY_SETTINGS = JSON.stringify({ version: 1, reducedEffects: true })
 
 // The canonical bytes, in the exact key order serializeSave emits. This string is the cross-host
 // contract: the browser adapter and the desktop adapter must both read and write exactly this.
-const CANONICAL = '{"schemaVersion":2,"contentRevision":"0.1.0","profileId":"default","revision":4,'
+const CANONICAL = '{"schemaVersion":3,"contentRevision":"0.1.0","profileId":"default","revision":4,'
+  + '"settings":{"version":2,"reducedEffects":true,"volMaster":1,"volMusic":0.7,"volSfx":1},'
+  + '"meta":{"version":1,"attempts":9,"victories":2,"unlockedWeapons":["blade"]},"checkpoint":null}'
+
+// The schema-2 fixture (settings V1, no volume sliders) — the bump's required migration evidence.
+const CANONICAL_V2 = '{"schemaVersion":2,"contentRevision":"0.1.0","profileId":"default","revision":4,'
   + '"settings":{"version":1,"reducedEffects":true},'
   + '"meta":{"version":1,"attempts":9,"victories":2,"unlockedWeapons":["blade"]},"checkpoint":null}'
+
+const DEFAULT_SETTINGS = { version: 2, reducedEffects: false, volMaster: 1, volMusic: 1, volSfx: 1 }
 
 describe('save envelope', () => {
   it('starts a fresh profile at revision 0 with the current schema and content revision', () => {
     expect(defaultSave()).toEqual({
       schemaVersion: SAVE_SCHEMA_VERSION, contentRevision: CONTENT_REVISION, profileId: DEFAULT_PROFILE_ID,
-      revision: 0, settings: { version: 1, reducedEffects: false }, meta: defaultMetaState(), checkpoint: null,
+      revision: 0, settings: DEFAULT_SETTINGS, meta: defaultMetaState(), checkpoint: null,
     })
   })
 
@@ -72,16 +79,18 @@ describe('parseSave', () => {
     expect(r.save).toEqual(defaultSave())    // never a half-read save
   })
 
-  it('refuses a sparse current-schema document rather than reading it as defaults', () => {
-    // Every v2 envelope this build ever wrote carries all seven fields, so `{"schemaVersion":2}` was
+  it('refuses a sparse envelope-versioned document rather than reading it as defaults', () => {
+    // Every envelope (v2 and up) this project ever wrote carries all its fields, so a sparse one was
     // never written by us. Parsing it as valid-with-defaults would skip the backup at boot, accept it
     // on import, and let the next autosave rotate the last good generation away under zeroes.
-    const bare = parseSave('{"schemaVersion":2}')
-    expect(bare.kind).toBe('corrupt')
-    if (bare.kind === 'corrupt') expect(bare.reason).toBe('missing-meta')
-    const metaOnly = parseSave('{"schemaVersion":2,"meta":{"version":1,"attempts":3}}')
-    expect(metaOnly.kind).toBe('corrupt')
-    if (metaOnly.kind === 'corrupt') expect(metaOnly.reason).toBe('missing-settings')
+    for (const sv of [2, 3]) {
+      const bare = parseSave(`{"schemaVersion":${sv}}`)
+      expect(bare.kind).toBe('corrupt')
+      if (bare.kind === 'corrupt') expect(bare.reason).toBe('missing-meta')
+      const metaOnly = parseSave(`{"schemaVersion":${sv},"meta":{"version":1,"attempts":3}}`)
+      expect(metaOnly.kind).toBe('corrupt')
+      if (metaOnly.kind === 'corrupt') expect(metaOnly.reason).toBe('missing-settings')
+    }
   })
 
   it('refuses a pre-current document that carries neither payload', () => {
@@ -97,7 +106,7 @@ describe('parseSave', () => {
     // A v1 doc with no settings key is a real settings-less legacy player, not damage.
     const r = migrateSave({ schemaVersion: 1, meta: { version: 1, attempts: 3, victories: 0, unlockedWeapons: ['blade'] } })
     expect(r.kind).toBe('ok')
-    if (r.kind === 'ok') expect(r.save.settings).toEqual({ version: 1, reducedEffects: false })
+    if (r.kind === 'ok') expect(r.save.settings).toEqual(DEFAULT_SETTINGS)
   })
 
   it('clamps garbage counters the way loadMeta does', () => {
@@ -167,6 +176,26 @@ describe('migrateSave', () => {
     expect(r.save.schemaVersion).toBe(SAVE_SCHEMA_VERSION)
     expect(r.save.meta.attempts).toBe(3)
     expect(r.save.checkpoint).toBeNull()
+  })
+
+  it('migrates a v2 envelope, defaulting the volume sliders and keeping reduced effects', () => {
+    const r = parseSave(CANONICAL_V2)
+    expect(r.kind).toBe('migrated')
+    if (r.kind !== 'migrated') return
+    expect(r.from).toBe(2)
+    expect(r.save.settings).toEqual({ version: 2, reducedEffects: true, volMaster: 1, volMusic: 1, volSfx: 1 })
+    expect(r.save.meta.attempts).toBe(9)
+    expect(r.save.revision).toBe(4)
+    expect((JSON.parse(serializeSave(r.save)) as { schemaVersion: number }).schemaVersion).toBe(SAVE_SCHEMA_VERSION)
+  })
+
+  it('clamps out-of-range or garbage volume sliders to the authored mix', () => {
+    const r = parseSave(CANONICAL.replace(
+      '"volMaster":1,"volMusic":0.7,"volSfx":1',
+      '"volMaster":-2,"volMusic":9,"volSfx":"loud"'))
+    expect(r.save.settings.volMaster).toBe(0)
+    expect(r.save.settings.volMusic).toBe(1)
+    expect(r.save.settings.volSfx).toBe(1)
   })
 })
 

@@ -3,7 +3,8 @@ import { loadAtlas, loadFonts } from '@/render/atlas'
 import { Presenter } from '@/render/presenter'
 import { createWorld } from '@/sim/scenarios'
 import { stepWorld } from '@/sim/step'
-import { canReturn } from '@/sim/return'
+import { abandonRun, canReturn } from '@/sim/return'
+import { pauseRowKinds } from '@/render/reward'
 import type { World } from '@/sim/world'
 import type { InputFrame } from '@/sim/input'
 import { InputSystem, PAD_RESTART } from '@/input'
@@ -86,6 +87,15 @@ async function boot() {
   // permanently rewrite a player's setting the next time any autosave fires.
   let storedReducedEffects = savedSave.settings.reducedEffects
   let reducedEffects = q.has('reduced') ? q.get('reduced') !== '0' : storedReducedEffects
+  // The three sliders the pause card shows. Applied immediately: setLevel stores the value even
+  // before the AudioContext exists, and buildGraph honours it when the first gesture arrives.
+  const volumes = { master: savedSave.settings.volMaster, music: savedSave.settings.volMusic, sfx: savedSave.settings.volSfx }
+  const applyVolumes = () => {
+    audio.setLevel('master', volumes.master)
+    audio.setLevel('music', volumes.music); audio.setLevel('ambience', volumes.music)
+    audio.setLevel('sfx', volumes.sfx); audio.setLevel('ui', volumes.sfx)
+  }
+  applyVolumes()
   let world: World = createWorld(seed, scenario, { god, ...(scenario === 'loop' ? { meta: savedSave.meta } : {}) })
   // Spatial audio starts with the player's actual spawn, before the first enemy tell can arrive.
   audio.setListener(world.player.x, world.player.y)
@@ -164,7 +174,7 @@ async function boot() {
       if (!noSave && !suppressedPersistShown) { suppressedPersistShown = true; presenter.hud.showBanner('PROGRESS NOT SAVING', 'this profile cannot be written', 3.0) }
       return Promise.resolve(false)
     }
-    savedSave = bumpRevision({ ...savedSave, settings: { version: 1, reducedEffects: storedReducedEffects } })
+    savedSave = bumpRevision({ ...savedSave, settings: { version: 2, reducedEffects: storedReducedEffects, volMaster: volumes.master, volMusic: volumes.music, volSfx: volumes.sfx } })
     const payload = serializeSave(savedSave)
     return new Promise(resolve => {
       if (queued) {
@@ -277,6 +287,42 @@ async function boot() {
       }
       padStartPrev = startNow
       returnOpenThisFrame = false
+      // The pause card's pad navigation, polled here for the same reason Start is: the sim (and with
+      // it the input system) is stopped while paused. Standard-mapping d-pad is buttons 12-15; A is 0.
+      if (userPaused && !titleWasUp) {
+        const up = !!pad?.buttons[12]?.pressed, down = !!pad?.buttons[13]?.pressed
+        const left = !!pad?.buttons[14]?.pressed, right = !!pad?.buttons[15]?.pressed
+        const a = !!pad?.buttons[0]?.pressed
+        if (up && !padMenuPrev.up) movePauseFocus(-1)
+        if (down && !padMenuPrev.down) movePauseFocus(1)
+        if (left && !padMenuPrev.left) pauseAdjust(-1)
+        if (right && !padMenuPrev.right) pauseAdjust(1)
+        if (a && !padMenuPrev.a && pauseRowKind() !== 'abandon') pauseActivate()
+        padAHeld = a
+        padMenuPrev = { up, down, left, right, a }
+      } else {
+        padAHeld = false
+        padMenuPrev = { up: false, down: false, left: false, right: false, a: false }
+      }
+      // Abandon is a held confirmation, advanced on the render clock because the sim is paused.
+      const holdingAbandon = userPaused && pauseRowKind() === 'abandon' && (abandonKeyHeld || padAHeld)
+      abandonHold = holdingAbandon ? Math.min(1, abandonHold + dt / ABANDON_HOLD_SEC) : 0
+      if (holdingAbandon && abandonHold >= 1) {
+        abandonKeyHeld = false
+        abandonRun(world)
+        setPaused(false)
+        presenter.hud.showBanner('THE RUN ENDS HERE', 'the bardo takes you back', 2.2)
+      }
+      presenter.reward.setPadActive(!!pad)
+      if (userPaused) {
+        presenter.reward.setPauseMenu({
+          focus: pauseFocus,
+          volumes: { ...volumes },
+          reduced: reducedEffects,
+          runActive: pauseRunActive(),
+          hold: abandonHold,
+        })
+      }
       presenter.reward.setPaused(userPaused)
       presenter.render(alpha, dt)
       overlay.update(world, loop)
@@ -301,6 +347,44 @@ async function boot() {
     !!pad && PAD_RESTART.some(i => !!pad.buttons[i]?.pressed)
   const padWantsStart = (pad: Gamepad | null): boolean =>
     !!pad && PAD_START.some(i => !!pad.buttons[i]?.pressed)
+
+  // ---- pause menu ------------------------------------------------------------------------------
+  // The card's rows live in pauseRowKinds (shared with the painter). Shell UX constants stay here:
+  // they are menu feel, not gameplay, so they do not belong in tuning.ts.
+  const ABANDON_HOLD_SEC = 0.9   // deliberate, but short enough that it never reads as broken
+  const VOL_STEP = 0.1
+  let pauseFocus = 0
+  let abandonHold = 0
+  let abandonKeyHeld = false
+  let padAHeld = false
+  let padMenuPrev = { up: false, down: false, left: false, right: false, a: false }
+  const pauseRunActive = () => !!world.session.run && world.session.run.result === 'active' && world.player.state !== 'dead'
+  const pauseRowKind = () => pauseRowKinds(pauseRunActive())[pauseFocus] ?? 'resume'
+  const movePauseFocus = (dir: number) => {
+    const rows = pauseRowKinds(pauseRunActive())
+    pauseFocus = (pauseFocus + dir + rows.length) % rows.length
+    abandonHold = 0; abandonKeyHeld = false
+  }
+  const toggleReduced = () => {
+    reducedEffects = !reducedEffects
+    storedReducedEffects = reducedEffects       // an explicit player choice, so it is the one that persists
+    presenter.setReducedEffects(reducedEffects)
+    void persist()
+  }
+  const pauseAdjust = (dir: number) => {
+    const kind = pauseRowKind()
+    if (kind === 'master' || kind === 'music' || kind === 'sfx') {
+      volumes[kind] = Math.min(1, Math.max(0, Math.round((volumes[kind] + dir * VOL_STEP) * 10) / 10))
+      applyVolumes()
+      void persist()
+    } else if (kind === 'reduced') toggleReduced()
+  }
+  const pauseActivate = () => {
+    const kind = pauseRowKind()
+    if (kind === 'resume') setPaused(false)
+    else if (kind === 'reduced') toggleReduced()
+    // 'abandon' is hold-driven (see render), so a stray tap can never end a run
+  }
 
   installApi({
     getWorld: () => world,
@@ -373,6 +457,10 @@ async function boot() {
       }
       reducedEffects = savedSave.settings.reducedEffects
       presenter.setReducedEffects(reducedEffects)
+      volumes.master = savedSave.settings.volMaster
+      volumes.music = savedSave.settings.volMusic
+      volumes.sfx = savedSave.settings.volSfx
+      applyVolumes()
       setPaused(false)
       // reset() rebuilds the world with the imported meta and rebinds the presenter. Deliberately not a
       // reload: that would drop ?bot=/?seed=, destroy window.__game mid-evaluate and break an attached
@@ -392,6 +480,7 @@ async function boot() {
   // disagree. Pausing used to stop only the simulation: the bed kept playing behind the overlay and
   // a backgrounded tab kept a synthesiser running indefinitely.
   const setPaused = (p: boolean) => {
+    if (p && !userPaused) { pauseFocus = 0; abandonHold = 0; abandonKeyHeld = false }
     const playerHeld = p || presenter.title.visible
     userPaused = p
     loop.paused = playerHeld || debugPaused
@@ -444,11 +533,21 @@ async function boot() {
       return
     }
     if ((e.code === 'Escape' || e.code === 'KeyP') && !e.repeat) { e.preventDefault(); setPaused(!userPaused) }
-    if (e.code === 'KeyV' && !e.repeat && !importing) {
-      reducedEffects = !reducedEffects
-      storedReducedEffects = reducedEffects        // an explicit player choice, so it is the one that persists
-      presenter.setReducedEffects(reducedEffects)
-      void persist()
+    if (e.code === 'KeyV' && !e.repeat && !importing) toggleReduced()
+    // The pause card's keyboard navigation. Sliders accept key repeat (holding a direction slides);
+    // the toggle and the rows do not, or one hold would flip them like a strobe.
+    if (userPaused && !importing) {
+      if (e.code === 'ArrowUp' || e.code === 'KeyW') { e.preventDefault(); if (!e.repeat) movePauseFocus(-1) }
+      if (e.code === 'ArrowDown' || e.code === 'KeyS') { e.preventDefault(); if (!e.repeat) movePauseFocus(1) }
+      if (e.code === 'ArrowLeft' || e.code === 'KeyA') { e.preventDefault(); if (!e.repeat || pauseRowKind() !== 'reduced') pauseAdjust(-1) }
+      if (e.code === 'ArrowRight' || e.code === 'KeyD') { e.preventDefault(); if (!e.repeat || pauseRowKind() !== 'reduced') pauseAdjust(1) }
+      // Enter only — Space is the dodge key, and a press latched behind the pause would roll the
+      // player the instant the card closes.
+      if ((e.code === 'Enter' || e.code === 'NumpadEnter') && !e.repeat) {
+        e.preventDefault()
+        if (pauseRowKind() === 'abandon') abandonKeyHeld = true
+        else pauseActivate()
+      }
     }
     if (e.code === 'F1') { e.preventDefault(); overlay.toggle() }
     if (e.code === 'F2') { e.preventDefault(); record() }
@@ -456,6 +555,10 @@ async function boot() {
     // Save management is reachable only from the pause screen, so it can never fire mid-fight.
     if (userPaused && !importing && e.code === 'KeyE' && !e.repeat) { e.preventDefault(); void exportSave() }
     if (userPaused && !importing && e.code === 'KeyI' && !e.repeat) { e.preventDefault(); void importSave() }
+  })
+  // Releasing the confirm key mid-hold cancels the abandon; the render loop drains the bar to zero.
+  window.addEventListener('keyup', e => {
+    if (e.code === 'Enter' || e.code === 'NumpadEnter') abandonKeyHeld = false
   })
   if (!noSave) {
     platform.watchForeignWrites?.(() => {

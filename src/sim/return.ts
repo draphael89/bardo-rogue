@@ -9,6 +9,16 @@ export function canReturn(world: World): boolean {
   return world.player.state === 'dead' || (!!world.session.run && world.session.run.result !== 'active')
 }
 
+// The pause card's "abandon run". Called by the shell directly rather than through an InputFrame:
+// giving up is a menu action, not a combat verb, and a new input bit would churn the replay format
+// for something a recording never needs to reproduce.
+export function abandonRun(world: World): void {
+  const run = world.session.run
+  if (!run || run.result !== 'active' || world.player.state === 'dead') return
+  finishRun(world, 'lost')
+  returnToHub(world)
+}
+
 // Death is a return, not a restart of the same fight. Stock scenarios have no hub and still
 // set wantsRestart so empty/full replays rebuild in place.
 export function returnToHub(world: World): void {

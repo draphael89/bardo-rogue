@@ -407,7 +407,9 @@ export class AudioSystem {
     this.duckStage = {}; this.bedNotch = {}
     const mk = (b: BusName) => {
       const g = ctx.createGain()
-      this.busLevel[b] = dbToGain(MIX.busDb[b])
+      // The slider may have been set before the context existed (settings load at boot, the graph
+      // at the first gesture); a bus that ignored it here would discard the player's saved volume.
+      this.busLevel[b] = dbToGain(MIX.busDb[b]) * sliderToGain(this.slider[b])
       g.gain.value = this.busLevel[b]
       g.connect(this.master!)
       if (MIX.ducked.includes(b)) {

@@ -14,6 +14,20 @@ export interface SettingsStateV1 {
   reducedEffects: boolean
 }
 
+// The envelope's current settings shape (save.ts schema 3). The legacy browser key above stays V1
+// forever -- it exists only so a rollback build can still find reducedEffects where it left it.
+export interface SettingsStateV2 {
+  version: 2
+  reducedEffects: boolean
+  volMaster: number   // 0..1 sliders; 1 is the authored mix, applied via audio.setLevel's dB curve
+  volMusic: number    // scales the music AND ambience buses together
+  volSfx: number      // scales the sfx AND ui buses together
+}
+
+export function vol01(v: unknown, fallback = 1): number {
+  return typeof v === 'number' && Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : fallback
+}
+
 export function loadMeta(storage?: StorageLike): MetaStateV1 {
   if (!storage) return defaultMetaState()
   try {

@@ -12,12 +12,15 @@
 //     a rollback to an older build still finds a player's attempts and victories where it left them.
 import { defaultMetaState, type MetaStateV1 } from './session'
 import { ARM, type ArmId } from './weapons'
-import type { SettingsStateV1 } from './storage'
+import { vol01, type SettingsStateV2 } from './storage'
 
 // Bumped only when the ENVELOPE shape changes; every bump adds one UPGRADES entry and one fixture.
 // 1 is the synthetic shape the two legacy keys deserialize into, so the legacy import and every
 // future upgrade run through the same chain.
-export const SAVE_SCHEMA_VERSION = 2
+// 3: settings went V1 -> V2 (volume sliders). That is an envelope bump on purpose -- a version-2
+// build treats settings.version 2 as damage, so leaving schemaVersion at 2 would send this file
+// down an old build's corruption path instead of its readable-but-never-writable 'future' path.
+export const SAVE_SCHEMA_VERSION = 3
 
 // Diagnostic only: which build wrote this file. Hand-maintained against package.json's version --
 // stamping it from the build would drag Vite into src/sim for a string that never gates a load.
@@ -39,7 +42,7 @@ export interface BardoSave {
   contentRevision: string
   profileId: string
   revision: number
-  settings: SettingsStateV1
+  settings: SettingsStateV2
   meta: MetaStateV1
   checkpoint: RunCheckpoint | null
 }
@@ -97,20 +100,32 @@ function validateMeta(input: unknown): MetaStateV1 {
   }
   return { version: 1, attempts: count(v.attempts), victories: count(v.victories), unlockedWeapons }
 }
-function validateSettings(input: unknown, preferred: boolean): SettingsStateV1 {
+// Accepts both settings shapes: a V1 (from an envelope being migrated up) simply has no volume
+// fields yet, and absent-or-invalid volumes default to 1 -- the authored mix, never silence.
+function validateSettings(input: unknown, preferred: boolean): SettingsStateV2 {
   const v = isObj(input) ? input : {}
-  return { version: 1, reducedEffects: typeof v.reducedEffects === 'boolean' ? v.reducedEffects : preferred }
+  return {
+    version: 2,
+    reducedEffects: typeof v.reducedEffects === 'boolean' ? v.reducedEffects : preferred,
+    volMaster: vol01(v.volMaster),
+    volMusic: vol01(v.volMusic),
+    volSfx: vol01(v.volSfx),
+  }
 }
 
 // The one place the envelope's key order is written. Fields are enumerated rather than spread so a
 // hostile "__proto__" or an unknown key from JSON.parse can never ride along into the document.
-function envelope(profileId: string, revision: number, contentRevision: string, settings: SettingsStateV1, meta: MetaStateV1): BardoSave {
+function envelope(profileId: string, revision: number, contentRevision: string, settings: SettingsStateV2, meta: MetaStateV1): BardoSave {
   return { schemaVersion: SAVE_SCHEMA_VERSION, contentRevision, profileId, revision, settings, meta, checkpoint: null }
+}
+
+function defaultSettings(preferred: boolean): SettingsStateV2 {
+  return { version: 2, reducedEffects: preferred, volMaster: 1, volMusic: 1, volSfx: 1 }
 }
 
 export function defaultSave(opts: ParseSaveOptions = {}): BardoSave {
   return envelope(profileIdOf(opts.profileId), 0, CONTENT_REVISION,
-    { version: 1, reducedEffects: !!opts.preferredReducedEffects }, defaultMetaState())
+    defaultSettings(!!opts.preferredReducedEffects), defaultMetaState())
 }
 
 // Canonical bytes. Re-normalises on the way out, so serializeSave(parseSave(s).save) is stable and
@@ -130,6 +145,9 @@ export function bumpRevision(save: BardoSave): BardoSave {
 // key = the version being upgraded FROM.
 const UPGRADES: Record<number, (prev: Obj) => Obj> = {
   1: prev => ({ ...prev, schemaVersion: 2, revision: 0, contentRevision: CONTENT_REVISION, checkpoint: null }),
+  // Settings V1 -> V2 is field-level (validateSettings defaults the volumes), so the step only
+  // advances the version; carrying the old settings object through is what keeps reducedEffects.
+  2: prev => ({ ...prev, schemaVersion: 3 }),
 }
 
 // Takes an already-parsed value so migrations are testable with plain object fixtures.
@@ -153,15 +171,14 @@ export function migrateSave(input: unknown, opts: ParseSaveOptions = {}): Migrat
   // Present-but-wrong-typed is damage and must not be silently zeroed into a fresh save; on a
   // MIGRATED document, absent is simply a field that version predates.
   if (obj.meta !== undefined && (!isObj(obj.meta) || (obj.meta.version !== undefined && obj.meta.version !== 1))) return { kind: 'corrupt', reason: 'bad-meta' }
-  if (obj.settings !== undefined && (!isObj(obj.settings) || (obj.settings.version !== undefined && obj.settings.version !== 1))) return { kind: 'corrupt', reason: 'bad-settings' }
+  if (obj.settings !== undefined && (!isObj(obj.settings) || (obj.settings.version !== undefined && obj.settings.version !== 1 && obj.settings.version !== 2))) return { kind: 'corrupt', reason: 'bad-settings' }
 
-  // A document that ARRIVES at the current schema must carry its required fields: every envelope this
-  // build has ever written has all of them, so a sparse one was never written by us. Treating it as
-  // valid-with-defaults would be worse than corruption -- it would parse 'ok', skip the backup, and
-  // the next autosave would rotate the last good generation away under a document full of zeroes.
-  // (A doc migrated UP from an older version keeps the leniency above: a v1 with no settings key is a
-  // real settings-less legacy player, not damage.)
-  if (sv === SAVE_SCHEMA_VERSION) {
+  // Every ENVELOPE version (2 and up) has always carried both payloads, so a sparse one was never
+  // written by us and is damage. Treating it as valid-with-defaults would be worse than corruption --
+  // it would parse 'ok'/'migrated', skip the backup, and the next autosave would rotate the last good
+  // generation away under a document full of zeroes. Only the synthetic v1 keeps the leniency below:
+  // a v1 with no settings key is a real settings-less legacy player, not damage.
+  if (sv >= 2) {
     if (obj.meta === undefined) return { kind: 'corrupt', reason: 'missing-meta' }
     if (obj.settings === undefined) return { kind: 'corrupt', reason: 'missing-settings' }
   } else if (obj.meta === undefined && obj.settings === undefined) {
@@ -175,7 +192,7 @@ export function migrateSave(input: unknown, opts: ParseSaveOptions = {}): Migrat
   const meta = isObj(obj.meta) ? validateMeta(obj.meta) : defaultMetaState()
   const settings = isObj(obj.settings)
     ? validateSettings(obj.settings, !!opts.preferredReducedEffects)
-    : { version: 1 as const, reducedEffects: !!opts.preferredReducedEffects }
+    : defaultSettings(!!opts.preferredReducedEffects)
   return { kind: 'ok', from: sv, save: envelope(profileIdOf(opts.profileId), revisionOf(obj.revision), contentRevisionOf(obj.contentRevision), settings, meta) }
 }
 
@@ -185,7 +202,7 @@ function bestEffortFuture(parsed: Obj, opts: ParseSaveOptions): BardoSave {
   const meta = isObj(parsed.meta) ? validateMeta(parsed.meta) : defaultMetaState()
   const settings = isObj(parsed.settings)
     ? validateSettings(parsed.settings, !!opts.preferredReducedEffects)
-    : { version: 1 as const, reducedEffects: !!opts.preferredReducedEffects }
+    : defaultSettings(!!opts.preferredReducedEffects)
   return envelope(profileIdOf(opts.profileId), revisionOf(parsed.revision), contentRevisionOf(parsed.contentRevision), settings, meta)
 }
 

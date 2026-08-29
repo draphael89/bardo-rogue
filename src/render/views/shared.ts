@@ -33,6 +33,19 @@ export class EntityView {
     layers.shadows.addChild(this.shadow)
   }
   setFlash(on: boolean) { this.body.texture = on ? this.whiteTex : this.normalTex }
+  /**
+   * Whose body already answers a blow with a drawing. Whitening one of these replaces the authored
+   * recoil pose with a flat silhouette for exactly the ticks it was drawn for, so the victim becomes
+   * the impact core and the hit loses its attribution.
+   *
+   * This lives here because two callers decide it — the per-frame pose epilogue (views/enemies.ts)
+   * and the hit-flash pass (render/presenter.ts) — and they had drifted: the second listed only the
+   * brute, so the Oath-Bound, which is the SAME authored sheet under a bronze cast, was whitened on
+   * every hit and lost both its pose and its metal. One rule, one place.
+   */
+  static authoredHitReaction(kind: string): boolean {
+    return kind === 'brute' || kind === 'oathbound'
+  }
   // Authored bodies: replace both flash slots so a later setFlash(false) cannot restore Kenney.
   bindBody(tex: Texture, whiteTex: Texture = tex) {
     this.normalTex = tex

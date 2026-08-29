@@ -67,6 +67,7 @@ export class Presenter {
   title: TitleOverlay
   private lastHurtAngle = 0
   private emberAcc = 0
+  private heavyPlantedSwing = -1      // the swingId whose commitment beat has already fired
   // contact reaction on real time, so it plays out *inside* the hit-stop instead of waiting for it
   private recoilX = 0; private recoilY = 0
   // the dodge-through mark: where the read happened, which way the roll was going, and how far
@@ -370,8 +371,10 @@ export class Presenter {
         }
         case 'footstep': this.particles.dust(ev.x, ev.y + 5, 0, 1); break
         case 'swing':
-          // the greatsword's wind-up plants the feet and drags the camera back off the swing line
-          if (ev.heavy) { this.camera.addTrauma(J.swing.heavyWindTrauma); this.particles.dust(ev.x, ev.y + 5, ev.angle + Math.PI, J.swing.heavyPlantDust) }
+          // The greatsword's plant is NOT here. It used to fire on the press, which is the one tick
+          // it is a lie: the sim still takes a dodge for another four ticks, so the dust said
+          // "committed" while leaving was free, and then said nothing on the tick leaving stopped
+          // working. It now fires in heavyWindup, on tuning.player.attack.heavyCommitTick.
           // A swing thrown out of a roll is its own verb, so it gets its own mark: the roll's cold
           // colour thrown forward along the blade. It borrows the dodge's language rather than
           // inventing a third one, because that is what it is — the roll, continued.
@@ -807,11 +810,23 @@ export class Presenter {
 
   // While the greatsword is up: the camera leans off the swing line and embers gather at the blade.
   // Both stop the instant the blade drops, so the release reads as a release.
+  //
+  // And one hard beat in the middle of it. `heavyCommitTick` is where the sim stops accepting a
+  // dodge; before this the boundary was invisible, so a roll asked for during the next seven ticks
+  // simply never happened and the player had no way to learn why. The plant dust and the shake are
+  // the beat — no new system, the same two effects that used to fire on the press, moved onto the
+  // tick they were describing all along. Once per swing, keyed on swingId, because this runs on the
+  // render clock and may see the same sim tick more than once.
   private heavyWindup(p: World['player'], dtSec: number) {
     const J = tuning.juice
     const s = tuning.player.attack.swings[p.swingIndex]
     if (p.state !== 'attack' || !s.heavy || p.stateTick >= s.startup) { this.emberAcc = 0; return }
     this.camera.lean(p.swingAngle + Math.PI, J.swing.heavyWindKick)
+    if (p.stateTick >= tuning.player.attack.heavyCommitTick && this.heavyPlantedSwing !== p.swingId) {
+      this.heavyPlantedSwing = p.swingId
+      this.camera.addTrauma(J.swing.heavyWindTrauma)
+      this.particles.dust(p.x, p.y + 5, p.swingAngle + Math.PI, J.swing.heavyPlantDust)
+    }
     if (p.stateTick < tuning.player.attack.heavyChargeTicks) return
     const w = this.playerView.weapon
     if (!w) return
@@ -1035,9 +1050,9 @@ export class Presenter {
       if (hf > 0) this.hitFlash.set(id, hf); else this.hitFlash.delete(id)
       const gf = (this.guardFlash.get(id) ?? 0) - dtSec
       if (gf > 0) this.guardFlash.set(id, gf); else this.guardFlash.delete(id)
-      // The authored Brute hit frame carries the reaction in its body drawing. Whitening it here
-      // would turn the victim into the impact core for most of hit-stop and erase attribution.
-      v.setFlash(hf > 0 && e.kind !== 'brute')
+      // The authored hit frame carries the reaction in the body drawing. Whitening it here would
+      // turn the victim into the impact core for most of hit-stop and erase attribution.
+      v.setFlash(hf > 0 && !EntityView.authoredHitReaction(e.kind))
       if (v.squash > 0 || v.redFlash > 0) this.flinchBody(v)
     }
     for (const b of w.projectiles) {

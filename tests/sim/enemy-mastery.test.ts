@@ -245,6 +245,44 @@ describe('enemy cadence and projectile authority', () => {
     for (let i = 1; i < attacks.length; i++) expect(attacks[i] - attacks[i - 1]).toBeGreaterThanOrEqual(tuning.enemyTellStartGap)
   })
 
+  // The elite used to open its bash on range alone. Every other body in the game asks two more
+  // questions first — can I see you, and is one of my own kind already telling — and the elite is
+  // exactly where those matter most: it survives longest, so a room holds several of it for longest.
+  it('the Oath-Bound will not begin a bash it cannot see', () => {
+    const world = createWorld(1, 'empty')
+    const p = world.player
+    const a = world.arena
+    const ex = p.x + 24, ey = p.y
+    a.solid[Math.floor(p.y / 16) * a.cols + Math.floor((p.x + 12) / 16)] = 1   // stone between the two
+    const e = world.spawnEnemy('oathbound', ex, ey)!
+    e.state = 'chase'; e.stateTick = 0
+    for (let t = 0; t < 60; t++) {
+      e.x = ex; e.y = ey   // hold it in range so only the sight-line is under test
+      stepWorld(world, emptyInput())
+      world.events.length = 0
+    }
+    expect(e.state).toBe('chase')
+  })
+
+  it('two Oath-Bound stagger their tells instead of releasing on one beat', () => {
+    const world = createWorld(1, 'empty')
+    const p = world.player
+    const pair = [
+      world.spawnEnemy('oathbound', p.x - 20, p.y)!,
+      world.spawnEnemy('oathbound', p.x + 20, p.y)!,
+    ]
+    for (const e of pair) { e.state = 'chase'; e.stateTick = 0 }
+    world.events.length = 0
+    const tells: number[] = []
+    for (let t = 0; t < 300 && tells.length < pair.length; t++) {
+      stepWorld(world, emptyInput())
+      for (const ev of world.events) if (ev.type === 'enemyWindup' && ev.kind === 'oathbound') tells.push(world.tick)
+      world.events.length = 0
+    }
+    expect(tells).toHaveLength(pair.length)
+    expect(tells[1] - tells[0]).toBeGreaterThanOrEqual(tuning.enemyTellStartGap)
+  })
+
   it('uses each hostile projectile own damage value', () => {
     const world = createWorld(1, 'empty')
     const p = world.player

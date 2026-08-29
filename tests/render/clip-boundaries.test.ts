@@ -99,6 +99,12 @@ describe('a wrong-but-existing contact fails the build', () => {
     bad.clips!.light1.sim!.contact = 'light1Contact'   // passes the name rule, IS frames[0]
     expect(() => validateClipRefs(bad, 't')).toThrow(/cannot be the wind-up pose/)
   })
+  it('a contact asserted as the LAST frame is rejected — recovery would hold the impact pose', () => {
+    const bad = structuredClone(hero)
+    bad.clips!.light1.frames = ['light1Start', 'light1Recover', 'light1Contact']
+    bad.clips!.light1.sim!.contact = 'light1Contact'   // well named, not the wind-up — and still wrong
+    expect(() => validateClipRefs(bad, 't')).toThrow(/never visibly end/)
+  })
   it('and the selector makes any wrong assertion visible: it IS what renders in the damage window', () => {
     const clip = structuredClone(hero.clips!.light1)
     clip.sim!.contact = 'light1Recover'   // wrong, exists, not the bookend — the validator's blind spot
@@ -131,5 +137,82 @@ describe('the Oath-Bound elite runs on its own clock', () => {
     // On the brute's clock this tick is already committed; on the Oath-Bound's it is still early.
     expect(bruteAttackClipFrame(clip, b, 'windup', bruteSplit)).toBe(clip.frames[1])
     expect(bruteAttackClipFrame(clip, o, 'windup', bruteSplit)).toBe(clip.frames[0])
+  })
+})
+
+// The sub-phase selector. Both standing audits named the same ceiling: a clip was three drawings
+// however many cells it declared, so buying more animation bought nothing. These tests pin the two
+// halves of the fix — today's sheets must not move, and a longer clip must actually play.
+describe('sub-phase frame selection', () => {
+  const W = { startup: 12, active: 7, recovery: 24 }
+
+  it('a three-frame clip is unchanged: one drawing per phase, contact on the first damage tick', () => {
+    const clip = { frames: ['a', 'contact', 'c'], timing: 'sim' as const, sim: { ref: 'x', contact: 'contact' } }
+    const seen = (t: number) => swingClipFrame(clip, W, t)
+    for (let t = 0; t < W.startup; t++) expect(seen(t)).toBe('a')
+    for (let t = W.startup; t < W.startup + W.active; t++) expect(seen(t)).toBe('contact')
+    for (let t = W.startup + W.active; t < W.startup + W.active + W.recovery; t++) expect(seen(t)).toBe('c')
+    // and a whiff, which runs past `recovery`, holds the settle pose rather than reading past the end
+    expect(seen(W.startup + W.active + W.recovery + 13)).toBe('c')
+  })
+
+  it('extra authored cells are reachable: five frames spread across startup and recovery', () => {
+    const clip = {
+      frames: ['coil', 'plant', 'contact', 'overshoot', 'settle'],
+      timing: 'sim' as const, sim: { ref: 'x', contact: 'contact' },
+    }
+    const seen = new Set<string>()
+    for (let t = 0; t < W.startup + W.active + W.recovery; t++) seen.add(swingClipFrame(clip, W, t))
+    expect(seen).toEqual(new Set(clip.frames))
+    // the contact assertion still owns exactly the damage window
+    expect(swingClipFrame(clip, W, W.startup - 1)).not.toBe('contact')
+    expect(swingClipFrame(clip, W, W.startup)).toBe('contact')
+    expect(swingClipFrame(clip, W, W.startup + W.active - 1)).toBe('contact')
+    expect(swingClipFrame(clip, W, W.startup + W.active)).toBe('overshoot')
+  })
+
+  it('the plant lands on the commitment tick, not on an arbitrary fraction of startup', () => {
+    const clip = {
+      frames: ['coil', 'plant', 'contact', 'settle'],
+      timing: 'sim' as const, sim: { ref: 'x', contact: 'contact' },
+    }
+    const commit = tuning.player.attack.heavyCommitTick
+    for (let t = 0; t < commit; t++) expect(swingClipFrame(clip, W, t, commit)).toBe('coil')
+    for (let t = commit; t < W.startup; t++) expect(swingClipFrame(clip, W, t, commit)).toBe('plant')
+    // the tick the sim stops accepting a dodge is the tick the drawing changes
+    expect(swingClipFrame(clip, W, commit - 1, commit)).not.toBe(swingClipFrame(clip, W, commit, commit))
+  })
+
+  it('the dodge clip spreads its middle frames across travel, and a triplet does not move', () => {
+    const w = tuning.player.dodge
+    const three = { frames: ['launch', 'travel', 'land'], timing: 'sim' as const }
+    for (let t = 0; t < DODGE_START_TICKS; t++) expect(dodgeClipFrame(three, w, t)).toBe('launch')
+    for (let t = DODGE_START_TICKS; t < w.travel; t++) expect(dodgeClipFrame(three, w, t)).toBe('travel')
+    expect(dodgeClipFrame(three, w, w.travel)).toBe('land')
+
+    // the shape a side-roll sheet would want: the body turns over instead of holding one drawing
+    const five = { frames: ['launch', 'dive', 'tuck', 'extend', 'land'], timing: 'sim' as const }
+    const seen = new Set<string>()
+    for (let t = 0; t < w.total; t++) seen.add(dodgeClipFrame(five, w, t))
+    expect(seen).toEqual(new Set(five.frames))
+    expect(dodgeClipFrame(five, w, w.travel)).toBe('land')
+  })
+
+  it('the side hero has no roll sheet, so a side roll IS the three-frame dodge clip', () => {
+    // north/south carry a four-frame airborne roll; side does not exist, which is the whole gap.
+    expect(() => readFileSync('public/assets/sprites/bardo_hero_side_roll.json', 'utf8')).toThrow()
+    expect(hero.clips!.dodge.frames).toHaveLength(3)
+  })
+
+  it('the shipped hero heavy still shows only two drawings — the sheets are what is missing now', () => {
+    const clip = hero.clips!.heavy
+    const s = tuning.player.attack.swings[2]
+    const seen = new Set<string>()
+    for (let t = 0; t < s.startup + s.active + s.recovery; t++) {
+      seen.add(swingClipFrame(clip, s, t, tuning.player.attack.heavyCommitTick))
+    }
+    // heavyRecover aliases heavyStart in every hero sidecar, so a 43-tick action is two images.
+    expect(seen.size).toBe(3)
+    expect(hero.aliases!.heavyRecover).toBe('heavyStart')
   })
 })

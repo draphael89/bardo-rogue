@@ -1,7 +1,7 @@
 import { tuning } from '@/tuning'
 import type { World, Enemy } from '../world'
 import { angleDiff } from '../math'
-import { angleToPlayer, distToPlayer, moveToward, moveAlong, facePlayer, enemyArcAttack, tickStagger } from './common'
+import { angleToPlayer, distToPlayer, moveToward, moveAlong, facePlayer, enemyArcAttack, tickStagger, familyTellSlotOpen, hasPlayerLineOfSight } from './common'
 
 // THE OATH-BOUND HOPLITE. The elite of this realm, and deliberately not a fourth ordinary enemy:
 // it is the same shade as the Fallen Hoplite with one rule added, because one rule that changes how
@@ -55,7 +55,11 @@ export function updateOathbound(world: World, e: Enemy): void {
       e.aimAngle = angleToPlayer(world, e)
       facePlayer(world, e)
       const d = distToPlayer(world, e)
-      if (d <= O.attackRange) {
+      // Range alone is not permission. The elite reuses the line shade's rules: it will not bash
+      // through a pillar it cannot see past, and two of them in one room stagger their tells rather
+      // than releasing on the same beat — which is the difference between a room that is hard and a
+      // room that is arbitrary, and it matters more here because this body takes longer to kill.
+      if (d <= O.attackRange && hasPlayerLineOfSight(world, e) && familyTellSlotOpen(world, e)) {
         e.state = 'windup'; e.stateTick = 0
         world.emit({ type: 'enemyWindup', id: e.id, kind: 'oathbound', x: e.x, y: e.y })
       } else moveToward(world, e, p.x, p.y, O.speed)

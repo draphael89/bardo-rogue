@@ -65,7 +65,11 @@ export function heroFrameName(sheet: Sheet, p: Player, world: World, time: numbe
   // The NAMES come from the SELECTED sheet's clip, so the sidecar's contact assertion is the
   // selection itself — including the south sheet's swapped light2 cells and the heavy's deliberate
   // bookend (heavyRecover aliases heavyStart), with no per-direction special case.
-  return swingClipFrame(clips[SWING_CLIPS[p.swingIndex]], tuning.player.attack.swings[p.swingIndex], p.stateTick)
+  // The heavy also hands over its commitment tick, so a sheet that authors a plant pose can land it
+  // on the tick the sim actually stops taking a dodge rather than at an arbitrary fraction.
+  const s = tuning.player.attack.swings[p.swingIndex]
+  return swingClipFrame(clips[SWING_CLIPS[p.swingIndex]], s, p.stateTick,
+    s.heavy ? tuning.player.attack.heavyCommitTick : undefined)
 }
 
 function authoredDirectionFor(v: EntityView, p: Player, bladeEquipped: boolean): HeroDirection | null {

@@ -1,0 +1,676 @@
+/* PlayBardo.com — one-page landing.
+   Colors cite art/palette/canon.json names; do not invent new hues. */
+
+/* ---- fonts (files rewritten to hashed names by tools/build-site.ts) ---- */
+@font-face {
+  font-family: 'Cinzel';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../fonts/cinzel-latin-400-normal.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Cinzel';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('../fonts/cinzel-latin-700-normal.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../fonts/inter-latin-400-normal.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('../fonts/inter-latin-600-normal.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* ---- tokens ---- */
+:root {
+  --void: #08070E;        /* canon: void */
+  --sky: #0E122C;         /* canon: sky */
+  --seal: #12141C;        /* canon: seal0 */
+  --slate-1: #2E3A4E;     /* canon: slate1 */
+  --slate-3: #58667C;     /* canon: slate3 */
+  --gold-dim: #8C7040;    /* canon: goldDim */
+  --gold: #D4B060;        /* canon: gold — "the threshold colour" */
+  --gold-hot: #F0D080;    /* canon: goldHot */
+  --bone: #D0C0A8;        /* canon: bone */
+  --bone-dim: #A08F76;    /* between canon bone and boneDim, tuned for 16px body contrast */
+  --wine: #762E40;        /* canon: purple2 */
+  --ember: #FF7A18;       /* canon: ember */
+  --ember-hot: #FFCC56;   /* canon: emberHi */
+  --star-cold: #B0C4FF;   /* canon: star */
+  --star-warm: #FFE2A0;   /* canon: goldStar */
+
+  --font-display: 'Cinzel', 'Times New Roman', serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-fast: 150ms;
+  --dur-base: 200ms;
+
+  /* two-step pixel corners (8px/4px) shared by CTAs and gallery slots */
+  --clip-steps: polygon(
+    0 8px, 4px 8px, 4px 4px, 8px 4px, 8px 0,
+    calc(100% - 8px) 0, calc(100% - 8px) 4px, calc(100% - 4px) 4px, calc(100% - 4px) 8px, 100% 8px,
+    100% calc(100% - 8px), calc(100% - 4px) calc(100% - 8px), calc(100% - 4px) calc(100% - 4px), calc(100% - 8px) calc(100% - 4px), calc(100% - 8px) 100%,
+    8px 100%, 8px calc(100% - 4px), 4px calc(100% - 4px), 4px calc(100% - 8px), 0 calc(100% - 8px)
+  );
+}
+
+/* ---- reset / base ---- */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { color-scheme: dark; }
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+}
+
+body {
+  background-color: var(--void);
+  /* sparse static star pixels on the void between sections */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240' shape-rendering='crispEdges'%3E%3Crect x='23' y='41' width='2' height='2' fill='%23B0C4FF' fill-opacity='.28'/%3E%3Crect x='167' y='19' width='1' height='1' fill='%23B0C4FF' fill-opacity='.35'/%3E%3Crect x='201' y='118' width='2' height='2' fill='%23FFE2A0' fill-opacity='.24'/%3E%3Crect x='88' y='166' width='1' height='1' fill='%23B0C4FF' fill-opacity='.3'/%3E%3Crect x='139' y='223' width='2' height='2' fill='%23B0C4FF' fill-opacity='.2'/%3E%3Crect x='52' y='97' width='1' height='1' fill='%23FFE2A0' fill-opacity='.3'/%3E%3C/svg%3E");
+  color: var(--bone);
+  font-family: var(--font-body);
+  font-size: 1rem;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+img { max-width: 100%; display: block; }
+p { text-wrap: pretty; }
+h1, h2 { text-wrap: balance; font-weight: 400; }
+
+:focus-visible {
+  outline: 2px solid var(--gold-hot);
+  outline-offset: 3px;
+}
+
+.skip-link {
+  position: absolute;
+  top: 8px; left: 8px;
+  z-index: 100;
+  padding: 10px 16px;
+  background: var(--void);
+  color: var(--gold);
+  font: 600 0.8rem/1 var(--font-body);
+  letter-spacing: 0.08em;
+  text-decoration: none;
+  transform: translateY(-300%);
+}
+.skip-link:focus { transform: none; }
+
+/* ---- shared: cinematic media sections ---- */
+.hero__media, .prologue__media, .journey__media, .feature__media, .threshold__media {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+.hero__media img, .prologue__media img, .journey__media img,
+.feature__media img, .threshold__media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* crisp integer-ish upscale once the viewport exceeds the art's native 1672px */
+@media (min-width: 1673px) {
+  .hero__media img, .prologue__media img, .journey__media img,
+  .feature__media img, .threshold__media img { image-rendering: pixelated; }
+}
+
+.stars {
+  /* canvas is a replaced element: inset alone won't stretch it — size it explicitly */
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.section-copy h2 {
+  font-family: var(--font-display);
+  font-size: clamp(1.7rem, 1.1rem + 2.6vw, 2.9rem);
+  line-height: 1.18;
+  letter-spacing: 0.045em;
+  color: var(--bone);
+}
+.section-copy h2::before {
+  /* stepped gold threshold rule above every heading: dim bar, bright gold lintel */
+  content: '';
+  display: block;
+  width: 56px;
+  height: 4px;
+  margin-bottom: 1.4rem;
+  background:
+    linear-gradient(var(--gold), var(--gold)) 0 0 / 16px 2px no-repeat,
+    linear-gradient(var(--gold-dim), var(--gold-dim)) 0 2px / 56px 2px no-repeat;
+}
+.section-copy h2, .section-copy p {
+  text-shadow: 0 1px 3px rgba(8, 7, 14, 0.85);
+}
+.section-copy p {
+  margin-top: 1.1rem;
+  max-width: 44ch;
+  font-size: clamp(1rem, 0.95rem + 0.3vw, 1.125rem);
+  color: var(--bone-dim);
+}
+
+/* ---- CTA ---- */
+.cta {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  margin-top: 2.2rem;
+  padding: 0 30px;
+  background: var(--gold);
+  clip-path: var(--clip-steps);
+  color: var(--gold);
+  font: 700 0.85rem/1 var(--font-display);
+  letter-spacing: 0.24em;
+  text-indent: 0.24em; /* optically re-center tracked caps */
+  text-transform: uppercase;
+  text-decoration: none;
+  transition: transform var(--dur-fast) var(--ease-out), color var(--dur-base) ease;
+}
+.cta::before {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  background: var(--void);
+  clip-path: var(--clip-steps);
+  transition: opacity var(--dur-base) ease;
+}
+.cta span { position: relative; }
+@media (hover: hover) and (pointer: fine) {
+  .cta:hover { color: var(--void); }
+  .cta:hover::before { opacity: 0; }
+}
+.cta:active { transform: scale(0.96); }
+.cta:focus-visible { color: var(--void); }
+.cta:focus-visible::before { opacity: 0; }
+
+/* ---- hero ---- */
+.hero {
+  position: relative;
+  min-height: 100svh;
+  display: grid;
+}
+.hero__media img { object-position: 58% 42%; }
+.hero__scrim {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(to bottom, rgba(8, 7, 14, 0.55), transparent 26%),
+    radial-gradient(ellipse 72% 62% at 18% 30%, rgba(8, 7, 14, 0.82), rgba(8, 7, 14, 0.35) 55%, transparent 78%),
+    linear-gradient(to top, var(--void), transparent 22%);
+}
+.hero__copy {
+  position: relative;
+  align-self: start;
+  padding: clamp(5rem, 13vh, 9rem) clamp(1.4rem, 6vw, 7rem) 0;
+  max-width: 46rem;
+}
+.hero__title {
+  font-family: var(--font-display);
+  font-size: clamp(3.4rem, 2rem + 7.5vw, 7.5rem);
+  line-height: 1;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--bone);
+}
+.hero__headline {
+  margin-top: 1.6rem;
+  font-family: var(--font-display);
+  font-size: clamp(1.15rem, 1rem + 1.1vw, 1.7rem);
+  line-height: 1.35;
+  letter-spacing: 0.08em;
+  color: var(--gold);
+}
+.hero__support {
+  margin-top: 1.1rem;
+  max-width: 34ch;
+  font-size: clamp(1rem, 0.95rem + 0.3vw, 1.125rem);
+  color: var(--bone-dim);
+}
+.hero__descend {
+  position: absolute;
+  left: 50%;
+  bottom: clamp(1.2rem, 4vh, 2.6rem);
+  transform: translateX(-50%);
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 12px;
+  color: var(--gold-dim);
+  text-decoration: none;
+  transition: color var(--dur-base) ease;
+}
+.hero__descend-label {
+  font: 600 0.65rem/1 var(--font-body);
+  letter-spacing: 0.3em;
+  text-indent: 0.3em;
+  text-transform: uppercase;
+}
+.hero__descend-glyph { fill: currentColor; }
+@media (hover: hover) and (pointer: fine) {
+  .hero__descend:hover { color: var(--gold); }
+}
+
+/* ---- prologue ---- */
+.prologue {
+  position: relative;
+  min-height: 88svh;
+  display: grid;
+  align-items: end;
+}
+.prologue__media img { object-position: 52% 58%; }
+.prologue__scrim {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(to bottom, var(--void), transparent 20%),
+    linear-gradient(to top, rgba(8, 7, 14, 0.92) 4%, rgba(8, 7, 14, 0.45) 34%, transparent 60%);
+}
+.prologue__copy {
+  position: relative;
+  padding: 0 clamp(1.4rem, 6vw, 7rem) clamp(4rem, 10vh, 7rem);
+}
+
+/* ---- journey ---- */
+.journey {
+  position: relative;
+  min-height: 82svh;
+  display: grid;
+  place-items: center;
+}
+.journey__media img { object-position: 50% 38%; }
+.journey__scrim {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(to bottom, var(--void) 1%, rgba(8, 7, 14, 0.42) 26%, rgba(8, 7, 14, 0.42) 72%, var(--void) 99%);
+}
+.journey__inner {
+  position: relative;
+  padding: clamp(5rem, 12vh, 8rem) clamp(1.4rem, 5vw, 4rem);
+  text-align: center;
+}
+.journey__title {
+  font-family: var(--font-display);
+  font-size: clamp(1.3rem, 1.1rem + 1vw, 1.8rem);
+  letter-spacing: 0.3em;
+  text-indent: 0.3em;
+  text-transform: uppercase;
+  color: var(--bone);
+}
+.journey__rail {
+  list-style: none;
+  margin-top: clamp(2.4rem, 6vh, 4rem);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: baseline;
+  column-gap: clamp(1.6rem, 4vw, 3.6rem);
+  row-gap: 2rem;
+}
+.journey__step {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 0.7rem;
+  font-family: var(--font-display);
+  font-size: clamp(0.95rem, 0.85rem + 0.5vw, 1.2rem);
+  letter-spacing: 0.14em;
+  color: var(--bone);
+  white-space: nowrap;
+}
+.journey__num {
+  font-size: 0.72em;
+  color: var(--gold-dim);
+  letter-spacing: 0.2em;
+}
+/* stepped gold gate glyph between stations */
+.journey__step:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  right: calc(-0.5 * clamp(1.6rem, 4vw, 3.6rem) - 6px);
+  bottom: 0.35em;
+  width: 12px;
+  height: 12px;
+  background: var(--gold-dim);
+  clip-path: polygon(0 100%, 0 33%, 25% 33%, 25% 15%, 42% 15%, 42% 0, 58% 0, 58% 15%, 75% 15%, 75% 33%, 100% 33%, 100% 100%, 72% 100%, 72% 55%, 28% 55%, 28% 100%);
+}
+@media (max-width: 719px) {
+  .journey__rail { flex-direction: column; align-items: center; row-gap: 1.7rem; }
+  .journey__step:not(:last-child)::after {
+    right: auto;
+    left: 50%;
+    bottom: -1.25rem;
+    transform: translateX(-50%);
+    width: 10px;
+    height: 10px;
+  }
+}
+
+/* ---- feature sections ---- */
+.feature {
+  position: relative;
+  min-height: 96svh;
+  display: grid;
+  align-items: center;
+}
+.feature__img--trial { object-position: 62% 52%; }
+.feature__img--town { object-position: 38% 52%; }
+.feature__scrim { position: absolute; inset: 0; }
+.feature__scrim--left {
+  background:
+    linear-gradient(to bottom, var(--void), transparent 14%),
+    linear-gradient(100deg, rgba(8, 7, 14, 0.9) 6%, rgba(8, 7, 14, 0.5) 38%, transparent 64%),
+    linear-gradient(to top, var(--void), transparent 14%);
+}
+.feature__scrim--right {
+  background:
+    linear-gradient(to bottom, var(--void), transparent 14%),
+    linear-gradient(260deg, rgba(8, 7, 14, 0.9) 6%, rgba(8, 7, 14, 0.5) 38%, transparent 64%),
+    linear-gradient(to top, var(--void), transparent 14%);
+}
+.feature__copy {
+  position: relative;
+  width: min(34rem, 100%);
+  padding: clamp(4rem, 10vh, 6rem) clamp(1.4rem, 6vw, 7rem);
+}
+.feature__copy--right { margin-left: auto; }
+/* narrow viewports: the copy spans most of the art, so the scrims must carry further */
+@media (max-width: 899px) {
+  .feature__scrim--left, .feature__scrim--right {
+    background:
+      linear-gradient(to bottom, var(--void), transparent 14%),
+      linear-gradient(to top, rgba(8, 7, 14, 0.94) 16%, rgba(8, 7, 14, 0.6) 48%, transparent 78%);
+  }
+  .feature { align-items: end; }
+}
+
+/* embers drifting up through the combat tableau */
+.embers { position: absolute; inset: 0; overflow: hidden; }
+.embers i {
+  position: absolute;
+  bottom: -6px;
+  width: 3px;
+  height: 3px;
+  background: var(--ember);
+}
+.embers i:nth-child(2n) { background: var(--ember-hot); width: 2px; height: 2px; }
+.embers i:nth-child(1) { left: 12%; --sway: 18px; }
+.embers i:nth-child(2) { left: 30%; --sway: -12px; }
+.embers i:nth-child(3) { left: 47%; --sway: 10px; }
+.embers i:nth-child(4) { left: 58%; --sway: -20px; }
+.embers i:nth-child(5) { left: 74%; --sway: 14px; }
+.embers i:nth-child(6) { left: 88%; --sway: -10px; }
+
+/* ---- worlds triptych ---- */
+.worlds {
+  position: relative;
+  padding-top: clamp(5rem, 12vh, 8rem);
+}
+.worlds__copy {
+  padding: 0 clamp(1.4rem, 6vw, 7rem) clamp(3rem, 7vh, 5rem);
+  max-width: 72rem;
+  margin-inline: auto;
+}
+.worlds__copy h2::before { margin-inline: 0; }
+.worlds__triptych {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  background: var(--void);
+}
+.worlds__panel {
+  position: relative;
+  height: min(78svh, 44rem);
+  overflow: hidden;
+}
+.worlds__panel img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  outline: 1px solid rgba(255, 255, 255, 0.07);
+  outline-offset: -1px;
+}
+.worlds__img--duat { object-position: 40% 50%; }
+.worlds__img--niflheim { object-position: 58% 45%; }
+.worlds__img--mictlan { object-position: 44% 55%; }
+.worlds__caption {
+  position: absolute;
+  inset: auto 0 0 0;
+  padding: 3.4rem 1.2rem 1.1rem;
+  background: linear-gradient(to top, rgba(8, 7, 14, 0.88), transparent);
+  font: 600 0.68rem/1.4 var(--font-body);
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  text-align: center;
+  color: var(--bone-dim);
+}
+@media (max-width: 719px) {
+  .worlds__triptych {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+  .worlds__panel {
+    flex: 0 0 80vw;
+    height: min(64svh, 30rem);
+    scroll-snap-align: center;
+  }
+}
+
+/* ---- gallery ---- */
+.gallery {
+  max-width: 74rem;
+  margin-inline: auto;
+  padding: clamp(6rem, 14vh, 9rem) clamp(1.4rem, 5vw, 3rem);
+}
+.gallery__title {
+  font-family: var(--font-display);
+  font-size: clamp(1.1rem, 1rem + 0.6vw, 1.4rem);
+  letter-spacing: 0.3em;
+  text-indent: 0.3em;
+  text-transform: uppercase;
+  text-align: center;
+  color: var(--bone-dim);
+}
+.gallery__grid {
+  margin-top: clamp(2rem, 5vh, 3.4rem);
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: clamp(0.8rem, 2vw, 1.4rem);
+}
+@media (max-width: 719px) {
+  .gallery__grid { grid-template-columns: 1fr; }
+}
+.gallery__slot {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  display: grid;
+  place-items: center;
+  background: var(--sky);
+  clip-path: var(--clip-steps);
+  box-shadow: inset 0 0 0 1px rgba(212, 176, 96, 0.18);
+}
+.gallery__slot::before, .gallery__slot::after {
+  content: '';
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background:
+    linear-gradient(var(--gold-dim), var(--gold-dim)) top left / 10px 2px no-repeat,
+    linear-gradient(var(--gold-dim), var(--gold-dim)) top left / 2px 10px no-repeat;
+}
+.gallery__slot::before { top: 10px; left: 10px; }
+.gallery__slot::after { bottom: 10px; right: 10px; rotate: 180deg; }
+.gallery__slot span {
+  font: 600 0.62rem/1 var(--font-body);
+  letter-spacing: 0.28em;
+  text-indent: 0.28em;
+  text-transform: uppercase;
+  color: var(--slate-3);
+}
+
+/* ---- threshold (final CTA) ---- */
+.threshold {
+  position: relative;
+  min-height: 96svh;
+  display: grid;
+  align-items: center;
+}
+.threshold__media img { object-position: 72% 45%; }
+.threshold__scrim {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(to bottom, var(--void), transparent 16%),
+    linear-gradient(100deg, rgba(8, 7, 14, 0.88) 8%, rgba(8, 7, 14, 0.45) 40%, transparent 62%),
+    linear-gradient(to top, var(--void), transparent 18%);
+}
+.threshold__copy {
+  position: relative;
+  width: min(34rem, 100%);
+  padding: clamp(4rem, 10vh, 6rem) clamp(1.4rem, 6vw, 7rem);
+}
+@media (max-width: 899px) {
+  .threshold__scrim {
+    background:
+      linear-gradient(to bottom, var(--void), transparent 16%),
+      linear-gradient(to top, rgba(8, 7, 14, 0.94) 16%, rgba(8, 7, 14, 0.55) 48%, transparent 78%);
+  }
+  .threshold { align-items: end; }
+}
+
+/* ---- footer ---- */
+.footer {
+  position: relative;
+  padding: clamp(3rem, 8vh, 5rem) 1.4rem clamp(2.4rem, 6vh, 4rem);
+  text-align: center;
+}
+.footer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(18rem, 60vw);
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--gold-dim) 30%, var(--gold-dim) 70%, transparent);
+}
+.footer__mark {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  letter-spacing: 0.3em;
+  text-indent: 0.3em;
+  text-transform: uppercase;
+  color: var(--bone-dim);
+}
+.footer__legal {
+  margin-top: 0.8rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  color: var(--slate-3);
+}
+
+/* =====================================================================
+   MOTION — all of it opt-in via prefers-reduced-motion: no-preference
+   ===================================================================== */
+@media (prefers-reduced-motion: no-preference) {
+  /* hero copy enters once, split + staggered */
+  @keyframes hero-in {
+    from { opacity: 0; transform: translateY(14px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .hero__copy > * { animation: hero-in 640ms var(--ease-out) backwards; }
+  .hero__copy > :nth-child(2) { animation-delay: 90ms; }
+  .hero__copy > :nth-child(3) { animation-delay: 180ms; }
+  .hero__copy > :nth-child(4) { animation-delay: 270ms; }
+  .hero__descend { animation: hero-in 640ms var(--ease-out) 600ms backwards; }
+
+  @keyframes descend-float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(4px); }
+  }
+  .hero__descend-glyph { animation: descend-float 2.6s var(--ease-in-out) infinite; }
+
+  /* embers: constant passage of time -> linear */
+  @keyframes ember-rise {
+    0% { transform: translateY(0) translateX(0); opacity: 0; }
+    8% { opacity: 0.9; }
+    70% { opacity: 0.45; }
+    100% { transform: translateY(-72vh) translateX(var(--sway, 12px)); opacity: 0; }
+  }
+  .embers i { animation: ember-rise 13s linear infinite; }
+  .embers i:nth-child(2) { animation-duration: 17s; animation-delay: -9s; }
+  .embers i:nth-child(3) { animation-duration: 11s; animation-delay: -4s; }
+  .embers i:nth-child(4) { animation-duration: 19s; animation-delay: -13s; }
+  .embers i:nth-child(5) { animation-duration: 12s; animation-delay: -7s; }
+  .embers i:nth-child(6) { animation-duration: 15s; animation-delay: -2s; }
+
+  /* scroll-driven parallax + reveals (progressive enhancement) */
+  @supports (animation-timeline: view()) {
+    @keyframes par-drift {
+      from { transform: translateY(-2.6%); }
+      to { transform: translateY(2.6%); }
+    }
+    .prologue__media img, .feature__media img, .threshold__media img, .journey__media img {
+      height: 112%;
+      top: -6%;
+      position: relative;
+      animation: par-drift linear both;
+      animation-timeline: view();
+    }
+
+    @keyframes hero-recede {
+      to { transform: translateY(9%); }
+    }
+    .hero__media img {
+      animation: hero-recede linear both;
+      animation-timeline: scroll();
+      animation-range: 0 120vh;
+    }
+    @keyframes hero-copy-away {
+      to { transform: translateY(-7%); opacity: 0.15; }
+    }
+    .hero__copy {
+      animation: hero-copy-away linear both;
+      animation-timeline: scroll();
+      animation-range: 0 90vh;
+    }
+
+    @keyframes rise-in {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .section-copy > *, .journey__title, .journey__step, .gallery__title, .gallery__slot, .worlds__panel {
+      animation: rise-in linear both;
+      animation-timeline: view();
+      animation-range: entry 8% entry 42%;
+    }
+    .section-copy > :nth-child(2), .journey__step:nth-child(2), .gallery__slot:nth-child(2), .worlds__panel:nth-child(2) { animation-range: entry 16% entry 50%; }
+    .section-copy > :nth-child(3), .journey__step:nth-child(3), .gallery__slot:nth-child(3), .worlds__panel:nth-child(3) { animation-range: entry 24% entry 58%; }
+    .journey__step:nth-child(4) { animation-range: entry 32% entry 66%; }
+    .journey__step:nth-child(5) { animation-range: entry 40% entry 74%; }
+  }
+}

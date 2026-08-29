@@ -1,0 +1,52 @@
+{
+  "run_id": "20260829T202659Z-f810ff5",
+  "captured_at_utc": "2026-08-29T20:26:59Z",
+  "git_sha": "f810ff51cc8e5387d672faa0d9d00de816e6524f",
+  "git_dirty": true,
+  "production_source_dirty": false,
+  "dirty_note": "Only profiling harness, documentation, and generated profiling artifacts differ from HEAD.",
+  "hardware": {
+    "cpu_model": "Apple M5 Pro",
+    "cpu_cores_physical": 18,
+    "cpu_threads_logical": 18,
+    "gpu_model": "Apple M5 Pro, 20 cores, Metal 4",
+    "ram_bytes": 68719476736,
+    "power": "AC, battery 100 percent"
+  },
+  "storage": {
+    "device": "/dev/disk3s5",
+    "filesystem": "APFS",
+    "protocol": "Apple Fabric",
+    "solid_state": true,
+    "mount_options": "local,journaled,nobrowse,protect,root data"
+  },
+  "os": {
+    "name": "macOS",
+    "version": "26.5.1",
+    "build": "25F80",
+    "kernel": "25.5.0",
+    "architecture": "arm64",
+    "sip": "enabled"
+  },
+  "toolchain": {
+    "node": "v22.22.3",
+    "pnpm": "10.33.0",
+    "typescript": "5.9.3",
+    "vite": "8.2.2",
+    "playwright": "1.62.1",
+    "pixi": "8.20.1",
+    "python": "3.12.13"
+  },
+  "build_profile": {
+    "name": "tsx source for simulation; Vite development source for browser attribution",
+    "sourcemaps": true
+  },
+  "browser": {
+    "viewport": [1920, 1080],
+    "device_scale_factor": 1,
+    "headless": true,
+    "renderer": "ANGLE SwiftShader Vulkan",
+    "claim_limit": "not physical-GPU proof"
+  },
+  "cache_state": "warm after declared warmups"
+}

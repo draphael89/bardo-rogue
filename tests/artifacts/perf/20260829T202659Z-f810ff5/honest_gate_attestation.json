@@ -1,0 +1,14 @@
+{
+  "run_id": "20260829T202659Z-f810ff5",
+  "representative_workload": true,
+  "warmups_declared": true,
+  "raw_samples_retained": true,
+  "golden_outputs_pinned": true,
+  "same_host_repeats": true,
+  "variance_reported": true,
+  "anomalies_reported": true,
+  "os_tuning_applied": false,
+  "physical_gpu_claim": false,
+  "primary_claim": "source-level CPU and allocation prioritization",
+  "gate": "PASS"
+}

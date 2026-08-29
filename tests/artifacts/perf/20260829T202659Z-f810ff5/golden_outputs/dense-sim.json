@@ -1,0 +1,8 @@
+{
+  "ticks": 3600,
+  "hash": 2057548653,
+  "outcome": {
+    "activeEnemies": 32,
+    "activeProjectiles": 64
+  }
+}

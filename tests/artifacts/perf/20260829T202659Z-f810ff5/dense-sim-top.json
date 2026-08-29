@@ -1,0 +1,212 @@
+[
+  {
+    "function": "updateProjectiles",
+    "url": "file:///Users/davidraphael/.codex/worktrees/6ca1/bardo-rogue-web/src/sim/projectiles.ts",
+    "line": 0,
+    "selfSamples": 8819,
+    "selfPercent": 43.23251139761753
+  },
+  {
+    "function": "furthestClear",
+    "url": "file:///Users/davidraphael/.codex/worktrees/6ca1/bardo-rogue-web/src/sim/collision.ts",
+    "line": 0,
+    "selfSamples": 5699,
+    "selfPercent": 27.93764400215697
+  },
+  {
+    "function": "resolveOverlaps",
+    "url": "file:///Users/davidraphael/.codex/worktrees/6ca1/bardo-rogue-web/src/sim/step.ts",
+    "line": 0,
+    "selfSamples": 2627,
+    "selfPercent": 12.878082258934262
+  },
+  {
+    "function": "overlapsSolid",
+    "url": "file:///Users/davidraphael/.codex/worktrees/6ca1/bardo-rogue-web/src/sim/collision.ts",
+    "line": 0,
+    "selfSamples": 1370,
+    "selfPercent": 6.716015490955439
+  },
+  {
+    "function": "(garbage collector)",
+    "url": "",
+    "line": -1,
+    "selfSamples": 1031,
+    "selfPercent": 5.054169322025589
+  },
+  {
+    "function": "stepWorld",
+    "url": "file:///Users/davidraphael/.codex/worktrees/6ca1/bardo-rogue-web/src/sim/step.ts",
+    "line": 0,
+    "selfSamples": 279,
+    "selfPercent": 1.367714103632531
+  },
+  {
+    "function": "moveWithWalls",
+    "url": "file:///Users/davidraphael/.codex/worktrees/6ca1/bardo-rogue-web/src/sim/collision.ts",
+    "line": 0,
+    "selfSamples": 122,
+    "selfPercent": 0.5980685327712143
+  },
+  {
+    "function": "separate",
+    "url": "file:///Users/davidraphael/.codex/worktrees/6ca1/bardo-rogue-web/src/sim/collision.ts",
+    "line": 0,
+    "selfSamples": 80,
+    "selfPercent": 0.3921760870630913
+  },
+  {
+    "function": "overlapsSolid",
+    "url": "file:///Users/davidraphael/.codex/worktrees/6ca1/bardo-rogue-web/src/sim/collision.ts",
+    "line": 0,
+    "selfSamples": 69,
+    "selfPercent": 0.3382518750919163
+  },
+  {
+    "function": "lineLengths",
+    "url": "node:internal/source_map/source_map_cache",
+    "line": 259,
+    "selfSamples": 47,
+    "selfPercent": 0.23040345114956615
+  },
+  {
+    "function": "updatePlayer",
+    "url": "file:///Users/davidraphael/.codex/worktrees/6ca1/bardo-rogue-web/src/sim/player.ts",
+    "line": 0,
+    "selfSamples": 28,
+    "selfPercent": 0.13726163047208195
+  },
+  {
+    "function": "consumeTick",
+    "url": "file:///Users/davidraphael/.codex/worktrees/6ca1/bardo-rogue-web/tools/perf-sim.ts",
+    "line": 0,
+    "selfSamples": 21,
+    "selfPercent": 0.10294622285406148
+  },
+  {
+    "function": "separate",
+    "url": "file:///Users/davidraphael/.codex/worktrees/6ca1/bardo-rogue-web/src/sim/collision.ts",
+    "line": 0,
+    "selfSamples": 18,
+    "selfPercent": 0.08823961958919554
+  },
+  {
+    "function": "applyEnemyKnockback",
+    "url": "file:///Users/davidraphael/.codex/worktrees/6ca1/bardo-rogue-web/src/sim/enemies/common.ts",
+    "line": 0,
+    "selfSamples": 11,
+    "selfPercent": 0.05392421197117506
+  },
+  {
+    "function": "consume",
+    "url": "file:///Users/davidraphael/.codex/worktrees/6ca1/bardo-rogue-web/src/sim/metrics.ts",
+    "line": 0,
+    "selfSamples": 10,
+    "selfPercent": 0.049022010882886415
+  },
+  {
+    "function": "furthestClear",
+    "url": "file:///Users/davidraphael/.codex/worktrees/6ca1/bardo-rogue-web/src/sim/collision.ts",
+    "line": 0,
+    "selfSamples": 8,
+    "selfPercent": 0.03921760870630913
+  },
+  {
+    "function": "read",
+    "url": "",
+    "line": -1,
+    "selfSamples": 8,
+    "selfPercent": 0.03921760870630913
+  },
+  {
+    "function": "len",
+    "url": "file:///Users/davidraphael/.codex/worktrees/6ca1/bardo-rogue-web/src/sim/math.ts",
+    "line": 0,
+    "selfSamples": 7,
+    "selfPercent": 0.03431540761802049
+  },
+  {
+    "function": "",
+    "url": "file:///Users/davidraphael/.codex/worktrees/6ca1/bardo-rogue-web/tools/perf-sim.ts",
+    "line": 0,
+    "selfSamples": 7,
+    "selfPercent": 0.03431540761802049
+  },
+  {
+    "function": "readFileUtf8",
+    "url": "",
+    "line": -1,
+    "selfSamples": 7,
+    "selfPercent": 0.03431540761802049
+  },
+  {
+    "function": "applyEnemyKnockback",
+    "url": "file:///Users/davidraphael/.codex/worktrees/6ca1/bardo-rogue-web/src/sim/enemies/common.ts",
+    "line": 0,
+    "selfSamples": 6,
+    "selfPercent": 0.02941320652973185
+  },
+  {
+    "function": "updateSpawnQueue",
+    "url": "file:///Users/davidraphael/.codex/worktrees/6ca1/bardo-rogue-web/src/sim/waves.ts",
+    "line": 0,
+    "selfSamples": 5,
+    "selfPercent": 0.024511005441443207
+  },
+  {
+    "function": "runDense",
+    "url": "file:///Users/davidraphael/.codex/worktrees/6ca1/bardo-rogue-web/tools/perf-sim.ts",
+    "line": 0,
+    "selfSamples": 5,
+    "selfPercent": 0.024511005441443207
+  },
+  {
+    "function": "compileSourceTextModule",
+    "url": "node:internal/modules/esm/utils",
+    "line": 343,
+    "selfSamples": 5,
+    "selfPercent": 0.024511005441443207
+  },
+  {
+    "function": "stepWorld",
+    "url": "file:///Users/davidraphael/.codex/worktrees/6ca1/bardo-rogue-web/src/sim/step.ts",
+    "line": 0,
+    "selfSamples": 3,
+    "selfPercent": 0.014706603264865925
+  },
+  {
+    "function": "resolveOverlaps",
+    "url": "file:///Users/davidraphael/.codex/worktrees/6ca1/bardo-rogue-web/src/sim/step.ts",
+    "line": 0,
+    "selfSamples": 3,
+    "selfPercent": 0.014706603264865925
+  },
+  {
+    "function": "updatePlayer",
+    "url": "file:///Users/davidraphael/.codex/worktrees/6ca1/bardo-rogue-web/src/sim/player.ts",
+    "line": 0,
+    "selfSamples": 3,
+    "selfPercent": 0.014706603264865925
+  },
+  {
+    "function": "tryEnterDoor",
+    "url": "file:///Users/davidraphael/.codex/worktrees/6ca1/bardo-rogue-web/src/sim/rooms.ts",
+    "line": 0,
+    "selfSamples": 3,
+    "selfPercent": 0.014706603264865925
+  },
+  {
+    "function": "len",
+    "url": "file:///Users/davidraphael/.codex/worktrees/6ca1/bardo-rogue-web/src/sim/math.ts",
+    "line": 0,
+    "selfSamples": 3,
+    "selfPercent": 0.014706603264865925
+  },
+  {
+    "function": "buildArena",
+    "url": "file:///Users/davidraphael/.codex/worktrees/6ca1/bardo-rogue-web/src/sim/arena.ts",
+    "line": 0,
+    "selfSamples": 3,
+    "selfPercent": 0.014706603264865925
+  }
+]

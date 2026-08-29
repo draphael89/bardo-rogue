@@ -20,6 +20,8 @@ per tick: `stepWorld(world, inputFrame)`.
 | `pnpm shot -- ...` | Playwright: open the game, run ticks, screenshot + state JSON (`tools/shot.ts`) |
 | `pnpm record-bots` | Regenerate the replay fixtures in `replays/` (`tools/record-bot.ts`) |
 | `pnpm matrix` | Seeded acceptance gate: every seed must resolve and come home; reports the win-rate band (`tools/matrix.ts`) |
+| `pnpm perf:sim -- --mode replay|loop|dense ...` | Repeated deterministic simulation timings with a golden hash/outcome check (`tools/perf-sim.ts`) |
+| `pnpm perf:render -- --profile warden|dense ...` | Browser/Pixi frame samples plus Chrome CPU/allocation profiles; dense mode asserts rendering cannot mutate the sim (`tools/perf-render.ts`; needs a server) |
 | `pnpm smoke` | Drives both endings of the production loop in a real browser and asserts the golden path (`tools/smoke.ts`; needs a server) |
 | `pnpm realm-air -- --url <server> [--seed n] [--min-median m] [--shots 1]` | Measures whether a realm actually changes the room: mean RGB of every node's play area, pairwise separation, and whether each realm reads the temperature the ledger claims (`tools/realm-air.ts`; needs a server). Bare, it reports; with `--min-median` it exits non-zero. |
 | `pnpm record-bot -- --bot kite --scenario full --seed 1 --out replays/x.json` | Record one bot run |

@@ -1,0 +1,31 @@
+{
+  "ticks": 3090,
+  "hash": 407338761,
+  "outcome": {
+    "ticks": 3090,
+    "seconds": 51.5,
+    "swings": 50,
+    "hitsLanded": 48,
+    "whiffSwings": 4,
+    "kills": 14,
+    "dodges": 20,
+    "successfulDodges": 5,
+    "grazes": 10,
+    "boltsFired": 38,
+    "boltsCut": 14,
+    "enemyAttacks": 18,
+    "damageTaken": 0,
+    "hitsTaken": 0,
+    "deaths": 0,
+    "wavesCleared": 6,
+    "returns": 1,
+    "roomsEntered": 6,
+    "boonsChosen": 4,
+    "runResult": "won",
+    "runSeconds": 48.5,
+    "clearSeconds": 51.5,
+    "deathSeconds": null,
+    "room": "bardo",
+    "phase": "town"
+  }
+}

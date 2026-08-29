@@ -30,6 +30,17 @@ function prepareAndDescend(world = createWorld(1, 'loop')) {
   return world
 }
 
+/**
+ * Sit through a modal's arming window, then answer it. Every modal now refuses `confirm` for
+ * `tuning.run.modalArmTicks` after it opens (rewards.ts / rites.ts), because the offer used to be
+ * answerable on the tick it appeared. A test that means "the player answers" waits the same way a
+ * player does; a test about the GATE itself should confirm early on purpose instead.
+ */
+function armThenConfirm(world: ReturnType<typeof createWorld>, extra: Record<string, unknown> = {}): void {
+  while (world.tick - world.phaseTick < tuning.run.modalArmTicks) stepWorld(world, emptyInput())
+  stepWorld(world, { ...emptyInput(), ...extra, confirm: true })
+}
+
 function forceRoomClear(world: ReturnType<typeof createWorld>): void {
   for (const e of world.enemies) e.active = false
   world.spawnQueue.length = 0
@@ -45,13 +56,13 @@ function answerRite(world: ReturnType<typeof createWorld>, choice: 'pay' | 'swim
   expect(world.roomPhase).toBe('entering')
   if (choice === 'swim') stepWorld(world, { ...emptyInput(), choiceDelta: 1 })
   expect(world.session.run?.pendingRite?.focus).toBe(choice === 'pay' ? 0 : 1)
-  stepWorld(world, { ...emptyInput(), confirm: true })
+  armThenConfirm(world)
   expect(world.session.run?.pendingRite).toBeNull()
 }
 
 function chooseFocusedReward(world: ReturnType<typeof createWorld>): void {
   expect(world.roomPhase).toBe('reward')
-  stepWorld(world, { ...emptyInput(), confirm: true })
+  armThenConfirm(world)
   expect(world.roomPhase).toBe('exits')
 }
 
@@ -117,6 +128,31 @@ describe('production vertical slice', () => {
     expect(world.session.run).toMatchObject({ hp, maxHp })
   })
 
+  it('refuses an answer until the offer has been on screen, but steers throughout', () => {
+    const world = prepareAndDescend(createWorld(21, 'loop'))
+    forceRoomClear(world)
+    expect(world.roomPhase).toBe('reward')
+    const opened = world.phaseTick
+
+    // The offer opens on the tick the last enemy dies, so the attack that killed it used to claim
+    // options[0] before a frame of the screen had been drawn.
+    for (let i = 1; i < tuning.run.modalArmTicks; i++) {
+      stepWorld(world, { ...emptyInput(), confirm: true })
+      expect(world.roomPhase).toBe('reward')
+    }
+
+    // Only the irreversible half is held. Moving the selection stays live for the whole window, so
+    // a player who already knows which card they want is never made to wait for a second press.
+    stepWorld(world, { ...emptyInput(), choiceDelta: 1 })
+    expect(world.session.run?.pendingReward?.focus).toBe(1)
+    expect(world.tick - opened).toBe(tuning.run.modalArmTicks)
+
+    const chosen = world.session.run!.pendingReward!.options[1]
+    stepWorld(world, { ...emptyInput(), confirm: true })
+    expect(world.roomPhase).toBe('exits')
+    expect(hasBoon(world, chosen)).toBe(true)
+  })
+
   it('offers three deterministic unique boons and opens exits only after a choice', () => {
     const a = prepareAndDescend(createWorld(12, 'loop'))
     const b = prepareAndDescend(createWorld(12, 'loop'))
@@ -131,7 +167,7 @@ describe('production vertical slice', () => {
     expect(hashWorld(a)).toBe(hashWorld(b))
     stepWorld(a, { ...emptyInput(), choiceDelta: 1 })
     const chosen = a.session.run!.pendingReward!.options[1]
-    stepWorld(a, { ...emptyInput(), confirm: true })
+    armThenConfirm(a)
     expect(hasBoon(a, chosen)).toBe(true)
     expect(a.session.run?.boons).toEqual([{ id: chosen, stacks: 1 }])
     expect(a.doorOpen).toBe(true)

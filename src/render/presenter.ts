@@ -388,7 +388,11 @@ export class Presenter {
         case 'waveStart': this.hud.showBanner(ev.wave === ev.total && ev.total > 1 ? 'FINAL WAVE' : `WAVE ${ev.wave}`, '', 1.3); break
         case 'roomClear':
           this.camera.addTrauma(0.3); this.flash(0.6, 0xfff4d0)
-          this.hud.showBanner(ev.victory ? 'THE JUDGE FALLS' : 'ROOM CLEARED', ev.reward ? 'choose what the sword remembers' : ev.hasNext ? 'the door is open' : '', 3)
+          // No subtitle when a god is about to speak: the offer opens on this very tick and paints a
+          // 92%-opacity scrim over the whole screen, so 'choose what the sword remembers' was drawn
+          // under it for its full three seconds and never once read. The overlay's own prompt is
+          // where that instruction lives, and it is on top of the scrim rather than beneath it.
+          this.hud.showBanner(ev.victory ? 'THE JUDGE FALLS' : 'ROOM CLEARED', ev.reward ? '' : ev.hasNext ? 'the door is open' : '', 3)
           this.tilemap.setDoorOpen(this.world.doorOpen); this.postfx.pulse(); this.camera.punchZoom(J.zoom.roomClear)
           break
         case 'roomTransition':

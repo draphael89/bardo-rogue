@@ -1,5 +1,5 @@
 import { Container, Graphics, Text } from 'pixi.js'
-import { BOONS, DEITIES, type BoonId, type Deity } from '@/sim/boons'
+import { BOONS, boonNames, DEITIES, UNMARKED_BUILD } from '@/sim/boons'
 import { RITES, type RiteDef } from '@/sim/rites'
 import { drawPortrait, MASK_W, type PortraitId } from './views/deity'
 import type { World } from '@/sim/world'
@@ -32,11 +32,13 @@ export interface PauseMenuState {
   hold: number   // 0..1 abandon hold progress
 }
 
+export type PauseRow = 'resume' | 'master' | 'music' | 'sfx' | 'reduced' | 'abandon'
+const ROWS_IDLE: readonly PauseRow[] = ['resume', 'master', 'music', 'sfx', 'reduced']
+const ROWS_RUN: readonly PauseRow[] = [...ROWS_IDLE, 'abandon']
+
 /** Row order is shared between the shell's input handling and the painter via this one list. */
-export function pauseRowKinds(runActive: boolean): Array<'resume' | 'master' | 'music' | 'sfx' | 'reduced' | 'abandon'> {
-  return runActive
-    ? ['resume', 'master', 'music', 'sfx', 'reduced', 'abandon']
-    : ['resume', 'master', 'music', 'sfx', 'reduced']
+export function pauseRowKinds(runActive: boolean): readonly PauseRow[] {
+  return runActive ? ROWS_RUN : ROWS_IDLE
 }
 
 export class RewardOverlay {
@@ -86,7 +88,17 @@ export class RewardOverlay {
   setPadActive(pad: boolean): void {
     if (this.padActive !== pad) { this.padActive = pad; this.key = '' }
   }
-  setPauseMenu(state: PauseMenuState): void { this.pauseMenu = state }
+  /** Field-compared, not stored blindly: a pause screen left open must not rebuild a repaint key
+   *  every frame just to conclude nothing moved. */
+  setPauseMenu(state: PauseMenuState): void {
+    const m = this.pauseMenu
+    if (m.focus === state.focus && m.reduced === state.reduced && m.runActive === state.runActive
+      && m.hold === state.hold && m.volumes.master === state.volumes.master
+      && m.volumes.music === state.volumes.music && m.volumes.sfx === state.volumes.sfx) return
+    m.focus = state.focus; m.reduced = state.reduced; m.runActive = state.runActive; m.hold = state.hold
+    m.volumes.master = state.volumes.master; m.volumes.music = state.volumes.music; m.volumes.sfx = state.volumes.sfx
+    this.key = ''
+  }
 
   update(world: World): void {
     if (this.suppressed) {
@@ -105,9 +117,10 @@ export class RewardOverlay {
     this.updateMeta(world)
     this.updateBuild(world)
     if (!this.root.visible) return
-    const m = this.pauseMenu
+    // setPauseMenu/setPadActive clear the key when the card actually changes, so the pause key is a
+    // constant: a card sitting open repaints nothing.
     const nextKey = this.paused
-      ? `pause|${m.focus}|${m.volumes.master.toFixed(2)}|${m.volumes.music.toFixed(2)}|${m.volumes.sfx.toFixed(2)}|${m.reduced ? 1 : 0}|${m.runActive ? 1 : 0}|${m.hold.toFixed(2)}|${this.padActive ? 1 : 0}|${tuning.view.width}`
+      ? `pause|${tuning.view.width}`
       : rite
       ? `rite|${rite.id}|${rite.focus}|${tuning.view.width}`
       : offer
@@ -182,8 +195,9 @@ export class RewardOverlay {
 
   private updateBuild(world: World): void {
     if (!this.build.visible) return
-    const ids = world.session.run?.boons.map(b => b.id) ?? []
-    const text = ids.length ? ids.map(id => BOONS[id].name).join('  ·  ') : 'UNMARKED BLADE'
+    const boons = world.session.run?.boons ?? []
+    const ids = boons.map(b => b.id)
+    const text = boons.length ? boonNames(boons).join('  ·  ') : UNMARKED_BUILD
     this.buildText.text = text
     placeLeft(this.buildText, 13, 39)
     const w = Math.min(tuning.view.width - 26, this.buildText.width + 14)
@@ -291,11 +305,16 @@ export class RewardOverlay {
       placeCentered(cost, x + cardW / 2, y + 43); add(cost)
       for (const line of wrappedCentered(choice.detail, 'body', selected ? P.bone : P.dim, cardW - 28, x + cardW / 2, y + 56)) add(line)
     })
-    const act = label(this.padActive
-      ? 'D-PAD TO CHOOSE   ·   A TO ANSWER'
-      : 'A / D OR ARROWS TO CHOOSE   ·   ENTER / ATTACK TO ANSWER', 'meta', accent)
+    const act = label(this.chooseHint('ANSWER'), 'meta', accent)
     placeCentered(act, W / 2, H - 16); this.add(act)
     this.act = act
+  }
+
+  /** One wording scheme for every card that offers a left/right choice. */
+  private chooseHint(verb: string): string {
+    return this.padActive
+      ? `D-PAD TO CHOOSE   ·   A TO ${verb}`
+      : `A / D OR ARROWS TO CHOOSE   ·   ENTER / ATTACK TO ${verb}`
   }
 
   // The offer is a meeting, not a menu. Someone specific is standing there, they are named, and they
@@ -352,9 +371,7 @@ export class RewardOverlay {
         placeCentered(from, x + cardW / 2, y + cardH - 10); add(from)
       }
     })
-    const act = label(this.padActive
-      ? 'D-PAD TO CHOOSE   ·   A TO CLAIM'
-      : 'A / D OR ARROWS TO CHOOSE   ·   ENTER / ATTACK TO CLAIM', 'meta', P.gold)
+    const act = label(this.chooseHint('CLAIM'), 'meta', P.gold)
     placeCentered(act, W / 2, H - 16); this.add(act)
     this.act = act
   }
@@ -373,7 +390,7 @@ export class RewardOverlay {
     const seconds = Math.floor((world.tick - run.startedTick) / 60)
     const stats = label(`${run.depth} CHAMBERS   ·   ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`, 'meta', P.dim)
     placeCentered(stats, W / 2, 120); this.add(stats)
-    for (const line of wrappedCentered(run.boons.map(b => BOONS[b.id].name).join('\n'), 'body', P.bone, 280, W / 2, 148)) this.add(line)
+    for (const line of wrappedCentered(boonNames(run.boons).join('\n'), 'body', P.bone, 280, W / 2, 148)) this.add(line)
     const act = label(this.padActive
       ? 'PRESS A TO WAKE IN THE BARDO'
       : 'PRESS ENTER / ATTACK TO WAKE IN THE BARDO', 'meta', P.gold)
@@ -434,7 +451,8 @@ export class RewardOverlay {
     })
 
     y += 4
-    const saves = label('V EFFECTS  ·  E EXPORT SAVE  ·  I IMPORT SAVE', 'meta', P.dim)
+    // E and I keep their hint because they have no row; effects lost theirs when it gained one.
+    const saves = label('E EXPORT SAVE  ·  I IMPORT SAVE', 'meta', P.dim)
     placeCentered(saves, W / 2, y); this.add(saves)
     const act = label(this.padActive
       ? 'D-PAD MOVE  ·  A SELECT  ·  START RESUME'

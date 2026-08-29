@@ -3,7 +3,7 @@ import { crispText } from './textCrisp'
 import type { Atlas } from './atlas'
 import type { EnemyKind } from '@/sim/events'
 import type { World } from '@/sim/world'
-import { BOONS, hasBoon } from '@/sim/boons'
+import { boonNames, hasBoon, UNMARKED_BUILD } from '@/sim/boons'
 import { HUB_ID } from '@/sim/rooms'
 import { tuning } from '@/tuning'
 
@@ -962,8 +962,8 @@ export class Hud {
     const run = world.session.run
     const atomic = (s: string) => s.replace(/ /g, '\u00a0')
     const build = !run ? '' : run.boons.length
-      ? run.boons.map(b => atomic(BOONS[b.id].name)).join(' · ')
-      : 'UNMARKED BLADE'
+      ? boonNames(run.boons).map(atomic).join(' · ')
+      : UNMARKED_BUILD
     const arm = run && run.boons.length ? (run.weapon === 'bow' ? 'THE BOW' : 'THE BLADE') : ''
     if (this.cardBuild.text !== build) this.cardBuild.text = build
     if (this.cardArm.text !== arm) this.cardArm.text = arm

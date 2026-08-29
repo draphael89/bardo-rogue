@@ -24,8 +24,9 @@ export interface SettingsStateV2 {
   volSfx: number      // scales the sfx AND ui buses together
 }
 
-export function vol01(v: unknown, fallback = 1): number {
-  return typeof v === 'number' && Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : fallback
+// Absent or invalid volumes fall back to 1 — the authored mix, never silence.
+export function vol01(v: unknown): number {
+  return typeof v === 'number' && Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 1
 }
 
 export function loadMeta(storage?: StorageLike): MetaStateV1 {

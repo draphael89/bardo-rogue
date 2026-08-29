@@ -129,6 +129,12 @@ export const tuning = {
     deathMinTicks: 50,    // the death card's key cap lands at CT beat 46 (hud.ts): the way out works only once it is shown
     victoryMinTicks: 30,  // the victory card arrives in one beat; half a second so a buffered press cannot skip it unread
   },
+  // The pause card's feel. Read by the shell only (src/main.ts) — the sim never touches these; the
+  // hold runs on the render clock in seconds because the sim is stopped while the card is up.
+  menu: {
+    abandonHoldSec: 0.9,  // deliberate, but short enough that it never reads as broken
+    volumeStep: 0.1,      // one slider notch per press / repeat
+  },
   run: {
     doorHalfW: 22,        // px: the open door is three tiles wide
     doorEnterMaxY: 32,    // px: north wall-face row; overlapping it while the door is open enters

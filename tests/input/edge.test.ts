@@ -658,3 +658,43 @@ describe('mouse aim follows the live camera transform', () => {
     expect(f.aimY).toBeCloseTo(ey / el, 4)
   })
 })
+
+describe('absorbLatched: the press that operated the pause card stays out of the game', () => {
+  // The shell pause stops the loop, so sample() — the only thing that drains latched pulses and
+  // ages pad edges — does not run while the card is up. main.ts calls absorbLatched() on resume.
+
+  it('drops a latched Enter instead of confirming the modal underneath', () => {
+    const h = harness()
+    const w = createWorld(1, 'loop')
+    prepareWeapon(w)
+    startRun(w, 'bardo')
+    finishRun(w, 'won')
+    w.tick += tuning.reveal.victoryMinTicks   // past the reveal: only the absorb can stop this press
+
+    h.win.fire('keydown', key('Enter'))       // the press that chose RESUME while paused
+    h.input.absorbLatched()
+    expect(h.input.sample(w).confirm ?? false).toBe(false)
+  })
+
+  it('makes a held pad button re-arm before it can drive the game again', () => {
+    const pad: FakePad = { axes: [0, 0, 0, 0], buttons: Array.from({ length: 16 }, () => ({ pressed: false })) }
+    const h = harness(pad)
+    const w = createWorld(1, 'dummy')
+    pad.buttons[0]!.pressed = true            // A, held to operate the card
+    h.input.absorbLatched()
+    expect(h.input.sample(w).dodge).toBe(false)
+    expect(h.input.sample(w).dodge).toBe(false)   // still held: still disarmed
+    pad.buttons[0]!.pressed = false
+    h.input.sample(w)                             // neutral sample re-arms it
+    pad.buttons[0]!.pressed = true
+    expect(h.input.sample(w).dodge).toBe(true)
+  })
+
+  it('leaves held movement keys alone — resuming with W down keeps walking', () => {
+    const h = harness()
+    const w = createWorld(1, 'dummy')
+    h.win.fire('keydown', key('KeyW'))
+    h.input.absorbLatched()
+    expect(h.input.sample(w).moveY).toBeLessThan(0)
+  })
+})

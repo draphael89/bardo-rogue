@@ -1,6 +1,6 @@
 import { tuning, type SwingDef } from '@/tuning'
 import type { Enemy, World } from './world'
-import type { RewardFamily } from './session'
+import type { BoonStack, RewardFamily } from './session'
 import { damageEnemy, type DamageResult } from './combat'
 import { applyBrand, applyBurn } from './status'
 import { hasLineOfSight } from './collision'
@@ -293,4 +293,13 @@ export function triggerPerfectDodge(world: World): void {
     afterimageActionId(world.tick),
     'echo',
   )
+}
+
+// ---------------------------------------------------------------------------------------------
+// Presentation vocabulary. The sim never reads a boon's NAME, so these are safe for any renderer
+// to import — they exist so the HUD strip, the death card and the victory card cannot drift into
+// three different spellings of the same build.
+export const UNMARKED_BUILD = 'UNMARKED BLADE'
+export function boonNames(boons: readonly BoonStack[]): string[] {
+  return boons.map(b => BOONS[b.id].name)
 }

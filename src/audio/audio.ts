@@ -352,7 +352,10 @@ export class AudioSystem {
     })
   }
 
-  private masterLevel(): number { return dbToGain(MIX.masterDb) * this.slider.master }
+  // sliderToGain, not a raw multiply: the pause card shows three identical sliders, and the master
+  // answering linearly while the buses answer on the -60 dB curve made equal positions sound wildly
+  // different (master 0.5 was -6 dB where music 0.5 was -30 dB).
+  private masterLevel(): number { return dbToGain(MIX.masterDb) * sliderToGain(this.slider.master) }
   private now(): number { return (this.ctx?.currentTime ?? 0) + this.timeOffset }
 
   /**

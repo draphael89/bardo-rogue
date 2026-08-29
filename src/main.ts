@@ -7,7 +7,8 @@ import { abandonRun, canReturn } from '@/sim/return'
 import { pauseRowKinds } from '@/render/reward'
 import type { World } from '@/sim/world'
 import type { InputFrame } from '@/sim/input'
-import { InputSystem, PAD_RESTART } from '@/input'
+import { InputSystem, PAD_CHOICE_LEFT, PAD_CHOICE_RIGHT, PAD_MENU_CONFIRM, PAD_MENU_DOWN, PAD_MENU_UP, PAD_RESTART } from '@/input'
+import { vol01 } from '@/sim/storage'
 import { Loop } from '@/loop'
 import { AudioSystem } from '@/audio/audio'
 import { playEventSfx } from '@/audio/sfxMap'
@@ -17,7 +18,7 @@ import { installApi } from '@/debug/api'
 import { makeBot, type BotName } from '@/sim/bots'
 import { ARENA_COLS, ARENA_ROWS, TILE } from '@/sim/arena'
 import { decodeReplay, isEncodedReplay, quantizeFrame, replayToJson, type Replay, type EncodedReplay } from '@/sim/replay'
-import { Recorder } from '@/input/recorder'
+import { downloadJson, Recorder } from '@/input/recorder'
 import { tuning } from '@/tuning'
 import { Text } from 'pixi.js'
 import { defaultMetaState, type MetaStateV1 } from '@/sim/session'
@@ -310,28 +311,32 @@ async function boot() {
       padStartPrev = startNow
       returnOpenThisFrame = false
       // The pause card's pad navigation, polled here for the same reason Start is: the sim (and with
-      // it the input system) is stopped while paused. Standard-mapping d-pad is buttons 12-15; A is 0.
+      // it the input system) is stopped while paused. Buttons come from src/input, so a remap moves
+      // the menu and the game together.
       if (userPaused && !titleWasUp) {
-        const up = !!pad?.buttons[12]?.pressed, down = !!pad?.buttons[13]?.pressed
-        const left = !!pad?.buttons[14]?.pressed, right = !!pad?.buttons[15]?.pressed
-        const a = !!pad?.buttons[0]?.pressed
+        const up = !!pad?.buttons[PAD_MENU_UP]?.pressed, down = !!pad?.buttons[PAD_MENU_DOWN]?.pressed
+        const left = !!pad?.buttons[PAD_CHOICE_LEFT]?.pressed, right = !!pad?.buttons[PAD_CHOICE_RIGHT]?.pressed
+        const a = !!pad?.buttons[PAD_MENU_CONFIRM]?.pressed
         if (up && !padMenuPrev.up) movePauseFocus(-1)
         if (down && !padMenuPrev.down) movePauseFocus(1)
         if (left && !padMenuPrev.left) pauseAdjust(-1)
         if (right && !padMenuPrev.right) pauseAdjust(1)
-        if (a && !padMenuPrev.a && pauseRowKind() !== 'abandon') pauseActivate()
-        padAHeld = a
-        padMenuPrev = { up, down, left, right, a }
-      } else {
-        padAHeld = false
-        padMenuPrev = { up: false, down: false, left: false, right: false, a: false }
+        // pauseActivate is already inert on the abandon row, which is hold-driven.
+        if (a && !padMenuPrev.a) pauseActivate()
+        padMenuPrev.up = up; padMenuPrev.down = down; padMenuPrev.left = left; padMenuPrev.right = right; padMenuPrev.a = a
+      } else if (padMenuPrev.a || padMenuPrev.up || padMenuPrev.down || padMenuPrev.left || padMenuPrev.right) {
+        padMenuPrev.up = padMenuPrev.down = padMenuPrev.left = padMenuPrev.right = padMenuPrev.a = false
       }
       // Abandon is a held confirmation, advanced on the render clock because the sim is paused.
-      const holdingAbandon = userPaused && pauseRowKind() === 'abandon' && (abandonKeyHeld || padAHeld)
-      abandonHold = holdingAbandon ? Math.min(1, abandonHold + dt / ABANDON_HOLD_SEC) : 0
+      const holdingAbandon = userPaused && pauseRowKind() === 'abandon' && (abandonKeyHeld || padMenuPrev.a)
+      abandonHold = holdingAbandon ? Math.min(1, abandonHold + dt / tuning.menu.abandonHoldSec) : 0
       if (holdingAbandon && abandonHold >= 1) {
         abandonKeyHeld = false
         abandonRun(world)
+        // The abandon mutates the world from outside the tick loop, so the tick-driven event scan
+        // has nothing to report to the host until the sim runs again — and under a debug pause it
+        // never does. Tell the host here, so a desktop quit cannot warn about a run already gone.
+        platform.setRunActive(false)
         setPaused(false)
         presenter.hud.showBanner('THE RUN ENDS HERE', 'the bardo takes you back', 2.2)
       }
@@ -371,21 +376,21 @@ async function boot() {
     !!pad && PAD_START.some(i => !!pad.buttons[i]?.pressed)
 
   // ---- pause menu ------------------------------------------------------------------------------
-  // The card's rows live in pauseRowKinds (shared with the painter). Shell UX constants stay here:
-  // they are menu feel, not gameplay, so they do not belong in tuning.ts.
-  const ABANDON_HOLD_SEC = 0.9   // deliberate, but short enough that it never reads as broken
-  const VOL_STEP = 0.1
+  // The card's rows live in pauseRowKinds (shared with the painter); its feel numbers in tuning.menu.
   let pauseFocus = 0
   let abandonHold = 0
   let abandonKeyHeld = false
-  let padAHeld = false
-  let padMenuPrev = { up: false, down: false, left: false, right: false, a: false }
-  const pauseRunActive = () => !!world.session.run && world.session.run.result === 'active' && world.player.state !== 'dead'
+  const padMenuPrev = { up: false, down: false, left: false, right: false, a: false }
+  // A playtest session records every frame it plays, and an abandon changes the world from outside
+  // that frame stream — the exported bundle would replay a run the tester had already ended. The
+  // row is therefore absent while a session is armed, which is an interlock rather than a warning.
+  const pauseRunActive = () =>
+    !playtest && !!world.session.run && world.session.run.result === 'active' && world.player.state !== 'dead'
   const pauseRowKind = () => pauseRowKinds(pauseRunActive())[pauseFocus] ?? 'resume'
   const movePauseFocus = (dir: number) => {
     const rows = pauseRowKinds(pauseRunActive())
     pauseFocus = (pauseFocus + dir + rows.length) % rows.length
-    abandonHold = 0; abandonKeyHeld = false
+    abandonKeyHeld = false   // the hold itself drains on the next rendered frame
   }
   const toggleReduced = () => {
     reducedEffects = !reducedEffects
@@ -396,7 +401,11 @@ async function boot() {
   const pauseAdjust = (dir: number) => {
     const kind = pauseRowKind()
     if (kind === 'master' || kind === 'music' || kind === 'sfx') {
-      volumes[kind] = Math.min(1, Math.max(0, Math.round((volumes[kind] + dir * VOL_STEP) * 10) / 10))
+      const next = vol01(Math.round((volumes[kind] + dir * tuning.menu.volumeStep) * 10) / 10)
+      // A notch against the rail changes nothing, and persisting it would rotate the backup copy
+      // once per key repeat for an identical payload.
+      if (next === volumes[kind]) return
+      volumes[kind] = next
       applyVolumes()
       void persist()
     } else if (kind === 'reduced') toggleReduced()
@@ -495,20 +504,16 @@ async function boot() {
   // Arm the playtest session: record from tick zero (the world is fresh here, so no reset is
   // needed), and keep the meta snapshot the recorder was handed — the exported bundle must carry
   // the exact counters the run seed was derived from, not the ones the session has mutated since.
-  let playtestMeta: MetaStateV1 | undefined
   if (playtest && !botName) {
-    playtestMeta = cur.scenario === 'loop'
-      ? { ...world.session.meta, unlockedWeapons: [...world.session.meta.unlockedWeapons] }
-      : undefined
-    recorder.start(cur.seed, cur.scenario, cur.god, playtestMeta)
+    // The recorder takes its own defensive copy of meta and holds it for the whole session, so the
+    // bundle is always stamped with the counters the run seeds were derived from.
+    recorder.start(cur.seed, cur.scenario, cur.god, cur.scenario === 'loop' ? world.session.meta : undefined)
     console.log(`[playtest] session armed: condition "${playtest}", recording from tick 0 — F4 exports the bundle`)
   }
   const exportPlaytestBundle = () => {
-    if (!recorder.recording) { presenter.hud.showBanner('NOTHING RECORDING', 'reload to arm the playtest', 2.2); return }
     // A snapshot, not a stop: the session keeps recording so a tester can export after every run.
-    const snapshot: Replay = { v: 1, seed: cur.seed, scenario: cur.scenario, frames: [...recorder.frames] }
-    if (cur.god) snapshot.god = true
-    if (playtestMeta) snapshot.meta = playtestMeta
+    const snapshot = recorder.snapshot()
+    if (!snapshot) { presenter.hud.showBanner('NOTHING RECORDING', 'reload to arm the playtest', 2.2); return }
     // The bundle IS a valid encoded replay with one extra key, so `pnpm sim -- --replay bundle.json`
     // replays it with no unwrapping. The condition rides along for the analyst, not the decoder.
     const bundle = {
@@ -522,11 +527,7 @@ async function boot() {
         metrics: metrics.summary(),
       },
     }
-    const name = `bundle-${playtest}-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.json`
-    const href = URL.createObjectURL(new Blob([JSON.stringify(bundle)], { type: 'application/json' }))
-    const a = document.createElement('a')
-    a.href = href; a.download = name; a.click()
-    setTimeout(() => URL.revokeObjectURL(href), 1000)
+    downloadJson(`bundle-${playtest}-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.json`, JSON.stringify(bundle))
     presenter.hud.showBanner('BUNDLE EXPORTED', 'send the download to the organizer', 2.4)
   }
 
@@ -540,7 +541,22 @@ async function boot() {
   // disagree. Pausing used to stop only the simulation: the bed kept playing behind the overlay and
   // a backgrounded tab kept a synthesiser running indefinitely.
   const setPaused = (p: boolean) => {
-    if (p && !userPaused) { pauseFocus = 0; abandonHold = 0; abandonKeyHeld = false }
+    if (p && !userPaused) {
+      pauseFocus = 0; abandonHold = 0; abandonKeyHeld = false
+      // Seed the menu's pad edges from the buttons that are ALREADY down. Without this, a player
+      // holding attack (A) when they hit Start reads as a fresh press on the opening frame and the
+      // card closes again immediately — a pad player holding A could never pause at all.
+      const pad = firstPad()
+      padMenuPrev.up = !!pad?.buttons[PAD_MENU_UP]?.pressed
+      padMenuPrev.down = !!pad?.buttons[PAD_MENU_DOWN]?.pressed
+      padMenuPrev.left = !!pad?.buttons[PAD_CHOICE_LEFT]?.pressed
+      padMenuPrev.right = !!pad?.buttons[PAD_CHOICE_RIGHT]?.pressed
+      padMenuPrev.a = !!pad?.buttons[PAD_MENU_CONFIRM]?.pressed
+    }
+    // Resuming: the press that operated the card must not also reach the game. sample() is what
+    // drains latched pulses and ages pad edges, and it has not run since the pause began — so the
+    // Enter that chose RESUME would confirm the modal underneath, and A would roll the player.
+    if (!p && userPaused) input.absorbLatched()
     const playerHeld = p || presenter.title.visible
     userPaused = p
     loop.paused = playerHeld || debugPaused
@@ -610,8 +626,11 @@ async function boot() {
       }
     }
     if (e.code === 'F1') { e.preventDefault(); overlay.toggle() }
-    if (e.code === 'F2') { e.preventDefault(); record() }
-    if (e.code === 'F3') { e.preventDefault(); if (recorder.recording) stopRecord(); recorder.download() }
+    // The dev recording keys are locked out while a playtest session is armed: F2 would restart the
+    // recorder against a mutated meta and F3 would end the session outright, either way silently
+    // gutting the bundle a tester is about to hand over.
+    if (e.code === 'F2') { e.preventDefault(); if (playtest) console.log('[playtest] F2 is disabled while a session is armed'); else record() }
+    if (e.code === 'F3') { e.preventDefault(); if (playtest) console.log('[playtest] F3 is disabled while a session is armed'); else { if (recorder.recording) stopRecord(); recorder.download() } }
     if (e.code === 'F4' && playtest && !e.repeat) { e.preventDefault(); exportPlaytestBundle() }
     // Save management is reachable only from the pause screen, so it can never fire mid-fight.
     if (userPaused && !importing && e.code === 'KeyE' && !e.repeat) { e.preventDefault(); void exportSave() }
@@ -621,6 +640,9 @@ async function boot() {
   window.addEventListener('keyup', e => {
     if (e.code === 'Enter' || e.code === 'NumpadEnter') abandonKeyHeld = false
   })
+  // A window that loses focus never delivers the keyup, and rAF keeps running while it is merely
+  // unfocused (the visibility pause needs document.hidden), so the bar would fill with nothing held.
+  window.addEventListener('blur', () => { abandonKeyHeld = false })
   if (!noSave) {
     platform.watchForeignWrites?.(() => {
       if (!savable) return

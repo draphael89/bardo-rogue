@@ -29,15 +29,29 @@ export class Recorder {
     return r
   }
 
+  /** The recording as it stands, without stopping it. Null when nothing is recording. */
+  snapshot(): Replay | null {
+    if (!this.recording) return null
+    const r: Replay = { v: 1, seed: this.seed, scenario: this.scenario, frames: [...this.frames] }
+    if (this.god) r.god = true
+    if (this.meta) r.meta = { ...this.meta, unlockedWeapons: [...this.meta.unlockedWeapons] }
+    return r
+  }
+
   suggestedName(r = this.last): string { return r ? `${r.scenario}-${r.seed}-${r.frames.length}.json` : 'replay.json' }
 
   // Browser-only: triggers a .json download of the last recording.
   download(name = this.suggestedName()): void {
     if (!this.last) { console.warn('[replay] nothing recorded yet (F2 to record)'); return }
-    const url = URL.createObjectURL(new Blob([replayToJson(this.last)], { type: 'application/json' }))
-    const a = document.createElement('a')
-    a.href = url; a.download = name; a.click()
-    setTimeout(() => URL.revokeObjectURL(url), 1000)
+    downloadJson(name, replayToJson(this.last))
     console.log(`[replay] downloaded ${name}; move it to replays/ to use it with pnpm sim/shot --replay`)
   }
+}
+
+// Browser-only: the one anchor-click download path, shared with the playtest bundle export.
+export function downloadJson(name: string, text: string): void {
+  const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }))
+  const a = document.createElement('a')
+  a.href = url; a.download = name; a.click()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
 }

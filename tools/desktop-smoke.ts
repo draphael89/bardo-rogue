@@ -11,6 +11,7 @@ import { join, relative, sep } from 'node:path'
 import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 import { replayFromJson, runReplay } from '../src/sim/replay'
+import { SAVE_SCHEMA_VERSION } from '../src/sim/save'
 import { bumpRevision, defaultSave, serializeSave } from '../src/sim/save'
 
 const args = Object.fromEntries(process.argv.slice(2).map((a, i, arr) => a.startsWith('--') ? [a.slice(2), arr[i + 1] ?? '1'] : []).filter(x => x.length))
@@ -341,7 +342,7 @@ try {
     for (let i = 0; i < 40 && !existsSync(live); i++) await new Promise(r => setTimeout(r, 100))
     assert(existsSync(live), 'pressing V wrote no save file through the seam')
     const doc = JSON.parse(readFileSync(live, 'utf8')) as { schemaVersion: number; revision: number; settings: { reducedEffects: boolean } }
-    assert(doc.schemaVersion === 2, `unexpected schemaVersion ${doc.schemaVersion}`)
+    assert(doc.schemaVersion === SAVE_SCHEMA_VERSION, `unexpected schemaVersion ${doc.schemaVersion}`)
     assert(doc.revision >= 1, `revision did not advance: ${doc.revision}`)
     assert(doc.settings.reducedEffects === !before, `the V keypress did not reach the persisted settings (was ${before}, stored ${doc.settings.reducedEffects})`)
     return `envelope v${doc.schemaVersion} rev${doc.revision} written by the game`

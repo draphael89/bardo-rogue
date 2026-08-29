@@ -49,7 +49,7 @@ export interface SheetProvenance {
   modelVersion?: string
   jobId?: string
   seed?: number
-  /** SHA-256 (or a 16+ digit prefix) of promptFile, verified by the compiler. */
+  /** SHA-256 (or a 16+ digit prefix) of the source-specific immutable promptFile. */
   promptHash?: string
   promptFile?: string
   referenceHashes?: string[]
@@ -119,6 +119,7 @@ export function validateSheetDef(def: SheetDef, where: string): void {
   if (!Number.isInteger(def.cols) || def.cols < 1) fail('cols must be a positive integer')
   if (!Number.isInteger(def.rows) || def.rows < 1) fail('rows must be a positive integer')
   const cells = def.cols * def.rows
+  if (!def.frames || Object.keys(def.frames).length === 0) fail('must declare at least one frame')
   const seen = new Set<number>()
   for (const [name, f] of Object.entries(def.frames)) {
     if (!Number.isInteger(f.i) || f.i < 0 || f.i >= cells) fail(`frame "${name}" index ${f.i} outside 0..${cells - 1}`)

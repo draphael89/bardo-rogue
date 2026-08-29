@@ -331,13 +331,16 @@ function reduce(
   opts: Required<Pick<CompileSpec, 'coverage' | 'chromaKey'>> & { salience: { minShare: number; minDelta: number } | false; gamma: number },
 ): { idx: Int16Array } {
   const idx = new Int16Array(cell * cell).fill(-1)
+  if (c.w < 1 || c.h < 1) return { idx }
   const votes = new Map<number, number>()
   // Memoise the palette lookup: a 1254px source has ~1.5M pixels but only thousands of distinct colours.
   const lut = new Map<number, number>()
   for (let oy = 0; oy < cell; oy++) {
-    const sy0 = Math.round(oy * c.h / cell), sy1 = Math.max(sy0 + 1, Math.round((oy + 1) * c.h / cell))
+    const sy0 = Math.min(c.h - 1, Math.round(oy * c.h / cell))
+    const sy1 = Math.min(c.h, Math.max(sy0 + 1, Math.round((oy + 1) * c.h / cell)))
     for (let ox = 0; ox < cell; ox++) {
-      const sx0 = Math.round(ox * c.w / cell), sx1 = Math.max(sx0 + 1, Math.round((ox + 1) * c.w / cell))
+      const sx0 = Math.min(c.w - 1, Math.round(ox * c.w / cell))
+      const sx1 = Math.min(c.w, Math.max(sx0 + 1, Math.round((ox + 1) * c.w / cell)))
       votes.clear()
       let opaque = 0, total = 0
       for (let sy = sy0; sy < sy1; sy++) for (let sx = sx0; sx < sx1; sx++) {
@@ -391,7 +394,12 @@ export async function compileSheet(spec: CompileSpec, specPath = '<inline>'): Pr
   const fit = spec.fit ?? 'grid'
   const margin = spec.margin ?? 0
   const pal = subset(spec.palette)
-  const maxColors = spec.maxColors ?? canon().budgets[spec.kind === 'character' ? 'character' : spec.kind === 'prop' ? 'prop' : 'effect'] ?? 16
+  const maxColors = spec.maxColors ?? canon().budgets[spec.kind] ?? 16
+  if (!Array.isArray(spec.frames) || spec.frames.length === 0) throw new Error('compile: spec must declare at least one frame')
+  const cells = spec.cols * spec.rows
+  for (const f of spec.frames) {
+    if (!Number.isInteger(f.i) || f.i < 0 || f.i >= cells) throw new Error(`compile: frame "${f.name}" index ${f.i} outside 0..${cells - 1}`)
+  }
 
   validateProvenance(spec, specPath)
 

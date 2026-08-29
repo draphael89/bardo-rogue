@@ -1,0 +1,7 @@
+Create one original dark-mythic pixel-art forge-brute sprite sheet, not based on any existing
+character. Use a strict 4x2 grid of equal square cells, a 48-logical-pixel large-enemy frame, stable
+feet, one oversized iron shoulder, a low mask with one amber slit, wine-red apron, heavy boots, and a
+square two-handed maul physically held in every relevant pose. Row-major poses: idle guard, chase,
+early windup, committed windup; strike release, contact, recovery, hurt/stagger. Match the hero's
+wine/indigo/bone/muted-gold family, reserve amber heat for committed attacks, and use a uniform
+#00ff00 background. No labels, grid, shadow, scenery, VFX, text, logo, watermark, or extra objects.

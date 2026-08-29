@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterEach, vi } from 'vitest'
-import { readFileSync, existsSync, mkdtempSync, readdirSync, writeFileSync } from 'node:fs'
+import { readFileSync, existsSync, mkdtempSync, readdirSync, writeFileSync, utimesSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -8,7 +8,7 @@ import { validateSheetDef, type SheetDef } from '../../src/render/sheet'
 import { compileSheet, validateClipRefs, validateProvenance, type CompileReport, type CompileSpec } from '../../tools/art/compile'
 import { makeContext, runGates, summarise } from '../../tools/art/gates'
 import { canon, rgbToHex, type RGB } from '../../tools/art/palette'
-import { generate, requests } from '../../tools/art/generate'
+import { generate, referenceImages, requests } from '../../tools/art/generate'
 import { authoredFxFrame, quantizeFxAlpha, quantizeFxRotation } from '../../src/render/fxUnits'
 import { heroFrameName } from '../../src/render/views/player'
 import { createWorld } from '../../src/sim/scenarios'
@@ -47,6 +47,11 @@ describe('asset contract', () => {
   it('rejects a frame whose cell is out of range', () => {
     const def = { id: 'x', version: 1, kind: 'character', cell: 32, cols: 2, rows: 2, palette: 'p', maxColors: 16, frames: { a: { i: 9, pivot: [16, 30] } } } as unknown as SheetDef
     expect(() => validateSheetDef(def, 'x')).toThrow(/outside 0\.\.3/)
+  })
+
+  it('rejects a sidecar with no frames', () => {
+    const def = { id: 'x', version: 1, kind: 'character', cell: 32, cols: 1, rows: 1, palette: 'p', maxColors: 16, frames: {} } as SheetDef
+    expect(() => validateSheetDef(def, 'x')).toThrow(/at least one frame/)
   })
 
   it('rejects two frames sharing a cell, but allows a declared alias', () => {
@@ -152,6 +157,45 @@ describe('compiler', () => {
       frames: [{ name: 'first', i: 0 }, { name: 'second', i: 0 }],
     }, 'test')).rejects.toThrow(/both use cell 0/)
   })
+
+  it('rejects zero frames and out-of-grid indices before every fit mode', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'bardo-compile-structure-'))
+    const src = join(dir, 'src.png')
+    await sharp({ create: { width: 8, height: 8, channels: 4, background: '#66334d' } }).png().toFile(src)
+    const base = {
+      id: 'test.structure', kind: 'character' as const, input: src, output: join(dir, 'out.png'),
+      cell: 8, cols: 1, rows: 1, palette: ['mortar', 'purple1'],
+    }
+    await expect(compileSheet({ ...base, frames: [] }, 'test')).rejects.toThrow(/at least one frame/)
+    for (const fit of ['grid', 'pose'] as const) {
+      await expect(compileSheet({ ...base, fit, frames: [{ name: 'outside', i: 1 }] }, 'test'))
+        .rejects.toThrow(/index 1 outside 0\.\.0/)
+    }
+  })
+
+  it('keeps a transparent 1x1 source transparent when enlarging it', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'bardo-tiny-transparent-'))
+    const src = join(dir, 'src.png'), output = join(dir, 'out.png')
+    await sharp({ create: { width: 1, height: 1, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).png().toFile(src)
+    const { report } = await compileSheet({
+      id: 'test.tiny-transparent', kind: 'effect', input: src, output,
+      cell: 8, cols: 1, rows: 1, palette: ['mortar'], frames: [{ name: 'empty', i: 0 }],
+    }, 'test')
+    const { data } = await sharp(output).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+    expect(report.frames[0].opaque).toBe(0)
+    expect([...data].filter((_v, i) => i % 4 === 3)).toEqual(Array(64).fill(0))
+  })
+
+  it('uses the canon tile colour budget when a spec omits maxColors', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'bardo-tile-budget-'))
+    const src = join(dir, 'src.png')
+    await sharp({ create: { width: 8, height: 8, channels: 4, background: '#2e3a4e' } }).png().toFile(src)
+    const { def } = await compileSheet({
+      id: 'test.tile-budget', kind: 'tile', input: src, output: join(dir, 'out.png'),
+      cell: 8, cols: 1, rows: 1, frames: [{ name: 'tile', i: 0 }],
+    }, 'test')
+    expect(def.maxColors).toBe(10)
+  })
 })
 
 describe('generation boundary', () => {
@@ -208,6 +252,30 @@ describe('generation boundary', () => {
       if (before === undefined) delete process.env.PIXELLAB_SECRET
       else process.env.PIXELLAB_SECRET = before
     }
+  })
+
+  it('rejects a missing requested reference before building a provider request', async () => {
+    const missing = join(tmpdir(), 'bardo-reference-that-does-not-exist.png')
+    await expect(requests('pixellab', {
+      subject: 'hero', size: 32, count: 1, references: [missing],
+    }, 'token')).rejects.toThrow(/requested reference does not exist/)
+
+    const empty = mkdtempSync(join(tmpdir(), 'bardo-empty-reference-'))
+    await expect(referenceImages([empty])).rejects.toThrow(/contains no PNG images/)
+  })
+
+  it('selects the same path-sorted approved prefix regardless of input order or mtimes', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'bardo-reference-order-'))
+    const files = ['echo.png', 'alpha.png', 'delta.png', 'bravo.png', 'charlie.png'].map(name => join(dir, name))
+    for (let i = 0; i < files.length; i++) {
+      await sharp({ create: { width: 1, height: 1, channels: 4, background: { r: i * 30, g: 20, b: 40, alpha: 1 } } }).png().toFile(files[i])
+      const when = new Date((files.length - i) * 10_000)
+      utimesSync(files[i], when, when)
+    }
+    const sorted = [...files].sort((a, b) => a < b ? -1 : a > b ? 1 : 0).slice(0, 4)
+    const expected = sorted.map(f => readFileSync(f).toString('base64'))
+    expect(await referenceImages([dir])).toEqual(expected)
+    expect(await referenceImages([...files].reverse())).toEqual(expected)
   })
 })
 
@@ -293,6 +361,28 @@ describe('gates', () => {
     expect(hard.has('clip:bad:loop-closure')).toBe(true)
     expect(hard.has('clip:bad:planted-feet')).toBe(true)
     expect(summarise(gates).pass, 'the CLI must not promote a candidate with any of these failures').toBe(false)
+  })
+
+  it('does not call distinct same-red canon colours duplicate frames', () => {
+    const cell = 8, width = cell * 2, height = cell
+    const pixels = new Uint8Array(width * height * 4)
+    const colors = [canon().colors.slateHi.rgb, canon().colors.purple2.rgb]
+    for (let frame = 0; frame < 2; frame++) for (let y = 2; y < 6; y++) for (let x = 2; x < 6; x++) {
+      const i = (y * width + frame * cell + x) * 4
+      pixels[i] = colors[frame][0]; pixels[i + 1] = colors[frame][1]; pixels[i + 2] = colors[frame][2]; pixels[i + 3] = 255
+    }
+    const def = {
+      id: 'test.same-red', version: 1, kind: 'effect' as const, cell, cols: 2, rows: 1,
+      palette: 'test', maxColors: 6,
+      frames: { slate: { i: 0, pivot: [4, 6] as [number, number] }, purple: { i: 1, pivot: [4, 6] as [number, number] } },
+    }
+    const report = {
+      spec: '', input: '', output: '', sidecar: '', source: { width, height, hash: '' },
+      atlas: { cell, cols: 2, rows: 1, width, height, colors: 2, partialAlpha: 0, indexed: false, liftGamma: 1, despeckled: 0, strays: 0 },
+      palette: [], offPalette: [], frames: [],
+    } satisfies CompileReport
+    const gates = runGates({ def, report, pixels, width, height, groundLuminance: 0.13 })
+    expect(gates.some(g => g.gate === 'duplicate-frames')).toBe(false)
   })
 })
 
@@ -421,6 +511,20 @@ describe('review findings', () => {
     expect(() => validateProvenance({ ...base, provenance: { provider: 'test', approvedSource, promptFile, promptHash: '0'.repeat(64) } }, 'x')).toThrow(/does not match/)
     expect(() => validateProvenance({ ...base, input: source, provenance: { provider: 'test', approvedSource: source } }, 'x')).toThrow(/under art\/approved/)
     expect(() => validateProvenance({ ...base, provenance: { provider: 'test', approvedReference: source } }, 'x')).toThrow(/under art\/approved/)
+  })
+
+  it('pins every shipped source to its own immutable prompt record', () => {
+    const promptFiles = new Set<string>()
+    for (const name of SHEETS) {
+      const def = JSON.parse(readFileSync(sidecarPath(name), 'utf8')) as SheetDef
+      const promptFile = def.source!.promptFile!
+      const promptHash = def.source!.promptHash!
+      expect(promptFile, name).toMatch(/^art\/prompts\/.+\.txt$/)
+      expect(promptHash, name).toBe(createHash('sha256').update(readFileSync(promptFile)).digest('hex'))
+      expect(readFileSync(promptFile, 'utf8').trim().length, name).toBeGreaterThan(100)
+      promptFiles.add(promptFile)
+    }
+    expect(promptFiles.size).toBe(SHEETS.length)
   })
 
   it('every shipped sidecar names a tuning window that still exists', () => {

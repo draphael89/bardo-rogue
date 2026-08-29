@@ -152,7 +152,7 @@
     "provider": "openai",
     "model": "gpt-image (built-in tool)",
     "approvedSource": "art/approved/bardo_brute_alpha_v1.png",
-    "promptFile": "art/bardo-combat-sprites.md",
-    "promptHash": "48e838b1f87f62c86c89db1bef18c85e063581a64d9e41fae853fb1787ff0bb1"
+    "promptFile": "art/prompts/bardo_brute_alpha_v1.txt",
+    "promptHash": "40421fc7fa6117eb11644a94681f8497e39c369db128ee278a083c18e651b749"
   }
 }

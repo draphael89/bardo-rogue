@@ -127,6 +127,14 @@ function resolveOverlaps(world: World, moved: boolean): void {
         const b = es[j]
         if (!b.active || b.state === 'dead') continue
         if (a.state === 'dash' || b.state === 'dash') continue
+        // Keep the canonical ascending pair walk: positions can change after every separation, so a
+        // cached grid or sorted sweep would become stale mid-pass. Axis bounds reject only pairs the
+        // circle narrow phase must reject, without changing the order of any pair that can overlap.
+        const min = a.radius + b.radius
+        const dx = b.x - a.x
+        if (dx >= min || dx <= -min) continue
+        const dy = b.y - a.y
+        if (dy >= min || dy <= -min) continue
         overlapped = separate(world.arena, a, a.radius, b, b.radius, 0.5, 0.5) || overlapped
       }
     }

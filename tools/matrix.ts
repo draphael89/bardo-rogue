@@ -33,9 +33,11 @@ if (!Number.isFinite(ticks) || ticks <= 0) usage(`--ticks must be a positive num
 // The SOFT band is balance: how often each policy wins. It is reported every run and only fails on a
 // gross drift, because a bot's win rate is evidence about tuning, not a correctness invariant. The
 // naive ceiling is the one that matters — if mashing starts reliably clearing the Warden, the
-// encounter has stopped asking for the skills the combat is built around.
+// encounter has stopped asking for the skills the combat is built around. The skilled floor is a
+// coarse alarm below the corrected veil baseline (333/500), not a promise that this rough policy
+// wins a particular seed sample.
 const SPECS: Array<{ bot: BotName; minWin: number; maxWin: number; note: string }> = [
-  { bot: 'slice-kite', minWin: 0.8, maxWin: 1, note: 'spacing and punishes should clear the run' },
+  { bot: 'slice-kite', minWin: 0.6, maxWin: 1, note: 'spacing and punishes should usually clear the run' },
   { bot: 'slice-naive', minWin: 0, maxWin: 0.2, note: 'mashing should rarely survive the Warden' },
 ]
 

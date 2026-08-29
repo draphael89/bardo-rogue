@@ -142,6 +142,14 @@ export function arrivalBanner(scenario: string, name: string): string | null {
   return scenario === 'loop' ? null : name
 }
 
+/** Coming home names the keep, not THE BARDO again. The footer already stands. */
+export function homeBanner(kept: number, smithWaiting: boolean): { title: string; sub: string } {
+  return {
+    title: keptLabel(kept),
+    sub: smithWaiting ? 'the anvil will take what you kept' : 'the blade waits',
+  }
+}
+
 /** You already pressed Descend. The first fight does not stamp the verb again. */
 export function runStartBanner(scenario: string): { title: string; sub: string } | null {
   if (scenario === 'loop') return null

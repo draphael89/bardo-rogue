@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { arrivalBanner, backPause, backTitle, confirmTitle, deathCarriedLine, deathClose, deathReachedLine, deathSentLine, deathTakenLine, duoFooter, hideFightChrome, hidePlaceCaption, keptLabel, meetingVeil, offerAct, offerSpoken, pauseNudge, pauseRows, resolvePause, runStartBanner, shopAct, shopSpoken, showBuildStrip, titleDescend, titleNudge, titleRows, townTally, victoryKeptLine, wrapPauseFocus, wrapTitleFocus } from '@/render/titleMenu'
+import { arrivalBanner, backPause, backTitle, confirmTitle, deathCarriedLine, deathClose, deathReachedLine, deathSentLine, deathTakenLine, duoFooter, hideFightChrome, hidePlaceCaption, homeBanner, keptLabel, meetingVeil, offerAct, offerSpoken, pauseNudge, pauseRows, resolvePause, runStartBanner, shopAct, shopSpoken, showBuildStrip, titleDescend, titleNudge, titleRows, townTally, victoryKeptLine, wrapPauseFocus, wrapTitleFocus } from '@/render/titleMenu'
 import { SHOP_COPY } from '@/sim/economy'
 import { clampSlider, nudgeSlider } from '@/sim/storage'
 
@@ -69,6 +69,13 @@ describe('title menu', () => {
     expect(arrivalBanner('wave1', 'THE THRESHOLD')).toBe('THE THRESHOLD')
     expect(runStartBanner('loop')).toBeNull()
     expect(runStartBanner('wave1')).toEqual({ title: 'DESCEND', sub: 'return with your name' })
+  })
+
+  it('names the keep on the way home, not THE BARDO again', () => {
+    expect(homeBanner(2, false)).toEqual({ title: '2 KEPT', sub: 'the blade waits' })
+    expect(homeBanner(0, false)).toEqual({ title: 'NOTHING NEW', sub: 'the blade waits' })
+    expect(homeBanner(3, true)).toEqual({ title: '3 KEPT', sub: 'the anvil will take what you kept' })
+    expect(homeBanner(2, false).title).not.toMatch(/BARDO/)
   })
 
   it('hides fight chrome on a pause the same way it hides it on a meeting', () => {

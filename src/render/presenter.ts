@@ -25,7 +25,7 @@ import { guardUp } from '@/sim/enemies/oathbound'
 import { RewardOverlay } from './reward'
 import { RouteMap } from './map'
 import { TitleOverlay } from './title'
-import { arrivalBanner, keptLabel, runStartBanner } from './titleMenu'
+import { arrivalBanner, homeBanner, runStartBanner } from './titleMenu'
 import { HardLockFeedback } from './hardLock'
 import { contactKillKey, enemyReactionTransform, grazeFeedbackGeometry, impactStampForHit, recognizedContactKills, type ImpactStamp } from './contact'
 import { brandCount, brandSlash, burnVein, judgmentBurst, judgmentContact } from './statusMarks'
@@ -461,12 +461,8 @@ export class Presenter {
           this.flash(0.32, arrivalFlash('bardo'))
           this.camera.addTrauma(0.08)
           this.postfx.pulse()
-          const home = ev.smithWaiting
-            ? 'the anvil will take what you kept'
-            : ev.kept > 0
-              ? keptLabel(ev.kept)
-              : 'the blade waits'
-          this.hud.showBanner(ev.name, home, 1.8)
+          const home = homeBanner(ev.kept, ev.smithWaiting)
+          this.hud.showBanner(home.title, home.sub, 1.8)
           this.hud.place.text = ev.name
           break
         }

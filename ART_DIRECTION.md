@@ -531,3 +531,64 @@ Run these on the captured frame or the baked room texture before any subjective 
 2. Run §11.1. Any failed gate **is** the gap. If several fail, take the earliest section number — the sections are ordered by leverage, and a §2 failure makes every §5 judgement meaningless.
 3. Only when every gate passes does the critic run the blind comparison against the reference.
 4. If the reference still wins with all gates green, the gap is a **missing rule**. Write it into this document as a new numbered clause, then send the builder back against the new clause. That is how this document stops the eleven-round loop from repeating.
+
+---
+
+## §12. The generation spec
+
+§1–§11 tell a builder what to make. This section tells the *pipeline* how to make it, and it is
+executable: `art/palette/canon.json` is §1 in machine form, `tools/art/generate.ts` quotes §2/§4/§10
+into every prompt, and `tools/art/gates.ts` measures §11.1 on every compile. A rule that is not in one
+of those three places is a rule the pipeline cannot enforce.
+
+### 12.1 The lanes
+
+Three, and an asset belongs to exactly one:
+
+| Lane | Owns | Tool |
+|---|---|---|
+| **Generated** | characters, large props, bosses | `pnpm art generate` → `pnpm art compile` |
+| **Code** | tiles, materials, autotiles, VFX, telegraphs, HUD chrome | `pnpm tiles`, `pnpm fx` |
+| **Runtime** | light, grade, camera, anything that must respond to sim state | `src/render/` |
+
+The code lane is not a stopgap. Anything whose shape is a function of gameplay geometry — a
+telegraph that draws the real danger set, an impact whose ramp lands on the damage tick — cannot be
+a generated sprite, because a sprite cannot track `tuning.ts`. Generation is for things that are
+*drawn*, not for things that are *computed*.
+
+### 12.2 The loop
+
+    spec → generate candidates → gate → HUMAN APPROVES the identity → directions and poses
+         → compile → gate → sidecar → pnpm poses / shot / strip → blind critic → commit
+
+One human checkpoint, and it is the identity master. Everything downstream is conditioned on it, so
+an unapproved master propagates its faults into every direction and every clip. Nothing else in the
+loop asks for a person.
+
+### 12.3 What a generator is told
+
+Never a fresh prompt. `buildPrompt()` assembles: the subject in the game's own words, the canvas from
+§4.1, the asset's palette ramp as explicit hex, the silhouette rule for its class from §4.3, the
+material and lighting laws from §2.1, and §10's forbidden list as negative constraints. The prompt's
+hash is recorded in the sheet's sidecar, so any asset can be traced to the exact words that made it.
+
+### 12.4 Palette ramps are per-asset and deliberate
+
+A character gets 16 canon colours, chosen — not 16 that happened to survive quantisation. Choosing
+them is an art-direction act with consequences: the Brute's first ramp included `emberLo`, and a
+lifted dark wine mapped nearer that strong red than to any purple, so he read as burning rather than
+aproned. Give each material a real ramp (§2.4: metal is a value range) before spending slots on
+accents, and write down why in the spec's `paletteNote`.
+
+### 12.5 Value is checked against the rendered floor, not the palette
+
+The floor's slab colours average 0.266 luminance; the floor as *rendered* is 0.130, because the
+lightmap multiplies over it. Ground separation (§4.3.4) is measured against the rendered value —
+grading a sprite against the raw tile demands a body twice as bright as the room can support. This is
+why the Brute shipped at Weber −0.03, darker than the stone he stands on.
+
+### 12.6 The approved pool is the style reference
+
+`art/approved/` holds every master a human has accepted. Each new generation is conditioned on it, so
+consistency compounds rather than being re-argued per asset. An asset leaves `.art-cache/` for
+`art/approved/` only by human decision, and reaches `public/assets/` only by passing the gates.

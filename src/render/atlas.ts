@@ -1,26 +1,30 @@
 import { Assets, Texture, Rectangle, TextureSource } from 'pixi.js'
+import { bindSheet, validateSheetDef, type Sheet, type SheetDef } from './sheet'
 
 // All pixel art is sampled nearest-neighbor. Set once, before any texture loads.
 TextureSource.defaultOptions.scaleMode = 'nearest'
 
+/** Authored sheets, each a PNG plus the JSON sidecar that names its frames. */
+const SHEETS = [
+  'bardo_hero',
+  'bardo_hero_north',
+  'bardo_hero_north_roll',
+  'bardo_hero_south',
+  'bardo_hero_south_roll',
+  'bardo_brute',
+] as const
+export type SheetName = (typeof SHEETS)[number]
+
 export interface Atlas {
-  tile(i: number): Texture          // Tiny Dungeon 16x16 by index (12 columns) — characters, weapons
+  tile(i: number): Texture          // Tiny Dungeon 16x16 by index (12 columns) — legacy actors, weapons
   room(i: number): Texture          // Bardo room sheet 16x16 by index (8 columns)
   prop(i: number): Texture          // Bardo furniture sheet 32x32 by index (4 columns)
   white(i: number): Texture         // same tile as a white silhouette (hit flash)
-  hero(i: number): Texture          // authored Bardo hero sheet, 32x32, four columns
-  heroWhite(i: number): Texture     // matching white silhouettes for hurt flash / perfect-read rim
-  heroNorth(i: number): Texture     // matching back-facing combat sheet
-  heroNorthWhite(i: number): Texture
-  heroNorthRoll(i: number): Texture // four-frame back-facing depth-axis tumble
-  heroNorthRollWhite(i: number): Texture
-  heroSouth(i: number): Texture     // matching front-facing combat sheet
-  heroSouthWhite(i: number): Texture
-  heroSouthRoll(i: number): Texture // four-frame front-facing depth-axis tumble
-  heroSouthRollWhite(i: number): Texture
-  brute(i: number): Texture         // authored Bardo Brute sheet, 48x48, four columns
-  bruteWhite(i: number): Texture    // matching silhouettes (kept for the shared feedback contract)
-  micro(i: number): Texture         // Micro Roguelike 8x8 by index (16 columns)
+  /**
+   * An authored sheet, addressed by semantic frame name rather than cell index.
+   * Pivots and sockets travel in the sidecar, so a view never hard-codes a registration table.
+   */
+  sheet(name: SheetName): Sheet
   particle(name: string): Texture
   decal(name: string): Texture
   light(name: string): Texture
@@ -31,13 +35,6 @@ export async function loadAtlas(manifest: Record<string, string[]>): Promise<Atl
   const tiny = await Assets.load<Texture>(base + 'sprites/tiny_dungeon.png')
   const room = await Assets.load<Texture>(base + 'sprites/bardo_room.png')
   const props = await Assets.load<Texture>(base + 'sprites/bardo_props.png')
-  const hero = await Assets.load<Texture>(base + 'sprites/bardo_hero.png')
-  const heroNorth = await Assets.load<Texture>(base + 'sprites/bardo_hero_north.png')
-  const heroNorthRoll = await Assets.load<Texture>(base + 'sprites/bardo_hero_north_roll.png')
-  const heroSouth = await Assets.load<Texture>(base + 'sprites/bardo_hero_south.png')
-  const heroSouthRoll = await Assets.load<Texture>(base + 'sprites/bardo_hero_south_roll.png')
-  const brute = await Assets.load<Texture>(base + 'sprites/bardo_brute.png')
-  const micro = await Assets.load<Texture>(base + 'sprites/micro.png')
   const particles = new Map<string, Texture>()
   const decals = new Map<string, Texture>()
   const lights = new Map<string, Texture>()
@@ -51,19 +48,6 @@ export async function loadAtlas(manifest: Record<string, string[]>): Promise<Atl
   const rooms = new Map<number, Texture>()
   const propTiles = new Map<number, Texture>()
   const whites = new Map<number, Texture>()
-  const heroTiles = new Map<number, Texture>()
-  const heroWhites = new Map<number, Texture>()
-  const heroNorthTiles = new Map<number, Texture>()
-  const heroNorthWhites = new Map<number, Texture>()
-  const heroNorthRollTiles = new Map<number, Texture>()
-  const heroNorthRollWhites = new Map<number, Texture>()
-  const heroSouthTiles = new Map<number, Texture>()
-  const heroSouthWhites = new Map<number, Texture>()
-  const heroSouthRollTiles = new Map<number, Texture>()
-  const heroSouthRollWhites = new Map<number, Texture>()
-  const bruteTiles = new Map<number, Texture>()
-  const bruteWhites = new Map<number, Texture>()
-  const micros = new Map<number, Texture>()
   const sub = (src: Texture, i: number, cols: number, size: number) =>
     new Texture({ source: src.source, frame: new Rectangle((i % cols) * size, Math.floor(i / cols) * size, size, size) })
 
@@ -83,31 +67,31 @@ export async function loadAtlas(manifest: Record<string, string[]>): Promise<Atl
     return out
   }
   const tinyWhite = whiteSheet(tiny)
-  const heroWhite = whiteSheet(hero)
-  const heroNorthWhite = whiteSheet(heroNorth)
-  const heroNorthRollWhite = whiteSheet(heroNorthRoll)
-  const heroSouthWhite = whiteSheet(heroSouth)
-  const heroSouthRollWhite = whiteSheet(heroSouthRoll)
-  const bruteWhite = whiteSheet(brute)
+  const sheets = new Map<string, Sheet>()
+  await Promise.all(SHEETS.map(async name => {
+    const [tex, def] = await Promise.all([
+      Assets.load<Texture>(`${base}sprites/${name}.png`),
+      fetch(`${base}sprites/${name}.json`).then(r => r.json() as Promise<SheetDef>),
+    ])
+    // The contract is checked at load, not assumed: a sidecar and its PNG can drift apart, and a
+    // silent mismatch shows up as the wrong pose on the wrong tick rather than as an error.
+    validateSheetDef(def, name)
+    if (tex.width !== def.cols * def.cell || tex.height !== def.rows * def.cell) {
+      throw new Error(`sheet ${name}: image is ${tex.width}x${tex.height}, sidecar declares ${def.cols * def.cell}x${def.rows * def.cell}`)
+    }
+    sheets.set(name, bindSheet(def, tex, whiteSheet(tex)))
+  }))
 
   return {
     tile: i => tiles.get(i) ?? (tiles.set(i, sub(tiny, i, 12, 16)), tiles.get(i)!),
     room: i => rooms.get(i) ?? (rooms.set(i, sub(room, i, 8, 16)), rooms.get(i)!),
     prop: i => propTiles.get(i) ?? (propTiles.set(i, sub(props, i, 4, 32)), propTiles.get(i)!),
     white: i => whites.get(i) ?? (whites.set(i, sub(tinyWhite, i, 12, 16)), whites.get(i)!),
-    hero: i => heroTiles.get(i) ?? (heroTiles.set(i, sub(hero, i, 4, 32)), heroTiles.get(i)!),
-    heroWhite: i => heroWhites.get(i) ?? (heroWhites.set(i, sub(heroWhite, i, 4, 32)), heroWhites.get(i)!),
-    heroNorth: i => heroNorthTiles.get(i) ?? (heroNorthTiles.set(i, sub(heroNorth, i, 4, 32)), heroNorthTiles.get(i)!),
-    heroNorthWhite: i => heroNorthWhites.get(i) ?? (heroNorthWhites.set(i, sub(heroNorthWhite, i, 4, 32)), heroNorthWhites.get(i)!),
-    heroNorthRoll: i => heroNorthRollTiles.get(i) ?? (heroNorthRollTiles.set(i, sub(heroNorthRoll, i, 2, 32)), heroNorthRollTiles.get(i)!),
-    heroNorthRollWhite: i => heroNorthRollWhites.get(i) ?? (heroNorthRollWhites.set(i, sub(heroNorthRollWhite, i, 2, 32)), heroNorthRollWhites.get(i)!),
-    heroSouth: i => heroSouthTiles.get(i) ?? (heroSouthTiles.set(i, sub(heroSouth, i, 4, 32)), heroSouthTiles.get(i)!),
-    heroSouthWhite: i => heroSouthWhites.get(i) ?? (heroSouthWhites.set(i, sub(heroSouthWhite, i, 4, 32)), heroSouthWhites.get(i)!),
-    heroSouthRoll: i => heroSouthRollTiles.get(i) ?? (heroSouthRollTiles.set(i, sub(heroSouthRoll, i, 2, 32)), heroSouthRollTiles.get(i)!),
-    heroSouthRollWhite: i => heroSouthRollWhites.get(i) ?? (heroSouthRollWhites.set(i, sub(heroSouthRollWhite, i, 2, 32)), heroSouthRollWhites.get(i)!),
-    brute: i => bruteTiles.get(i) ?? (bruteTiles.set(i, sub(brute, i, 4, 48)), bruteTiles.get(i)!),
-    bruteWhite: i => bruteWhites.get(i) ?? (bruteWhites.set(i, sub(bruteWhite, i, 4, 48)), bruteWhites.get(i)!),
-    micro: i => micros.get(i) ?? (micros.set(i, sub(micro, i, 16, 8)), micros.get(i)!),
+    sheet: name => {
+      const s = sheets.get(name)
+      if (!s) throw new Error(`atlas: no sheet "${name}"`)
+      return s
+    },
     particle: n => particles.get(n) ?? Texture.WHITE,
     decal: n => decals.get(n) ?? Texture.WHITE,
     light: n => lights.get(n) ?? Texture.WHITE,

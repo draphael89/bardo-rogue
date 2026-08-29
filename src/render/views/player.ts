@@ -7,63 +7,43 @@ import { lerp, clamp01, easeOutCubic, easeInCubic, lerpAngle } from '../anim'
 import { swingProgress } from '@/sim/combat'
 import { hasBoon, swingReach } from '@/sim/boons'
 import { EntityView, SPRITE, WEAPON, HALF_PI } from './shared'
+import type { Sheet } from '../sheet'
 import { ARM, armOf } from '@/sim/weapons'
 import { restoreSword, updateBow } from './bow'
 import { nearestHeroDirection, stableHeroDirection, verticalDodgeFrame, type HeroDirection } from '../heroDirection'
 
 const deg = (d: number): number => d * Math.PI / 180
 
-// Sheet order is the production contract documented by tools/process-sprite-sheet.mjs. The body and
-// blade are one authored drawing: semantic simulation phases select semantic frames; no full-body
-// rotation or squash is needed to invent an attack pose after the fact.
-const HERO = {
-  idle: 0, runA: 1, runB: 2, hurt: 3,
-  light1Start: 4, light1Contact: 5, light1Recover: 6,
-  light2Start: 7, light2Contact: 8, light2Recover: 9,
-  heavyStart: 10, heavyContact: 11, heavyRecover: 10,
-  dodgeStart: 12, dodgeTravel: 13, dodgeLand: 14, dead: 15,
-} as const
-
-// Source cells carry poses with very different silhouettes. Their logical feet are not all at row
-// 32 (especially the horizontal dodge), so the pivot is part of the clip metadata rather than a
-// hidden per-frame correction in the renderer.
-const HERO_PIVOT_Y = [28, 28, 28, 28, 26, 26, 32, 26, 25, 25, 25, 25, 21, 14, 21, 23] as const
-// Per-sheet travel cells have different transparent padding. Anchor each on its last occupied row
-// so the authored tuck skims the same floor plane instead of sinking below its contact shadow.
-const HERO_TRAVEL_PIVOT_Y: Record<HeroDirection, number> = { side: 14, north: 20, south: 18 }
-const VERTICAL_ROLL_PIVOT_Y = {
-  north: [28, 28, 28, 28],
-  south: [28, 28, 28, 28],
-} as const
+// The body and blade are one authored drawing: semantic simulation phases select semantic frames, so
+// no full-body rotation or squash is needed to invent an attack pose after the fact. Frame names,
+// cell indices and per-pose foot pivots all live in the sheet's sidecar
+// (`public/assets/sprites/bardo_hero.json`, compiled by `pnpm art compile art/specs/hero.json`) —
+// the renderer names a pose and the contract answers with the drawing and where its feet are.
 const VERTICAL_ROLL_HOP = [0, 1, 2, 0] as const
-type HeroSheet = { frames: Texture[]; whites: Texture[]; rollFrames?: Texture[]; rollWhites?: Texture[] }
+const VERTICAL_ROLL_FRAME = ['dive', 'tuck', 'apex', 'extend'] as const
+type HeroSheet = { sheet: Sheet; roll?: Sheet }
 type PlayerArt = { stock: Texture; stockWhite: Texture; hero: Record<HeroDirection, HeroSheet> }
 const playerArt = new WeakMap<EntityView, PlayerArt>()
 type ClipSelection = { key: string; direction: HeroDirection; stateTick: number }
 const clipSelection = new WeakMap<EntityView, ClipSelection>()
 const freeDirection = new WeakMap<EntityView, HeroDirection>()
 
-function heroFrame(p: Player, world: World, time: number): number {
-  if (p.state === 'dead') return HERO.dead
-  if (p.state === 'hurt' || p.flash > 0) return HERO.hurt
-  if (p.state === 'free') return Math.hypot(p.vx, p.vy) > 10 ? (Math.floor(time * 9) & 1 ? HERO.runA : HERO.runB) : HERO.idle
-  if (p.state === 'dodge') return p.stateTick < 3 ? HERO.dodgeStart : p.stateTick < tuning.player.dodge.travel ? HERO.dodgeTravel : HERO.dodgeLand
-  if (p.state !== 'attack' || armOf(world) !== ARM.blade) return HERO.idle
+export function heroFrameName(p: Player, world: World, time: number): string {
+  if (p.state === 'dead') return 'dead'
+  if (p.state === 'hurt' || p.flash > 0) return 'hurt'
+  if (p.state === 'free') return Math.hypot(p.vx, p.vy) > 10 ? (Math.floor(time * 9) & 1 ? 'runA' : 'runB') : 'idle'
+  if (p.state === 'dodge') return p.stateTick < 3 ? 'dodgeStart' : p.stateTick < tuning.player.dodge.travel ? 'dodgeTravel' : 'dodgeLand'
+  if (p.state !== 'attack' || armOf(world) !== ARM.blade) return 'idle'
+  // Timing comes from tuning, never from the sheet: the frame is a function of where stateTick sits
+  // in this swing's own startup/active windows, so the contact drawing cannot drift off the hitbox.
   const s = tuning.player.attack.swings[p.swingIndex]
-  if (p.swingIndex === 0) return p.stateTick < s.startup ? HERO.light1Start : p.stateTick < s.startup + s.active ? HERO.light1Contact : HERO.light1Recover
-  if (p.swingIndex === 1) return p.stateTick < s.startup ? HERO.light2Start : p.stateTick < s.startup + s.active ? HERO.light2Contact : HERO.light2Recover
-  // The first sheet deliberately bookends the heavy with its planted frame: contact releases into
-  // the same heavy-specific stance rather than borrowing the second light attack's recovery.
-  return p.stateTick < s.startup ? HERO.heavyStart : p.stateTick < s.startup + s.active ? HERO.heavyContact : HERO.heavyRecover
-}
-
-function directionalHeroFrame(direction: HeroDirection, frame: number): number {
-  // The south sheet's second cut resolves downward in cell 9 and recoils overhead in cell 8. Its
-  // generated semantic pair is intentionally reversed to keep both the contact axis and recovery
-  // silhouette truthful; simulation timing and the public 16-frame contract stay unchanged.
-  if (direction === 'south' && frame === HERO.light2Contact) return HERO.light2Recover
-  if (direction === 'south' && frame === HERO.light2Recover) return HERO.light2Contact
-  return frame
+  const phase = p.stateTick < s.startup ? 'Start' : p.stateTick < s.startup + s.active ? 'Contact' : 'Recover'
+  if (p.swingIndex === 0) return 'light1' + phase
+  if (p.swingIndex === 1) return 'light2' + phase
+  // The sheet deliberately bookends the heavy with its planted frame (`heavyRecover` is an alias of
+  // `heavyStart`): contact releases into the same heavy-specific stance rather than borrowing the
+  // second light attack's recovery.
+  return 'heavy' + phase
 }
 
 function authoredDirectionFor(v: EntityView, p: Player, bladeEquipped: boolean): HeroDirection | null {
@@ -105,30 +85,23 @@ export function createPlayerView(atlas: Atlas, layers: { entities: Container; sh
   const art: PlayerArt = {
     stock: atlas.tile(SPRITE.player), stockWhite: atlas.white(SPRITE.player),
     hero: {
-      side: {
-        frames: Array.from({ length: 16 }, (_, i) => atlas.hero(i)),
-        whites: Array.from({ length: 16 }, (_, i) => atlas.heroWhite(i)),
-      },
-      north: {
-        frames: Array.from({ length: 16 }, (_, i) => atlas.heroNorth(i)),
-        whites: Array.from({ length: 16 }, (_, i) => atlas.heroNorthWhite(i)),
-        rollFrames: Array.from({ length: 4 }, (_, i) => atlas.heroNorthRoll(i)),
-        rollWhites: Array.from({ length: 4 }, (_, i) => atlas.heroNorthRollWhite(i)),
-      },
-      south: {
-        frames: Array.from({ length: 16 }, (_, i) => atlas.heroSouth(i)),
-        whites: Array.from({ length: 16 }, (_, i) => atlas.heroSouthWhite(i)),
-        rollFrames: Array.from({ length: 4 }, (_, i) => atlas.heroSouthRoll(i)),
-        rollWhites: Array.from({ length: 4 }, (_, i) => atlas.heroSouthRollWhite(i)),
-      },
+      side: { sheet: atlas.sheet('bardo_hero') },
+      north: { sheet: atlas.sheet('bardo_hero_north'), roll: atlas.sheet('bardo_hero_north_roll') },
+      south: { sheet: atlas.sheet('bardo_hero_south'), roll: atlas.sheet('bardo_hero_south_roll') },
     },
   }
   playerArt.set(v, art)
   whiteFor.set(atlas.tile(SPRITE.player), atlas.white(SPRITE.player))
   for (const direction of ['side', 'north', 'south'] as const) {
-    const sheet = art.hero[direction]
-    for (let i = 0; i < sheet.frames.length; i++) whiteFor.set(sheet.frames[i], sheet.whites[i])
-    for (let i = 0; i < (sheet.rollFrames?.length ?? 0); i++) whiteFor.set(sheet.rollFrames![i], sheet.rollWhites![i])
+    const { sheet, roll } = art.hero[direction]
+    for (const name of sheet.names()) {
+      const f = sheet.frame(name)
+      whiteFor.set(f.texture, f.white)
+    }
+    for (const name of roll?.names() ?? []) {
+      const f = roll!.frame(name)
+      whiteFor.set(f.texture, f.white)
+    }
   }
   for (let i = 0; i < RIM_OFFSETS.length; i++) {
     const s = new Sprite(); s.anchor.set(0.5, 1); s.visible = false
@@ -489,25 +462,25 @@ export function updatePlayerView(v: EntityView, p: Player, world: World, alpha: 
 
   b.tint = 0xffffff
   if (art && heroDirection) {
-    const frame = directionalHeroFrame(heroDirection, heroFrame(p, world, time))
-    const sheet = art.hero[heroDirection]
+    const frameName = heroFrameName(p, world, time)
+    const hero = art.hero[heroDirection]
     verticalRollFrame = verticalDodgeFrame(heroDirection, p.stateTick, P.dodge.travel)
-    if (p.state === 'dodge' && verticalRollFrame >= 0 && sheet.rollFrames && sheet.rollWhites) {
-      v.bindBody(sheet.rollFrames[verticalRollFrame], sheet.rollWhites[verticalRollFrame])
+    if (p.state === 'dodge' && verticalRollFrame >= 0 && hero.roll) {
+      const frame = hero.roll.frame(VERTICAL_ROLL_FRAME[verticalRollFrame])
+      v.bindBody(frame.texture, frame.white)
+      b.anchor.set(frame.anchorX, frame.anchorY)
       if (verticalRollFrame === 1 || verticalRollFrame === 2) {
         // The compact tuck and boots-over-head apex both need a readable rotation axis at native
         // scale. Turn them around their own centres: the compensating hop preserves the authored
         // floor plane while separating helm, torso, and boots from one round floor-bound mass.
-        b.anchor.set(0.5, 0.5)
         hop = 11
       } else {
-        b.anchor.set(0.5, VERTICAL_ROLL_PIVOT_Y[heroDirection as 'north' | 'south'][verticalRollFrame] / 32)
         hop = VERTICAL_ROLL_HOP[verticalRollFrame]
       }
     } else {
-      v.bindBody(sheet.frames[frame], sheet.whites[frame])
-      const pivotY = frame === HERO.dodgeTravel ? HERO_TRAVEL_PIVOT_Y[heroDirection] : HERO_PIVOT_Y[frame]
-      b.anchor.set(0.5, pivotY / 32)
+      const frame = hero.sheet.frame(frameName)
+      v.bindBody(frame.texture, frame.white)
+      b.anchor.set(frame.anchorX, frame.anchorY)
     }
   } else if (art) {
     v.bindBody(art.stock, art.stockWhite)

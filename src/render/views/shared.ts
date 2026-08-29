@@ -37,8 +37,10 @@ export class EntityView {
     this.whiteTex = whiteTex
     this.body.texture = tex
   }
+  // The contact shadow is the authored 16px hard disc (tools/make-bardo-fx.ts), not a soft 64px
+  // Kenney blob: §3.2.8 wants cast shadows "hard-edged... never a blur".
   setShadow(x: number, y: number, w: number, h: number, alpha = 0.35) {
-    this.shadow.position.set(Math.round(x), Math.round(y)); this.shadow.scale.set(w / 64, h / 64); this.shadow.alpha = alpha
+    this.shadow.position.set(Math.round(x), Math.round(y)); this.shadow.scale.set(w / 16, h / 16); this.shadow.alpha = alpha
   }
   destroy() { this.body.destroy(); this.weapon?.destroy(); this.shadow.destroy() }
 }

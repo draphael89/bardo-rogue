@@ -1,5 +1,5 @@
 {
-  "input": "art/source/bardo_hero_north_alpha_v7.png",
+  "input": "art/approved/bardo_hero_north_alpha_v7.png",
   "output": "public/assets/sprites/bardo_hero_north.png",
   "source": {
     "width": 1254,

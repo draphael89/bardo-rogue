@@ -299,7 +299,7 @@ export function updateChargerView(v: EntityView, e: Enemy, f: EnemyFrame, out: P
   } else if (e.state === 'recover') {
     const u = easeOutCubic(tk / C.recovery)
     sx = lerp(1.3, 1, u); sy = lerp(0.75, 1, u); rot = Math.sin(time * 8) * 0.15 * (1 - u)
-  } else if (e.state === 'stagger') { rot = 0.5; sx = 0.9; sy = 1.1 }
+  } else if (e.state === 'stagger') { rot = -e.facing * 0.5; sx = 0.9; sy = 1.1 }   // mirrored, like every other kind: the epilogue flips scale.x but never negates rotation
 
   out.sx = sx; out.sy = sy; out.rot = rot; out.hop = hop; out.tint = tint
 }

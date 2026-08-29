@@ -1,0 +1,67 @@
+{
+  "id": "actor.hero.north.roll",
+  "version": 1,
+  "kind": "character",
+  "cell": 32,
+  "cols": 2,
+  "rows": 2,
+  "palette": "bardo.canon",
+  "maxColors": 16,
+  "facing": "north",
+  "mirror": false,
+  "frames": {
+    "dive": {
+      "i": 0,
+      "pivot": [
+        16,
+        28
+      ]
+    },
+    "tuck": {
+      "i": 1,
+      "pivot": [
+        16,
+        16
+      ]
+    },
+    "apex": {
+      "i": 2,
+      "pivot": [
+        16,
+        16
+      ]
+    },
+    "extend": {
+      "i": 3,
+      "pivot": [
+        16,
+        28
+      ]
+    }
+  },
+  "clips": {
+    "roll": {
+      "frames": [
+        "dive",
+        "tuck",
+        "apex",
+        "extend"
+      ],
+      "timing": "sim",
+      "sim": {
+        "ref": "player.dodge"
+      },
+      "grounded": false
+    }
+  },
+  "source": {
+    "provider": "openai",
+    "model": "gpt-image (built-in tool)",
+    "approvedSource": "art/approved/bardo_hero_north_roll_alpha_v3.png",
+    "promptFile": "art/prompts/bardo_hero_north_roll_alpha_v3.txt",
+    "promptHash": "a80682221079f8ea8e2a36e1b97ab5d6a03da5d778ae47cbc81cf9997b779922",
+    "compiler": "bardo-art/1",
+    "sourceFile": "art/approved/bardo_hero_north_roll_alpha_v3.png",
+    "sourceHash": "3ec850e2f63f817f"
+  }
+}

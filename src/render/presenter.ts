@@ -952,7 +952,13 @@ export class Presenter {
     this.ra.world.position.set(Math.round(off.x + pxr + this.camera.offsetX), Math.round(off.y + pyr + this.camera.offsetY))
     this.ra.world.rotation = this.camera.rotation
 
-    if (this.flashAlpha > 0) { this.flashOverlay.alpha = this.flashAlpha; this.flashAlpha = Math.max(0, this.flashAlpha - dtSec * 6) } else this.flashOverlay.alpha = 0
+    if (this.flashAlpha > 0) {
+      // The target's width is adaptive (app.ts fits 480..768 in 16px steps), so a size taken once at
+      // construction leaves the "full-frame" flash covering the left 480px of a wide screen.
+      if (this.flashOverlay.width !== tuning.view.width) this.flashOverlay.width = tuning.view.width
+      if (this.flashOverlay.height !== tuning.view.height) this.flashOverlay.height = tuning.view.height
+      this.flashOverlay.alpha = this.flashAlpha; this.flashAlpha = Math.max(0, this.flashAlpha - dtSec * 6)
+    } else this.flashOverlay.alpha = 0
     this.hud.update(w, dtSec)
     this.reward.update(w)
   }

@@ -1,0 +1,7 @@
+Create one original dark-mythic pixel-art warrior sprite sheet, not based on any existing character.
+Use a strict 4x4 grid of equal square cells, a 32-logical-pixel frame, no overlap, a split helm crest,
+dark wine/indigo/bone/muted-gold palette, and an oversized physically held greatsword. Row-major poses:
+idle, run A, run B, hurt; light-1 anticipation, contact, recovery, light-2 anticipation; light-2 contact,
+recovery, heavy anticipation, contact; dodge launch, travel, land, dead. Use hard pixel clusters, at
+most 12 requested colors, and a uniform #00ff00 background. No labels, grid, shadow, scenery, VFX,
+text, logo, watermark, or extra objects.

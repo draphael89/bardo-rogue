@@ -1,10 +1,20 @@
 import { Container, Sprite, Texture, RenderTexture, Rectangle } from 'pixi.js'
 import type { Atlas } from './atlas'
-import { tuning } from '@/tuning'
 import { fxRng } from './fxRng'
 import { decalAlphaForFrame } from './feedback'
+import { authoredFxFrame, FX_UNIT, quantizeFxRotation } from './fxUnits'
 
-interface P { s: Sprite; vx: number; vy: number; life: number; maxLife: number; drag: number; grav: number; scale0: number; scale1: number; rot: number; alpha0: number; alpha1: number; ground: number | null; tint0: number; tint1: number | null; sgn: number }
+interface P { s: Sprite; frames: readonly Texture[] | null; spin: number; vx: number; vy: number; life: number; maxLife: number; drag: number; grav: number; scale0: number; scale1: number; rot: number; alpha0: number; alpha1: number; ground: number | null; tint0: number; tint1: number | null; sgn: number; unit: number }
+
+// Authored FX sprites are 16x16 (tools/make-bardo-fx.ts). `scale0`/`scale1` stay in screen pixels, so
+// the sprite scale is size/unit. shatter() passes BODY_UNIT because it scales a body texture, not an
+// effect: its numbers were tuned against that divisor and are left exactly alone.
+const FX = FX_UNIT
+const BODY_UNIT = 64
+
+// §6.1: rotation quantises to 16 steps. A freely rotating sprite over a 480x270 target resamples its
+// own pixels every frame, which is the loudest "not pixel art" tell there is.
+const QUANT = (Math.PI * 2) / 16
 
 // Pooled sprite particles. Everything is drawn into the low-res target so soft shapes pixelate on their own.
 export class Particles {
@@ -16,9 +26,11 @@ export class Particles {
   private stamp = new Sprite()
   private decalContainer = new Container()
   private hostileFloorThreat = false
+  private dustFrames: readonly Texture[]
   readonly max = 1500
 
   constructor(private atlas: Atlas, private fx: Container, decals: Container, _floor: Container) {
+    this.dustFrames = [1, 2, 3, 4].map(i => atlas.particle(`smoke_0${i}`))
     this.decalRt = RenderTexture.create({ width: 480, height: 300, scaleMode: 'nearest' })
     this.decalSprite = new Sprite(this.decalRt); this.decalSprite.position.set(-32, -15)
     decals.addChild(this.decalSprite)
@@ -41,13 +53,18 @@ export class Particles {
   private spawn(tex: Texture, x: number, y: number, o: Partial<P> & { tint?: number; tint1?: number; blend?: 'add' | 'normal' } = {}): P | null {
     if (this.live.length >= this.max) return null
     let p = this.pool.pop()
-    if (!p) { const s = new Sprite(); s.anchor.set(0.5); this.fx.addChild(s); p = { s, vx: 0, vy: 0, life: 0, maxLife: 1, drag: 1, grav: 0, scale0: 1, scale1: 1, rot: 0, alpha0: 1, alpha1: 0, ground: null, tint0: 0xffffff, tint1: null, sgn: 1 } }
+    if (!p) { const s = new Sprite(); s.anchor.set(0.5); s.roundPixels = true; this.fx.addChild(s); p = { s, frames: null, spin: 0, vx: 0, vy: 0, life: 0, maxLife: 1, drag: 1, grav: 0, scale0: 1, scale1: 1, rot: 0, alpha0: 1, alpha1: 0, ground: null, tint0: 0xffffff, tint1: null, sgn: 1, unit: FX } }
     p.s.texture = tex; p.s.visible = true; p.s.position.set(x, y)
+    p.frames = o.frames ?? null
     p.vx = o.vx ?? 0; p.vy = o.vy ?? 0; p.life = p.maxLife = o.maxLife ?? 0.4; p.drag = o.drag ?? 1; p.grav = o.grav ?? 0
     p.scale0 = o.scale0 ?? 1; p.scale1 = o.scale1 ?? p.scale0; p.rot = o.rot ?? 0; p.alpha0 = o.alpha0 ?? 1; p.alpha1 = o.alpha1 ?? 0; p.ground = o.ground ?? null
-    p.tint0 = o.tint ?? 0xffffff; p.tint1 = o.tint1 ?? null; p.sgn = o.sgn ?? 1
-    p.s.tint = p.tint0; p.s.blendMode = o.blend ?? 'normal'; p.s.rotation = fxRng.particles.next() * 6.28
-    p.s.scale.set(p.scale0 / 64 * p.sgn, p.scale0 / 64)
+    p.tint0 = o.tint ?? 0xffffff; p.tint1 = o.tint1 ?? null; p.sgn = o.sgn ?? 1; p.unit = o.unit ?? FX
+    p.s.tint = p.tint0; p.s.blendMode = o.blend ?? 'normal'
+    // `spin` is the true angle; the sprite only ever shows it quantised. Accumulating on the sprite
+    // itself discards the remainder every frame, and a slow spin never advances a step at all.
+    p.spin = fxRng.particles.next() * 6.28
+    p.s.rotation = quantizeFxRotation(p.spin)
+    p.s.scale.set(p.scale0 / p.unit * p.sgn, p.scale0 / p.unit)
     this.live.push(p)
     return p
   }
@@ -63,9 +80,10 @@ export class Particles {
       p.vx *= Math.pow(p.drag, dt * 60); p.vy *= Math.pow(p.drag, dt * 60)
       p.s.x += p.vx * dt; p.s.y += p.vy * dt
       if (p.ground !== null && p.s.y > p.ground) { p.s.y = p.ground; p.vy = -Math.abs(p.vy) * 0.3; p.vx *= 0.6 }
-      p.s.rotation += p.rot * dt
+      if (p.rot !== 0) { p.spin += p.rot * dt; p.s.rotation = quantizeFxRotation(p.spin) }
+      if (p.frames) p.s.texture = p.frames[authoredFxFrame(u, p.frames.length)]
       const sc = p.scale0 + (p.scale1 - p.scale0) * u
-      p.s.scale.set(sc / 64 * p.sgn, sc / 64)
+      p.s.scale.set(sc / p.unit * p.sgn, sc / p.unit)
       p.s.alpha = p.alpha0 + (p.alpha1 - p.alpha0) * u
       if (p.tint1 !== null) p.s.tint = lerpColor(p.tint0, p.tint1, u)
     }
@@ -84,7 +102,8 @@ export class Particles {
     for (let i = 0; i < n; i++) {
       const a = angle + fxRng.particles.signed(1.2)
       const sp = fxRng.particles.range(10, 40)
-      this.spawn(this.atlas.particle('smoke_0' + fxRng.particles.int(1, 5)), x + fxRng.particles.signed(4), y, { vx: Math.cos(a) * sp, vy: Math.sin(a) * sp * 0.4 - 6, maxLife: fxRng.particles.range(0.35, 0.6), drag: 0.9, scale0: fxRng.particles.range(5, 9), scale1: 12, tint: 0xd8b088, alpha0: 0.5, alpha1: 0 })
+      const size = fxRng.particles.range(8, 12)
+      this.spawn(this.dustFrames[0], x + fxRng.particles.signed(4), y, { frames: this.dustFrames, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp * 0.4 - 6, maxLife: fxRng.particles.range(0.35, 0.6), drag: 0.9, scale0: size, scale1: size, tint: 0xd8b088, alpha0: 0.5, alpha1: 0 })
     }
   }
 
@@ -166,7 +185,11 @@ export class Particles {
       vx: fxRng.particles.signed(6), vy: -16 - fxRng.particles.next() * 14, maxLife: (big ? 0.5 : 0.3) + fxRng.particles.next() * 0.15, drag: 0.94,
       scale0: big ? 22 : fxRng.particles.range(14, 18), scale1: 5, rot: fxRng.particles.signed(2), tint: 0xfff0a0, tint1: 0xff5a14, alpha0: 1, alpha1: 0.55,
     })
-    if (f) f.s.rotation = fxRng.particles.signed(0.4) // spawn() randomises rotation; a flame must point up
+    // A flame must point up, with a little lean. Feeding a continuous +/-0.4 rad through quantRot
+    // collapsed it: the 22.5-degree step has a +/-11.25-degree capture zone, so half the draws snapped
+    // to exactly 0 and the rest to exactly one step. Pick the step directly instead — same three
+    // angles, but uniformly, so a brazier reads as several tongues rather than a picket fence.
+    if (f) { f.spin = QUANT * (fxRng.particles.int(0, 2) - 1); f.s.rotation = f.spin }
   }
 
   // The enemy's own pixels fly apart along the hit direction, fall, and settle.
@@ -182,31 +205,11 @@ export class Particles {
       const ox = (px - fw / 2) * (body.scale.x < 0 ? -1 : 1), oy = py - fh
       const a = angle + fxRng.particles.signed(1.4)
       const sp = fxRng.particles.range(40, 130)
-      this.spawn(sub, x + ox, y + body.height / 2 + oy, { vx: Math.cos(a) * sp + fxRng.particles.signed(30), vy: Math.sin(a) * sp - 40 - fxRng.particles.next() * 40, maxLife: fxRng.particles.range(0.6, 1.1), drag: 0.96, grav: 260, scale0: 64 * (step / 2), scale1: 64 * (step / 2), rot: fxRng.particles.signed(12), alpha0: 1, alpha1: 0.6, ground: y + fxRng.particles.range(6, 12) })
+      this.spawn(sub, x + ox, y + body.height / 2 + oy, { vx: Math.cos(a) * sp + fxRng.particles.signed(30), vy: Math.sin(a) * sp - 40 - fxRng.particles.next() * 40, maxLife: fxRng.particles.range(0.6, 1.1), drag: 0.96, grav: 260, scale0: 64 * (step / 2), scale1: 64 * (step / 2), rot: fxRng.particles.signed(12), alpha0: 1, alpha1: 0.6, ground: y + fxRng.particles.range(6, 12), unit: BODY_UNIT })
     }
   }
 
-  // A ghost of a body left exactly where it stood, in its own pose. Cheap: it reuses the sprite's texture.
-  afterimage(body: Sprite, tint: number, alpha: number, life: number) {
-    const g = this.spawn(body.texture, body.position.x, body.position.y - body.height / 2, {
-      maxLife: life, scale0: 64, scale1: 64, tint, blend: 'add', alpha0: alpha, alpha1: 0, sgn: body.scale.x < 0 ? -1 : 1,
-    })
-    if (g) g.s.rotation = body.rotation
-  }
 
-  // The reward for phasing through an attack: one cold ring and a spray of cold sparks. Nothing else
-  // in the fight is this colour, so the player never confuses it with a hit or with being hit.
-  dodgeSlip(x: number, y: number, n: number, tint: number) {
-    this.spawn(this.atlas.particle('circle_02'), x, y, { maxLife: 0.22, scale0: 6, scale1: 34, tint, blend: 'add', alpha0: 0.9, alpha1: 0 })
-    for (let i = 0; i < n; i++) {
-      const a = (i / n) * 6.28 + fxRng.particles.signed(0.3)
-      const sp = fxRng.particles.range(50, 130)
-      this.spawn(this.atlas.particle('spark_01'), x, y, {
-        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp * 0.6 - 8, maxLife: fxRng.particles.range(0.22, 0.4), drag: 0.88,
-        scale0: fxRng.particles.range(4, 8), scale1: 1, tint, blend: 'add', alpha0: 0.95, alpha1: 0,
-      })
-    }
-  }
 
   // A graze is a whisper, not the perfect-dodge jackpot: three cyan needles peel off the threat
   // line and vanish before they can read as a hit spark or as the expanding cold success ring.

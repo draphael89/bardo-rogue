@@ -5,31 +5,46 @@ built-in image generation tool. The base hero and Brute used no external referen
 iterations referenced only the original sheets made for this repository. The retained editable inputs
 are alpha-matted sources, not shipped browser assets:
 
-- `source/bardo_hero_alpha_v1.png` — 4x4, 16 semantic hero poses.
-- `source/bardo_hero_north_alpha_v7.png` — the same 16-pose contract, viewed from behind / north.
-- `source/bardo_hero_north_roll_alpha_v3.png` — 2x2, four-key northward tumble progression.
-- `source/bardo_hero_south_alpha_v4.png` — the same 16-pose contract, viewed from the front / south.
-- `source/bardo_hero_south_roll_alpha_v3.png` — 2x2, four-key southward tumble progression.
-- `source/bardo_brute_alpha_v1.png` — 4x2, 8 semantic Brute poses.
+- `approved/bardo_hero_alpha_v1.png` — 4x4, 16 semantic hero poses.
+- `approved/bardo_hero_north_alpha_v7.png` — the same 16-pose contract, viewed from behind / north.
+- `approved/bardo_hero_north_roll_alpha_v3.png` — 2x2, four-key northward tumble progression.
+- `approved/bardo_hero_south_alpha_v4.png` — the same 16-pose contract, viewed from the front / south.
+- `approved/bardo_hero_south_roll_alpha_v3.png` — 2x2, four-key southward tumble progression.
+- `approved/bardo_brute_alpha_v1.png` — 4x2, 8 semantic Brute poses.
 
-The tiny indexed production sheets are deterministic derivatives:
+The production sheets are deterministic derivatives, compiled from these sources by specs:
 
 ```sh
-node tools/process-sprite-sheet.mjs art/source/bardo_hero_alpha_v1.png public/assets/sprites/bardo_hero.png --cols 4 --rows 4 --cell 32 --colors 16 --report art/source/bardo_hero.metrics.json
-node tools/process-sprite-sheet.mjs art/source/bardo_hero_north_alpha_v7.png public/assets/sprites/bardo_hero_north.png --cols 4 --rows 4 --cell 32 --colors 16 --report art/source/bardo_hero_north.metrics.json
-node tools/process-sprite-sheet.mjs art/source/bardo_hero_north_roll_alpha_v3.png public/assets/sprites/bardo_hero_north_roll.png --cols 2 --rows 2 --cell 32 --colors 16 --fit pose --margin 5 --report art/source/bardo_hero_north_roll.metrics.json
-node tools/process-sprite-sheet.mjs art/source/bardo_hero_south_alpha_v4.png public/assets/sprites/bardo_hero_south.png --cols 4 --rows 4 --cell 32 --colors 16 --report art/source/bardo_hero_south.metrics.json
-node tools/process-sprite-sheet.mjs art/source/bardo_hero_south_roll_alpha_v3.png public/assets/sprites/bardo_hero_south_roll.png --cols 2 --rows 2 --cell 32 --colors 16 --fit pose --margin 5 --report art/source/bardo_hero_south_roll.metrics.json
-node tools/process-sprite-sheet.mjs art/source/bardo_brute_alpha_v1.png public/assets/sprites/bardo_brute.png --cols 4 --rows 2 --cell 48 --colors 16 --fit pose --margin 2 --midtone-floor 90 --report art/source/bardo_brute.metrics.json
+pnpm art compile art/specs/hero.json
+pnpm art compile art/specs/hero-north.json
+pnpm art compile art/specs/hero-north-roll.json
+pnpm art compile art/specs/hero-south.json
+pnpm art compile art/specs/hero-south-roll.json
+pnpm art compile art/specs/brute.json
 ```
 
-The Brute uses pose fitting because its square generated sheet has tall 4x2 grid cells; cropping each
-silhouette before fitting preserves its aspect ratio. The processor otherwise downsamples every cell
-with nearest-neighbor sampling, removes residual
-green spill, forces binary alpha, and quantizes the entire atlas to a shared palette. The retained JSON
-reports are inspection metadata and are outside the shipped `public/` tree.
+Each spec records its own grid, palette ramp, pivots, sockets, clips and provenance; the compiler
+(`tools/art/compile.ts`) reduces the source by voting in canon-palette space, and the gates
+(`tools/art/gates.ts`) reject the result if it drifts. The Brute uses `fit: "pose"` because its square
+generated sheet has tall 4x2 cells. Those crops all use one sheet-wide source scale, so a crouched pose
+cannot be enlarged independently; pivots and sockets still own each frame's placement.
+
+The accepted editable masters live under `art/approved/` and are the direct compiler inputs, recorded
+as `approvedSource`. The compiler rejects an `approvedSource` outside that custody boundary. A separate
+`approvedReference` is reserved for an accepted style reference used to condition another generation.
+`promptFile` names the source-specific immutable instruction record under `art/prompts/`, and
+`promptHash` is its compiler-verified SHA-256. The aggregate notes in this document can therefore
+evolve without rewriting generation provenance. Human approval remains explicit: automated gates
+reject objective contract failures, but they do not substitute for judging identity, pose
+readability, or taste at 1x.
+
+The original normalizer (`tools/process-sprite-sheet.mjs`) is gone. It sampled one source point per
+output pixel, which at ~39 source pixels per output pixel is a coin flip at every edge — that is why
+the first sheets shipped with dissolved blades. Its metrics sidecar reported `pass: true` for both.
 
 ## Hero generation prompt
+
+Immutable record: [`prompts/bardo_hero_alpha_v1.txt`](prompts/bardo_hero_alpha_v1.txt).
 
 Create one original dark-mythic pixel-art warrior sprite sheet, not based on any existing character.
 Use a strict 4x4 grid of equal square cells, a 32-logical-pixel frame, no overlap, a split helm crest,
@@ -50,6 +65,9 @@ fifteen poses. Earlier directional sheets are iteration provenance, not producti
 
 North/back variant:
 
+Immutable record, including the accepted cell-13 refinement:
+[`prompts/bardo_hero_north_alpha_v7.txt`](prompts/bardo_hero_north_alpha_v7.txt).
+
 > Create an original dark-mythic pixel-art warrior sprite sheet on a uniform #00ff00 chroma
 > background. Strict 4x4 equal square grid, one centered non-overlapping character per cell, viewed
 > clearly from behind and facing north/up in every standing pose. Match one identity throughout: a
@@ -63,6 +81,9 @@ North/back variant:
 > northward axis. Dodge travel must be a compact rear-view vertical tumble, not a rotated side pose.
 
 South/front variant:
+
+Immutable record, including the accepted cell-13 refinement:
+[`prompts/bardo_hero_south_alpha_v4.txt`](prompts/bardo_hero_south_alpha_v4.txt).
 
 > Create an original dark-mythic pixel-art warrior sprite sheet on a uniform #00ff00 chroma
 > background. Strict 4x4 equal square grid, one centered non-overlapping character per cell, viewed
@@ -111,7 +132,13 @@ helm, torso, and boots and keeps the narrow apex from collapsing into an upright
 scale. No interpolation or synthetic squash manufactures an extra pose. The generated sources were
 constrained to read as the same sequence even with translation, shadow, and effects removed.
 
+Immutable roll records:
+[`prompts/bardo_hero_north_roll_alpha_v3.txt`](prompts/bardo_hero_north_roll_alpha_v3.txt) and
+[`prompts/bardo_hero_south_roll_alpha_v3.txt`](prompts/bardo_hero_south_roll_alpha_v3.txt).
+
 ## Brute generation prompt
+
+Immutable record: [`prompts/bardo_brute_alpha_v1.txt`](prompts/bardo_brute_alpha_v1.txt).
 
 Create one original dark-mythic pixel-art forge-brute sprite sheet, not based on any existing
 character. Use a strict 4x2 grid of equal square cells, a 48-logical-pixel large-enemy frame, stable

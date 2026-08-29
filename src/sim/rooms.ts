@@ -1,14 +1,13 @@
 import { tuning } from '@/tuning'
 import { TILE, buildArena, setDoorWalkable, type DoorDir, type DoorMark, type RoomKind } from './arena'
+import { runGraph, sliceGraph } from './content/slice'
+import type { WaveDef } from './content/waves'
+import { dressArena } from './dress'
+import { arenaKind, type LayoutId } from './layouts'
 import { Rng, STREAM, streamSeed } from './rng'
-import {
-  THRESHOLD_RUN_WAVES, CROSSING_RUN_WAVES,
-  SLICE_ROOM_1, SLICE_ROOM_2_BLADE, SLICE_ROOM_2_VEIL, SLICE_ROOM_3, SLICE_WARDEN,
-  type WaveDef,
-} from './waves'
 import type { World } from './world'
 import { clearBulletTime } from './combat'
-import { recordRoomEntry, restoreRunHealth, startRun, storeRunHealth, type RewardFamily } from './session'
+import { recordRoomEntry, restoreRunHealth, smithWaiting, startRun, storeRunHealth, type RoomReward } from './session'
 import { beginRoomFight, offerRite, type RiteId } from './rites'
 
 export interface RoomExit {
@@ -17,14 +16,20 @@ export interface RoomExit {
   mark: DoorMark
 }
 
+/**
+ * One node of a route. A new room later ships as a RoomDef plus a layout id
+ * (`layouts.ts`), not as edits to step or combat. Waves, exits, rewards, and
+ * rites stay data; `buildArena` is the only geometry implementation.
+ */
 export interface RoomDef {
   id: string
   name: string
   kind: RoomKind
+  layout: LayoutId
   startDoorOpen?: boolean
   waves?: WaveDef[] | null
   exits?: RoomExit[]
-  reward?: RewardFamily
+  reward?: RoomReward
   boss?: boolean
   /** Asked on arrival, before the room's own waves. See rites.ts. */
   rite?: RiteId
@@ -32,94 +37,14 @@ export interface RoomDef {
 
 export const HUB_ID = 'bardo'
 
-function runGraph(): RoomDef[] {
-  return [
-    {
-      id: 'threshold',
-      name: 'THE THRESHOLD',
-      kind: 'threshold',
-      waves: THRESHOLD_RUN_WAVES,
-      exits: [
-        { dir: 'north', to: 'crossing', mark: 'combat' },
-        { dir: 'east', to: 'shore', mark: 'gift' },
-      ],
-    },
-    { id: 'crossing', name: 'THE CROSSING', kind: 'crossing', waves: CROSSING_RUN_WAVES },
-    { id: 'shore', name: 'THE FAR SHORE', kind: 'shore' },
-    {
-      id: HUB_ID,
-      name: 'THE BARDO',
-      kind: 'crossing',
-      startDoorOpen: true,
-      exits: [{ dir: 'north', to: 'threshold', mark: 'combat' }],
-    },
-  ]
-}
-
-function sliceGraph(): RoomDef[] {
-  return [
-    {
-      id: HUB_ID,
-      name: 'THE BARDO',
-      kind: 'bardo',
-      exits: [{ dir: 'north', to: 'threshold', mark: 'combat' }],
-    },
-    {
-      id: 'threshold',
-      name: 'THE ACHERON GATE',
-      kind: 'threshold',
-      waves: SLICE_ROOM_1,
-      reward: 'blade',
-      exits: [
-        { dir: 'north', to: 'veil-path', mark: 'veil' },
-        { dir: 'east', to: 'blade-path', mark: 'blade' },
-      ],
-    },
-    {
-      id: 'veil-path',
-      name: 'THE LETHE CISTERN',
-      kind: 'crossing',
-      waves: SLICE_ROOM_2_VEIL,
-      reward: 'veil',
-      exits: [{ dir: 'north', to: 'black-step', mark: 'hard' }],
-    },
-    {
-      id: 'blade-path',
-      name: 'THE FIELD OF ASPHODEL',
-      kind: 'threshold',
-      waves: SLICE_ROOM_2_BLADE,
-      reward: 'blade',
-      exits: [{ dir: 'north', to: 'black-step', mark: 'hard' }],
-    },
-    {
-      id: 'black-step',
-      name: "CHARON'S LANDING",
-      kind: 'crossing',
-      rite: 'toll',
-      waves: SLICE_ROOM_3,
-      reward: 'veil',
-      exits: [{ dir: 'north', to: 'warden', mark: 'boss' }],
-    },
-    {
-      id: 'warden',
-      name: 'THE HALL OF MINOS',
-      kind: 'threshold',
-      waves: SLICE_WARDEN,
-      boss: true,
-    },
-  ]
-}
-
+/** Thin reader over the authored graphs in `content/slice.ts`. */
 export function roomsFor(scenario: string): RoomDef[] {
-  if (scenario === 'loop') return sliceGraph()
-  if (scenario === 'run') {
-    const rooms = runGraph()
-    return rooms
-  }
+  if (scenario === 'loop') return sliceGraph
+  if (scenario === 'run') return runGraph
   if (scenario === 'shore') {
-    return [{ id: 'shore', name: 'THE FAR SHORE', kind: 'shore' }]
+    return [{ id: 'shore', name: 'THE FAR SHORE', kind: 'shore', layout: 'shore' }]
   }
-  return [{ id: 'threshold', name: 'THE THRESHOLD', kind: 'threshold' }]
+  return [{ id: 'threshold', name: 'THE THRESHOLD', kind: 'threshold', layout: 'threshold' }]
 }
 
 function roomHasExits(room: RoomDef): boolean {
@@ -139,14 +64,17 @@ export function assignDoorRoles(arena: World['arena'], room: RoomDef): void {
   }
 }
 
-export function enterRoom(world: World, index: number, via: 'door' | 'return' = 'door', mark?: DoorMark): void {
+export function enterRoom(world: World, index: number, via: 'door' | 'return' | 'resume' = 'door', mark?: DoorMark): void {
   if (index < 0 || index >= world.rooms.length) return
-  storeRunHealth(world)
+  const run = world.session.run
+  if (via !== 'resume' && run) run.boundaryRng = world.rng.state
+  if (via !== 'resume') storeRunHealth(world)
   const room = world.rooms[index]
   world.roomIndex = index
   world.roomName = room.name
   const rng = new Rng(streamSeed(world.seed, STREAM.visual ^ ((index + 1) * 0x51ed)))
-  world.arena = buildArena(rng, room.kind)
+  world.arena = buildArena(rng, arenaKind(room.layout))
+  dressArena(world.arena, room.layout)
   assignDoorRoles(world.arena, room)
   world.doorOpen = !!(room.startDoorOpen && roomHasExits(room))
   setDoorWalkable(world.arena, world.doorOpen)
@@ -187,12 +115,34 @@ export function enterRoom(world: World, index: number, via: 'door' | 'return' = 
     world.arena.rackTaken = false
     world.doorOpen = false
     setDoorWalkable(world.arena, false)
-  } else recordRoomEntry(world, room.id, mark)
-  if (via === 'return') world.emit({ type: 'returned', name: room.name, x: p.x, y: p.y })
-  else world.emit({ type: 'roomEnter', name: room.name, index, total: world.rooms.length })
+  } else if (via !== 'resume') {
+    recordRoomEntry(world, room.id, mark)
+  } else if (run) {
+    run.roomId = room.id
+  }
+  switch (via) {
+    case 'return': {
+      const meta = world.session.meta
+      world.emit({
+        type: 'returned',
+        name: room.name,
+        x: p.x,
+        y: p.y,
+        kept: world.session.lastBanked,
+        remembrances: meta.remembrances,
+        smithWaiting: smithWaiting(meta),
+      })
+      break
+    }
+    case 'door':
+    case 'resume':
+      world.emit({ type: 'roomEnter', name: room.name, index, total: world.rooms.length })
+      break
+    default: { const _e: never = via; return _e }
+  }
 }
 
-export function enterRoomById(world: World, id: string, via: 'door' | 'return' = 'door', mark?: DoorMark): void {
+export function enterRoomById(world: World, id: string, via: 'door' | 'return' | 'resume' = 'door', mark?: DoorMark): void {
   const index = world.rooms.findIndex(r => r.id === id)
   if (index < 0) return
   enterRoom(world, index, via, mark)
@@ -229,11 +179,15 @@ export function tryEnterDoor(world: World): void {
       if (leavingTown && !startRun(world, ex.to)) return
       world.roomPhase = 'transitioning'
       world.phaseTick = world.tick
-      world.transitionTarget = ex.to
+      // The catalog hub still points at Acheron. A live map may open on Styx.
+      const dest = leavingTown
+        ? (world.session.run?.map?.nodes[0]?.id ?? ex.to)
+        : ex.to
+      world.transitionTarget = dest
       world.transitionMark = ex.mark
       world.transitionTicks = tuning.run.transitionTicks
       p.vx = p.vy = 0
-      world.emit({ type: 'roomTransition', from: room.name, to: world.rooms.find(r => r.id === ex.to)?.name ?? ex.to })
+      world.emit({ type: 'roomTransition', from: room.name, to: world.rooms.find(r => r.id === dest)?.name ?? dest })
       return
     }
   }

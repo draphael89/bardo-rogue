@@ -44,7 +44,7 @@ A stock combat scenario stops 2 s after clear or death; the production `loop` st
 
 `http://localhost:5173/?scenario=wave2&seed=7&debug=1&mute=1&god=1&bot=kite`
 
-- `scenario`: `loop` is the default production game: Bardo rack → Threshold → one of two branches → Black Step → Warden → Bardo, with three deterministic boon offers. Debug scenarios remain: `empty`, `dummy`, `blessed`, `bow`, `boss`, `brute-only`, `caster-only`, `charger-swarm`, `wave1`, `wave2`, `wave3`, `full`, `run`, and `shore`.
+- `scenario`: `loop` is the default production game: Bardo rack → Greek gate → six chambers → Minos → Bardo. The attempt seed picks one of six spines: early shop, late shop, a fork at the Field of Asphodel, the fire ford (Landing then Phlegethon), the Styx gate (first fight is the oath river), or the ash march (both rivers, no bank). Debug scenarios remain: `empty`, `dummy`, `blessed`, `bow`, `boss`, `brute-only`, `caster-only`, `charger-swarm`, `wave1`, `wave2`, `wave3`, `full`, `run`, and `shore`.
 - Death or victory then confirm: `loop` returns to the Bardo in the same world and clears run power. Legacy `run` also returns on death. Stock combat scenarios still set `wantsRestart` and rebuild the same fight.
 - `seed`: integer, default 1. Same seed + same inputs = same run.
 - `save=off`: run against a fresh profile and write nothing. `pnpm shot` and `pnpm poses` pass it by
@@ -55,9 +55,10 @@ A stock combat scenario stops 2 s after clear or death; the production `loop` st
 
 Combat slow-motion: `__game.state().slow` is `{ rate, ticks }` — rate is per-mille, 1000 is full speed. Force it with `__game.world.slowRate = 250; __game.world.slowTicks = 120`.
 
-Keys in the game: WASD move, arrows aim (8-way, and holding one pins the facing so you strafe), mouse aim, left-click/J/Z light attack, right-click/L/C heavy attack, Space/Shift/K/X dodge, P/Escape pause, V reduced effects, F fullscreen. With no arrow and an untouched mouse, aim follows movement. Rewards use A/D or left/right, then Enter/Space/attack to claim. The same confirm returns after death or victory.
-While paused, E exports the save file and I imports one; an import is refused during a live run, and
-refused if either file came from a newer build than this one.
+Keys in the game: WASD move, arrows aim (8-way, and holding one pins the facing so you strafe), mouse aim, left-click/J/Z light attack, right-click/L/C heavy attack, Space/Shift/K/X dodge, P/Escape pause, V reduced effects, F fullscreen. The title over the Bardo is a card: W/S or arrows move, Enter/Space/J or a click answers DESCEND / SETTINGS / CREDITS; A/D or left/right set MUSIC and SOUND on Settings; Escape or RISE returns from a page. With no arrow and an untouched mouse, aim follows movement. Rewards use A/D or left/right, then Enter/Space/attack to claim. The same confirm returns after death or victory.
+While paused, arrows or W/S move the card, Enter / A chooses: RISE, or (on a live run) GIVE THE
+ATTEMPT BACK — confirm twice and the Bardo takes you. E exports the save file and I imports one;
+an import is refused during a live run, and refused if either file came from a newer build than this one.
 F1 toggles the debug overlay, F2 toggles recording, F3 downloads the last recording.
 
 ## `window.__game` (src/debug/api.ts)
@@ -70,17 +71,22 @@ Available once the page has booted (`await page.waitForFunction(() => !!window._
 - `loop`: the fixed-step loop; `loop.paused`, `loop.frameTimes`.
 - `reset(seed?, scenario?, { god? })`: fresh world. Omitted args keep the current run's seed/scenario.
 - `step(n = 1)`: advance the sim n ticks by hand (pause first, or the loop keeps ticking too).
-- `setInput(partial | null)`: force an `InputFrame` (`moveX moveY aimX aimY aimSoft attack attackHeld heavy dodge restart choiceDelta confirm`). Forced action/modal fields fire once, then clear. `null` returns control to the keyboard.
+- `setInput(partial | null)`: force an `InputFrame` (`moveX moveY aimX aimY aimSoft attack attackHeld heavy dodge restart choiceDelta confirm reroll`). Forced action/modal fields fire once, then clear. `null` returns control to the keyboard.
 - `bot(name | null)`: swap in or remove any bot listed above.
-- `pause(p?)`: pause/unpause the loop, returns the new state.
+- `pause(p?)`: debug-hold the loop (audio stays live; the pause card does not appear). Returns the new state.
+- `shellPause(p?)`: player-facing pause — the BETWEEN BREATHS card. Returns whether the card is up.
+- `abandon()`: give a live attempt back and wake in the Bardo. Returns whether a run was ended.
 - `hash()`: FNV hash of the sim state. Equal hashes = identical worlds.
-- `state()`: compact JSON snapshot: tick, freeze/slow, room and phase, player/armed state, session/meta/run/reward/rite/history, rack/offering, boons, enemies, bolts, and metrics.
+- `state()`: compact JSON snapshot: tick, freeze/slow, room and phase, player/armed state, session/meta/run/obols/shop/mystery/reward/rite/history, rack/offering, boons, enemies, bolts, and metrics.
 - `frameStats()`: `{ frames, p50, p95, max }` render frame time in ms over the last 240 frames.
 - `mute(m?)`, `debug(v?)`: toggle audio / overlay, return the new state.
 - `record(on?)`: start (resets to a fresh run of the current seed/scenario) or stop recording. Returns whether recording.
 - `stopRecord()`: stop, return the `Replay`, and log its JSON to the console.
 - `download(name?)`: save the last recording as a `.json` download (stops recording first if needed).
 - `replay(obj)`: reset to the replay's seed/scenario and feed its frames instead of input. Live input resumes when frames run out.
+- `inspectSave()`: the in-memory envelope (`schemaVersion`, `contentRevision`, `revision`, `meta`, `checkpoint`). Null checkpoint means town or no active run.
+- `gotoRoom(id, { skipRite? })`: debug jump. On `loop` it starts a run if needed, then `enterRoomById`. `skipRite` answers an unasked rite so Charon's modal does not cover the room.
+- `giveRemembrances(n)`: add (or subtract) banked Remembrances. Returns the new total.
 
 ## Pose a frame and look at it
 
@@ -96,7 +102,7 @@ Available once the page has booted (`await page.waitForFunction(() => !!window._
 
 A replay is `{ v: 1, seed, scenario, god?, meta?: MetaStateV1, frames: InputFrame[] }` (`src/sim/replay.ts`). On disk it is run-length
 encoded: `runs: [moveX, moveY, aimX, aimY, flags, count]` with axes as ints x10000 and flags bits
-`1 aimSoft, 2 attack, 4 dodge, 8 restart, 16 attackHeld, 32 confirm, 64 choice-left, 128 choice-right, 256 heavy`
+`1 aimSoft, 2 attack, 4 dodge, 8 restart, 16 attackHeld, 32 confirm, 64 choice-left, 128 choice-right, 256 heavy, 512 reroll`
 (the table in `src/sim/replay.ts` is the source of truth; `pnpm test` fails if this line drifts from it). The browser quantizes every frame to 1/10000 before the sim sees it, so
 what was played and what is stored are identical. A `loop` replay's hash depends on its `meta`, because `hashWorld` folds
 attempts and victories in for that scenario; the pinned fixtures are all non-`loop` and carry none.

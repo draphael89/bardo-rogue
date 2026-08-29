@@ -10,14 +10,17 @@
 //     overwriting it with the fields this build understands would silently destroy the rest.
 //   - the two pre-envelope browser keys are read (see migrateLegacySave) and never deleted, so
 //     a rollback to an older build still finds a player's attempts and victories where it left them.
+import { parseCheckpoint, normalizeCheckpoint, type RunCheckpoint } from './checkpoint'
 import { defaultMetaState, type MetaStateV1 } from './session'
 import { ARM, type ArmId } from './weapons'
-import type { SettingsStateV1 } from './storage'
+import { defaultSettings, normalizeSettings, type SettingsStateV1 } from './storage'
+
+export type { RunCheckpoint }
 
 // Bumped only when the ENVELOPE shape changes; every bump adds one UPGRADES entry and one fixture.
 // 1 is the synthetic shape the two legacy keys deserialize into, so the legacy import and every
 // future upgrade run through the same chain.
-export const SAVE_SCHEMA_VERSION = 2
+export const SAVE_SCHEMA_VERSION = 3
 
 // Diagnostic only: which build wrote this file. Hand-maintained against package.json's version --
 // stamping it from the build would drag Vite into src/sim for a string that never gates a load.
@@ -29,10 +32,7 @@ const MAX_COUNTER = 1_000_000_000
 // profileId becomes a filename in the desktop adapter, so it is constrained here, at the source.
 const PROFILE_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/
 
-// RESERVED (see PLATFORM_STRATEGY.md section H). `never` keeps the slot in the type and in the JSON
-// while making it impossible to construct one: filling it in later is a change to this line plus a
-// schemaVersion bump, with no re-key and no churn in consumers.
-export type RunCheckpoint = never
+// Node-boundary resume. A damaged checkpoint is dropped; it must never take the profile with it.
 
 export interface BardoSave {
   schemaVersion: number
@@ -95,22 +95,39 @@ function validateMeta(input: unknown): MetaStateV1 {
   if (Array.isArray(v.unlockedWeapons)) {
     for (const id of v.unlockedWeapons) if (isArmId(id) && !seen.has(id)) { seen.add(id); unlockedWeapons.push(id) }
   }
-  return { version: 1, attempts: count(v.attempts), victories: count(v.victories), unlockedWeapons }
+  return {
+    version: 1,
+    attempts: count(v.attempts),
+    victories: count(v.victories),
+    remembrances: count(v.remembrances),
+    rerollUnlocked: v.rerollUnlocked === true,
+    vesselUnlocked: v.vesselUnlocked === true,
+    unlockedWeapons,
+  }
 }
 function validateSettings(input: unknown, preferred: boolean): SettingsStateV1 {
-  const v = isObj(input) ? input : {}
-  return { version: 1, reducedEffects: typeof v.reducedEffects === 'boolean' ? v.reducedEffects : preferred }
+  return normalizeSettings(isObj(input) ? input : {}, preferred)
 }
 
 // The one place the envelope's key order is written. Fields are enumerated rather than spread so a
 // hostile "__proto__" or an unknown key from JSON.parse can never ride along into the document.
-function envelope(profileId: string, revision: number, contentRevision: string, settings: SettingsStateV1, meta: MetaStateV1): BardoSave {
-  return { schemaVersion: SAVE_SCHEMA_VERSION, contentRevision, profileId, revision, settings, meta, checkpoint: null }
+function envelope(
+  profileId: string,
+  revision: number,
+  contentRevision: string,
+  settings: SettingsStateV1,
+  meta: MetaStateV1,
+  checkpoint: RunCheckpoint | null = null,
+): BardoSave {
+  return {
+    schemaVersion: SAVE_SCHEMA_VERSION, contentRevision, profileId, revision, settings, meta,
+    checkpoint: checkpoint ? normalizeCheckpoint(checkpoint) : null,
+  }
 }
 
 export function defaultSave(opts: ParseSaveOptions = {}): BardoSave {
   return envelope(profileIdOf(opts.profileId), 0, CONTENT_REVISION,
-    { version: 1, reducedEffects: !!opts.preferredReducedEffects }, defaultMetaState())
+    defaultSettings(!!opts.preferredReducedEffects), defaultMetaState())
 }
 
 // Canonical bytes. Re-normalises on the way out, so serializeSave(parseSave(s).save) is stable and
@@ -118,18 +135,19 @@ export function defaultSave(opts: ParseSaveOptions = {}): BardoSave {
 export function serializeSave(save: BardoSave): string {
   return JSON.stringify(envelope(
     profileIdOf(save.profileId), revisionOf(save.revision), contentRevisionOf(save.contentRevision),
-    validateSettings(save.settings, false), validateMeta(save.meta)))
+    validateSettings(save.settings, false), validateMeta(save.meta), parseCheckpoint(save.checkpoint)))
 }
 
 // Monotonic write counter: the field that makes a backup or a cloud conflict diagnosable.
 export function bumpRevision(save: BardoSave): BardoSave {
   return envelope(profileIdOf(save.profileId), Math.min(Number.MAX_SAFE_INTEGER, revisionOf(save.revision) + 1),
-    CONTENT_REVISION, validateSettings(save.settings, false), validateMeta(save.meta))
+    CONTENT_REVISION, validateSettings(save.settings, false), validateMeta(save.meta), parseCheckpoint(save.checkpoint))
 }
 
 // key = the version being upgraded FROM.
 const UPGRADES: Record<number, (prev: Obj) => Obj> = {
   1: prev => ({ ...prev, schemaVersion: 2, revision: 0, contentRevision: CONTENT_REVISION, checkpoint: null }),
+  2: prev => ({ ...prev, schemaVersion: 3 }),
 }
 
 // Takes an already-parsed value so migrations are testable with plain object fixtures.
@@ -175,8 +193,9 @@ export function migrateSave(input: unknown, opts: ParseSaveOptions = {}): Migrat
   const meta = isObj(obj.meta) ? validateMeta(obj.meta) : defaultMetaState()
   const settings = isObj(obj.settings)
     ? validateSettings(obj.settings, !!opts.preferredReducedEffects)
-    : { version: 1 as const, reducedEffects: !!opts.preferredReducedEffects }
-  return { kind: 'ok', from: sv, save: envelope(profileIdOf(opts.profileId), revisionOf(obj.revision), contentRevisionOf(obj.contentRevision), settings, meta) }
+    : defaultSettings(!!opts.preferredReducedEffects)
+  const checkpoint = parseCheckpoint(obj.checkpoint)
+  return { kind: 'ok', from: sv, save: envelope(profileIdOf(opts.profileId), revisionOf(obj.revision), contentRevisionOf(obj.contentRevision), settings, meta, checkpoint) }
 }
 
 // A newer build's fields we do understand, so the player still sees their counters. Display only:
@@ -185,7 +204,7 @@ function bestEffortFuture(parsed: Obj, opts: ParseSaveOptions): BardoSave {
   const meta = isObj(parsed.meta) ? validateMeta(parsed.meta) : defaultMetaState()
   const settings = isObj(parsed.settings)
     ? validateSettings(parsed.settings, !!opts.preferredReducedEffects)
-    : { version: 1 as const, reducedEffects: !!opts.preferredReducedEffects }
+    : defaultSettings(!!opts.preferredReducedEffects)
   return envelope(profileIdOf(opts.profileId), revisionOf(parsed.revision), contentRevisionOf(parsed.contentRevision), settings, meta)
 }
 

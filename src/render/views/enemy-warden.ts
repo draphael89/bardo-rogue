@@ -2,7 +2,7 @@ import { Graphics, Texture, type Container } from 'pixi.js'
 import type { Enemy } from '@/sim/world'
 import type { Arena } from '@/sim/arena'
 import { tuning } from '@/tuning'
-import { WARDEN_PATTERN, wardenAttackTicks, wardenRecover, wardenWindup } from '@/sim/enemies/warden'
+import { WARDEN_PATTERN, wardenAttackTicks, wardenCompanion, wardenRecover, wardenWindup } from '@/sim/enemies/warden'
 import {
   wardenProjectileAngle, wardenProjectileContract, wardenThreatReach,
   type WardenProjectileContract,
@@ -10,6 +10,7 @@ import {
 import { clamp01, lerp } from '../anim'
 import { isDangerPointVisible } from '../terrain'
 import { EntityView, type EnemyFrame, type Pose } from './shared'
+import { MINOS } from '../minosInk'
 
 // Authored 24×28 judge. Not a tinted grunt: a hooded robe, a gold circlet, a veil.
 // Four poses. The sentence of the fight lives in exact floor geometry — circle, spokes, or fan —
@@ -307,8 +308,8 @@ export function updateWardenView(v: EntityView, e: Enemy, f: EnemyFrame, out: Po
   v.bindBody(wardenTexture(key))
   v.body.anchor.set(0.5, 1)
 
-  if (e.flash > 0) out.tint = 0xffe8d0
-  else if (e.phase) out.tint = 0xffe0c8
+  if (e.flash > 0) out.tint = MINOS.wash
+  else if (e.phase) out.tint = MINOS.wash
   else out.tint = 0xffffff
 
   updateWardenTell(v, e, f.x, f.y, tk, arena)
@@ -323,10 +324,10 @@ function updateWardenEyes(v: EntityView, e: Enemy, x: number, y: number, hop: nu
   if (!e.phase || e.state === 'dead') { g.visible = false; return }
   g.visible = true
   const ex = Math.round(x), ey = Math.round(y - 18 - hop)
-  g.rect(ex - 3, ey, 1, 1).fill(0xff7a18)
-  g.rect(ex + 2, ey, 1, 1).fill(0xff7a18)
-  g.rect(ex - 3, ey - 1, 1, 1).fill(0xfff4d8)
-  g.rect(ex + 2, ey - 1, 1, 1).fill(0xfff4d8)
+  g.rect(ex - 3, ey, 1, 1).fill(MINOS.eye)
+  g.rect(ex + 2, ey, 1, 1).fill(MINOS.eye)
+  g.rect(ex - 3, ey - 1, 1, 1).fill(MINOS.eyeHot)
+  g.rect(ex + 2, ey - 1, 1, 1).fill(MINOS.eyeHot)
   g.zIndex = y + e.radius + 2
 }
 
@@ -347,7 +348,7 @@ function updateWardenTell(v: EntityView, e: Enemy, x: number, y: number, tk: num
   const cy = Math.round(y + foot)
   if (s === 'phase') {
     const u = clamp01(tk / W.phaseTransitionTicks)
-    // A veil BREAK, never a danger ring: disconnected cloth/gold fragments leave the body and fade.
+    // A veil BREAK, never a danger ring: disconnected wine fragments leave the body and fade.
     // Closed geometry is reserved for the slam, so the safe transition does not train a false dodge.
     const pulse = Math.sin(u * Math.PI)
     const radius = 7 + u * W.slamRadius * 0.68
@@ -357,18 +358,20 @@ function updateWardenTell(v: EntityView, e: Enemy, x: number, y: number, tk: num
       const r = radius * (0.72 + stagger * 0.28)
       const sx = Math.round(cx + Math.cos(a) * r)
       const sy = Math.round(cy + Math.sin(a) * r * 0.72)
-      g.rect(sx, sy, i % 3 === 0 ? 2 : 1, i % 3 === 1 ? 2 : 1).fill({ color: i & 1 ? 0xff7a18 : 0xc49a48, alpha: 0.35 + 0.6 * pulse })
-      if (hi && i % 3 === 0) hi.rect(sx, sy, 1, 1).fill({ color: 0xfff4d8, alpha: 0.45 + 0.5 * pulse })
+      g.rect(sx, sy, i % 3 === 0 ? 2 : 1, i % 3 === 1 ? 2 : 1).fill({ color: i & 1 ? MINOS.shard : MINOS.shardAlt, alpha: 0.35 + 0.6 * pulse })
+      if (hi && i % 3 === 0) hi.rect(sx, sy, 1, 1).fill({ color: MINOS.commit, alpha: 0.45 + 0.5 * pulse })
     }
     return
   }
 
   if (e.pattern === WARDEN_PATTERN.ring && !scorching) {
     drawRingTell(g, hi, e, cx, cy, tk, arena, foot)
+    drawCompanionTell(g, hi, e, cx, cy, tk, arena, foot, x, y)
     return
   }
   if (e.pattern === WARDEN_PATTERN.fan && !scorching) {
     drawFanTell(g, hi, e, cx, cy, tk, arena, foot)
+    drawCompanionTell(g, hi, e, cx, cy, tk, arena, foot, x, y)
     return
   }
 
@@ -382,12 +385,12 @@ function updateWardenTell(v: EntityView, e: Enemy, x: number, y: number, tk: num
   const front = Math.max(4, Math.round(R * (scorching ? 1 : q)))
   const committed = s === 'attack' || (s === 'windup' && tk >= wardenWindup(e) - W.commitLead + 1)
   const plateA = (scorching ? 0.18 * fade : lerp(0.27, 0.42, q)) * bloom
-  const plateCol = e.phase ? 0x3a1420 : 0x121018
-  const rimCol = s === 'attack' ? (e.phase ? 0xffe8a0 : 0xfff4d8) : (e.phase ? 0xff7a18 : 0xd4b060)
-  const dark = 0x120d18
+  const plateCol = e.phase ? MINOS.plateHot : MINOS.plate
+  const rimCol = s === 'attack' ? MINOS.commit : (e.phase ? MINOS.circleHot : MINOS.circle)
+  const dark = MINOS.dark
 
   // The body is the clock. The floor is only the PLACE the slam will land — a dark plate that grows.
-  // Gold rim only after the aim locks. A dotted gold circle reads as a HUD ring, not a smash.
+  // Wine rim only after the aim locks. Gold is the scale, not the smash.
   dangerDisk(g, cx, cy, front - 1, plateCol, plateA, arena, x, y, foot, tuning.player.radius)
   octagon(g, cx, cy, front, dark, 0.55 * bloom * fade, false, arena, x, y, foot, tuning.player.radius)
   if (committed && !scorching) {
@@ -397,13 +400,42 @@ function updateWardenTell(v: EntityView, e: Enemy, x: number, y: number, tk: num
       octagon(hi, cx, cy, front, rimCol, 1, false, arena, x, y, foot, tuning.player.radius)
     }
   } else {
-    // The old near-black opening hid the Warden's most immediate attack until commitment. A broken
-    // amber edge names danger from the first readable body lift, while the closed hot rim remains
-    // reserved for the actual lock.
-    octagon(g, cx, cy, front, e.phase ? 0xc85b24 : 0xc49a48,
+    // A broken wine edge names danger from the first readable body lift. The closed white rim
+    // is reserved for the lock. Gold stays on the scale.
+    octagon(g, cx, cy, front, e.phase ? MINOS.circleHot : MINOS.circle,
       (0.38 + q * 0.22) * Math.max(0.7, bloom), true,
       arena, x, y, foot, tuning.player.radius)
-    if (hi) hi.visible = false
+    // Above the light. The Hall's river dark ate the windup plate and the slam arrived untelegraphed.
+    if (hi) {
+      octagon(hi, cx, cy, front, e.phase ? MINOS.circleHot : MINOS.circle,
+        (0.32 + q * 0.2) * Math.max(0.7, bloom), true,
+        arena, x, y, foot, tuning.player.radius)
+    }
+  }
+  if (!scorching) drawCompanionTell(g, hi, e, cx, cy, tk, arena, foot, x, y)
+}
+
+function drawCompanionTell(
+  g: Graphics, hi: Graphics | null, e: Enemy, cx: number, cy: number, tk: number,
+  arena: Arena, foot: number, originX: number, originY: number,
+): void {
+  const companion = wardenCompanion(e.pattern, e.actionPhase)
+  if (companion === null) return
+  if (companion === WARDEN_PATTERN.ring) {
+    drawRingTell(g, hi, e, cx, cy, tk, arena, foot)
+    return
+  }
+  if (companion === WARDEN_PATTERN.fan) {
+    drawFanTell(g, hi, e, cx, cy, tk, arena, foot)
+    return
+  }
+  const W = tuning.warden
+  const q = tellProgress(e, tk)
+  const R = Math.max(4, Math.round((W.slamRadius + tuning.player.radius) * q))
+  octagon(g, cx, cy, R, MINOS.dark, 0.45, false, arena, originX, originY, foot, tuning.player.radius)
+  octagon(g, cx, cy, R, e.phase ? MINOS.circleHot : MINOS.circle, 0.55, true, arena, originX, originY, foot, tuning.player.radius)
+  if (hi) {
+    octagon(hi, cx, cy, R, e.phase ? MINOS.circleHot : MINOS.circle, 0.5, true, arena, originX, originY, foot, tuning.player.radius)
   }
 }
 
@@ -452,13 +484,21 @@ function threatLane(g: Graphics, hi: Graphics | null, arena: Arena, e: Enemy,
     g.fill({ color, alpha: alpha * (secondary ? 0.30 : 0.40) * clamp01((q - 0.18) / 0.42) })
   }
 
-  if (committed && hi) {
-    const hotFrom = Math.max(from, proximalShown - 7)
-    for (let d = hotFrom; d <= proximalShown; d += 2) {
-      const px = Math.round(x + ca * d), py = Math.round(y + sa * d)
-      if (isDangerPointVisible(arena, e.x, e.y, px, py - foot)) hi.rect(px, py, 1, 1)
+  if (hi) {
+    if (committed) {
+      const hotFrom = Math.max(from, proximalShown - 7)
+      for (let d = hotFrom; d <= proximalShown; d += 2) {
+        const px = Math.round(x + ca * d), py = Math.round(y + sa * d)
+        if (isDangerPointVisible(arena, e.x, e.y, px, py - foot)) hi.rect(px, py, 1, 1)
+      }
+      hi.fill({ color: secondary ? MINOS.veilHot : MINOS.commit, alpha: secondary ? 0.72 : 0.96 })
+    } else {
+      for (let d = from; d <= proximalShown; d += nearStep * 2) {
+        const px = Math.round(x + ca * d), py = Math.round(y + sa * d)
+        if (isDangerPointVisible(arena, e.x, e.y, px, py - foot)) hi.rect(px, py, 1, 1)
+      }
+      hi.fill({ color, alpha: alpha * 0.55 })
     }
-    hi.fill({ color: secondary ? 0xe6c6ff : 0xfff4d8, alpha: secondary ? 0.72 : 0.96 })
   }
 }
 
@@ -469,12 +509,11 @@ function drawRingTell(g: Graphics, hi: Graphics | null, e: Enemy, x: number, y: 
   const q = tellProgress(e, tk)
   const committed = e.state === 'attack' || tk >= wardenWindup(e) - W.commitLead + 1
   const contract = wardenProjectileContract('ring', e.actionPhase)
-  if (hi) hi.visible = committed
-  octagon(g, x, y, Math.round(10 + q * 8), 0x120d18, 0.72, false)
+  octagon(g, x, y, Math.round(10 + q * 8), MINOS.dark, 0.72, false)
   for (let i = 0; i < contract.count; i++) {
     const a = wardenProjectileAngle(contract, e.aimAngle, e.patternCursor, i)
     threatLane(g, hi, arena, e, x, y, foot, a, contract, q, committed,
-      committed ? 0xff7a18 : 0x9a6d3c, committed ? 0.88 : 0.62)
+      committed ? MINOS.veilHot : MINOS.veil, committed ? 0.88 : 0.62)
   }
 }
 
@@ -485,7 +524,6 @@ function drawFanTell(g: Graphics, hi: Graphics | null, e: Enemy, x: number, y: n
   const q = tellProgress(e, tk)
   const committed = e.state === 'attack' || tk >= wardenWindup(e) - W.commitLead + 1
   const contract = wardenProjectileContract('fan', e.actionPhase)
-  if (hi) hi.visible = committed
   for (let volley = 0; volley < contract.volleys; volley++) {
     const released = e.state === 'attack' && e.patternStep > volley
     const reveal = volley === 0 ? q : clamp01((q - 0.34) / 0.66)
@@ -495,8 +533,8 @@ function drawFanTell(g: Graphics, hi: Graphics | null, e: Enemy, x: number, y: n
     for (let i = 0; i < contract.count; i++) {
       const a = wardenProjectileAngle(contract, e.aimAngle, e.patternCursor, i, volley)
       threatLane(g, hi, arena, e, x, y, foot, a, contract, reveal, laneCommitted,
-        returnLane ? 0xc878ff : committed ? 0xff7a18 : 0x9a6d3c, laneAlpha, returnLane)
+        returnLane ? MINOS.veil : committed ? MINOS.fanHot : MINOS.fan, laneAlpha, returnLane)
     }
   }
-  octagon(g, x, y, Math.round(7 + q * 4), 0x120d18, 0.75, false)
+  octagon(g, x, y, Math.round(7 + q * 4), MINOS.dark, 0.75, false)
 }

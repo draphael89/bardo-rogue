@@ -1,10 +1,12 @@
 import { Rng, STREAM, streamSeed } from './rng'
 import { buildArena, setDoorWalkable, type Arena, type DoorMark } from './arena'
-import type { SimEvent, EnemyKind } from './events'
+import type { SimEvent, EnemyKind, WardenAttackPattern } from './events'
 import { tuning } from '@/tuning'
 import type { WaveDef } from './waves'
+import { dressArena } from './dress'
+import { arenaKind } from './layouts'
 import { assignDoorRoles, roomsFor, type RoomDef } from './rooms'
-import { makeSessionState, type GameSessionState, type MetaStateV1, type RoomPhase } from './session'
+import { makeSessionState, townMaxHp, type GameSessionState, type MetaStateV1, type RoomPhase } from './session'
 
 export const SLOW_FULL = 1000   // scale unit for slowRate, not a tunable
 
@@ -76,6 +78,12 @@ export interface Enemy extends Body {
   burnActionId: number          // immutable action that ignited/refreshed the current burn
   knockbackHeavy: boolean       // current shove came from a committed contact and may punctuate on stone
   knockbackActionId: number     // immutable action identity for that possible wall contact
+  // The one you left on the bank. Kind stays brute so the fight does not change; the flag is how
+  // the Hall and the death card know which body waded in. Not hashed: it cannot change an outcome.
+  hunt: boolean
+  // The refused toll. Kind stays charger; the flag is how the Hall and the death card know the
+  // river collected. Not hashed: it cannot change an outcome.
+  debt: boolean
 }
 
 export type ProjectileKind = 'bolt' | 'arrow' | 'mirror' | 'echo'
@@ -89,13 +97,15 @@ export interface Projectile extends Body {
   // Who loosed it. A bolt outlives its caster, so the killing blow has to carry its own attribution
   // rather than asking the world who is still standing.
   srcKind: EnemyKind | 'player'
+  // Presentation-only: which Minos sentence a bolt belongs to. Not hashed — it cannot change an outcome.
+  sentence?: WardenAttackPattern
 }
 
 // `total` is the telegraph's authored length, kept beside the countdown so the marker can draw its
 // own progress. `debt` marks the one body the refused toll sends, so its arrival can announce
 // itself. Neither is hashed: `ticksLeft` alone decides when the body arrives, and an announcement
 // is presentation.
-export interface SpawnEntry { kind: EnemyKind; x: number; y: number; ticksLeft: number; total: number; debt?: boolean }
+export interface SpawnEntry { kind: EnemyKind; x: number; y: number; ticksLeft: number; total: number; debt?: boolean; hunt?: boolean }
 
 export type WaveState = 'idle' | 'pending' | 'active' | 'done'
 
@@ -153,13 +163,15 @@ export class World {
     const room = this.rooms[0]
     this.roomName = room.name
     this.roomPhase = room.kind === 'bardo' ? 'town' : room.waves?.length ? 'fighting' : room.exits?.length ? 'exits' : 'resolved'
-    this.arena = buildArena(this.visualRng, room.kind)
+    this.arena = buildArena(this.visualRng, arenaKind(room.layout))
+    dressArena(this.arena, room.layout)
     assignDoorRoles(this.arena, room)
     if (room.startDoorOpen && this.hasNextRoom()) {
       this.doorOpen = true
       setDoorWalkable(this.arena, true)
     }
     this.player = makePlayer(this.arena.playerStart.x, this.arena.playerStart.y)
+    this.player.hp = this.player.maxHp = townMaxHp(this.session.meta)
     this.player.armed = room.kind !== 'bardo'
     for (let i = 0; i < MAX_ENEMIES; i++) this.enemies.push(makeEnemy())
     for (let i = 0; i < MAX_PROJECTILES; i++) this.projectiles.push(makeProjectile())
@@ -202,6 +214,7 @@ export class World {
     p.actionId = actionId
     p.kind = kind
     p.srcKind = srcKind
+    p.sentence = undefined
     return p
   }
 
@@ -232,7 +245,7 @@ export function makeEnemy(): Enemy {
     lastHitSwingId: -1, flash: 0, hitDone: false, orbitAngle: 0, orbitDir: 1, hoverTicks: 0, cooldown: 0, dashTicks: 0, spawnTick: 0,
     phase: 0, phasePending: false, actionPhase: 0, pattern: 0, patternCursor: 0, patternStep: 0, poseTick: 0,
     brand: 0, brandTicks: 0, burn: 0, burnTicks: 0, burnAcc: 0, burnActionId: -1,
-    knockbackHeavy: false, knockbackActionId: 0,
+    knockbackHeavy: false, knockbackActionId: 0, hunt: false, debt: false,
   }
 }
 

@@ -113,10 +113,39 @@ const CHARON = [
   '.mmmmmmmmmmmmmmmmmmmm...',
 ]
 
+// No pole, no fare. A hood and a mouth that has been open too long. The eyes are sockets, not coins:
+// he could not pay, and that is the whole of him.
+const UNBURIED = [
+  '.........mmmmmm.........',
+  '.......mmmmmmmmmm.......',
+  '......mmmmmmmmmmmm......',
+  '.....mmddddddddddmm.....',
+  '....mmddddddddddddmm....',
+  '....mddddddddddddddm....',
+  '....mdddmmddddmmdddm....',
+  '....mdddlhldddlhlddm....',
+  '....mddddddddddddddm....',
+  '....mmddddddddddddmm....',
+  '.....mddllllllllldm.....',
+  '.....mddllllllllldm.....',
+  '......mdllllllllld......',
+  '......mdllaalllld.......',
+  '.......ddlllllld........',
+  '.......ddlllllld........',
+  '........dllllld.........',
+  '........ddllldd.........',
+  '......mmmdddddmmm.......',
+  '....mmmmmddddmmmmm......',
+  '...mmmmmmddddmmmmmm.....',
+  '...mmmmmmmddmmmmmmm.....',
+  '...mmmmmmmmmmmmmmmm.....',
+  '...mmmmmmmmmmmmmmmm.....',
+]
+
 export interface MaskPalette { d: number; m: number; l: number; a: number; h: number }
 
 /** Everyone who can stand on the speaker plate. Only two of them are gods. */
-export type PortraitId = Deity | 'charon'
+export type PortraitId = Deity | 'charon' | 'unburied'
 
 export const PORTRAIT: Record<PortraitId, { rows: string[]; palette: MaskPalette }> = {
   fury: {
@@ -135,6 +164,11 @@ export const PORTRAIT: Record<PortraitId, { rows: string[]; palette: MaskPalette
     // mass has to sit a clear step above the niche behind it or the whole silhouette disappears,
     // and the beard a clear step above the mass or it disappears into the cloak.
     palette: { d: 0x080e0d, m: 0x334440, l: 0x8a9488, a: 0xd4b060, h: 0xffe8b0 },
+  },
+  unburied: {
+    rows: UNBURIED,
+    // No fare in the eyes. River-silt and bone, the face of someone who has been waiting.
+    palette: { d: 0x0a0c10, m: 0x3a4048, l: 0xb8b0a4, a: 0x8c806f, h: 0xd0c0a8 },
   },
 }
 

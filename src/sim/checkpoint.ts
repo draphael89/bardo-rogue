@@ -1,0 +1,461 @@
+import type { DoorDir, DoorMark } from './arena'
+import { setDoorWalkable } from './arena'
+import { BOON, type BoonId, type Deity } from './boons'
+import { ARM, grantArm, type ArmId } from './weapons'
+import type { RiteId } from './rites'
+import { Rng } from './rng'
+import { FIRST_GATE, buildSliceRooms, installRoute, templateForSeed, type RouteNodeKind, type RunMap } from './route'
+import { enterRoomById } from './rooms'
+import type { MysteryChoice, MysteryOffer, RewardFamily, RewardOffer, RiteAnswer, RiteOffer, RoomPhase, RoomVisit, ShopGood, ShopOffer } from './session'
+import type { World } from './world'
+
+export interface CheckpointBoon {
+  id: BoonId
+  stacks: number
+}
+
+export interface CheckpointVisit {
+  id: string
+  enteredTick: number
+  via?: DoorMark
+}
+
+export interface CheckpointEdge {
+  dir: DoorDir
+  to: string
+  mark: DoorMark
+}
+
+export interface CheckpointNode {
+  id: string
+  kind: RouteNodeKind
+  edges: CheckpointEdge[]
+}
+
+export interface CheckpointMap {
+  template: string
+  nodes: CheckpointNode[]
+}
+
+export interface CheckpointReward {
+  family: RewardFamily
+  options: [BoonId, BoonId, BoonId]
+  focus: 0 | 1 | 2
+  deity: Deity
+  fromRite: boolean
+}
+
+export interface CheckpointRite {
+  id: RiteId
+  focus: 0 | 1
+}
+
+export interface CheckpointShop {
+  goods: [ShopGood, ShopGood, ShopGood]
+  focus: 0 | 1 | 2
+}
+
+export interface CheckpointMystery {
+  choices: [MysteryChoice, MysteryChoice, MysteryChoice]
+  focus: 0 | 1 | 2
+}
+
+/**
+ * Node-boundary resume document. Never holds Pixi, audio, particles, or wall-clock time.
+ * Resume re-enters `roomId` from `boundaryRng` so the node starts the same way it did live.
+ */
+export interface RunCheckpoint {
+  version: 1
+  seed: number
+  weapon: ArmId
+  roomId: string
+  hp: number
+  maxHp: number
+  depth: number
+  boonBits: number
+  boons: CheckpointBoon[]
+  history: CheckpointVisit[]
+  riteAnswer: RiteAnswer
+  riteBoonOwed: boolean
+  riteDebt: boolean
+  primedBrand: boolean
+  boundaryRng: number
+  phase: RoomPhase
+  map: CheckpointMap | null
+  pendingReward: CheckpointReward | null
+  pendingRite: CheckpointRite | null
+  pendingShop: CheckpointShop | null
+  pendingMystery: CheckpointMystery | null
+  mysteryHunt: boolean
+  obols: number
+  rerolls: number
+}
+
+function cloneMap(map: RunMap | null): CheckpointMap | null {
+  if (!map) return null
+  return {
+    template: map.template,
+    nodes: map.nodes.map(n => ({
+      id: n.id,
+      kind: n.kind,
+      edges: n.edges.map(e => ({ dir: e.dir, to: e.to, mark: e.mark })),
+    })),
+  }
+}
+
+function cloneHistory(history: RoomVisit[]): CheckpointVisit[] {
+  return history.map(v => v.via ? { id: v.id, enteredTick: v.enteredTick, via: v.via } : { id: v.id, enteredTick: v.enteredTick })
+}
+
+function cloneReward(offer: RewardOffer | null): CheckpointReward | null {
+  if (!offer) return null
+  return {
+    family: offer.family,
+    options: [offer.options[0], offer.options[1], offer.options[2]],
+    focus: offer.focus,
+    deity: offer.deity,
+    fromRite: offer.fromRite,
+  }
+}
+
+function cloneRite(offer: RiteOffer | null): CheckpointRite | null {
+  if (!offer) return null
+  return { id: offer.id, focus: offer.focus }
+}
+
+function cloneShop(offer: ShopOffer | null): CheckpointShop | null {
+  if (!offer) return null
+  return { goods: [offer.goods[0], offer.goods[1], offer.goods[2]], focus: offer.focus }
+}
+
+function cloneMystery(offer: MysteryOffer | null): CheckpointMystery | null {
+  if (!offer) return null
+  return { choices: [offer.choices[0], offer.choices[1], offer.choices[2]], focus: offer.focus }
+}
+
+/** Null in town and after the attempt is over. */
+export function captureCheckpoint(world: World): RunCheckpoint | null {
+  const run = world.session.run
+  if (!run || run.result !== 'active') return null
+  if (world.scenario !== 'loop') return null
+  if (world.roomPhase === 'town') return null
+  return {
+    version: 1,
+    seed: run.seed,
+    weapon: run.weapon,
+    roomId: run.roomId,
+    hp: run.hp,
+    maxHp: run.maxHp,
+    depth: run.depth,
+    boonBits: run.boonBits,
+    boons: run.boons.map(b => ({ id: b.id, stacks: b.stacks })),
+    history: cloneHistory(run.roomHistory),
+    riteAnswer: run.riteAnswer,
+    riteBoonOwed: run.riteBoonOwed,
+    riteDebt: run.riteDebt,
+    primedBrand: run.primedBrand,
+    boundaryRng: run.boundaryRng,
+    phase: world.roomPhase,
+    map: cloneMap(run.map),
+    pendingReward: cloneReward(run.pendingReward),
+    pendingRite: cloneRite(run.pendingRite),
+    pendingShop: cloneShop(run.pendingShop),
+    pendingMystery: cloneMystery(run.pendingMystery),
+    mysteryHunt: run.mysteryHunt,
+    obols: run.obols,
+    rerolls: run.rerolls,
+  }
+}
+
+/**
+ * Rebuild an active run onto a town world and re-enter the saved node from its boundary rng.
+ * Does not increment attempts — the envelope's meta already counted this descent.
+ */
+export function restoreCheckpoint(world: World, snap: RunCheckpoint): boolean {
+  if (world.scenario !== 'loop') return false
+  if (snap.version !== 1) return false
+  world.session.preparedWeapon = snap.weapon
+  world.session.run = {
+    seed: snap.seed,
+    weapon: snap.weapon,
+    boons: snap.boons.map(b => ({ id: b.id, stacks: b.stacks })),
+    boonBits: snap.boonBits,
+    hp: snap.hp,
+    maxHp: snap.maxHp,
+    depth: snap.depth,
+    roomId: snap.roomId,
+    roomHistory: cloneHistory(snap.history),
+    pendingReward: null,
+    pendingShop: null,
+    pendingMystery: null,
+    obols: snap.obols,
+    mysteryHunt: snap.mysteryHunt,
+    pendingRite: null,
+    riteAnswer: snap.riteAnswer,
+    riteBoonOwed: snap.riteBoonOwed,
+    riteDebt: snap.riteDebt,
+    result: 'active',
+    startedTick: 0,
+    primedBrand: snap.primedBrand,
+    killedBy: 'none',
+    killedRanged: false,
+    map: null,
+    boundaryRng: snap.boundaryRng,
+    rerolls: snap.rerolls,
+  }
+  world.boonBits = snap.boonBits
+  world.player.hp = snap.hp
+  world.player.maxHp = snap.maxHp
+  world.player.armed = true
+  grantArm(world, snap.weapon)
+  const template = templateForSeed(snap.seed)
+  installRoute(world, buildSliceRooms(template, new Rng(snap.seed)), template)
+  world.rng = Rng.fromState(snap.boundaryRng)
+  if (snap.map) world.session.run.map = {
+    template: snap.map.template === FIRST_GATE.id ? FIRST_GATE.id : snap.map.template,
+    nodes: snap.map.nodes.map(n => ({
+      id: n.id,
+      kind: n.kind,
+      edges: n.edges.map(e => ({ dir: e.dir, to: e.to, mark: e.mark })),
+    })),
+  }
+  enterRoomById(world, snap.roomId, 'resume')
+  // enterRoom rebuilds the node; keep the door shut if this snapshot was a modal.
+  if (snap.pendingReward || snap.pendingRite || snap.pendingShop || snap.pendingMystery) setDoorWalkable(world.arena, false)
+  return world.session.run.roomId === snap.roomId
+}
+
+const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
+const isArm = (v: unknown): v is ArmId => typeof v === 'string' && Object.prototype.hasOwnProperty.call(ARM, v)
+const isBoon = (v: unknown): v is BoonId => typeof v === 'string' && Object.prototype.hasOwnProperty.call(BOON, v)
+const PHASE: Record<RoomPhase, 1> = {
+  town: 1, entering: 1, fighting: 1, reward: 1, exits: 1, transitioning: 1, resolved: 1,
+}
+const MARK: Record<DoorMark, 1> = { combat: 1, gift: 1, blade: 1, veil: 1, hard: 1, elite: 1, boss: 1 }
+const DIR: Record<DoorDir, 1> = { north: 1, east: 1 }
+const NODE: Record<RouteNodeKind, 1> = { combat: 1, utility: 1, elite: 1, boss: 1 }
+const DEITY: Record<Deity, 1> = { fury: 1, hecate: 1 }
+const FAMILY: Record<RewardFamily, 1> = { blade: 1, veil: 1 }
+const SHOP: Record<ShopGood, 1> = { heal: 1, vessel: 1, vow: 1 }
+const MYSTERY: Record<MysteryChoice, 1> = { coin: 1, memory: 1, leave: 1 }
+
+function int(v: unknown): number | null {
+  return typeof v === 'number' && Number.isFinite(v) ? Math.floor(v) : null
+}
+function flag(v: unknown): boolean | null {
+  return typeof v === 'boolean' ? v : null
+}
+function id(v: unknown): string | null {
+  return typeof v === 'string' && v.length > 0 && v.length <= 64 ? v : null
+}
+
+function parseVisit(v: unknown): CheckpointVisit | null {
+  if (!isObj(v)) return null
+  const room = id(v.id)
+  const enteredTick = int(v.enteredTick)
+  if (!room || enteredTick === null || enteredTick < 0) return null
+  if (v.via === undefined) return { id: room, enteredTick }
+  if (typeof v.via !== 'string' || !Object.prototype.hasOwnProperty.call(MARK, v.via)) return null
+  return { id: room, enteredTick, via: v.via as DoorMark }
+}
+
+function parseEdge(v: unknown): CheckpointEdge | null {
+  if (!isObj(v)) return null
+  if (typeof v.dir !== 'string' || !Object.prototype.hasOwnProperty.call(DIR, v.dir)) return null
+  if (typeof v.mark !== 'string' || !Object.prototype.hasOwnProperty.call(MARK, v.mark)) return null
+  const to = id(v.to)
+  if (!to) return null
+  return { dir: v.dir as DoorDir, to, mark: v.mark as DoorMark }
+}
+
+function parseNode(v: unknown): CheckpointNode | null {
+  if (!isObj(v)) return null
+  const nodeId = id(v.id)
+  if (!nodeId) return null
+  if (typeof v.kind !== 'string' || !Object.prototype.hasOwnProperty.call(NODE, v.kind)) return null
+  if (!Array.isArray(v.edges)) return null
+  const edges: CheckpointEdge[] = []
+  for (const raw of v.edges) {
+    const edge = parseEdge(raw)
+    if (!edge) return null
+    edges.push(edge)
+  }
+  return { id: nodeId, kind: v.kind as RouteNodeKind, edges }
+}
+
+function parseMap(v: unknown): CheckpointMap | null | undefined {
+  if (v === null) return null
+  if (!isObj(v)) return undefined
+  const template = id(v.template)
+  if (!template || !Array.isArray(v.nodes)) return undefined
+  const nodes: CheckpointNode[] = []
+  for (const raw of v.nodes) {
+    const node = parseNode(raw)
+    if (!node) return undefined
+    nodes.push(node)
+  }
+  return { template, nodes }
+}
+
+function parseReward(v: unknown): CheckpointReward | null | undefined {
+  if (v === null) return null
+  if (!isObj(v)) return undefined
+  if (typeof v.family !== 'string' || !Object.prototype.hasOwnProperty.call(FAMILY, v.family)) return undefined
+  if (typeof v.deity !== 'string' || !Object.prototype.hasOwnProperty.call(DEITY, v.deity)) return undefined
+  if (!Array.isArray(v.options) || v.options.length !== 3 || !v.options.every(isBoon)) return undefined
+  const focus = v.focus
+  if (focus !== 0 && focus !== 1 && focus !== 2) return undefined
+  const fromRite = flag(v.fromRite)
+  if (fromRite === null) return undefined
+  return {
+    family: v.family as RewardFamily,
+    options: [v.options[0], v.options[1], v.options[2]],
+    focus,
+    deity: v.deity as Deity,
+    fromRite,
+  }
+}
+
+function parseShop(v: unknown): CheckpointShop | null | undefined {
+  if (v === null || v === undefined) return null
+  if (!isObj(v)) return undefined
+  if (!Array.isArray(v.goods) || v.goods.length !== 3) return undefined
+  if (!v.goods.every((g): g is ShopGood => typeof g === 'string' && Object.prototype.hasOwnProperty.call(SHOP, g))) return undefined
+  const focus = v.focus
+  if (focus !== 0 && focus !== 1 && focus !== 2) return undefined
+  return { goods: [v.goods[0], v.goods[1], v.goods[2]], focus }
+}
+
+function parseMystery(v: unknown): CheckpointMystery | null | undefined {
+  if (v === null || v === undefined) return null
+  if (!isObj(v)) return undefined
+  if (!Array.isArray(v.choices) || v.choices.length !== 3) return undefined
+  if (!v.choices.every((c): c is MysteryChoice => typeof c === 'string' && Object.prototype.hasOwnProperty.call(MYSTERY, c))) return undefined
+  const focus = v.focus
+  if (focus !== 0 && focus !== 1 && focus !== 2) return undefined
+  return { choices: [v.choices[0], v.choices[1], v.choices[2]], focus }
+}
+
+function parseRite(v: unknown): CheckpointRite | null | undefined {
+  if (v === null) return null
+  if (!isObj(v)) return undefined
+  if (v.id !== 'toll') return undefined
+  if (v.focus !== 0 && v.focus !== 1) return undefined
+  return { id: 'toll', focus: v.focus }
+}
+
+function parseAnswer(v: unknown): RiteAnswer | undefined {
+  if (v === null) return null
+  if (v === 'paid' || v === 'refused') return v
+  return undefined
+}
+
+/** Unknown JSON → a checkpoint or null. Damage drops the run, never the profile. */
+export function parseCheckpoint(input: unknown): RunCheckpoint | null {
+  if (input == null) return null
+  if (!isObj(input) || input.version !== 1) return null
+  const seed = int(input.seed)
+  const hp = int(input.hp)
+  const maxHp = int(input.maxHp)
+  const depth = int(input.depth)
+  const boonBits = int(input.boonBits)
+  const boundaryRng = int(input.boundaryRng)
+  const roomId = id(input.roomId)
+  if (seed === null || hp === null || maxHp === null || depth === null || boonBits === null || boundaryRng === null) return null
+  if (!roomId || !isArm(input.weapon)) return null
+  if (hp < 0 || maxHp < 1 || depth < 0) return null
+  if (typeof input.phase !== 'string' || !Object.prototype.hasOwnProperty.call(PHASE, input.phase)) return null
+  const riteAnswer = parseAnswer(input.riteAnswer)
+  const riteBoonOwed = flag(input.riteBoonOwed)
+  const riteDebt = flag(input.riteDebt)
+  const primedBrand = flag(input.primedBrand)
+  if (riteAnswer === undefined || riteBoonOwed === null || riteDebt === null || primedBrand === null) return null
+  if (!Array.isArray(input.boons) || !Array.isArray(input.history)) return null
+  const boons: CheckpointBoon[] = []
+  for (const raw of input.boons) {
+    if (!isObj(raw) || !isBoon(raw.id)) return null
+    const stacks = int(raw.stacks)
+    if (stacks === null || stacks < 1) return null
+    boons.push({ id: raw.id, stacks })
+  }
+  const history: CheckpointVisit[] = []
+  for (const raw of input.history) {
+    const visit = parseVisit(raw)
+    if (!visit) return null
+    history.push(visit)
+  }
+  const map = parseMap(input.map)
+  const pendingReward = parseReward(input.pendingReward)
+  const pendingRite = parseRite(input.pendingRite)
+  const pendingShop = parseShop(input.pendingShop)
+  const pendingMystery = parseMystery(input.pendingMystery)
+  if (map === undefined || pendingReward === undefined || pendingRite === undefined || pendingShop === undefined || pendingMystery === undefined) return null
+  const mysteryHunt = input.mysteryHunt === undefined ? false : flag(input.mysteryHunt)
+  if (mysteryHunt === null) return null
+  const obols = input.obols === undefined ? 0 : int(input.obols)
+  if (obols === null || obols < 0) return null
+  const rerolls = input.rerolls === undefined ? 0 : int(input.rerolls)
+  if (rerolls === null || rerolls < 0) return null
+  return normalizeCheckpoint({
+    version: 1,
+    seed,
+    weapon: input.weapon,
+    roomId,
+    hp,
+    maxHp,
+    depth,
+    boonBits,
+    boons,
+    history,
+    riteAnswer,
+    riteBoonOwed,
+    riteDebt,
+    primedBrand,
+    boundaryRng,
+    phase: input.phase as RoomPhase,
+    map,
+    pendingReward,
+    pendingRite,
+    pendingShop,
+    pendingMystery,
+    mysteryHunt,
+    obols,
+    rerolls,
+  })
+}
+
+/** Enumerated field order so serializeSave is byte-stable across hosts. */
+export function normalizeCheckpoint(cp: RunCheckpoint): RunCheckpoint {
+  return {
+    version: 1,
+    seed: cp.seed,
+    weapon: cp.weapon,
+    roomId: cp.roomId,
+    hp: cp.hp,
+    maxHp: cp.maxHp,
+    depth: cp.depth,
+    boonBits: cp.boonBits,
+    boons: cp.boons.map(b => ({ id: b.id, stacks: b.stacks })),
+    history: cloneHistory(cp.history),
+    riteAnswer: cp.riteAnswer,
+    riteBoonOwed: cp.riteBoonOwed,
+    riteDebt: cp.riteDebt,
+    primedBrand: cp.primedBrand,
+    boundaryRng: cp.boundaryRng,
+    phase: cp.phase,
+    map: cloneMap(cp.map as RunMap | null),
+    pendingReward: cp.pendingReward ? {
+      family: cp.pendingReward.family,
+      options: [cp.pendingReward.options[0], cp.pendingReward.options[1], cp.pendingReward.options[2]],
+      focus: cp.pendingReward.focus,
+      deity: cp.pendingReward.deity,
+      fromRite: cp.pendingReward.fromRite,
+    } : null,
+    pendingRite: cloneRite(cp.pendingRite),
+    pendingShop: cloneShop(cp.pendingShop),
+    pendingMystery: cloneMystery(cp.pendingMystery),
+    mysteryHunt: cp.mysteryHunt,
+    obols: cp.obols,
+    rerolls: cp.rerolls,
+  }
+}

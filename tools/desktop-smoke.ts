@@ -137,7 +137,7 @@ const saveA = serializeSave(bumpRevision(defaultSave({ profileId: 'default' })))
 const saveB = serializeSave(bumpRevision(bumpRevision(defaultSave({ profileId: 'default' }))))
 const importedSave = serializeSave({
   ...defaultSave({ profileId: 'default' }),
-  meta: { version: 1, attempts: 42, victories: 6, unlockedWeapons: ['blade'] },
+  meta: { version: 1, attempts: 42, victories: 6, remembrances: 0, rerollUnlocked: false, vesselUnlocked: false, unlockedWeapons: ['blade'] },
 })
 const CORRUPT = '{"schemaVersion": 2, "meta"'
 const CORRUPT_BACKUP = '{"schemaVersion": 2, "settings"'
@@ -349,6 +349,8 @@ try {
 
   await check('import is acknowledged only after its coalesced write is durable', 20_000, async () => {
     await page.evaluate(() => {
+      // The packaged app boots onto the title. Enter answers DESCEND; Escape then owns pause.
+      window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Enter' }))
       window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Escape' }))
       window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyI' }))
     })

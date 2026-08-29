@@ -3,8 +3,12 @@ import { BOONS, DEITIES, type BoonId, type Deity } from '@/sim/boons'
 import { RITES, type RiteDef } from '@/sim/rites'
 import { drawPortrait, MASK_W, type PortraitId } from './views/deity'
 import type { World } from '@/sim/world'
-import type { RewardOffer } from '@/sim/session'
+import { obolsLabel, SHOP_COPY, shopCost } from '@/sim/economy'
+import { MYSTERY_COPY, canAffordMystery } from '@/sim/mystery'
+import { canAbandon } from '@/sim/return'
+import type { MysteryOffer, RewardOffer, ShopOffer } from '@/sim/session'
 import { tuning } from '@/tuning'
+import { backPause, duoFooter, meetingVeil, offerAct, offerSpoken, pauseNudge, resolvePause, shopAct, shopSpoken, showBuildStrip, townTally, victoryKeptLine, wrapPauseFocus, type PauseAct, type PausePage, type TitleNudge } from './titleMenu'
 import { label, P } from './ui'
 
 export class RewardOverlay {
@@ -19,8 +23,13 @@ export class RewardOverlay {
   private metaG = new Graphics()
   private metaText = label('', 9, P.dim)
   private paused = false
+  private pausePage: PausePage = 'menu'
+  private pauseFocus = 0
+  private abandonArmed = false
   private suppressed = false
   private reducedEffects = false
+  private music = 1
+  private sfx = 1
 
   constructor(layer: Container) {
     this.root.visible = false
@@ -30,7 +39,52 @@ export class RewardOverlay {
   }
 
   relayout(): void { this.key = '' }
-  setPaused(paused: boolean): void { if (this.paused !== paused) { this.paused = paused; this.key = '' } }
+  setPaused(paused: boolean): void {
+    if (this.paused === paused) return
+    this.paused = paused
+    this.pausePage = 'menu'
+    this.pauseFocus = 0
+    this.abandonArmed = false
+    this.key = ''
+  }
+
+  setLevels(music: number, sfx: number): void {
+    if (this.music === music && this.sfx === sfx) return
+    this.music = music
+    this.sfx = sfx
+    this.key = ''
+  }
+
+  movePause(delta: -1 | 1, canAbandon: boolean): void {
+    if (!this.paused) return
+    this.pauseFocus = wrapPauseFocus(this.pausePage, this.pauseFocus, delta, canAbandon)
+    this.abandonArmed = false
+    this.key = ''
+  }
+
+  confirmPause(canAbandon: boolean): PauseAct {
+    if (!this.paused) return 'none'
+    const next = resolvePause(this.pausePage, this.pauseFocus, canAbandon, this.abandonArmed)
+    this.pausePage = next.page
+    this.pauseFocus = next.focus
+    this.abandonArmed = next.abandonArmed
+    this.key = ''
+    return next.act
+  }
+
+  backPause(canAbandon: boolean): boolean {
+    if (!this.paused || this.pausePage === 'menu') return false
+    const next = backPause(this.pausePage, canAbandon)
+    this.pausePage = next.page
+    this.pauseFocus = next.focus
+    this.abandonArmed = false
+    this.key = ''
+    return true
+  }
+
+  nudgePause(): TitleNudge {
+    return this.paused ? pauseNudge(this.pausePage, this.pauseFocus) : 'none'
+  }
   /** Stand down entirely while a higher overlay owns the screen, so nothing of ours shows under it. */
   setSuppressed(suppressed: boolean): void { if (this.suppressed !== suppressed) { this.suppressed = suppressed; this.key = '' } }
   setReducedEffects(reduced: boolean): void {
@@ -45,36 +99,49 @@ export class RewardOverlay {
       return
     }
     const offer = this.paused ? null : world.session.run?.pendingReward
+    const shop = this.paused ? null : world.session.run?.pendingShop
+    const mystery = this.paused ? null : world.session.run?.pendingMystery
     const rite = this.paused ? null : world.session.run?.pendingRite
     const victory = !this.paused && world.session.run?.result === 'won'
-    this.root.visible = !!offer || !!rite || victory || this.paused
-    this.build.visible = !!world.session.run && world.roomPhase !== 'town' && !this.root.visible
+    this.root.visible = !!offer || !!shop || !!mystery || !!rite || victory || this.paused
+    this.build.visible = showBuildStrip({
+      hasRun: !!world.session.run,
+      inTown: world.roomPhase === 'town',
+      overlayOpen: this.root.visible,
+      dead: world.player.state === 'dead',
+    })
     this.updateMeta(world)
     this.updateBuild(world)
     if (!this.root.visible) return
     const nextKey = this.paused
-      ? `pause|${this.reducedEffects ? 1 : 0}|${tuning.view.width}`
+      ? `pause|${this.pausePage}|${this.reducedEffects ? 1 : 0}|${canAbandon(world) ? 1 : 0}|${this.pauseFocus}|${this.abandonArmed ? 1 : 0}|${this.music}|${this.sfx}|${tuning.view.width}`
       : rite
       ? `rite|${rite.id}|${rite.focus}|${tuning.view.width}`
+      : shop
+      ? `shop|${shop.goods.join('|')}|${shop.focus}|${world.session.run?.obols}|${tuning.view.width}`
+      : mystery
+      ? `mystery|${mystery.choices.join('|')}|${mystery.focus}|${world.session.run?.obols}|${world.session.meta.remembrances}|${tuning.view.width}`
       : offer
-      ? `offer|${offer.options.join('|')}|${offer.focus}|${offer.deity}|${offer.fromRite ? 1 : 0}|${tuning.view.width}`
+      ? `offer|${offer.options.join('|')}|${offer.focus}|${offer.deity}|${offer.fromRite ? 1 : 0}|${world.session.run?.rerolls ?? 0}|${tuning.view.width}`
       : victory
-        ? `won|${world.session.run?.depth}|${world.session.run?.boons.map(b => b.id).join('|')}|${tuning.view.width}`
+        ? `won|${world.session.run?.depth}|${world.session.run?.boons.map(b => b.id).join('|')}|${world.session.lastBanked}|${tuning.view.width}`
         : ''
     if (nextKey === this.key) return
     this.key = nextKey
     this.clear()
     if (rite) this.paintRite(RITES[rite.id], rite.focus)
-    else if (offer) this.paintOffer(offer)
+    else if (shop) this.paintShop(shop, world.session.run?.obols ?? 0)
+    else if (mystery) this.paintMystery(mystery, world)
+    else if (offer) this.paintOffer(offer, world.session.run?.rerolls ?? 0)
     else if (victory) this.paintVictory(world)
-    else this.paintPause()
+    else this.paintPause(canAbandon(world))
   }
 
   private updateMeta(world: World): void {
     const m = world.session.meta
     this.meta.visible = world.roomPhase === 'town' && m.attempts > 0 && !this.paused
     if (!this.meta.visible) return
-    this.metaText.text = `${m.attempts} ATTEMPTS  ·  ${m.victories} VICTORIES`
+    this.metaText.text = townTally(m.attempts, m.victories, m.remembrances)
     this.metaText.anchor.set(1, 0.5)
     this.metaText.position.set(tuning.view.width - 13, 15)
     const w = this.metaText.width + 14
@@ -85,8 +152,9 @@ export class RewardOverlay {
   private updateBuild(world: World): void {
     if (!this.build.visible) return
     const ids = world.session.run?.boons.map(b => b.id) ?? []
-    const text = ids.length ? ids.map(id => BOONS[id].name).join('  ·  ') : 'UNMARKED BLADE'
-    this.buildText.text = text
+    const purse = world.session.run?.obols ?? 0
+    const vows = ids.length ? ids.map(id => BOONS[id].name).join('  ·  ') : 'UNMARKED BLADE'
+    this.buildText.text = `${vows}   ·   ${obolsLabel(purse)}`
     this.buildText.anchor.set(0, 0.5)
     this.buildText.position.set(13, 39)
     const w = Math.min(tuning.view.width - 26, this.buildText.width + 14)
@@ -107,13 +175,13 @@ export class RewardOverlay {
 
   /**
    * The plate every speaker stands on: a niche, a portrait, a name, an epithet, and one line beneath.
-   * Two screens use it now — the gods' offer and the ferryman's toll — so it lives here once. It
+   * The gods, the ferryman, and the Unburied all stand on it, so it lives here once. It
    * returns the y the caller's own content may start at, which is the only thing they disagree on.
    * The line arrives already formed: quoted when someone is saying it, bare when it is narration.
    */
   private paintSpeaker(who: PortraitId, name: string, epithet: string, accent: number, line: string, lineTone = P.dim): number {
     const W = tuning.view.width, H = tuning.view.height
-    this.g.rect(0, 0, W, H).fill({ color: P.void, alpha: 0.92 })
+    this.g.rect(0, 0, W, H).fill({ color: P.void, alpha: meetingVeil() })
     this.g.rect(0, 0, W, 3).fill({ color: accent })
 
     const plateH = 56
@@ -180,14 +248,91 @@ export class RewardOverlay {
       detail.anchor.set(0.5, 0)
       detail.position.set(x + cardW / 2, y + 62); this.add(detail)
     })
-    const act = label('A / D OR ARROWS TO CHOOSE   ·   ENTER / ATTACK TO ANSWER', 10, accent)
+    const act = label('ANSWER', 10, accent)
+    act.position.set(W / 2, H - 16); this.add(act)
+  }
+
+  private paintShop(offer: ShopOffer, purse: number): void {
+    const W = tuning.view.width, H = tuning.view.height
+    const accent = P.gold
+    const y = this.paintSpeaker('charon', 'THE FERRYMAN', 'he who is owed', accent, shopSpoken())
+    const purseLine = label(`${obolsLabel(purse)} ON THE BANK`, 10, accent)
+    purseLine.position.set(W / 2, y); this.add(purseLine)
+    const cardsY = y + 16
+    const gap = 8
+    const cardW = Math.min(142, Math.floor((W - 32 - gap * 2) / 3))
+    const cardH = 128
+    const total = cardW * 3 + gap * 2
+    const x0 = Math.floor((W - total) / 2)
+    offer.goods.forEach((good, i) => {
+      const copy = SHOP_COPY[good]
+      const cost = shopCost(good)
+      const x = x0 + i * (cardW + gap)
+      const selected = i === offer.focus
+      const affordable = purse >= cost
+      const tone = affordable ? accent : P.dim
+      const edge = selected ? tone : 0x4c4658
+      this.g.roundRect(x, cardsY, cardW, cardH, 3).fill({ color: selected ? P.faceHi : P.face, alpha: 1 })
+      this.g.roundRect(x, cardsY, cardW, cardH, 3).stroke({ color: edge, width: selected ? 3 : 1 })
+      this.g.rect(x + 10, cardsY + 29, cardW - 20, 2).fill({ color: edge })
+      if (selected) {
+        this.g.rect(x + 3, cardsY + 3, cardW - 6, 2).fill({ color: edge })
+        this.g.rect(x + 3, cardsY + cardH - 5, cardW - 6, 2).fill({ color: edge })
+      }
+      const n = label(copy.name, 11, selected && affordable ? P.bone : P.dim)
+      n.position.set(x + cardW / 2, cardsY + 17); this.add(n)
+      const price = label(copy.cost, 9, tone)
+      price.position.set(x + cardW / 2, cardsY + 45); this.add(price)
+      const detail = label(copy.detail, 11, selected && affordable ? P.bone : P.dim)
+      detail.style.wordWrap = true; detail.style.wordWrapWidth = cardW - 24
+      detail.anchor.set(0.5, 0)
+      detail.position.set(x + cardW / 2, cardsY + 60); this.add(detail)
+    })
+    const act = label(shopAct(), 10, accent)
+    act.position.set(W / 2, H - 16); this.add(act)
+  }
+
+  private paintMystery(offer: MysteryOffer, world: World): void {
+    const W = tuning.view.width, H = tuning.view.height
+    const accent = P.dim
+    const y = this.paintSpeaker('unburied', 'THE UNBURIED', 'who could not pay', P.gold, '"A coin, a memory, or you leave me on this bank."')
+    const cardsY = y + 8
+    const gap = 8
+    const cardW = Math.min(142, Math.floor((W - 32 - gap * 2) / 3))
+    const cardH = 128
+    const total = cardW * 3 + gap * 2
+    const x0 = Math.floor((W - total) / 2)
+    offer.choices.forEach((choice, i) => {
+      const copy = MYSTERY_COPY[choice]
+      const x = x0 + i * (cardW + gap)
+      const selected = i === offer.focus
+      const affordable = canAffordMystery(world, choice)
+      const tone = affordable ? P.gold : P.dim
+      const edge = selected ? tone : 0x4c4658
+      this.g.roundRect(x, cardsY, cardW, cardH, 3).fill({ color: selected ? P.faceHi : P.face, alpha: 1 })
+      this.g.roundRect(x, cardsY, cardW, cardH, 3).stroke({ color: edge, width: selected ? 3 : 1 })
+      this.g.rect(x + 10, cardsY + 29, cardW - 20, 2).fill({ color: edge })
+      if (selected) {
+        this.g.rect(x + 3, cardsY + 3, cardW - 6, 2).fill({ color: edge })
+        this.g.rect(x + 3, cardsY + cardH - 5, cardW - 6, 2).fill({ color: edge })
+      }
+      const n = label(copy.name, 11, selected && affordable ? P.bone : P.dim)
+      n.position.set(x + cardW / 2, cardsY + 17); this.add(n)
+      const price = label(copy.cost, 9, tone)
+      price.position.set(x + cardW / 2, cardsY + 45); this.add(price)
+      const detail = label(copy.detail, 11, selected && affordable ? P.bone : P.dim)
+      detail.style.wordWrap = true; detail.style.wordWrapWidth = cardW - 24
+      detail.anchor.set(0.5, 0)
+      detail.position.set(x + cardW / 2, cardsY + 60); this.add(detail)
+    })
+    const act = label('ANSWER', 10, P.gold)
     act.position.set(W / 2, H - 16); this.add(act)
   }
 
   // The offer is a meeting, not a menu. Someone specific is standing there, they are named, and they
   // say one line before you take their terms — so the screen leads with the speaker and only then
   // shows what is on the table.
-  private paintOffer(offer: RewardOffer): void {
+  private paintOffer(offer: RewardOffer, rerolls: number): void {
     const { options, focus, deity } = offer
     const W = tuning.view.width, H = tuning.view.height
     const god = DEITIES[deity]
@@ -196,8 +341,8 @@ export class RewardOverlay {
     // promised. Without a word of attribution that reads as a bug, so his line replaces her greeting
     // — unquoted and in his gold, because he is not the one standing there.
     const y = offer.fromRite
-      ? this.paintSpeaker(deity, god.name, god.epithet, accent, 'THE FERRYMAN PAYS OUT WHAT HE WAS PAID', P.gold)
-      : this.paintSpeaker(deity, god.name, god.epithet, accent, `"${god.greeting}"`)
+      ? this.paintSpeaker(deity, god.name, god.epithet, accent, offerSpoken(true, god.greeting), P.gold)
+      : this.paintSpeaker(deity, god.name, god.epithet, accent, offerSpoken(false, god.greeting))
 
     // --- the terms ---------------------------------------------------------------------------
     const gap = 8
@@ -232,7 +377,7 @@ export class RewardOverlay {
       // about a card, so it speaks instead of the attribution rather than under it.
       if (def.requires?.length) {
         this.g.rect(x + 3, y + 3, cardW - 6, 2).fill({ color: P.gold })
-        const duo = label('A PACT BETWEEN POWERS', 8, P.gold)
+        const duo = label(duoFooter(DEITIES.fury.name, DEITIES.hecate.name), 8, P.gold)
         duo.position.set(x + cardW / 2, y + cardH - 11); this.add(duo)
       } else if (def.deity !== deity) {
         // The only signal that the run is being offered something from across the crossroads.
@@ -240,7 +385,7 @@ export class RewardOverlay {
         from.position.set(x + cardW / 2, y + cardH - 11); this.add(from)
       }
     })
-    const act = label('A / D OR ARROWS TO CHOOSE   ·   ENTER / ATTACK TO CLAIM', 10, P.gold)
+    const act = label(offerAct(rerolls), 10, P.gold)
     act.position.set(W / 2, H - 16); this.add(act)
   }
 
@@ -255,30 +400,73 @@ export class RewardOverlay {
     const title = label('YOU RETURN WITH YOUR NAME', 16, P.bone)
     title.position.set(W / 2, 84); this.add(title)
     this.g.rect(W / 2 - 92, 100, 184, 2).fill({ color: P.red })
-    const seconds = Math.floor((world.tick - run.startedTick) / 60)
-    const stats = label(`${run.depth} CHAMBERS   ·   ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`, 10, P.dim)
+    const stats = label(victoryKeptLine(run.depth, world.session.lastBanked), 10, P.dim)
     stats.position.set(W / 2, 120); this.add(stats)
     const build = label(run.boons.map(b => BOONS[b.id].name).join('\n'), 10, P.bone)
     build.position.set(W / 2, 154); this.add(build)
-    const act = label('PRESS ENTER / ATTACK TO WAKE IN THE BARDO', 10, P.gold)
+    const act = label('WAKE IN THE BARDO', 10, P.gold)
     act.position.set(W / 2, 205); this.add(act)
   }
 
-  private paintPause(): void {
-    const W = tuning.view.width, H = tuning.view.height
-    this.g.rect(0, 0, W, H).fill({ color: P.void, alpha: 0.76 })
-    // The card grew 134 -> 152 and moved up 6 to seat the save line, keeping the 28/21 top and bottom
-    // padding it already had. The new line is static, so the repaint key above needs no new input.
-    this.g.roundRect(W / 2 - 120, 62, 240, 152, 3).fill({ color: P.face, alpha: 0.98 }).stroke({ color: P.gold, width: 2 })
-    const over = label('BETWEEN BREATHS', 11, P.gold)
-    over.position.set(W / 2, 90); this.add(over)
-    const title = label('PAUSED', 22, P.bone)
-    title.position.set(W / 2, 120); this.add(title)
-    const effects = label(`V  ·  REDUCED EFFECTS ${this.reducedEffects ? 'ON' : 'OFF'}`, 10, this.reducedEffects ? P.gold : P.dim)
-    effects.position.set(W / 2, 152); this.add(effects)
-    const saves = label('E EXPORT SAVE  ·  I IMPORT SAVE', 10, P.dim)
-    saves.position.set(W / 2, 170); this.add(saves)
-    const act = label('P / ESCAPE / START TO RETURN', 10, P.dim)
-    act.position.set(W / 2, 193); this.add(act)
+  private paintPause(leaving: boolean): void {
+    const W = tuning.view.width
+    this.g.rect(0, 0, W, tuning.view.height).fill({ color: P.void, alpha: 0.76 })
+    const settings = this.pausePage === 'settings'
+    const rows = settings ? 4 : leaving ? 3 : 2
+    const cardH = 56 + rows * 22 + 16
+    const cardY = Math.round((tuning.view.height - cardH) / 2)
+    this.g.roundRect(W / 2 - 130, cardY, 260, cardH, 3).fill({ color: P.face, alpha: 0.98 }).stroke({ color: P.gold, width: 2 })
+    const title = label('BETWEEN BREATHS', 16, P.gold)
+    title.position.set(W / 2, cardY + 28); this.add(title)
+
+    const rowY = cardY + 56
+    if (settings) {
+      const still = this.reducedEffects ? 'THE ROOM IS STILL' : 'STILL THE ROOM'
+      this.paintPauseRow(W / 2, rowY, still, this.pauseFocus === 0)
+      this.paintPauseMeter(W / 2, rowY + 22, 'MUSIC', this.music, this.pauseFocus === 1)
+      this.paintPauseMeter(W / 2, rowY + 44, 'SOUND', this.sfx, this.pauseFocus === 2)
+      this.paintPauseRow(W / 2, rowY + 66, 'RISE', this.pauseFocus === 3)
+      return
+    }
+    this.paintPauseRow(W / 2, rowY, 'RISE', this.pauseFocus === 0)
+    if (leaving) {
+      const give = this.abandonArmed ? 'THE BARDO WILL TAKE YOU' : 'GIVE THE DESCENT BACK'
+      this.paintPauseRow(W / 2, rowY + 22, give, this.pauseFocus === 1, this.abandonArmed)
+      this.paintPauseRow(W / 2, rowY + 44, 'SETTINGS', this.pauseFocus === 2)
+      return
+    }
+    this.paintPauseRow(W / 2, rowY + 22, 'SETTINGS', this.pauseFocus === 1)
+  }
+
+  private paintPauseMeter(cx: number, y: number, name: string, value: number, selected: boolean): void {
+    const steps = 8
+    const pip = 5
+    const gap = 3
+    const nameT = label(name, 11, selected ? P.bone : P.dim)
+    const nameW = Math.round(nameT.width)
+    const barW = steps * pip + (steps - 1) * gap
+    const total = nameW + 12 + barW
+    const x0 = Math.round(cx - total / 2)
+    nameT.anchor.set(0, 0.5)
+    nameT.position.set(x0, y)
+    this.add(nameT)
+    const filled = Math.round(value * steps)
+    const bx = x0 + nameW + 12
+    for (let i = 0; i < steps; i++) {
+      const x = bx + i * (pip + gap)
+      this.g.rect(x, y - 2, pip, 4).fill({ color: i < filled ? P.gold : P.dim, alpha: i < filled ? 0.95 : 0.35 })
+    }
+    if (selected) this.g.rect(x0, y + 7, total, 1).fill({ color: P.gold, alpha: 0.7 })
+  }
+
+  private paintPauseRow(cx: number, y: number, text: string, selected: boolean, armed = false): void {
+    const tone = armed ? P.gold : selected ? P.bone : P.dim
+    const row = label(text, 11, tone)
+    row.position.set(cx, y)
+    this.add(row)
+    if (selected) {
+      const w = Math.min(220, row.width + 20)
+      this.g.rect(cx - w / 2, y + 7, w, 1).fill({ color: P.gold, alpha: 0.7 })
+    }
   }
 }

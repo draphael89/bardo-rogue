@@ -90,6 +90,7 @@ const savedSword = new WeakMap<EntityView, Texture>()
 
 export function updateBow(v: EntityView, p: Player, x: number, y: number, alpha: number, time: number): void {
   const w = v.weapon!
+  if (!p.armed) { w.visible = false; return }
   if (!savedSword.has(v)) savedSword.set(v, w.texture)
   const B = tuning.bow
   const f = p.facing

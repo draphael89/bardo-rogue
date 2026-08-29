@@ -53,19 +53,19 @@ describe('replay format', () => {
   it('round-trips the initial persistent meta snapshot', () => {
     const r: Replay = {
       v: 1, seed: 17, scenario: 'loop',
-      meta: { version: 1, attempts: 7, victories: 3, unlockedWeapons: ['blade'] },
+      meta: { version: 1, attempts: 7, victories: 3, remembrances: 0, rerollUnlocked: false, vesselUnlocked: false, unlockedWeapons: ['blade'] },
       frames: randomFrames(20),
     }
     expect(decodeReplay(encodeReplay(r))).toEqual(r)
     expect(replayFromJson(replayToJson(r))).toEqual(r)
   })
   it('snapshots recorder meta instead of retaining a live counter reference', () => {
-    const meta = { version: 1 as const, attempts: 7, victories: 3, unlockedWeapons: ['blade' as const] }
+    const meta = { version: 1 as const, attempts: 7, victories: 3, remembrances: 0, rerollUnlocked: false, vesselUnlocked: false, unlockedWeapons: ['blade' as const] }
     const recorder = new Recorder()
     recorder.start(17, 'loop', false, meta)
     meta.attempts++
     recorder.capture(emptyInput())
-    expect(recorder.stop().meta).toEqual({ version: 1, attempts: 7, victories: 3, unlockedWeapons: ['blade'] })
+    expect(recorder.stop().meta).toEqual({ version: 1, attempts: 7, victories: 3, remembrances: 0, rerollUnlocked: false, vesselUnlocked: false, unlockedWeapons: ['blade'] })
   })
   it('rejects unknown versions', () => {
     expect(() => decodeReplay({ v: 2 as 1, seed: 1, scenario: 'empty', runs: [] })).toThrow()
@@ -92,7 +92,7 @@ describe('replay fixtures', () => {
   })
 
   it('reproduces a loop recording from its captured meta baseline', () => {
-    const initialMeta = { version: 1 as const, attempts: 7, victories: 3, unlockedWeapons: ['blade' as const] }
+    const initialMeta = { version: 1 as const, attempts: 7, victories: 3, remembrances: 0, rerollUnlocked: false, vesselUnlocked: false, unlockedWeapons: ['blade' as const] }
     const source = createWorld(17, 'loop', { meta: initialMeta })
     const bot = makeBot('slice-kite')
     const frames: InputFrame[] = []

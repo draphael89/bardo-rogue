@@ -8,6 +8,8 @@ export type DeathKind = EnemyKind | 'none'
 import type { ArmId } from './weapons'
 import type { BoonId, Deity } from './boons'
 import type { RiteId } from './rites'
+import type { MysteryChoice, ShopGood } from './session'
+import type { SmithBeat } from './smith'
 
 // Presentation must be able to render a contact after the player has moved, changed weapon, or
 // started another swing. These values are therefore snapshots of the action that caused the hit,
@@ -35,6 +37,14 @@ export interface HitEvent {
 }
 
 export type WardenAttackPattern = 'slam' | 'ring' | 'fan'
+
+/** Matches `WARDEN_PATTERN` in warden.ts. Lives here so combat can name a sentence without importing AI. */
+export const WARDEN_SENTENCE: readonly WardenAttackPattern[] = ['slam', 'ring', 'fan']
+
+export function wardenSentenceOf(pattern: number): WardenAttackPattern {
+  return WARDEN_SENTENCE[pattern] ?? 'slam'
+}
+
 export type GrazeSource = 'projectile' | 'radial' | 'arc' | 'dash'
 
 type EnemyAttackBase = {
@@ -59,7 +69,7 @@ export type SimEvent =
   // The sim names the killer. Presentation used to guess it from the nearest living body, which was
   // wrong exactly when it mattered most: a charger that dashed past, a bolt whose caster was already
   // dead. `ranged` separates "the mark found you" from "the body reached you".
-  | { type: 'playerDeath'; x: number; y: number; by: DeathKind; ranged: boolean }
+  | { type: 'playerDeath'; x: number; y: number; by: DeathKind; ranged: boolean; sentence?: WardenAttackPattern; hunt?: boolean; debt?: boolean }
   | { type: 'dodge'; x: number; y: number; angle: number }
   | { type: 'dodgeEnd'; x: number; y: number }
   | { type: 'dodgeWall'; x: number; y: number; angle: number }
@@ -76,10 +86,10 @@ export type SimEvent =
   | { type: 'spawn'; id: number; kind: EnemyKind; x: number; y: number }
   | { type: 'waveStart'; wave: number; total: number }
   | { type: 'waveClear'; wave: number }
-  | { type: 'roomClear'; hasNext: boolean; reward?: boolean; victory?: boolean }
+  | { type: 'roomClear'; hasNext: boolean; reward?: boolean; shop?: boolean; mystery?: boolean; victory?: boolean }
   | { type: 'roomEnter'; name: string; index: number; total: number }
   | { type: 'roomTransition'; from: string; to: string }
-  | { type: 'returned'; name: string; x: number; y: number }
+  | { type: 'returned'; name: string; x: number; y: number; kept: number; remembrances: number; smithWaiting: boolean }
   | { type: 'offeringTaken'; kind: 'life'; x: number; y: number; hp: number; maxHp: number }
   | { type: 'weaponPrepared'; weapon: ArmId; x: number; y: number }
   | { type: 'runStarted'; weapon: ArmId }
@@ -90,7 +100,7 @@ export type SimEvent =
   | { type: 'riteFocus'; focus: 0 | 1 }
   | { type: 'riteChosen'; rite: RiteId; paid: boolean; x: number; y: number }
   // the refused toll, collected where it was always going to be collected
-  | { type: 'riteDebtCalled' }
+  | { type: 'riteDebtCalled'; id: number; x: number; y: number }
   | { type: 'brandApplied'; id: number; stacks: number; x: number; y: number }
   | { type: 'burnApplied'; id: number; stacks: number; x: number; y: number }
   | { type: 'burnTick'; id: number; stacks: number; x: number; y: number }
@@ -101,6 +111,19 @@ export type SimEvent =
   // A light blow turned by a raised shield. It is not a hit and must never read as one.
   | { type: 'guardBlocked'; id: number; x: number; y: number; angle: number; actionId: number }
   | { type: 'runWon' | 'runLost'; depth: number; ticks: number; boons: BoonId[]; by: DeathKind; ranged: boolean }
+  | { type: 'obolsGained'; amount: number; total: number }
+  | { type: 'shopOffered'; purse: number }
+  | { type: 'shopFocus'; focus: 0 | 1 | 2 }
+  | { type: 'shopBought'; good: ShopGood; cost: number; purse: number }
+  | { type: 'mysteryOffered' }
+  | { type: 'mysteryFocus'; focus: 0 | 1 | 2 }
+  | { type: 'mysteryChosen'; choice: MysteryChoice; x: number; y: number }
+  | { type: 'mysteryHuntCalled'; id: number; x: number; y: number }
+  | { type: 'remembrancesBanked'; amount: number; total: number }
+  | { type: 'smithSpoke'; beat: SmithBeat; line: string; x: number; y: number }
+  | { type: 'rerollUnlocked'; cost: number; remembrances: number }
+  | { type: 'vesselUnlocked'; cost: number; remembrances: number }
+  | { type: 'rewardRerolled'; remaining: number }
   | { type: 'draw'; x: number; y: number; angle: number }
   | { type: 'arrowLoose'; x: number; y: number; angle: number }
   | { type: 'arrowHitWall'; x: number; y: number }

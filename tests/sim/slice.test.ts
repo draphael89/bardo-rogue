@@ -10,9 +10,13 @@ import { loadMeta, loadSettings, META_KEY, saveMeta, saveSettings, SETTINGS_KEY,
 import { tuning } from '@/tuning'
 import { enterRoomById, roomsFor } from '@/sim/rooms'
 import { makeBot } from '@/sim/bots'
+import { shopCost } from '@/sim/economy'
+import { canAffordMystery, mysteryCost } from '@/sim/mystery'
+import { FIRST_GATE, LATE_SHOP, FIELD_FORK, FIRE_FORD, STYX_GATE, ASH_MARCH, pinUtility } from '@/sim/route'
 import { offerReward } from '@/sim/rewards'
 import { quantizeFrame, runReplay, type Replay } from '@/sim/replay'
 import { tryCollectOffering } from '@/sim/offering'
+import { guardUp } from '@/sim/enemies/oathbound'
 
 const landed = (interrupted = false): DamageResult => ({
   outcome: 'landed', landed: true, killed: false, guarded: false, interrupted, resolvedDamage: 1,
@@ -27,6 +31,7 @@ function prepareAndDescend(world = createWorld(1, 'loop')) {
   world.player.y = tuning.run.doorEnterMaxY
   stepWorld(world, emptyInput())
   for (let i = 0; i < tuning.run.transitionTicks; i++) stepWorld(world, emptyInput())
+  pinUtility(world, 'shop')
   return world
 }
 
@@ -51,6 +56,19 @@ function answerRite(world: ReturnType<typeof createWorld>, choice: 'pay' | 'swim
 
 function chooseFocusedReward(world: ReturnType<typeof createWorld>): void {
   expect(world.roomPhase).toBe('reward')
+  const shop = world.session.run?.pendingShop
+  if (shop && world.session.run) {
+    world.session.run.obols = Math.max(world.session.run.obols, shopCost(shop.goods[shop.focus]))
+  }
+  const mystery = world.session.run?.pendingMystery
+  if (mystery && world.session.run) {
+    const price = mysteryCost(mystery.choices[mystery.focus])
+    if (price.kind === 'obols') world.session.run.obols = Math.max(world.session.run.obols, price.amount)
+    if (price.kind === 'remembrances') {
+      world.session.meta.remembrances = Math.max(world.session.meta.remembrances, price.amount)
+    }
+    expect(canAffordMystery(world, mystery.choices[mystery.focus])).toBe(true)
+  }
   stepWorld(world, { ...emptyInput(), confirm: true })
   expect(world.roomPhase).toBe('exits')
 }
@@ -83,7 +101,9 @@ describe('production vertical slice', () => {
     for (let i = 1; i < tuning.run.transitionTicks; i++) stepWorld(world, emptyInput())
     expect(world.rooms[world.roomIndex]?.id).toBe('bardo')
     stepWorld(world, emptyInput())
-    expect(world.rooms[world.roomIndex]?.id).toBe('threshold')
+    const opened = world.session.run!.map!.nodes[0]!.id
+    expect(['threshold', 'styx']).toContain(opened)
+    expect(world.rooms[world.roomIndex]?.id).toBe(opened)
     expect(world.roomPhase).toBe('fighting')
   })
 
@@ -93,13 +113,44 @@ describe('production vertical slice', () => {
     expect(world.roomPhase).toBe('town')
     expect(world.player.armed).toBe(false)
     prepareAndDescend(world)
-    expect(world.rooms[world.roomIndex].id).toBe('threshold')
+    const first = world.session.run!.map!.nodes[0]!.id
+    expect(['threshold', 'styx']).toContain(first)
+    expect(world.rooms[world.roomIndex].id).toBe(first)
     expect(world.roomPhase).toBe('fighting')
     expect(world.session.run?.weapon).toBe('blade')
     expect(world.session.run).toMatchObject({ hp: tuning.player.hp, maxHp: tuning.player.hp })
     expect(world.session.run?.depth).toBe(1)
-    expect(world.session.run?.roomHistory.map(v => v.id)).toEqual(['threshold'])
+    expect(world.session.run?.roomHistory.map(v => v.id)).toEqual([first])
     expect(world.session.meta.attempts).toBe(1)
+  })
+
+  it("the loop's first tell is on the floor as the door flash dies, not after another hold", () => {
+    const world = prepareAndDescend()
+    expect(tuning.loopLeadTicks).toBe(tuning.run.transitionTicks)
+    expect(tuning.loopLeadTicks).toBeLessThan(tuning.waveLeadTicks)
+    expect(world.wave.state).toBe('active')
+    expect(world.spawnQueue.length).toBeGreaterThan(0)
+    expect(world.spawnQueue.every(s => s.ticksLeft === tuning.spawnTelegraphTicks)).toBe(true)
+  })
+
+  it("the next chamber's tell is down when that door flash dies", () => {
+    const world = prepareAndDescend()
+    forceRoomClear(world)
+    if (world.roomPhase === 'reward') chooseFocusedReward(world)
+    expect(world.roomPhase).toBe('exits')
+    const north = world.rooms[world.roomIndex].exits?.find(e => e.dir === 'north')
+    expect(north).toBeDefined()
+    takeDoor(world, 'north')
+    expect(world.rooms[world.roomIndex].id).toBe(north!.to)
+    expect(world.wave.state).toBe('active')
+    expect(world.spawnQueue.length).toBeGreaterThan(0)
+    expect(world.spawnQueue.every(s => s.ticksLeft === tuning.spawnTelegraphTicks)).toBe(true)
+  })
+
+  it('stock arenas still hold the old lead so the pinned hashes stay put', () => {
+    const world = createWorld(1, 'wave1')
+    expect(world.wave.state).toBe('pending')
+    expect(world.wave.timer).toBe(tuning.waveLeadTicks)
   })
 
   it('carries damage and max-health gifts through the explicit run/room boundary', () => {
@@ -137,8 +188,16 @@ describe('production vertical slice', () => {
     expect(a.doorOpen).toBe(true)
   })
 
+  function descendOn(templateId: string): ReturnType<typeof createWorld> {
+    for (let seed = 1; seed <= 128; seed++) {
+      const world = prepareAndDescend(createWorld(seed, 'loop'))
+      if (world.session.run!.map!.template === templateId) return world
+    }
+    throw new Error(`no seed in 1..128 produced ${templateId}`)
+  }
+
   it('opens only the doors that are exits: blade-path keeps its dead east doorway shut', () => {
-    const world = prepareAndDescend(createWorld(21, 'loop'))
+    const world = descendOn(FIRST_GATE.id)
     forceRoomClear(world); chooseFocusedReward(world); takeDoor(world, 'east')
     expect(world.rooms[world.roomIndex].id).toBe('blade-path')
     forceRoomClear(world); chooseFocusedReward(world)
@@ -153,23 +212,80 @@ describe('production vertical slice', () => {
     expect(a.solid[east.row * a.cols + east.col]).toBe(1)
   })
 
-  it.each(['north', 'east'] as const)('connects the %s branch through Room 3 to victory and a clean Bardo return', dir => {
-    const world = prepareAndDescend(createWorld(dir === 'north' ? 21 : 22, 'loop'))
-    forceRoomClear(world); chooseFocusedReward(world); takeDoor(world, dir)
-    expect(['veil-path', 'blade-path']).toContain(world.rooms[world.roomIndex].id)
-    forceRoomClear(world); chooseFocusedReward(world); takeDoor(world, 'north')
-    expect(world.rooms[world.roomIndex].id).toBe('black-step')
-    // The Landing asks before it fights. Refusing here is what puts a body in the Hall of Minos.
-    answerRite(world, 'swim')
-    forceRoomClear(world); chooseFocusedReward(world); takeDoor(world, 'north')
+  it.each([
+    [FIRST_GATE.id, 'north'],
+    [FIRST_GATE.id, 'east'],
+    [LATE_SHOP.id, 'north'],
+    [LATE_SHOP.id, 'east'],
+    [FIELD_FORK.id, 'north'],
+    [FIELD_FORK.id, 'east'],
+    [FIRE_FORD.id, 'north'],
+    [FIRE_FORD.id, 'east'],
+    [STYX_GATE.id, 'north'],
+    [STYX_GATE.id, 'east'],
+    [ASH_MARCH.id, 'north'],
+    [ASH_MARCH.id, 'east'],
+  ] as const)('connects %s via %s through six chambers to victory', (template, dir) => {
+    const world = descendOn(template)
+    forceRoomClear(world); chooseFocusedReward(world)
+    if (template === FIELD_FORK.id) {
+      takeDoor(world, 'north')
+      expect(world.rooms[world.roomIndex].id).toBe('blade-path')
+      forceRoomClear(world); chooseFocusedReward(world)
+      takeDoor(world, dir)
+      expect(['veil-path', 'cocytus']).toContain(world.rooms[world.roomIndex].id)
+      forceRoomClear(world); chooseFocusedReward(world); takeDoor(world, 'north')
+      expect(world.rooms[world.roomIndex].id).toBe('black-step')
+      answerRite(world, 'swim')
+      forceRoomClear(world); chooseFocusedReward(world); takeDoor(world, 'north')
+    } else {
+      takeDoor(world, dir)
+      expect(['veil-path', 'blade-path']).toContain(world.rooms[world.roomIndex].id)
+      forceRoomClear(world); chooseFocusedReward(world); takeDoor(world, 'north')
+      // Early shop / fire-ford: landing then the river. Late shop: Cocytus then landing.
+      const mid = world.rooms[world.roomIndex].id
+      expect(['black-step', 'cocytus', 'phlegethon']).toContain(mid)
+      if (mid === 'black-step') answerRite(world, 'swim')
+      forceRoomClear(world); chooseFocusedReward(world); takeDoor(world, 'north')
+      const mid2 = world.rooms[world.roomIndex].id
+      expect(['black-step', 'cocytus', 'phlegethon']).toContain(mid2)
+      expect(mid2).not.toBe(mid)
+      if (mid2 === 'black-step') answerRite(world, 'swim')
+      forceRoomClear(world); chooseFocusedReward(world); takeDoor(world, 'north')
+    }
+    expect(world.rooms[world.roomIndex].id).toBe('antechamber')
+    if (template === FIELD_FORK.id) {
+      const seen = world.session.run!.roomHistory.map(v => v.id)
+      expect(seen.includes('veil-path') && seen.includes('cocytus')).toBe(false)
+      expect(seen.includes('veil-path') || seen.includes('cocytus')).toBe(true)
+    }
+    if (template === FIRE_FORD.id) {
+      const seen = world.session.run!.roomHistory.map(v => v.id)
+      expect(seen).toContain('phlegethon')
+      expect(seen).not.toContain('cocytus')
+    }
+    if (template === STYX_GATE.id) {
+      const seen = world.session.run!.roomHistory.map(v => v.id)
+      expect(seen).toContain('styx')
+      expect(seen).not.toContain('threshold')
+    }
+    if (template === ASH_MARCH.id) {
+      const seen = world.session.run!.roomHistory.map(v => v.id)
+      expect(seen).toContain('phlegethon')
+      expect(seen).toContain('cocytus')
+      expect(seen).not.toContain('black-step')
+    }
+    forceRoomClear(world); takeDoor(world, 'north')
     expect(world.rooms[world.roomIndex].id).toBe('warden')
-    expect(world.spawnQueue.some(s => s.kind === tuning.rites.toll.debtKind)).toBe(true)
+    const owed = template !== ASH_MARCH.id
+    expect(world.spawnQueue.some(s => s.kind === tuning.rites.toll.debtKind)).toBe(owed)
     expect(world.session.run?.riteDebt).toBe(false)
     forceRoomClear(world)
     expect(world.session.run?.result).toBe('won')
     expect(world.roomPhase).toBe('resolved')
     expect(world.session.meta.victories).toBe(1)
-    expect(activeBoons(world)).toHaveLength(3)
+    expect(world.session.meta.remembrances).toBe(6 * tuning.economy.remembrancePerDepth + tuning.economy.remembranceOnVictory)
+    expect(activeBoons(world)).toHaveLength(owed ? 3 : 4)
     stepWorld(world, { ...emptyInput(), confirm: true })
     expect(world.roomName).toBe('THE BARDO')
     expect(world.roomPhase).toBe('town')
@@ -180,9 +296,11 @@ describe('production vertical slice', () => {
     expect(world.session.meta.victories).toBe(1)
   })
 
-  it.each(['threshold', 'veil-path', 'blade-path', 'black-step', 'warden'])('returns a death in %s safely to a clean Bardo', roomId => {
-    const world = prepareAndDescend(createWorld(31, 'loop'))
-    if (roomId !== 'threshold') enterRoomById(world, roomId)
+  it.each(['threshold', 'styx', 'veil-path', 'blade-path', 'black-step', 'cocytus', 'phlegethon', 'antechamber', 'warden'])('returns a death in %s safely to a clean Bardo', roomId => {
+    const world = roomId === 'phlegethon' ? descendOn(FIRE_FORD.id)
+      : roomId === 'styx' ? descendOn(STYX_GATE.id)
+      : descendOn(FIRST_GATE.id)
+    if (world.rooms[world.roomIndex].id !== roomId) enterRoomById(world, roomId)
     grantBoon(world, 'ashenEdge')
     world.player.hp = 1
     hurtPlayer(world, 0, 1)
@@ -195,6 +313,47 @@ describe('production vertical slice', () => {
     expect(world.session.run).toBeNull()
     expect(activeBoons(world)).toEqual([])
     expect(world.session.meta).toMatchObject({ attempts: 1, victories: 0 })
+  })
+
+  it('the judge is standing on the same clock as the Oath-Bound', () => {
+    const world = descendOn(FIRST_GATE.id)
+    enterRoomById(world, 'warden')
+    const opening = tuning.spawnTelegraphTicks
+    for (let i = 0; i < opening - 1; i++) stepWorld(world, emptyInput())
+    expect(world.enemies.some(e => e.active && e.kind === 'warden')).toBe(false)
+    stepWorld(world, emptyInput())
+    const judge = world.enemies.find(e => e.active && e.kind === 'warden')
+    expect(judge).toBeDefined()
+    expect(judge?.hp).toBe(tuning.warden.hp)
+  })
+
+  it('the Antechamber teaches the shield on the production clock: a light is bronze, a heavy is the answer', () => {
+    const world = descendOn(FIRST_GATE.id)
+    enterRoomById(world, 'antechamber')
+    const opening = tuning.spawnTelegraphTicks
+    for (let i = 0; i < opening; i++) stepWorld(world, emptyInput())
+    const oath = world.enemies.find(e => e.active && e.kind === 'oathbound')
+    expect(oath).toBeDefined()
+    expect(world.aliveEnemies()).toBe(1)
+    expect(guardUp(oath!)).toBe(true)
+    const p = world.player
+    p.god = true
+    p.x = p.px = oath!.x
+    p.y = p.py = oath!.y + 18
+    p.vx = p.vy = 0
+    world.events.length = 0
+    const hp = oath!.hp
+    stepWorld(world, { ...emptyInput(), attack: true, aimX: 0, aimY: -1 })
+    for (let i = 0; i < 16; i++) stepWorld(world, { ...emptyInput(), aimX: 0, aimY: -1 })
+    expect(world.events.some(e => e.type === 'guardBlocked')).toBe(true)
+    expect(oath!.hp).toBe(hp)
+    for (let i = 0; i < 24 && p.state !== 'free'; i++) stepWorld(world, { ...emptyInput(), aimX: 0, aimY: -1 })
+    expect(p.state).toBe('free')
+    world.events.length = 0
+    stepWorld(world, { ...emptyInput(), heavy: true, aimX: 0, aimY: -1 })
+    for (let i = 0; i < 24; i++) stepWorld(world, { ...emptyInput(), aimX: 0, aimY: -1 })
+    expect(oath!.hp).toBeLessThan(hp)
+    expect(world.events.some(e => e.type === 'hit' && e.heavy && e.targetId === oath!.id)).toBe(true)
   })
 
   it('has a valid authored graph with both branches reaching the Warden', () => {
@@ -361,21 +520,23 @@ describe('versioned meta storage', () => {
 
   it('round-trips counters and safely rejects corrupt or unknown data', () => {
     const storage = new MemoryStorage()
-    expect(saveMeta({ version: 1, attempts: 9, victories: 2, unlockedWeapons: ['blade'] }, storage)).toBe(true)
-    expect(loadMeta(storage)).toEqual({ version: 1, attempts: 9, victories: 2, unlockedWeapons: ['blade'] })
+    expect(saveMeta({ version: 1, attempts: 9, victories: 2, remembrances: 4, rerollUnlocked: true, vesselUnlocked: false, unlockedWeapons: ['blade'] }, storage)).toBe(true)
+    expect(loadMeta(storage)).toEqual({ version: 1, attempts: 9, victories: 2, remembrances: 4, rerollUnlocked: true, vesselUnlocked: false, unlockedWeapons: ['blade'] })
     storage.setItem(META_KEY, '{broken')
-    expect(loadMeta(storage)).toEqual({ version: 1, attempts: 0, victories: 0, unlockedWeapons: ['blade'] })
+    expect(loadMeta(storage)).toEqual({ version: 1, attempts: 0, victories: 0, remembrances: 0, rerollUnlocked: false, vesselUnlocked: false, unlockedWeapons: ['blade'] })
     storage.setItem(META_KEY, JSON.stringify({ version: 999, attempts: 50 }))
-    expect(loadMeta(storage)).toEqual({ version: 1, attempts: 0, victories: 0, unlockedWeapons: ['blade'] })
+    expect(loadMeta(storage)).toEqual({ version: 1, attempts: 0, victories: 0, remembrances: 0, rerollUnlocked: false, vesselUnlocked: false, unlockedWeapons: ['blade'] })
   })
 
   it('persists the reduced-effects preference with a safe system-preference fallback', () => {
     const storage = new MemoryStorage()
-    expect(loadSettings(storage, true)).toEqual({ version: 1, reducedEffects: true })
-    expect(saveSettings({ version: 1, reducedEffects: false }, storage)).toBe(true)
-    expect(loadSettings(storage, true)).toEqual({ version: 1, reducedEffects: false })
+    expect(loadSettings(storage, true)).toEqual({ version: 1, reducedEffects: true, music: 1, sfx: 1 })
+    expect(saveSettings({ version: 1, reducedEffects: false, music: 1, sfx: 1 }, storage)).toBe(true)
+    expect(loadSettings(storage, true)).toEqual({ version: 1, reducedEffects: false, music: 1, sfx: 1 })
     storage.setItem(SETTINGS_KEY, '{broken')
-    expect(loadSettings(storage, true)).toEqual({ version: 1, reducedEffects: true })
+    expect(loadSettings(storage, true)).toEqual({ version: 1, reducedEffects: true, music: 1, sfx: 1 })
+    storage.setItem(SETTINGS_KEY, JSON.stringify({ version: 1, reducedEffects: false }))
+    expect(loadSettings(storage, true)).toEqual({ version: 1, reducedEffects: false, music: 1, sfx: 1 })
   })
 })
 
@@ -385,13 +546,13 @@ describe('attempt identity', () => {
   it('gives a fresh profile and a returning profile different runs', () => {
     const first = prepareAndDescend(createWorld(1, 'loop'))
     const returning = prepareAndDescend(createWorld(1, 'loop', {
-      meta: { version: 1, attempts: 12, victories: 3, unlockedWeapons: ['blade'] },
+      meta: { version: 1, attempts: 12, victories: 3, remembrances: 0, rerollUnlocked: false, vesselUnlocked: false, unlockedWeapons: ['blade'] },
     }))
     expect(first.session.run!.seed).not.toBe(returning.session.run!.seed)
   })
 
   it('still reproduces exactly for a given attempt number', () => {
-    const meta = { version: 1 as const, attempts: 4, victories: 1, unlockedWeapons: ['blade' as const] }
+    const meta = { version: 1 as const, attempts: 4, victories: 1, remembrances: 0, rerollUnlocked: false, vesselUnlocked: false, unlockedWeapons: ['blade' as const] }
     const a = prepareAndDescend(createWorld(3, 'loop', { meta: { ...meta } }))
     const b = prepareAndDescend(createWorld(3, 'loop', { meta: { ...meta } }))
     expect(a.session.run!.seed).toBe(b.session.run!.seed)
@@ -463,6 +624,8 @@ describe('statuses', () => {
     const w = prepareAndDescend(createWorld(seed, 'loop'))
     for (const e of w.enemies) e.active = false
     w.spawnQueue.length = 0
+    // Opening tells are already queued. Emptying them would clear the room on the next tick.
+    w.wave.state = 'done'
     return w
   }
 
@@ -554,6 +717,8 @@ describe('the vows of the Kindly One and Hecate', () => {
     const w = prepareAndDescend(createWorld(seed, 'loop'))
     for (const e of w.enemies) e.active = false
     w.spawnQueue.length = 0
+    // Opening tells are already queued. Emptying them would clear the room on the next tick.
+    w.wave.state = 'done'
     return w
   }
 

@@ -2,6 +2,7 @@ import { Container, Sprite, RenderTexture, Graphics, type DestroyOptions, type R
 import { TILE, T, type Arena, type ArenaDoor, type DoorMark, type ArenaOffering, type ArenaRack, doorOpens } from '@/sim/arena'
 import type { Atlas } from './atlas'
 import { tuning } from '@/tuning'
+import { OATH } from './oathMetal'
 
 // Static floor/walls baked into one texture; door clusters (sprites + marks) change with open state.
 // `door` is a Container so every exit rides with presenter addChild / destroy. destroy() always
@@ -14,9 +15,24 @@ const MARK = {
   blade: 0xff7a30, bladeCore: 0xffd060, bladeEdge: 0x4a1808,
   veil: 0xa878ff, veilCore: 0xe0c8ff, veilEdge: 0x241044,
   hard: 0xe04438, hardCore: 0xffb050, hardEdge: 0x3c0808,
+  elite: OATH.body, eliteCore: OATH.rim, eliteEdge: OATH.edge,
   boss: 0xffc448, bossCore: 0xfff0a0, bossEdge: 0x4a2600,
   plate: 0x08070e,
 } as const
+
+function markGlow(mark: DoorMark | undefined): number {
+  if (!mark) return 0xff6a28
+  switch (mark) {
+    case 'combat': return 0xff6a28
+    case 'gift': return 0xffe090
+    case 'blade': return 0xff7a30
+    case 'veil': return 0xb888ff
+    case 'hard': return 0xe04438
+    case 'elite': return OATH.body
+    case 'boss': return 0xffc448
+    default: { const _e: never = mark; return _e }
+  }
+}
 
 function markPx(g: Graphics, x: number, y: number, w: number, h: number, color: number): void {
   g.rect(Math.round(x), Math.round(y), Math.round(w), Math.round(h))
@@ -82,6 +98,13 @@ function paintMark(g: Graphics, mark: DoorMark): void {
       markPx(g, -5, 3, 10, 3, e); markPx(g, -2, 6, 4, 5, e)
       break
     }
+    case 'elite': {
+      const e = MARK.eliteEdge, f = MARK.elite, c = MARK.eliteCore
+      markPx(g, -10, -11, 20, 4, e); markPx(g, -12, -8, 24, 16, e)
+      markPx(g, -8, -8, 16, 13, f); markPx(g, -3, -5, 6, 7, c)
+      markPx(g, -2, 8, 4, 5, e)
+      break
+    }
     case 'boss': {
       const e = MARK.bossEdge, f = MARK.boss, c = MARK.bossCore
       markPx(g, -11, 5, 22, 5, e); markPx(g, -9, 3, 18, 4, f)
@@ -103,7 +126,7 @@ function makeDoorCluster(atlas: Atlas, d: ArenaDoor): { root: Container; setOpen
   const glow = new Sprite(atlas.light('circle'))
   glow.anchor.set(0.5)
   glow.blendMode = 'add'
-  glow.tint = d.mark === 'veil' ? 0xb888ff : d.mark === 'blade' ? 0xff7a30 : d.mark === 'hard' ? 0xe04438 : d.mark === 'boss' ? 0xffc448 : d.mark === 'gift' ? 0xffe090 : 0xff6a28
+  glow.tint = markGlow(d.mark)
   glow.scale.set(0.28)
   glow.alpha = 0.06
 
@@ -229,6 +252,25 @@ function makeRackCluster(rack: ArenaRack): { root: Container; sync(taken: boolea
   }
   paint(false)
   return { root, sync: paint }
+}
+
+function makeSmithCluster(smith: { x: number; y: number }): Container {
+  const root = new Container()
+  root.position.set(smith.x, smith.y)
+  const g = new Graphics()
+  g.circle(0, 2, 20).fill({ color: 0xd4b060, alpha: 0.12 })
+  // Anvil first, then the shade leaning on it — a body, not another crate.
+  markPx(g, -12, 10, 24, 4, 0x1a1210)
+  markPx(g, -10, 6, 20, 5, 0x3a2018)
+  markPx(g, -7, 3, 14, 4, 0x2a1810)
+  markPx(g, -2, 0, 5, 4, 0x4a4a58)
+  markPx(g, -5, -16, 10, 16, 0x2a2438)
+  markPx(g, -6, -22, 12, 8, 0x1a1624)
+  markPx(g, -4, -20, 3, 2, 0xd4b060)
+  markPx(g, 1, -20, 3, 2, 0xd4b060)
+  markPx(g, -2, -12, 4, 2, 0x5a4860)
+  root.addChild(g)
+  return root
 }
 
 function paintOffering(g: Graphics, spent: boolean): void {
@@ -457,6 +499,7 @@ export function buildTilemap(renderer: Renderer, atlas: Atlas, arena: Arena, are
   if (gift) door.addChild(gift.root)
   const rack = arena.rack ? makeRackCluster(arena.rack) : null
   if (rack) door.addChild(rack.root)
+  if (arena.smith) door.addChild(makeSmithCluster(arena.smith))
   const nativeDestroy = door.destroy.bind(door)
   door.destroy = (options?: boolean | DestroyOptions) => {
     nativeDestroy(typeof options === 'boolean' ? { children: true } : { children: true, ...options })

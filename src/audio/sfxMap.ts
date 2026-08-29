@@ -271,6 +271,51 @@ export function playEventSfx(a: AudioSystem, ev: SimEvent, listener?: Readonly<{
       else a.bell(0.6, 130.81, 4.2, 'ui', 0, { partials: 'plate', glideTo: 87.31, strike: 0.35 })
       a.bell(0.34, ev.paid ? 329.63 : 98, 2.4, 'music', 0.22)
       break
+    case 'shopOffered':
+      a.bell(0.7, 110, 3.4, 'ui', 0, { partials: 'plate', strike: 1 })
+      a.bell(0.28, 220, 2.2, 'music', 0.2)
+      break
+    case 'shopFocus':
+      a.play('impactGeneric_light', { gain: 0.14, pitch: 1.25 + ev.focus * 0.08, bus: 'ui' })
+      break
+    case 'shopBought':
+      a.bell(0.62, 220, 2.4, 'ui', 0, { partials: 'tone', strike: 0.8 })
+      a.play('impactGeneric_light', { gain: 0.2, pitch: 1.4, bus: 'ui' })
+      break
+    case 'mysteryOffered':
+      a.bell(0.55, 98, 3.2, 'ui', 0, { partials: 'plate', strike: 0.7 })
+      break
+    case 'mysteryFocus':
+      a.play('impactGeneric_light', { gain: 0.14, pitch: 1.15 + ev.focus * 0.08, bus: 'ui' })
+      break
+    case 'mysteryChosen':
+      if (ev.choice === 'leave') a.bell(0.5, 87.31, 3.6, 'ui', 0, { partials: 'plate', glideTo: 65.41, strike: 0.3 })
+      else a.bell(0.55, 196, 2.4, 'ui', 0, { partials: 'tone', strike: 0.7 })
+      break
+    case 'mysteryHuntCalled':
+      a.bell(0.48, 82.41, 4.0, 'music', 0, { partials: 'plate', glideTo: 61.74, strike: 0.2 })
+      break
+    case 'obolsGained':
+      a.play('impactGeneric_light', { gain: 0.1, pitch: 1.8, bus: 'ui' })
+      break
+    case 'remembrancesBanked':
+      if (ev.amount > 0) a.bell(0.4, 196, 2.4, 'music')
+      break
+    case 'smithSpoke':
+      a.play('impactGeneric_light', { ...at, gain: 0.16, pitch: 0.85, bus: 'ui' })
+      break
+    case 'rerollUnlocked':
+      a.bell(0.7, 146.83, 2.8, 'ui', 0, { partials: 'plate', strike: 0.9 })
+      a.bell(0.35, 220, 2.2, 'music', 0.18)
+      break
+    case 'vesselUnlocked':
+      a.bell(0.7, 164.81, 2.8, 'ui', 0, { partials: 'tone', strike: 0.85 })
+      a.bell(0.32, 246.94, 2.2, 'music', 0.18)
+      break
+    case 'rewardRerolled':
+      a.play('swordMetal', { gain: 0.4, pitch: 1.15, bus: 'ui' })
+      a.bell(0.45, 196, 1.8, 'ui')
+      break
     case 'riteDebtCalled':
       // The same falling figure, an octave down and much later. It is the only cue in the game that
       // quotes an earlier one, because it is the only consequence that crosses a room boundary.
@@ -345,7 +390,7 @@ export function playEventSfx(a: AudioSystem, ev: SimEvent, listener?: Readonly<{
 function listen(a: AudioSystem, ev: SimEvent): void {
   switch (ev.type) {
     case 'footstep': case 'swing': case 'dodge': case 'dodgeWall': case 'dodgeEnd': case 'dodged': case 'reversal': case 'graze':
-    case 'draw': case 'arrowLoose': case 'weaponPrepared': case 'boonChosen': case 'riteChosen':
+    case 'draw': case 'arrowLoose': case 'weaponPrepared': case 'boonChosen': case 'riteChosen': case 'mysteryChosen':
     case 'playerHurt': case 'playerDeath': case 'returned': a.setListener(ev.x, ev.y)
   }
 }

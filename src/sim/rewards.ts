@@ -102,10 +102,20 @@ export function updateReward(world: World, input: InputFrame): void {
     // The rite's modal (rites.ts) holds the same rule.
     return
   }
+  const run = world.session.run
+  if (input.reroll) {
+    if (!run || run.rerolls <= 0) return
+    run.rerolls--
+    const family = offer.family
+    const fromRite = offer.fromRite
+    run.pendingReward = null
+    world.emit({ type: 'rewardRerolled', remaining: run.rerolls })
+    offerReward(world, family, fromRite)
+    return
+  }
   if (!input.confirm) return
   const id = offer.options[offer.focus]
   grantBoon(world, id)
-  const run = world.session.run
   if (run) run.pendingReward = null
   // What the ferryman was paid with, handed over the moment the bank is clear. It comes from the
   // other side of the crossroads than the room's own mark: the coin in his hand was somebody else's.

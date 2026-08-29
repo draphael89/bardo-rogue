@@ -2,7 +2,8 @@ import { tuning, type SwingDef } from '@/tuning'
 import { angleDiff, deg } from './math'
 import { SLOW_FULL } from './world'
 import type { World, Enemy } from './world'
-import type { DeathKind, GrazeSource, HitSource } from './events'
+import { wardenSentenceOf, type DeathKind, type GrazeSource, type HitSource, type WardenAttackPattern } from './events'
+import { grantKillObols } from './economy'
 import { finishRun } from './session'
 import { ARM, armOf } from './weapons'
 import { guardBlocks } from './enemies/oathbound'
@@ -173,6 +174,7 @@ export function damageEnemy(
       world.emit(hit)
     }
     world.emit({ type: 'kill', x: e.x, y: e.y, angle, kind, id: e.id, actionId })
+    grantKillObols(world, kind)
     resolveKill(world, e)
     e.active = false
     return { outcome: 'landed', landed: true, killed: true, guarded, interrupted: false, resolvedDamage: damage }
@@ -239,7 +241,7 @@ export function damageEnemyForTest(
 }
 
 // Returns true if damage was applied. During dodge i-frames the sim records a successful dodge instead.
-export function hurtPlayer(world: World, angle: number, damage: number, by: DeathKind = 'none', ranged = false): boolean {
+export function hurtPlayer(world: World, angle: number, damage: number, by: DeathKind = 'none', ranged = false, sentence?: WardenAttackPattern, mark: { hunt?: boolean; debt?: boolean } = {}): boolean {
   const p = world.player
   if (p.state === 'dead') return false
   const dodgeInvulnerable = isPlayerDodgeInvulnerable(world)
@@ -291,7 +293,17 @@ export function hurtPlayer(world: World, angle: number, damage: number, by: Deat
     world.slowmoTicks = tuning.player.deathSlowmoTicks
     clearBulletTime(world)   // death owns the clock; composing the two would crawl at 1/16 speed
     if (run) { run.killedBy = by; run.killedRanged = ranged }
-    world.emit({ type: 'playerDeath', x: p.x, y: p.y, by, ranged })
+    if (by === 'warden' && !sentence) {
+      for (const e of world.enemies) {
+        if (e.active && e.kind === 'warden') { sentence = wardenSentenceOf(e.pattern); break }
+      }
+    }
+    world.emit({
+      type: 'playerDeath', x: p.x, y: p.y, by, ranged,
+      ...(sentence ? { sentence } : {}),
+      ...(mark.hunt ? { hunt: true } : {}),
+      ...(mark.debt ? { debt: true } : {}),
+    })
     finishRun(world, 'lost')
   } else {
     beginPlayerHurtReaction(world)

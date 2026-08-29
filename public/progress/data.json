@@ -1,10 +1,410 @@
 {
   "title": "Bardo Rogue",
-  "subtitle": "The Greek gate: two powers, twelve vows, fire, an elite that turns a light blade, a ferryman who is owed, and Minos",
-  "updated": "2026-08-28T23:35:00-04:00",
-  "now": "greek-gate",
-  "round": 2,
+  "subtitle": "First Gate: rooms-as-data, a generated route, a town that remembers",
+  "updated": "2026-08-29T08:02:00-04:00",
+  "now": "first-gate-bot-refresh",
+  "round": 3,
   "timeline": [
+    {
+      "t": "08:02",
+      "text": "After the door-flash lead, kite is 7/8 and naive is 0/8. Coming home is still unarmed. Do not retune the loss."
+    },
+    {
+      "t": "07:36",
+      "text": "Minos's life is wine. The Hall no longer wears a gold door for a plate."
+    },
+    {
+      "t": "07:32",
+      "text": "A light on the Oath-Bound stays copper. The disc no longer flashes as a gold door."
+    },
+    {
+      "t": "07:26",
+      "text": "A mix is the names. Lethe no longer says 3 SHADES."
+    },
+    {
+      "t": "07:22",
+      "text": "The Lampad's lock is wine. A pale ray the length of the cistern read as a shot."
+    },
+    {
+      "t": "07:16",
+      "text": "The Kindly One meets you in the room. The 0.92 blackout is gone."
+    },
+    {
+      "t": "07:10",
+      "text": "2 HOPLITES is the count. The four-dot rail under marks still on the floor is gone."
+    },
+    {
+      "t": "07:06",
+      "text": "The door flash is the hold. Acheron no longer waits a second lead on an empty floor."
+    },
+    {
+      "t": "06:58",
+      "text": "One Oath-Bound is a name. The empty pip rail no longer reads as a dead bar."
+    },
+    {
+      "t": "06:54",
+      "text": "The judge's plate is his life. The veil is a notch, not a cut that empties the bar."
+    },
+    {
+      "t": "06:52",
+      "text": "Minos names the slam before it locks. The Hall's dark no longer eats the tell."
+    },
+    {
+      "t": "06:50",
+      "text": "Arrival is a wine pad on the floor. The dashed reticle is gone."
+    },
+    {
+      "t": "06:48",
+      "text": "A ready Brand is three cuts, not three yellow plates over the head."
+    },
+    {
+      "t": "06:46",
+      "text": "Judgment collects in ember. Cream stays off the ring and the stamp."
+    },
+    {
+      "t": "06:42",
+      "text": "THE ACCOUNT's coin is brass. A caught word is white and ember, not a door."
+    },
+    {
+      "t": "06:36",
+      "text": "A Kindly swing is ember and wine. Cream stays off the crescent."
+    },
+    {
+      "t": "06:34",
+      "text": "The ferryman is owed for coin or a word. He does not sell."
+    },
+    {
+      "t": "06:32",
+      "text": "The Unburied's memory stands for a breath. It does not buy."
+    },
+    {
+      "t": "06:30",
+      "text": "Coming home asks DESCEND AGAIN. The tally sits with the verbs. DAMNED is gone."
+    },
+    {
+      "t": "06:22",
+      "text": "Three marks and the collection ring stay Kindly fire. Gold stays the crossing."
+    },
+    {
+      "t": "06:20",
+      "text": "The stall ends on PAY. BUY no longer sits under the ferryman."
+    },
+    {
+      "t": "06:16",
+      "text": "The five-second strip is the plan. THE ACHERON GATE stays in the footer."
+    },
+    {
+      "t": "06:12",
+      "text": "A meeting is a face and a vow. THE ACHERON GATE no longer sits under CLAIM."
+    },
+    {
+      "t": "06:10",
+      "text": "The Hall dresses now. The scale sits west or east. Same wine, one poppy, a fight circle that stays bare."
+    },
+    {
+      "t": "06:07",
+      "text": "Minos falls in wine. The verdict is SIX CHAMBERS. TWO KEPT — a sentence, not a clock."
+    },
+    {
+      "t": "06:04",
+      "text": "WAKE THE ROOM uses the same left column. The first frame a browser shows is the living Bardo, not a card over the rack."
+    },
+    {
+      "t": "06:00",
+      "text": "The title sits left. The veil thins. You can see the unarmed body and the rack while you read DESCEND."
+    },
+    {
+      "t": "05:56",
+      "text": "Kite seeds 1–8 all come home in 45–59 s. Naive dies by 26 s in two or three chambers and still comes home. The sentence plays. A person has not sat down."
+    },
+    {
+      "t": "05:54",
+      "text": "You wake without the blade. The authored idle no longer carries a sword in the Bardo. The rack is the ritual."
+    },
+    {
+      "t": "05:52",
+      "text": "A primed step heats the blade. The chevron over the helmet is gone."
+    },
+    {
+      "t": "05:50",
+      "text": "Coming home is a Bardo veil, not the cream strobe of a new chamber. A door lifts dark; a floor wears its own fog."
+    },
+    {
+      "t": "05:45",
+      "text": "The one bed retunes with the floor. Acheron is thinner; the Hall is heavier. The tell band does not move."
+    },
+    {
+      "t": "05:40",
+      "text": "A shade arrives in wine, not cream. THE ACCOUNT's ring is brass, not the door. The Empusa's body strobes wine-hot."
+    },
+    {
+      "t": "05:36",
+      "text": "Minos's circle, veil, and fan are wine. Gold stays on the scale. Ember stays on a burning body."
+    },
+    {
+      "t": "05:33",
+      "text": "The Empusa's lane is wine-dark. She chooses in wine and commits in wine-hot. Ember stays on a burning body, not on the floor she promised."
+    },
+    {
+      "t": "05:30",
+      "text": "The Lampad's bolt and lock are wine-dark. Magenta is Hecate's. A dart you cut does not wear the veil."
+    },
+    {
+      "t": "05:26",
+      "text": "A brazier tongue follows the floor. Acheron is cold river; Phlegethon is wine. Fire on a body stays ember."
+    },
+    {
+      "t": "05:22",
+      "text": "The smear wears the vow. Kindly fire is ember; Hecate is veil. Cleaving Grace stays steel and only gets wider. A primed step heats the next cut."
+    },
+    {
+      "t": "05:17",
+      "text": "The Oath-Bound's hoplon is bronze. Gold stays the crossing. A light that rings off the disc no longer wears the door's colour."
+    },
+    {
+      "t": "05:12",
+      "text": "A burning shade wears a vertical ember vein. Brand keeps the diagonal cut. Burn does not grow a second pip row."
+    },
+    {
+      "t": "05:08",
+      "text": "The key light follows the floor. An undressed Acheron brazier is cold river, not ember. A shut door on Styx is iron; the open door is still gold."
+    },
+    {
+      "t": "05:05",
+      "text": "The air follows the floor. Acheron is cold river, the Landing is gold, Styx is iron, the Hall and Phlegethon are wine. Consecutive rooms no longer share one warm bed."
+    },
+    {
+      "t": "05:00",
+      "text": "The title no longer says NONE RETURNED. A first death is 1 DESCENT · UNNAMED. Minos names you; coming home does not."
+    },
+    {
+      "t": "04:56",
+      "text": "A meeting ends on CLAIM, or CLAIM · TURN when the Smith has been paid. A duo names THE KINDLY ONE · HECATE. The ferryman's extra meeting is WHAT THE LAST ONE PAID; the toll costs A LIFE, FOR GOOD."
+    },
+    {
+      "t": "04:52",
+      "text": "The death stone is three sentences: A FALLEN HOPLITE TOOK YOU, AN UNMARKED BLADE, ONE CHAMBER IN. NOTHING NEW. The plan's last row dropped THEN — the names are the rest of the spine."
+    },
+    {
+      "t": "04:46",
+      "text": "A coming Hoplite is a wine-dark pad on the floor, not a white reticle in the air. The strip says 2 HOPLITES."
+    },
+    {
+      "t": "04:40",
+      "text": "The loop's door flash is the hold. Spawn marks are already drawing on Acheron when the floor is visible. The Antechamber's Oath-Bound lands on that clock: a light is bronze, a heavy is the answer."
+    },
+    {
+      "t": "04:33",
+      "text": "A loop room no longer reprints its name as a second title. The footer already names the floor; you already pressed Descend."
+    },
+    {
+      "t": "04:31",
+      "text": "Pause hushes the life plate. BETWEEN BREATHS is not five sockets sitting on the card."
+    },
+    {
+      "t": "04:28",
+      "text": "Pause opens SETTINGS. MUSIC / SOUND / STILL THE ROOM are reachable mid-descent; a run does not have to die to go quiet."
+    },
+    {
+      "t": "04:22",
+      "text": "The Antechamber no longer wears a Field poppy. Consecutive oath rooms half-recognize: a bronze lintel, or an iron court. The only poppy left is the one on Minos' scale."
+    },
+    {
+      "t": "04:16",
+      "text": "Death no longer keeps UNMARKED BLADE · NO OBOLS on the stele. The stone already names the blade."
+    },
+    {
+      "t": "04:10",
+      "text": "The death stone says RETURN. The loop no longer names R on the way home; stock scenarios still teach the key."
+    },
+    {
+      "t": "04:07",
+      "text": "The Unburied's memory costs ONE KEPT, not ONE REMEMBRANCE. The town, the Smith, and the bank now share the same word."
+    },
+    {
+      "t": "04:02",
+      "text": "The Smith asks for three of what the dead keep, and five of what you kept. He does not say remembrances."
+    },
+    {
+      "t": "03:58",
+      "text": "The plan no longer says FIRE or ICE. Late doors read RIVER — the river's name is already on the row."
+    },
+    {
+      "t": "03:52",
+      "text": "The verdict names what this descent banked, not the lifetime pile. 9 KEPT on a win after other runs; the home banner uses the same words."
+    },
+    {
+      "t": "03:47",
+      "text": "Swim and the river collects as THE ACCOUNT — coin on the body, ACCOUNT on the strip, TAKEN BY THE ACCOUNT on the stone. Pause gives the descent back, not the attempt."
+    },
+    {
+      "t": "03:42",
+      "text": "The plan no longer says NORTH or EAST. The doors read VEIL, BLADE, OATH — the compass was sitting on the five-second decision."
+    },
+    {
+      "t": "03:35",
+      "text": "Leave him and he is THE UNBURIED in the Hall — wine on the body, UNBURIED on the strip, TAKEN BY THE UNBURIED on the stone. Not a fallen Hoplite."
+    },
+    {
+      "t": "03:26",
+      "text": "Final Judgment holds a ring at the sim's own radius through hit-stop. The collection is a crowd, not a louder hit on one body."
+    },
+    {
+      "t": "03:21",
+      "text": "A marked Hoplite wears the cut. Three gold pips count the sentence; the slash sits on the body, not in a HUD row."
+    },
+    {
+      "t": "03:18",
+      "text": "A vow no longer says Brand or names the L key. Ashen Edge writes a mark; three is a sentence. The footer is CLAIM, or CLAIM · REFORGE."
+    },
+    {
+      "t": "03:14",
+      "text": "The Oath-Bound holds a hoplon on the body, not a smile under the feet. The plan says VEIL, BLADE, OATH, JUDGE — not FIGHT, HARD, ELITE."
+    },
+    {
+      "t": "03:08",
+      "text": "The Oath-Bound holds a plate, not a 1px smile. A light that lands on bronze lights the face it refused."
+    },
+    {
+      "t": "03:02",
+      "text": "A meeting hides the life plate. The stall is a conversation, not five empty sockets under the ferryman."
+    },
+    {
+      "t": "03:00",
+      "text": "The fight strip and Charon's bank say NO OBOLS and ONE OBOL, not 0 OBOLS."
+    },
+    {
+      "t": "02:56",
+      "text": "Coming home says 1 DESCENT, not 1 ATTEMPTS, and does not put the sword back in an unarmed hand."
+    },
+    {
+      "t": "02:53",
+      "text": "Phase two names the blow that landed. The circle's veil reads THE VEIL, not the circle that threw it."
+    },
+    {
+      "t": "02:44",
+      "text": "Minos deaths name the sentence: THE CIRCLE, THE VEIL, or THE FAN. The Hall no longer subtitles itself the last chamber. The sound gate says WAKE THE ROOM."
+    },
+    {
+      "t": "02:40",
+      "text": "Pause is BETWEEN BREATHS, not PAUSED. The rivers no longer wear Field poppies; the Antechamber no longer wears the ferry shore."
+    },
+    {
+      "t": "02:38",
+      "text": "The judge arrives on the Oath-Bound's clock. The Hall no longer stands empty while his name sits on the banner; the refused toll still wades in after him."
+    },
+    {
+      "t": "02:36",
+      "text": "The Hall dresses as a scale. Two pans at different heights, a short beam that does not cross the fight, wine light — not a stripe through the judge and not hell-orange."
+    },
+    {
+      "t": "02:33",
+      "text": "A sixth spine. The ash march walks both rivers and never stops at the bank — no ferryman, no Unburied, no stall. The plan reads PHLEGETHON · COCYTUS · ELITE · MINOS."
+    },
+    {
+      "t": "02:31",
+      "text": "A fifth spine. The Styx Gate is the first fight on one descent in five: a dash and a Hoplite, iron banks, not the Acheron ferry. Consecutive runs can miss the room that used to open every attempt."
+    },
+    {
+      "t": "02:22",
+      "text": "Settings owns the mix. MUSIC and SOUND in eight steps, keyboard and pad. The room stills in the same words. A save without the new fields still comes back at full voice."
+    },
+    {
+      "t": "02:14",
+      "text": "A fourth spine. The Phlegethon Ford is its own late fight — two Lampads on the banks, then a dash through the ash. Cocytus is no longer the only river after the stall."
+    },
+    {
+      "t": "02:12",
+      "text": "The loop no longer writes ROOM CLEARED over the plan. Pause stills the room without a V. Coming home says what you kept, not the currency's name."
+    },
+    {
+      "t": "02:08",
+      "text": "The third spine omits a chamber. Acheron stays the first fight. The Field is the fork: Lethe or the Reach, never both. The combine-verbs room is no longer the second door."
+    },
+    {
+      "t": "02:00",
+      "text": "The title is three verbs. DESCEND, SETTINGS, CREDITS. The room can be stilled from the gate; the credits name who waits, not the toolchain."
+    },
+    {
+      "t": "01:56",
+      "text": "The Smith names the one you left before he names the cup. The title says DESCEND, not PRESS ENTER."
+    },
+    {
+      "t": "01:52",
+      "text": "A second spine. Half the descents put the stall after Cocytus. The plan reads COCYTUS · LANDING · ELITE · MINOS, and the next attempt can flip it."
+    },
+    {
+      "t": "01:47",
+      "text": "Minos phase two recombines. After the veil, the circle throws the veil, the veil throws the fan, the fan plants the circle. The tells do not get shorter."
+    },
+    {
+      "t": "01:44",
+      "text": "Pause is a breath, not a harness. Export/import and the keybind dump left the card. Offers say CLAIM, the stall says BUY, the bank says ANSWER. The loop no longer stamps WASD over the first swing."
+    },
+    {
+      "t": "01:42",
+      "text": "The death card names the sword you built. Taken by, carried (the vows), reached — not a timer where the build should be."
+    },
+    {
+      "t": "01:40",
+      "text": "The HUD names the dead of this realm. One body is an Oath-Bound, not LEFT 1. The loop no longer writes WAVE 1 or WALK NORTH over the plan."
+    },
+    {
+      "t": "01:38",
+      "text": "The exits strip is a plan. After the next door it names the rest of the spine: landing or the Unburied, Cocytus, the elite, Minos."
+    },
+    {
+      "t": "01:35",
+      "text": "The six chambers dress themselves. Cocytus weeps down the west wall; the Antechamber is a lintel, not the Acheron shore. Live descents swap same-kind floors so a room you know comes back half-new."
+    },
+    {
+      "t": "01:30",
+      "text": "Six chambers on a path. After the landing: the Cocytus Reach, then the Antechamber where the Oath-Bound stands alone, then Minos. The cup that stays is already in the steel."
+    },
+    {
+      "t": "01:25",
+      "text": "The anvil sells a cup that stays. Five Remembrances after the reforging: one more vessel in town and on every later descent. The stall's sip still dies with the attempt."
+    },
+    {
+      "t": "01:20",
+      "text": "The Smith names the one you left on the bank. The town answers the Unburied once, then the anvil is the anvil again."
+    },
+    {
+      "t": "01:15",
+      "text": "The Unburied. Half the landings are his mooring, not the stall. A coin, a memory, or you leave him — and he follows you to the judge."
+    },
+    {
+      "t": "01:05",
+      "text": "Pause can send you home. RISE, or give the attempt back — confirm twice and the Bardo takes you. Remembrances bank; you do not have to die to leave."
+    },
+    {
+      "t": "01:00",
+      "text": "Coming home names what you kept. If the anvil can be paid, the Bardo says so — you do not have to find the Smith to learn the town remembers."
+    },
+    {
+      "t": "00:55",
+      "text": "The Smith stands west of the rack. Three Remembrances buy one offer reforging per descent. Town remembers; the next run plays differently."
+    },
+    {
+      "t": "00:50",
+      "text": "Landing shop: obols from kills and clears, Remembrances banked on death or victory, Charon sells a sip / a cup / a word. Town meta shows what you kept. Smith reroll is next."
+    },
+    {
+      "t": "00:45",
+      "text": "Greek dress on the four existing builders (Acheron silt/reeds, Lethe grate-water, Asphodel poppies, Landing prow+pole, Minos beam). Collision unchanged. Open-door glow is canon gold, not hell-orange. Gauntlet still parked."
+    },
+    {
+      "t": "00:28",
+      "text": "First Gate spine: rooms-as-data, exits-phase route strip, startRun route install, node-boundary checkpoint (schema 3). Overlay verified at the Acheron fork. Gauntlet still parked for authored art."
+    },
+    {
+      "t": "00:21",
+      "text": "Task 4 sim half: startRun installs a generated first-gate route (fixed fill matches the loop fixture). Map hashed. Overlay still the parent."
+    },
+    {
+      "t": "00:16",
+      "text": "Revision 3 audit at 6852aa0. Loop proven. 512 tests. Kite 6/8, naive 0/8. Next: rooms-as-data + exits map. Gauntlet stays parked pending authored art."
+    },
     {
       "t": "16:54",
       "text": "Goal armed. Inventoryed the Kenney vertical slice."

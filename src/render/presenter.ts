@@ -4,9 +4,9 @@ import type { Atlas } from './atlas'
 import { slowAlphaFor } from './slowAlpha'
 import { SLOW_FULL } from '@/sim/world'
 import type { World, Enemy, Projectile } from '@/sim/world'
-import type { HitSource, SimEvent } from '@/sim/events'
+import type { EnemyKind, HitSource, SimEvent } from '@/sim/events'
 import { tuning } from '@/tuning'
-import { EntityView, createPlayerView, createEnemyView, updatePlayerView, updateEnemyView, makePropSprite, SpawnMarkerView, BoltView, ArrowView, EchoView, MirrorBoltView, drawAimLine, drawSwingArc, drawSwingTip, drawBowAim } from './views'
+import { EntityView, createPlayerView, createEnemyView, updatePlayerView, updateEnemyView, makePropSprite, BoltView, ArrowView, EchoView, MirrorBoltView, drawAimLine, drawSwingArc, drawSwingTip, drawBowAim } from './views'
 import { updatePlayerRim } from './views/player'
 import { ARM, armOf } from '@/sim/weapons'
 import { buildTilemap, type TilemapView } from './tilemap'
@@ -23,9 +23,17 @@ import { BOONS } from '@/sim/boons'
 import { ActionFeedbackGate, applyActionFeedbackLifecycle, crowdScreenMultiplier, guardedHitScreenScale, hasHostileFloorThreat, wardenAttackFeedback } from './feedback'
 import { guardUp } from '@/sim/enemies/oathbound'
 import { RewardOverlay } from './reward'
+import { RouteMap } from './map'
 import { TitleOverlay } from './title'
+import { arrivalBanner, keptLabel, runStartBanner } from './titleMenu'
 import { HardLockFeedback } from './hardLock'
 import { contactKillKey, enemyReactionTransform, grazeFeedbackGeometry, impactStampForHit, recognizedContactKills, type ImpactStamp } from './contact'
+import { brandCount, brandSlash, burnVein, judgmentBurst, judgmentContact } from './statusMarks'
+import { OATH } from './oathMetal'
+import { MINOS } from './minosInk'
+import { LAMPAD } from './lampadInk'
+import { SPAWN, debtCoin, spawnInk, spawnPad } from './spawnInk'
+import { arrivalFlash, VEIL_FLASH } from './atmospherePresets'
 
 // Reads sim state + events every frame and drives everything visible. Never mutates the sim.
 export class Presenter {
@@ -35,7 +43,6 @@ export class Presenter {
   arrowViews = new Map<number, ArrowView>()
   mirrorViews = new Map<number, MirrorBoltView>()
   echoViews = new Map<number, EchoView>()
-  spawnMarkers: SpawnMarkerView[] = []
   tilemap: TilemapView
   camera = new Camera()
   hud: Hud
@@ -53,6 +60,7 @@ export class Presenter {
   damageNumbers: DamageNumbers
   atmosphere: Atmosphere
   reward: RewardOverlay
+  routeMap: RouteMap
   title: TitleOverlay
   private lastHurtAngle = 0
   private emberAcc = 0
@@ -72,6 +80,15 @@ export class Presenter {
   private reversalActions = new Set<number>()
   // hit flash on real time, not sim ticks: hit-stop must not hold a target white for its whole freeze
   private hitFlash = new Map<number, number>()
+  // Bronze stays hot for a beat after a turned blow so the plate, not the sparks, is the lesson.
+  private guardFlash = new Map<number, number>()
+  // The collection: a ring at the sim's own radius, so a still says the burst reached the crowd.
+  private judgmentT = -1
+  private judgmentX = 0
+  private judgmentY = 0
+  private judgmentStacks = 1
+  // The one you left. The kind is still a Hoplite; this set is how the room knows which body waded in.
+  private huntIds = new Set<number>()
   private propSprites: Sprite[] = []
   private reducedEffects = false
   private hardLock = new HardLockFeedback()
@@ -90,13 +107,14 @@ export class Presenter {
     }
     this.playerView = createPlayerView(atlas, L)
     this.particles = new Particles(atlas, L.fx, L.decals, L.floor)
-    this.atmosphere = new Atmosphere(atlas, L.fx, world.arena)
+    this.atmosphere = new Atmosphere(atlas, L.fx, world.arena, world.rooms[world.roomIndex]?.layout ?? 'threshold')
     L.fx.addChild(this.fxGraphics)
     L.shadows.addChild(this.groundFx)
     this.hud = new Hud(atlas, L.hud)
     this.flashOverlay = new Sprite(Texture.WHITE); this.flashOverlay.width = tuning.view.width; this.flashOverlay.height = tuning.view.height
     this.flashOverlay.alpha = 0; L.hud.addChild(this.flashOverlay)
     this.reward = new RewardOverlay(L.hud)
+    this.routeMap = new RouteMap(L.hud)
     // Above the reward overlay in z-order: the title is the one thing that covers everything.
     this.title = new TitleOverlay(L.hud)
     // juice hooks
@@ -111,6 +129,7 @@ export class Presenter {
     this.camera.setReducedEffects(reduced)
     this.postfx.setReducedEffects(reduced)
     this.reward.setReducedEffects(reduced)
+    this.title.setReducedEffects(reduced)
     if (reduced) this.flashAlpha = Math.min(this.flashAlpha, 0.12)
   }
 
@@ -135,9 +154,11 @@ export class Presenter {
     for (const v of this.arrowViews.values()) v.destroy(); this.arrowViews.clear()
     for (const v of this.mirrorViews.values()) v.destroy(); this.mirrorViews.clear()
     for (const v of this.echoViews.values()) v.destroy(); this.echoViews.clear()
-    for (const m of this.spawnMarkers) m.sprite.destroy(); this.spawnMarkers = []
     this.particles.clear()
     this.hitFlash.clear()
+    this.guardFlash.clear()
+    this.judgmentT = -1
+    this.huntIds.clear()
     this.rebuildRoom()
     this.playerView.body.tint = 0xffffff
     // juice hooks: the player body is hidden after the death shatter
@@ -203,7 +224,7 @@ export class Presenter {
             if (ev.cleave) this.particles.ring(impact.wx, impact.wy, 0xffe090)
             if (ev.source === 'mirror') this.particles.hitSparks(impact.wx, impact.wy, ev.direction, 5, 0x62eaff)
             else if (ev.source === 'echo') this.particles.hitSparks(impact.wx, impact.wy, ev.direction, 4, 0xb78cff)
-            else if (ev.source === 'backlash') this.particles.hitSparks(impact.wx, impact.wy, ev.direction, 6, 0xd070ff)
+            else if (ev.source === 'backlash') this.particles.hitSparks(impact.wx, impact.wy, ev.direction, 6, LAMPAD.node)
           }
           if (!crate && !ev.guarded) this.particles.wound(impact.wx, impact.wy, ev.direction, C.blood)
 
@@ -260,7 +281,7 @@ export class Presenter {
           this.postfx.pulse(); this.lastHurtAngle = ev.angle // juice hook
           break
         case 'playerDeath': {
-          this.hud.setKiller(ev.by)
+          this.hud.setKiller(ev.by, ev.sentence, ev.hunt, ev.debt)
           this.camera.addTrauma(0.8)
           // juice hook: the player shatters like an enemy and stays hidden until restart
           const v = this.playerView
@@ -356,39 +377,48 @@ export class Presenter {
             this.particles.hitSparks(ev.x, ev.y, ev.angle, 4, DG.ringMid)
           }
           break
-        case 'boltCut': this.particles.hitSparks(ev.x, ev.y, 0, 10, 0xe0a0ff); this.camera.addTrauma(0.15); break
-        case 'boltHitWall': this.particles.puff(ev.x, ev.y, 3, 0xb070ff); break
-        case 'boltFired': this.particles.ring(ev.x, ev.y, 0xd070ff); break
+        case 'boltCut': this.particles.hitSparks(ev.x, ev.y, 0, 10, LAMPAD.node); this.camera.addTrauma(0.15); break
+        case 'boltHitWall': this.particles.puff(ev.x, ev.y, 3, LAMPAD.lock); break
+        case 'boltFired': this.particles.ring(ev.x, ev.y, LAMPAD.glow); break
         case 'enemyAttack':
           if (ev.kind === 'brute') this.particles.dust(ev.x, ev.y + 6, ev.angle + Math.PI, 5)
           else if (ev.kind === 'charger') this.particles.dust(ev.x, ev.y + 6, ev.angle + Math.PI, 3)
           else if (ev.kind === 'warden') {
             const F = wardenAttackFeedback(ev.pattern)
             if (F.dust) this.particles.dust(ev.x, ev.y + 8, ev.pattern === 'fan' ? ev.angle + Math.PI : 0, F.dust)
-            if (ev.pattern === 'ring') this.particles.ring(ev.x, ev.y + 2, 0xc878ff)
+            if (ev.pattern === 'ring') this.particles.ring(ev.x, ev.y + 2, MINOS.veilHot)
             this.camera.addTrauma(F.trauma)
             if (F.kick) this.camera.kick(ev.angle, F.kick)
             if (F.zoom > 1) this.camera.punchZoom(F.zoom)
-            if (F.flash) this.flash(F.flash, 0xfff0c0)
+            if (F.flash) this.flash(F.flash, MINOS.wash)
             if (F.pulse) this.postfx.pulse()
           }
           break
         case 'enemyPhase': {
           const Wj = J.warden
-          this.particles.ring(ev.x, ev.y, 0xff7a18)
-          this.particles.puff(ev.x, ev.y, 8, 0xff8020)
+          this.particles.ring(ev.x, ev.y, MINOS.veil)
+          this.particles.puff(ev.x, ev.y, 8, MINOS.shard)
           this.camera.addTrauma(Wj.phaseTrauma)
           this.camera.punchZoom(Wj.phaseZoom)
-          this.flash(Wj.phaseFlash, 0xff8020)
+          this.flash(Wj.phaseFlash, MINOS.circleHot)
           this.postfx.pulse()
           this.hud.showBanner('THE VEIL BREAKS', '', 1.5)
           break
         }
-        case 'spawn': this.particles.spawnBurst(ev.x, ev.y); this.camera.addTrauma(0.08); break
-        case 'waveStart': this.hud.showBanner(ev.wave === ev.total && ev.total > 1 ? 'FINAL WAVE' : `WAVE ${ev.wave}`, '', 1.3); break
+        case 'spawn': this.particles.spawnBurst(ev.x, ev.y, SPAWN.burst, SPAWN.burstSpark); this.camera.addTrauma(0.08); break
+        case 'waveStart':
+          if (ev.total <= 1) break
+          this.hud.showBanner(ev.wave === ev.total ? 'FINAL WAVE' : `WAVE ${ev.wave}`, '', 1.3)
+          break
         case 'roomClear':
-          this.camera.addTrauma(0.3); this.flash(0.6, 0xfff4d0)
-          this.hud.showBanner(ev.victory ? 'THE JUDGE FALLS' : 'ROOM CLEARED', ev.reward ? 'choose what the sword remembers' : ev.hasNext ? 'the door is open' : '', 3)
+          this.camera.addTrauma(0.3); this.flash(0.45, VEIL_FLASH)
+          // The loop's offer, stall, or exits strip is the next beat. A second slab saying
+          // ROOM CLEARED is developer text sitting on the plan.
+          if (this.world.scenario !== 'loop') {
+            this.hud.showBanner(ev.victory ? 'THE JUDGE FALLS' : 'ROOM CLEARED', ev.mystery ? 'a shade begs passage' : ev.shop ? 'the ferryman keeps a stall' : ev.reward ? 'choose what the sword remembers' : ev.hasNext ? 'the door is open' : '', 3)
+          } else if (ev.victory) {
+            this.hud.showBanner('THE JUDGE FALLS', '', 2)
+          }
           this.tilemap.setDoorOpen(this.world.doorOpen); this.postfx.pulse(); this.camera.punchZoom(J.zoom.roomClear)
           break
         case 'roomTransition':
@@ -396,15 +426,16 @@ export class Presenter {
           break
         case 'roomEnter':
           this.rebuildRoom()
-          this.flash(0.55, 0xfff4d0)
-          this.camera.addTrauma(0.22)
+          this.flash(0.4, arrivalFlash(this.world.rooms[this.world.roomIndex]?.layout ?? 'threshold'))
+          this.camera.addTrauma(0.16)
           this.camera.punchZoom(J.zoom.roomClear)
           this.postfx.pulse()
           // A room that opens with a rite introduces itself through the speaker standing in it, so
           // the arrival banner would only be a second title bleeding through the modal. The place
           // label still carries the name, and the answer gets the banner instead.
           if (this.world.roomPhase !== 'entering') {
-            this.hud.showBanner(ev.name, ev.index + 1 < ev.total ? '' : 'the last chamber', 1.8)
+            const title = arrivalBanner(this.world.scenario, ev.name)
+            if (title) this.hud.showBanner(title, '', 1.8)
           }
           this.hud.place.text = ev.name
           break
@@ -420,12 +451,16 @@ export class Presenter {
           const v = this.playerView
           v.body.tint = 0xffffff
           v.body.visible = v.shadow.visible = true
-          if (v.weapon) v.weapon.visible = true
-          this.flash(0.55, 0xfff4d0)
-          this.camera.addTrauma(0.22)
-          this.camera.punchZoom(J.zoom.roomClear)
+          if (v.weapon) v.weapon.visible = this.world.player.armed
+          this.flash(0.32, arrivalFlash('bardo'))
+          this.camera.addTrauma(0.08)
           this.postfx.pulse()
-          this.hud.showBanner(ev.name, 'the blade waits', 1.8)
+          const home = ev.smithWaiting
+            ? 'the anvil will take what you kept'
+            : ev.kept > 0
+              ? keptLabel(ev.kept)
+              : 'the blade waits'
+          this.hud.showBanner(ev.name, home, 1.8)
           this.hud.place.text = ev.name
           break
         }
@@ -445,12 +480,38 @@ export class Presenter {
           this.hud.showBanner('THE BLADE REMEMBERS', 'the threshold wakes', 1.5)
           break
         case 'runStarted':
-          this.hud.showBanner('DESCEND', 'return with your name', 1.4)
+          const start = runStartBanner(this.world.scenario)
+          if (start) this.hud.showBanner(start.title, start.sub, 1.4)
           break
         case 'rewardOffered':
         case 'rewardFocus':
         case 'riteOffered':
         case 'riteFocus':
+        case 'shopOffered':
+        case 'shopFocus':
+        case 'mysteryOffered':
+        case 'mysteryFocus':
+        case 'obolsGained':
+        case 'remembrancesBanked':
+          break
+        case 'shopBought':
+          this.flash(0.28, 0xd4b060)
+          this.tilemap.setDoorOpen(this.world.doorOpen)
+          break
+        case 'smithSpoke':
+          this.hud.showBanner('THE SMITH', ev.line.toLowerCase(), 2.4)
+          break
+        case 'rerollUnlocked':
+          this.flash(0.32, 0xd4b060)
+          this.hud.showBanner('THE BLADE WILL TURN', 'once per descent', 2.2)
+          break
+        case 'vesselUnlocked':
+          this.flash(0.32, 0xd4b060)
+          this.hud.showBanner('THE BOAT HOLDS MORE', 'every descent from here', 2.2)
+          break
+        case 'rewardRerolled':
+          this.flash(0.22, 0xd4b060)
+          this.hud.showBanner('TURNED', ev.remaining ? 'once more' : 'live with it', 1.4)
           break
         case 'riteChosen':
           // Paying is a thing taken out of you; refusing is a thing left behind. Same beat, opposite
@@ -461,6 +522,18 @@ export class Presenter {
           break
         case 'riteDebtCalled':
           this.hud.showBanner('THE ACCOUNT IS READ', 'the river sent one after you', 1.8)
+          break
+        case 'mysteryChosen':
+          this.flash(0.32, ev.choice === 'leave' ? 0x9e4658 : 0xd4b060)
+          this.hud.showBanner(
+            ev.choice === 'leave' ? 'LEFT ON THE BANK' : ev.choice === 'memory' ? 'A MEMORY TAKEN' : 'A COIN TAKEN',
+            ev.choice === 'leave' ? 'he will find you' : 'he drinks',
+            1.6,
+          )
+          break
+        case 'mysteryHuntCalled':
+          this.huntIds.add(ev.id)
+          this.hud.showBanner('THE UNBURIED WADES IN', 'you left him on the bank', 1.8)
           break
         case 'boonChosen': {
           const def = BOONS[ev.boon]
@@ -495,8 +568,9 @@ export class Presenter {
         case 'guardBlocked': {
           // Bronze, not blood: a turned blow must never wear the contact language of a landed one,
           // or the player learns the wrong lesson from the loudest signal on screen.
-          this.particles.hitSparks(ev.x, ev.y, ev.angle + Math.PI, 6, 0xf0c070)
+          this.particles.hitSparks(ev.x, ev.y, ev.angle + Math.PI, 6, OATH.struck)
           this.camera.addTrauma(0.08)
+          this.guardFlash.set(ev.id, 0.14)
           const v = this.enemyViews.get(ev.id)
           if (v) v.squash = Math.round(J.squashTicks * 0.6)
           break
@@ -504,22 +578,27 @@ export class Presenter {
         case 'interrupt':
           // Catching someone mid-word is the hardest read the heavy can buy. It gets its own
           // punctuation: a hard white ring and a shove, over and above the hit that carried it.
-          this.particles.ring(ev.x, ev.y, 0xfff4d8)
-          this.particles.puff(ev.x, ev.y, 7, 0xffd070)
+          this.particles.ring(ev.x, ev.y, 0xecf0f6)
+          this.particles.puff(ev.x, ev.y, 7, 0xff7a18)
           this.camera.addTrauma(0.22)
           this.postfx.pulse()
           break
         case 'burnEnded':
           break
         case 'brandConsumed':
-          this.particles.ring(ev.x, ev.y, 0xffe090)
+          this.particles.ring(ev.x, ev.y, judgmentBurst(1))
           this.particles.puff(ev.x, ev.y, 4 + ev.stacks * 2, 0xff7a18)
           this.camera.addTrauma(0.12 + ev.stacks * 0.05)
           this.postfx.pulse()
+          this.judgmentT = 0
+          this.judgmentX = ev.x
+          this.judgmentY = ev.y
+          this.judgmentStacks = ev.stacks
           break
         case 'runWon':
-          this.flash(0.7, 0xffd080)
-          this.camera.addTrauma(0.5)
+          // The Hall ends in wine, not a cream strobe. Gold stays on the scale and the card.
+          this.flash(0.46, MINOS.circleHot)
+          this.camera.addTrauma(0.36)
           this.postfx.pulse()
           break
         case 'runLost':
@@ -760,6 +839,43 @@ export class Presenter {
     }
   }
 
+  // The collection is a floor sentence at the sim's own radius. A puff at the origin let a player
+  // believe Judgment was a louder hit on one body; the ring is the crowd, and it never grows past
+  // what the heavy actually spent.
+  private drawJudgmentBurst(ground: Graphics, air: Graphics, dtSec: number): void {
+    if (this.judgmentT < 0) return
+    const stepSec = 0.022
+    const tiers = 4
+    // Hit-stop owns the first image. Advancing on real time ate the ring before a still could name it.
+    if (this.world.freeze <= 0) this.judgmentT += dtSec
+    const step = Math.floor(this.judgmentT / stepSec)
+    if (step >= tiers) { this.judgmentT = -1; return }
+    const cx = Math.round(this.judgmentX)
+    const cy = Math.round(this.judgmentY)
+    const r = tuning.boons.judgmentRadius
+    const core = judgmentBurst(step)
+    const dark = 0x120d18
+    const steps = Math.max(24, r * 3)
+    for (const g of [ground, air]) {
+      for (let i = 0; i < steps; i++) {
+        const a = (i / steps) * Math.PI * 2
+        g.rect(Math.round(cx + Math.cos(a) * r), Math.round(cy + Math.sin(a) * r) + 1, 2, 2)
+      }
+      g.fill({ color: dark, alpha: 0.9 })
+      for (let i = 0; i < steps; i++) {
+        const a = (i / steps) * Math.PI * 2
+        g.rect(Math.round(cx + Math.cos(a) * r), Math.round(cy + Math.sin(a) * r), 1, 1)
+      }
+      g.fill({ color: core, alpha: 0.95 })
+    }
+    if (step < 3) {
+      const n = 6 + this.judgmentStacks
+      for (let i = 0; i < n; i++) {
+        ray(air, cx, cy, (i + 0.5) * (Math.PI * 2 / n), 4, r - 1, step === 0 ? 2 : 1, core)
+      }
+    }
+  }
+
   // The dodge-through mark, stepped on REAL time, one tier per tick, so no two frames of it are the
   // same image. Everything it draws goes into the ground layer, UNDER both fighters: an open ring
   // that expands and thins (never a filled disk), a bar smeared along the roll axis so the still says
@@ -861,7 +977,7 @@ export class Presenter {
       L.entities.addChild(s)
     }
     this.lighting.rebind(this.world.arena)
-    this.atmosphere.rebind(this.world.arena)
+    this.atmosphere.rebind(this.world.arena, this.world.rooms[this.world.roomIndex]?.layout ?? 'threshold')
     this.tilemap.setDoorOpen(this.world.doorOpen)
   }
 
@@ -912,6 +1028,8 @@ export class Presenter {
       updateEnemyView(v, e, w, slowAlpha, this.time)
       const hf = (this.hitFlash.get(id) ?? 0) - dtSec
       if (hf > 0) this.hitFlash.set(id, hf); else this.hitFlash.delete(id)
+      const gf = (this.guardFlash.get(id) ?? 0) - dtSec
+      if (gf > 0) this.guardFlash.set(id, gf); else this.guardFlash.delete(id)
       // The authored Brute hit frame carries the reaction in its body drawing. Whitening it here
       // would turn the victim into the impact core for most of hit-stop and erase attribution.
       v.setFlash(hf > 0 && e.kind !== 'brute')
@@ -959,13 +1077,6 @@ export class Presenter {
       v.update(lerp(b.px, b.x, slowAlpha), lerp(b.py, b.y, slowAlpha), b.angle, this.time)
       this.stampTrail(v, b, dtSec, tuning.juice.trail.arrowPx, (x, y) => this.particles.echoTrail(x, y))
     }
-    while (this.spawnMarkers.length < w.spawnQueue.length) this.spawnMarkers.push(new SpawnMarkerView(this.atlas, L.fx))
-    for (let i = 0; i < this.spawnMarkers.length; i++) {
-      const s = w.spawnQueue[i]
-      this.spawnMarkers[i].sprite.visible = !!s
-      if (s) this.spawnMarkers[i].update(s.x, s.y, s.ticksLeft, s.total)
-    }
-
     if (w.freeze <= 0 && this.playerView.squash > 0) this.playerView.squash -= dtSec * 60
     updatePlayerView(this.playerView, p, w, alpha, this.time)
     if (!p.armed && this.playerView.weapon) this.playerView.weapon.visible = false
@@ -977,14 +1088,18 @@ export class Presenter {
     // per-frame vector fx
     this.fxGraphics.clear()
     this.groundFx.clear()
+    // Above the light. A pad on the shadow layer vanished in the river dark and the first
+    // fight arrived untelegraphed.
+    drawSpawnTells(this.fxGraphics, w, this.reducedEffects)
     for (const e of w.enemies) {
       if (!e.active) continue
       if (e.kind === 'caster' && e.state === 'aim') drawAimLine(this.fxGraphics, e, slowAlpha)
+      if (e.hunt) drawHunt(this.fxGraphics, this.groundFx, e, slowAlpha)
+      if (e.debt) drawDebt(this.fxGraphics, this.groundFx, e, slowAlpha)
       if (e.brand > 0) drawBrandPips(this.fxGraphics, e, slowAlpha)
       if (e.burn > 0) drawBurn(this.fxGraphics, this.groundFx, e, slowAlpha, this.time)
-      if (guardUp(e)) drawGuard(this.fxGraphics, e, slowAlpha)
+      if (guardUp(e)) drawGuard(this.fxGraphics, e, slowAlpha, this.guardFlash.get(e.id) ?? 0)
     }
-    if (w.session.run?.primedBrand) drawPrimedEdge(this.fxGraphics, p, alpha)
     if (armOf(w) === ARM.bow) drawBowAim(this.fxGraphics, p, alpha)
     else {
       // smear under the fighters so body and blade occupy the frame; the hot tip stays in air
@@ -998,6 +1113,7 @@ export class Presenter {
     this.drawReversal(this.groundFx, dtSec)
     this.drawGraze(this.groundFx, this.fxGraphics, dtSec)
     this.drawDodgeMark(this.groundFx, dtSec)
+    this.drawJudgmentBurst(this.groundFx, this.fxGraphics, dtSec)
     // and the one bright thing that is allowed on a body: the player's own outline, white for a
     // single tick and cold for two more. Last, so it rides the contact recoil with the body.
     const DG = tuning.juice.dodged
@@ -1030,20 +1146,53 @@ export class Presenter {
     } else this.flashOverlay.alpha = 0
     this.hud.setChromeHidden(this.title.visible)
     this.reward.setSuppressed(this.title.visible)
-    this.hud.update(w, dtSec)
+    this.routeMap.setSuppressed(this.title.visible)
     this.reward.update(w)
+    this.hud.setHushFight(this.reward.root.visible && !this.title.visible)
+    this.hud.update(w, dtSec)
+    this.routeMap.update(w)
     this.title.update(w, dtSec)
   }
 }
 
+// The river still on him. A gold plate would make him Oath-Bound; ember would make him Phlegethon.
+function drawDebt(g: Graphics, ground: Graphics, e: Enemy, alpha: number): void {
+  const x = Math.round(lerp(e.px, e.x, alpha))
+  const y = Math.round(lerp(e.py, e.y, alpha))
+  // A coin the river kept. ACCOUNT brass, not the door and not the Unburied's wine.
+  const pr = e.radius + 4
+  const coin = debtCoin()
+  ground.ellipse(x, y + 5, pr, Math.round(pr * 0.45)).fill({ color: 0x3a2018, alpha: 0.55 })
+  g.rect(x - 2, y + 3, 4, 3).fill(coin.body)
+  g.rect(x - 1, y + 4, 2, 1).fill(coin.face)
+  g.rect(x, y + 3, 1, 1).fill(coin.face)
+}
+
+function drawHunt(g: Graphics, ground: Graphics, e: Enemy, alpha: number): void {
+  const x = Math.round(lerp(e.px, e.x, alpha))
+  const y = Math.round(lerp(e.py, e.y, alpha))
+  // The river still on him. Wider than the body so it reads when Minos owns the strip.
+  const pr = e.radius + 6
+  ground.ellipse(x, y + 5, pr, Math.round(pr * 0.5)).fill({ color: 0x2a0e1c, alpha: 0.72 })
+  ground.ellipse(x, y + 5, pr - 2, Math.max(1, Math.round((pr - 2) * 0.42))).fill({ color: 0x9e4658, alpha: 0.5 })
+  // Wet hem, not a pip row and not a gold plate.
+  g.rect(x - 4, y + 2, 8, 2).fill(0x4e1c2e)
+  g.rect(x - 3, y + 1, 6, 1).fill(0x9e4658)
+  g.rect(x + e.facing * 3, y - 3, 3, 3).fill(0x762e40)
+  g.rect(x + e.facing * 4, y - 4, 1, 1).fill(0xd0c0a8)
+}
+
 function drawBrandPips(g: Graphics, e: Enemy, alpha: number): void {
   const x = Math.round(lerp(e.px, e.x, alpha))
-  const y = Math.round(lerp(e.py, e.y, alpha) - e.radius - 10)
-  for (let i = 0; i < 3; i++) {
-    const px = x - 7 + i * 6
-    g.rect(px - 1, y - 1, 5, 5).fill(0x08070e)
-    g.rect(px, y, 3, 3).fill(i < e.brand ? (e.brand === 3 ? 0xffcc56 : 0xff7a18) : 0x3a2018)
-    if (i < e.brand) g.rect(px + 1, y, 1, 2).fill(0xfff0c0)
+  const y = Math.round(lerp(e.py, e.y, alpha))
+  // The count sits above the head so a heavy can read three. The slash sits ON the body so the
+  // room wears what you wrote — a pip row alone was a HUD, and §E asked for a sword you can see.
+  for (const [dx, dy, color] of brandSlash(e.brand)) {
+    g.rect(x + dx, y + dy, 1, 1).fill(color)
+  }
+  const py = y - e.radius - 8
+  for (const [dx, dy, color] of brandCount(e.brand)) {
+    g.rect(x + dx, py + dy, 1, 1).fill(color)
   }
 }
 
@@ -1058,6 +1207,11 @@ function drawBurn(g: Graphics, ground: Graphics, e: Enemy, alpha: number, time: 
   const pulse = 0.5 + 0.5 * Math.sin(time * 7)
   const pr = e.radius + 3 + e.burn
   ground.ellipse(x, y + 3, pr, Math.round(pr * 0.5)).fill({ color: 0xff7a18, alpha: 0.10 + 0.05 * e.burn + 0.04 * pulse })
+  // The vein is the status. The licks are the fire. Without a static mark the licks read as VFX
+  // and the Oath-Bound's dropped guard has no body language to stand next to.
+  for (const [dx, dy, color] of burnVein(e.burn)) {
+    g.rect(x + dx, y + dy, 1, 1).fill(color)
+  }
   const licks = 3 + e.burn
   for (let i = 0; i < licks; i++) {
     // A cheap deterministic flicker: each lick has its own phase, so they never pulse in unison.
@@ -1075,6 +1229,55 @@ function drawBurn(g: Graphics, ground: Graphics, e: Enemy, alpha: number, time: 
   }
 }
 
+function spawnBodyRadius(kind: EnemyKind): number {
+  switch (kind) {
+    case 'dummy': return 6
+    case 'brute':
+    case 'oathbound':
+    case 'caster':
+    case 'charger':
+    case 'warden':
+      return tuning[kind].radius
+    default: {
+      const _e: never = kind
+      return _e
+    }
+  }
+}
+
+function ringFloor(g: Graphics, cx: number, cy: number, rx: number, ry: number, color: number, alpha: number): void {
+  const steps = Math.max(16, Math.round(rx * 3))
+  for (let i = 0; i < steps; i++) {
+    const a = (i / steps) * Math.PI * 2
+    g.rect(Math.round(cx + Math.cos(a) * rx), Math.round(cy + Math.sin(a) * ry), 1, 1)
+  }
+  g.fill({ color, alpha })
+}
+
+// Arrival is a floor sentence, not a HUD reticle. The outer pad is the body that will stand
+// here (ART §6.7 COMMIT). The inner ring closes toward the centre as the delay runs out.
+// Wine-dark is the First Gate's reserved hostile hue; gold is crossings only.
+function drawSpawnTells(g: Graphics, world: World, still: boolean): void {
+  for (const s of world.spawnQueue) {
+    const total = s.total > 0 ? s.total : 1
+    const u = 1 - s.ticksLeft / total
+    const x = Math.round(s.x)
+    const y = Math.round(s.y + 3)
+    const r = spawnBodyRadius(s.kind) + 4
+    const ry = Math.max(2, Math.round(r * 0.55))
+    const { ink, hot } = spawnInk(s)
+    const pad = spawnPad(s, u)
+    g.ellipse(x, y, r, ry).fill({ color: pad.color, alpha: pad.alpha })
+    // The pad stays. The ring is the clock, and it may blink — a missing pad was a dashed reticle.
+    if (!still && s.ticksLeft % 8 >= 5 && u <= 0.75) continue
+    const inner = Math.max(2, Math.round(r * (1 - u)))
+    const innerY = Math.max(1, Math.round(inner * 0.55))
+    ringFloor(g, x, y, r, ry, ink, 0.9)
+    ringFloor(g, x, y, inner, innerY, hot, 0.95)
+    g.rect(x, y, 1, 1).fill({ color: hot, alpha: 0.9 })
+  }
+}
+
 // A sentence with a clock on it. The outer ring is the ground that will be struck and never moves,
 // so the player can judge the edge exactly; the inner ring closes toward the centre as the delay
 // runs out, which is the countdown. It is drawn on the FLOOR layer only — a hazard that paints over
@@ -1083,38 +1286,43 @@ function drawBurn(g: Graphics, ground: Graphics, e: Enemy, alpha: number, time: 
 // the arc is present exactly when a light blow would be turned, and gone the instant it would land -
 // when the shade is burning, staggered, or committed to its own swing. A player never has to be told
 // the rule, only shown it twice.
-function drawGuard(g: Graphics, e: Enemy, alpha: number): void {
+function drawGuard(g: Graphics, e: Enemy, alpha: number, flash: number): void {
   const x = Math.round(lerp(e.px, e.x, alpha))
   const y = Math.round(lerp(e.py, e.y, alpha))
   const span = (tuning.oathbound.guardArcDeg * Math.PI) / 360
-  // Held in front of the body and OUTSIDE it. This took three passes: at body radius and at chest
-  // height the 32px silhouette ate the arc, and on the floor plane it read as one more ground
-  // telegraph among several. A shield is a thing held up, so it is drawn above the body, one
-  // shield's distance out, where nothing else in the frame is competing for those pixels.
-  const r = e.radius + 14
-  const cy = y - 6
-  const steps = 30
-  // A dark backing row under a bronze face, the same two-tone treatment every readable mark in this
-  // game uses, so it holds its edge on lit stone and on shadow alike. Two passes rather than two
-  // fills per pixel: the arc is redrawn every frame for every guarding body.
+  // Held ON the body, facing you. A 1px smile 14px out died as horns; a detached crescent under
+  // the feet then read as a health bar. A hoplon is a disc you hold, so the band sits on the
+  // silhouette and fills the same arc the sim refuses.
+  const r0 = e.radius + 3
+  const r1 = e.radius + 10
+  const cy = y - 3
+  const squash = 0.72
+  const steps = 22
+  const struck = flash > 0
+  for (let rr = r0; rr <= r1 + 1; rr++) {
+    for (let i = 0; i <= steps; i++) {
+      const a = e.aimAngle - span + (span * 2 * i) / steps
+      g.rect(Math.round(x + Math.cos(a) * rr), Math.round(cy + Math.sin(a) * rr * squash) + 1, 2, 2)
+    }
+  }
+  g.fill({ color: 0x120d18, alpha: 0.9 })
+  for (let rr = r0 + 1; rr <= r1; rr++) {
+    for (let i = 0; i <= steps; i++) {
+      const a = e.aimAngle - span + (span * 2 * i) / steps
+      g.rect(Math.round(x + Math.cos(a) * rr), Math.round(cy + Math.sin(a) * rr * squash), 2, 2)
+    }
+  }
+  g.fill({ color: struck ? OATH.struck : OATH.body, alpha: 0.95 })
   for (let i = 0; i <= steps; i++) {
     const a = e.aimAngle - span + (span * 2 * i) / steps
-    g.rect(Math.round(x + Math.cos(a) * r), Math.round(cy + Math.sin(a) * r * 0.85) + 1, 1, 2)
+    g.rect(Math.round(x + Math.cos(a) * r1), Math.round(cy + Math.sin(a) * r1 * squash), 1, 1)
   }
-  g.fill({ color: 0x120d18, alpha: 0.85 })
-  for (let i = 0; i <= steps; i++) {
-    const a = e.aimAngle - span + (span * 2 * i) / steps
-    g.rect(Math.round(x + Math.cos(a) * r), Math.round(cy + Math.sin(a) * r * 0.85), 1, 1)
-  }
-  g.fill({ color: 0xd8a45c, alpha: 0.95 })
-}
-
-function drawPrimedEdge(g: Graphics, p: World['player'], alpha: number): void {
-  const x = Math.round(lerp(p.px, p.x, alpha))
-  const y = Math.round(lerp(p.py, p.y, alpha) - p.radius - 13)
-  g.rect(x - 6, y, 13, 1).fill(0xff7a18)
-  g.rect(x - 3, y - 2, 7, 1).fill(0xffcc56)
-  g.rect(x, y - 4, 1, 3).fill(0xfff0c0)
+  g.fill({ color: struck ? OATH.struck : OATH.rim, alpha: 0.95 })
+  const umbo = (r0 + r1) / 2
+  const bx = Math.round(x + Math.cos(e.aimAngle) * umbo)
+  const by = Math.round(cy + Math.sin(e.aimAngle) * umbo * squash)
+  g.rect(bx - 1, by - 1, 3, 3).fill({ color: OATH.edge, alpha: 0.95 })
+  g.rect(bx, by, 1, 1).fill({ color: struck ? OATH.struck : OATH.rim, alpha: 0.95 })
 }
 
 // ---- authored contact shapes -------------------------------------------------------------------
@@ -1174,7 +1382,7 @@ function pierceStamp(g: Graphics, x: number, y: number, a: number, step: number,
 const SOURCE_CONTACT_COLORS = {
   mirror: { dark: 0x10222c, mid: 0x36a9bf, hot: 0xbdf8ff },
   echo: { dark: 0x1b142d, mid: 0x7651ad, hot: 0xddc8ff },
-  judgment: { dark: 0x2b160a, mid: 0xd06a20, hot: 0xffed9a },
+  judgment: judgmentContact(),
   backlash: { dark: 0x21102c, mid: 0x9a42cc, hot: 0xf0b8ff },
 } as const
 

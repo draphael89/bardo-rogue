@@ -1,6 +1,6 @@
 import { DT, tuning } from '@/tuning'
 import type { World, Enemy } from '../world'
-import type { WardenAttackPattern } from '../events'
+import { wardenSentenceOf } from '../events'
 import { angleToPlayer, distToPlayer, moveToward, facePlayer, enemyRadialAttack, tickStagger, hasPlayerLineOfSight } from './common'
 import { wardenProjectileAngle, wardenProjectileContract, type WardenProjectileContract } from './warden-contract'
 
@@ -8,28 +8,35 @@ import { wardenProjectileAngle, wardenProjectileContract, type WardenProjectileC
 export const WARDEN_PATTERN = { slam: 0, ring: 1, fan: 2 } as const
 export type WardenPattern = typeof WARDEN_PATTERN[keyof typeof WARDEN_PATTERN]
 
-const WARDEN_EVENT_PATTERN: readonly WardenAttackPattern[] = ['slam', 'ring', 'fan']
-
 // `actionPhase` is captured when the windup begins. Never read live phase for an in-flight timing:
 // crossing the veil threshold cannot steal warning or recovery frames from an attack already shown.
 export function wardenActionPhase(e: Enemy): number {
   return e.state === 'windup' || e.state === 'attack' || e.state === 'recover' ? e.actionPhase : e.phase
 }
 
+// Phase two recombines the taught sentences. It does not shorten the tell that named them.
 export function wardenWindup(e: Enemy): number {
   const W = tuning.warden
-  const p2 = wardenActionPhase(e) > 0
-  if (e.pattern === WARDEN_PATTERN.ring) return p2 ? W.ringWindup2 : W.ringWindup
-  if (e.pattern === WARDEN_PATTERN.fan) return p2 ? W.fanWindup2 : W.fanWindup
-  return p2 ? W.windup2 : W.windup
+  if (e.pattern === WARDEN_PATTERN.ring) return W.ringWindup
+  if (e.pattern === WARDEN_PATTERN.fan) return W.fanWindup
+  return W.windup
 }
 
 export function wardenRecover(e: Enemy): number {
   const W = tuning.warden
-  const p2 = wardenActionPhase(e) > 0
-  if (e.pattern === WARDEN_PATTERN.ring) return p2 ? W.ringRecover2 : W.ringRecover
-  if (e.pattern === WARDEN_PATTERN.fan) return p2 ? W.fanRecover2 : W.fanRecover
-  return p2 ? W.recover2 : W.recover
+  if (e.pattern === WARDEN_PATTERN.ring) return W.ringRecover
+  if (e.pattern === WARDEN_PATTERN.fan) return W.fanRecover
+  return W.recover
+}
+
+// After the veil breaks, each sentence brings the next one with it: the circle throws the veil,
+// the veil throws the fan, the fan plants the circle. Phase one has no companion.
+export function wardenCompanion(pattern: number, phase: number): WardenPattern | null {
+  if (phase <= 0) return null
+  if (pattern === WARDEN_PATTERN.slam) return WARDEN_PATTERN.ring
+  if (pattern === WARDEN_PATTERN.ring) return WARDEN_PATTERN.fan
+  if (pattern === WARDEN_PATTERN.fan) return WARDEN_PATTERN.slam
+  return null
 }
 
 export function wardenAttackTicks(e: Enemy): number {
@@ -73,7 +80,10 @@ function fireBolt(world: World, e: Enemy, angle: number, contract: WardenProject
   const ox = e.x + Math.cos(angle) * contract.spawnOffset
   const oy = e.y + Math.sin(angle) * contract.spawnOffset
   const bolt = world.fireProjectile(ox, oy, angle, contract.speed, contract.boltRadius, contract.lifeTicks, 0, tuning.warden.boltDamage, 0, 'bolt', 'warden')
-  if (bolt) world.emit({ type: 'boltFired', x: ox, y: oy, angle })
+  if (bolt) {
+    bolt.sentence = contract.pattern
+    world.emit({ type: 'boltFired', x: ox, y: oy, angle })
+  }
 }
 
 function looseRing(world: World, e: Enemy): void {
@@ -90,6 +100,22 @@ function looseFan(world: World, e: Enemy, volley: number): void {
   }
 }
 
+function fireCompanion(world: World, e: Enemy): void {
+  const companion = wardenCompanion(e.pattern, wardenActionPhase(e))
+  if (companion === null) return
+  if (companion === WARDEN_PATTERN.ring) looseRing(world, e)
+  else if (companion === WARDEN_PATTERN.fan) looseFan(world, e, 0)
+  else if (companion === WARDEN_PATTERN.slam) {
+    const W = tuning.warden
+    if (!e.hitDone && e.stateTick > 0 && e.stateTick <= W.slamTicks) {
+      if (enemyRadialAttack(world, e, W.slamRadius, W.slamDamage)) e.hitDone = true
+    }
+  } else {
+    const _never: never = companion
+    void _never
+  }
+}
+
 function updateAttack(world: World, e: Enemy): void {
   const W = tuning.warden
   e.vx = 0; e.vy = 0
@@ -97,14 +123,17 @@ function updateAttack(world: World, e: Enemy): void {
     if (!e.hitDone && e.stateTick > 0 && e.stateTick <= W.slamTicks) {
       if (enemyRadialAttack(world, e, W.slamRadius, W.slamDamage)) e.hitDone = true
     }
+    if (e.patternStep === 0 && e.stateTick > 0) { fireCompanion(world, e); e.patternStep = 1 }
   } else if (e.pattern === WARDEN_PATTERN.ring) {
     if (e.patternStep === 0 && e.stateTick > 0) { looseRing(world, e); e.patternStep = 1 }
-  } else {
+    if (e.patternStep === 1 && e.stateTick > 0) { fireCompanion(world, e); e.patternStep = 2 }
+  } else if (e.pattern === WARDEN_PATTERN.fan) {
     const volleys = wardenProjectileContract('fan', wardenActionPhase(e)).volleys
     while (e.patternStep < volleys && e.stateTick >= 1 + e.patternStep * W.fanVolleyGap) {
       looseFan(world, e, e.patternStep)
       e.patternStep++
     }
+    fireCompanion(world, e)
   }
   if (e.stateTick >= wardenAttackTicks(e)) { e.state = 'recover'; e.stateTick = 0 }
 }
@@ -147,7 +176,7 @@ export function updateWarden(world: World, e: Enemy): void {
         e.state = 'attack'; e.stateTick = 0; e.hitDone = false; e.patternStep = 0
         world.emit({
           type: 'enemyAttack', id: e.id, kind: 'warden', x: e.x, y: e.y, angle: e.aimAngle,
-          pattern: WARDEN_EVENT_PATTERN[e.pattern] ?? 'slam',
+          pattern: wardenSentenceOf(e.pattern),
         })
       }
       break

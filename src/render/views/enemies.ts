@@ -9,6 +9,7 @@ import { updateCasterView } from './enemy-caster'
 import { updateChargerView } from './enemy-charger'
 import { updateDummyView } from './enemy-dummy'
 import { updateWardenView } from './enemy-warden'
+import { OATH } from '../oathMetal'
 
 export function createEnemyView(atlas: Atlas, e: Enemy, layers: { entities: Container; shadows: Container }): EntityView {
   const w = e.kind === 'brute' || e.kind === 'oathbound' ? WEAPON.brute : e.kind === 'caster' ? WEAPON.caster : null
@@ -49,7 +50,7 @@ export function updateEnemyView(v: EntityView, e: Enemy, world: World, alpha: nu
       updateBruteView(v, e, frame, pose, world.arena)
       // Cast in bronze so the elite is recognised across the room before it has done anything. The
       // tint rides on top of the authored pose rather than replacing it.
-      if (pose.tint === 0xffffff) pose.tint = 0xd8a45c
+      if (pose.tint === 0xffffff) pose.tint = OATH.cast
       break
     case 'caster': updateCasterView(v, e, frame, pose, world.arena); break
     case 'charger': updateChargerView(v, e, frame, pose, world.arena); break

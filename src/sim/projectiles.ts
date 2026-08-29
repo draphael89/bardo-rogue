@@ -44,10 +44,10 @@ export function updateProjectiles(world: World): void {
     if (d <= hitR) {
       const src = b.srcKind === 'player' ? 'none' : b.srcKind
       if (isPlayerDodgeInvulnerable(world)) {
-        hurtPlayer(world, b.angle, b.damage, src, true) // announces the read once; the bolt stays
+        hurtPlayer(world, b.angle, b.damage, src, true, b.sentence) // announces the read once; the bolt stays
         continue
       }
-      hurtPlayer(world, b.angle, b.damage, src, true)
+      hurtPlayer(world, b.angle, b.damage, src, true, b.sentence)
       b.active = false
     } else if (d <= hitR + tuning.bullet.grazePx) {
       noteNearMiss(world, b.angle, b.x, b.y, 'projectile')

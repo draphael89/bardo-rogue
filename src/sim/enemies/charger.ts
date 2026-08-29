@@ -1,15 +1,15 @@
 import { tuning, DT } from '@/tuning'
 import type { World, Enemy } from '../world'
-import { angleToPlayer, distToPlayer, moveToward, moveAlong, facePlayer, tickStagger } from './common'
+import { angleToPlayer, distToPlayer, moveToward, moveAlong, facePlayer, tickStagger, familyTellSlotOpen, hasPlayerLineOfSight } from './common'
 import { hurtPlayer, noteNearMiss } from '../combat'
 
 const IDLE_TICKS = 20
 
 // The last freeze ticks are already committed: the aim stops tracking and whatever the lane covers
 // is what gets hit. The renderer needs the same tick to harden the floor telegraph on it, so it is
-// derived here rather than copied there. Changing LOCK_LEAD changes the sim (and the replay hashes).
-const LOCK_LEAD = 3
-export const chargerLockTick = (): number => tuning.charger.freezeTicks - LOCK_LEAD
+// derived here rather than copied there. Nine committed ticks make the lane a promise rather than
+// a last-frame reaction test.
+export const chargerLockTick = (): number => tuning.charger.freezeTicks - tuning.charger.commitLead
 
 export function updateCharger(world: World, e: Enemy): void {
   const C = tuning.charger
@@ -26,7 +26,7 @@ export function updateCharger(world: World, e: Enemy): void {
       moveToward(world, e, tx, ty, C.hoverSpeed)
       facePlayer(world, e)
       e.hoverTicks--
-      if (e.hoverTicks <= 0 && distToPlayer(world, e) <= C.hoverMax + 24) {
+      if (e.hoverTicks <= 0 && distToPlayer(world, e) <= C.hoverMax + 24 && hasPlayerLineOfSight(world, e) && familyTellSlotOpen(world, e)) {
         e.state = 'freeze'; e.stateTick = 0
         world.emit({ type: 'enemyWindup', id: e.id, kind: 'charger', x: e.x, y: e.y })
       }
@@ -47,7 +47,7 @@ export function updateCharger(world: World, e: Enemy): void {
         const d = distToPlayer(world, e)
         const hitR = e.radius + p.radius
         if (d <= hitR) { hurtPlayer(world, e.aimAngle, C.damage, e.kind); e.hitDone = true }
-        else if (d <= hitR + tuning.bullet.grazePx) noteNearMiss(world, e.aimAngle)
+        else if (d <= hitR + tuning.bullet.grazePx) noteNearMiss(world, e.aimAngle, e.x, e.y, 'dash')
       }
       if (r.hitX || r.hitY || e.stateTick >= e.dashTicks) { e.state = 'recover'; e.stateTick = 0 }
       break

@@ -3,7 +3,7 @@ import type { BoonId, Deity } from './boons'
 import type { DeathKind } from './events'
 import type { DoorMark } from './arena'
 import type { RiteId } from './rites'
-import type { World } from './world'
+import { SLOW_FULL, type World } from './world'
 import { ARM, grantArm } from './weapons'
 import { Rng, STREAM, streamSeed } from './rng'
 import { tuning } from '@/tuning'
@@ -193,6 +193,9 @@ export function parkForModal(world: World): void {
   world.timeScale = 1
   world.slowmoTicks = 0
   world.freeze = 0
+  world.slowRate = SLOW_FULL
+  world.slowTicks = 0
+  world.slowAcc = 0
   const p = world.player
   p.state = 'free'
   p.stateTick = 0
@@ -202,6 +205,10 @@ export function parkForModal(world: World): void {
   p.dodgeTick = -1
   p.dodgeRead = 0
   p.dodgeProcTick = -1
+  p.reversalTicks = 0
+  p.reversalActionId = -1
+  p.bladeActionConnected = false
+  p.swingFromRoll = false
   p.vx = p.vy = 0
 }
 

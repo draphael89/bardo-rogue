@@ -24,6 +24,8 @@ export function returnToHub(world: World): void {
   p.flash = 0
   p.dodgeRead = 0
   p.dodgeProcTick = -1
+  p.reversalTicks = 0
+  p.reversalActionId = -1
   p.vx = p.vy = 0
   p.kbx = p.kby = 0
   p.controlTick = 0
@@ -32,6 +34,8 @@ export function returnToHub(world: World): void {
   p.dodgeQueuedAt = -1
   p.dodgeTick = -1
   p.swingIndex = 0
+  p.bladeActionConnected = false
+  p.swingFromRoll = false
   p.assistTargetId = 0
   world.timeScale = 1
   world.slowmoTicks = 0

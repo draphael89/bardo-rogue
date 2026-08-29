@@ -22,12 +22,13 @@ export function applyBrand(world: World, enemy: Enemy, stacks: number): void {
 
 // The river's touch. Stacks deepen it and refresh its clock; they never extend it past its authored
 // life, so a crowd that keeps catching fire still burns out on a schedule the player can read.
-export function applyBurn(world: World, enemy: Enemy, stacks: number): void {
+export function applyBurn(world: World, enemy: Enemy, stacks: number, actionId: number): void {
   if (!alive(enemy) || stacks <= 0) return
   const B = tuning.status.burn
   const before = enemy.burn
   enemy.burn = Math.min(B.maxStacks, enemy.burn + stacks)
   enemy.burnTicks = B.ticks
+  enemy.burnActionId = actionId
   // A fresh ignition starts its first bite promptly; a refresh does not restart the meter, or
   // re-applying every half second would keep the damage permanently one tick away.
   if (before === 0) enemy.burnAcc = B.interval
@@ -44,6 +45,7 @@ export function tickStatuses(world: World, enemy: Enemy): void {
   if (enemy.burnTicks > 0 && --enemy.burnTicks === 0) {
     enemy.burn = 0
     enemy.burnAcc = 0
+    enemy.burnActionId = -1
     world.emit({ type: 'burnEnded', id: enemy.id, x: enemy.x, y: enemy.y })
     return
   }
@@ -53,12 +55,20 @@ export function tickStatuses(world: World, enemy: Enemy): void {
   // Fire has no direction and earns no hit-stop: it is a consequence, not a blow. Freezing the game
   // on a damage-over-time tick would stutter the whole fight every time a crowd was alight.
   world.emit({ type: 'burnTick', id: enemy.id, stacks: enemy.burn, x: enemy.x, y: enemy.y })
-  damageEnemy(world, enemy, B.damage * enemy.burn, enemy.aimAngle, 0, false, 0, 0, { silent: true })
+  damageEnemy(world, enemy, B.damage * enemy.burn, enemy.aimAngle, 0, false, 0, enemy.burnActionId, {
+    source: 'backlash',
+    originX: enemy.x,
+    originY: enemy.y,
+    direction: enemy.aimAngle,
+    sweep: 0,
+    cleave: false,
+    contactDepth: 0,
+  }, { silent: true })
 }
 
 export function clearStatuses(enemy: Enemy): void {
   enemy.brand = 0; enemy.brandTicks = 0
-  enemy.burn = 0; enemy.burnTicks = 0; enemy.burnAcc = 0
+  enemy.burn = 0; enemy.burnTicks = 0; enemy.burnAcc = 0; enemy.burnActionId = -1
 }
 
 function alive(e: Enemy): boolean {

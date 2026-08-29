@@ -10,9 +10,8 @@ import { isPlayerInvulnerable } from '@/sim/combat'
 import { arcHits } from '@/sim/combat'
 import { grantBoon, hasBoon, resolveWeaponOnHit, swingReach } from '@/sim/boons'
 import { ARM, grantArm } from '@/sim/weapons'
-import { damageEnemy, hurtPlayer } from '@/sim/combat'
+import { damageEnemyForTest, hurtPlayer } from '@/sim/combat'
 import { HUB_ID } from '@/sim/rooms'
-import { ATTACK } from '@/sim/enemies/warden'
 import { overlapsSolid } from '@/sim/collision'
 import { guardUp } from '@/sim/enemies/oathbound'
 import { applyBurn } from '@/sim/status'
@@ -46,8 +45,8 @@ describe('determinism', () => {
       const a = createWorld(1, 'boss'), b = createWorld(1, 'boss')
       const ea = a.spawnEnemy('warden', 160, 96)!
       const eb = b.spawnEnemy('warden', 160, 96)!
-      ea.phase = 1; ea.attackId = 0
-      eb.phase = 0; eb.attackId = 1
+      ea.phase = 1; ea.pattern = 0
+      eb.phase = 0; eb.pattern = 1
       expect(hashWorld(a)).not.toBe(hashWorld(b))
     })
     it('separates two hostile bolts by the damage they carry', () => {
@@ -760,46 +759,47 @@ describe('warden', () => {
     expect(miss.player.hp).toBe(tuning.player.hp)
   })
 
-  it('half life breaks the veil, and the gavel then throws a ring AND leaves the floor sentenced', () => {
+  it('half life queues a separate veil-break beat after the current attack resolves', () => {
     const w = createWorld(1, 'empty')
     const e = plantWarden(w, -80)
+    w.events.length = 0
     e.hp = Math.floor(e.maxHp / 2)
     stepWorld(w, emptyInput())
-    expect(e.phase).toBe(1)
-    expect(w.events.some(ev => ev.type === 'enemyPhase' && ev.phase === 1)).toBe(true)
+    expect(e.phase).toBe(0)
+    expect(e.phasePending).toBe(true)
+    expect(w.events.some(ev => ev.type === 'enemyPhase')).toBe(false)
     w.events.length = 0
 
-    e.state = 'attack'
-    e.stateTick = 0
-    e.hitDone = true
-    e.dashTicks = 0
-    let bolts = 0
-    for (let i = 0; i < tuning.warden.slamTicks + tuning.warden.boltDelay + 2; i++) {
+    let attacked = false, phased = false
+    for (let i = 0; i < tuning.warden.windup + tuning.warden.slamTicks + tuning.warden.recover + 8; i++) {
       stepWorld(w, emptyInput())
-      bolts += w.events.filter(ev => ev.type === 'boltFired').length
+      const sameTickAttack = w.events.some(ev => ev.type === 'enemyAttack' || ev.type === 'boltFired')
+      const sameTickPhase = w.events.some(ev => ev.type === 'enemyPhase')
+      expect(sameTickAttack && sameTickPhase, `phase and attack shared tick ${w.tick}`).toBe(false)
+      attacked ||= sameTickAttack
+      phased ||= sameTickPhase
       w.events.length = 0
+      if (phased) break
     }
-    expect(bolts).toBe(tuning.warden.boltCount)
-    const live = w.projectiles.filter(b => b.active && b.team === 0)
-    expect(live.filter(b => b.kind === 'bolt').length).toBe(tuning.warden.boltCount)
-    // Phase two recombines rather than accelerating: the ground he struck keeps the sentence, so the
-    // space the player rolled into is not safe by the time they land in it.
-    expect(live.filter(b => b.kind === 'verdict').length).toBe(tuning.warden.scales.gavelCount)
+    expect(attacked).toBe(true)
+    expect(phased).toBe(true)
+    expect(e.phase).toBe(1)
+    expect(e.state).toBe('phase')
   })
 
   it('a light hit does not stagger; a heavy in recover does; a heavy in windup does not', () => {
     const w = createWorld(1, 'empty')
     const e = plantWarden(w, -80)
     e.state = 'recover'
-    damageEnemy(w, e, 1, 0, 10, false, 0)
+    damageEnemyForTest(w, e, 1, 0, 10, false, 0)
     expect(e.state).toBe('recover')
 
-    damageEnemy(w, e, 1, 0, 10, true, 0)
+    damageEnemyForTest(w, e, 1, 0, 10, true, 0)
     expect(e.state).toBe('stagger')
 
     e.state = 'windup'
     e.stateTick = 8
-    damageEnemy(w, e, 1, 0, 10, true, 0)
+    damageEnemyForTest(w, e, 1, 0, 10, true, 0)
     expect(e.state).toBe('windup')
   })
 
@@ -909,104 +909,6 @@ describe('return', () => {
   })
 })
 
-// Minos has three attacks and picks between them; a boss that only ever does more of one thing is a
-// health bar. These pin what each one actually asks of the player.
-describe('Minos, judge of the first gate', () => {
-  function plant(w: ReturnType<typeof createWorld>, dy: number, attack: number) {
-    const e = w.spawnEnemy('warden', w.player.x, w.player.y + dy)!
-    e.attackId = attack
-    e.state = 'windup'
-    e.stateTick = 0
-    e.aimAngle = Math.atan2(-dy, 0)
-    return e
-  }
-
-  it('speaks the verdict as a stream that sweeps across an arc, not a single lane', () => {
-    const w = createWorld(1, 'empty')
-    const e = plant(w, -140, ATTACK.verdict)
-    const angles: number[] = []
-    for (let i = 0; i < 200; i++) {
-      stepWorld(w, emptyInput())
-      for (const ev of w.events) if (ev.type === 'boltFired') angles.push(ev.angle)
-      w.events.length = 0
-      if (e.state === 'recover') break
-    }
-    expect(angles.length).toBe(tuning.warden.sweep.bolts)
-    // The first and last bolt are a full arc apart: the lane it denies moves while it fires.
-    const spread = Math.abs(angles[angles.length - 1] - angles[0]) * 180 / Math.PI
-    expect(spread).toBeGreaterThan(tuning.warden.sweep.arcDeg * 0.9)
-  })
-
-  it('alternates the verdict’s handedness, so the same sidestep never works twice', () => {
-    const w = createWorld(1, 'empty')
-    const e = plant(w, -140, ATTACK.verdict)
-    const first = e.orbitDir
-    for (let i = 0; i < 400; i++) {
-      stepWorld(w, emptyInput())
-      w.events.length = 0
-      if (e.state === 'chase') break
-    }
-    expect(e.orbitDir).toBe(first === 1 ? -1 : 1)
-  })
-
-  it('writes the scales on commitment and gives the player the whole delay to answer them', () => {
-    const w = createWorld(1, 'empty')
-    const e = plant(w, -60, ATTACK.scales)
-    for (let i = 0; i < 200; i++) {
-      stepWorld(w, emptyInput())
-      if (w.events.some(ev => ev.type === 'verdictMarked')) break
-      w.events.length = 0
-    }
-    const marks = w.projectiles.filter(b => b.active && b.kind === 'verdict')
-    expect(marks.length).toBeGreaterThan(0)
-    expect(marks.length).toBeLessThanOrEqual(tuning.warden.scales.count)
-    // The mark is a countdown, not a hit: standing still is what costs.
-    expect(w.player.hp).toBe(tuning.player.hp)
-    for (const m of marks) expect(m.life).toBeGreaterThan(1)
-  })
-
-  it('the scales fall on the ground the player refused to leave', () => {
-    const w = createWorld(1, 'empty')
-    w.player.god = false
-    plant(w, -60, ATTACK.scales)
-    let hurt = false
-    for (let i = 0; i < 400; i++) {
-      stepWorld(w, emptyInput())          // the player never moves
-      if (w.events.some(ev => ev.type === 'playerHurt')) hurt = true
-      w.events.length = 0
-      if (hurt) break
-    }
-    expect(hurt).toBe(true)
-  })
-
-  it('a verdict on the floor cannot be cut like a bolt in the air', () => {
-    const w = createWorld(1, 'empty')
-    const e = w.spawnEnemy('warden', w.player.x, w.player.y - 60)!
-    const v = w.fireProjectile(w.player.x + 12, w.player.y, 0, 0, 20, 200, 0, 1, 0, 'verdict', e.kind)!
-    for (let i = 0; i < 12; i++) stepWorld(w, { ...emptyInput(), attack: i === 0, aimX: 1, aimY: 0 })
-    expect(v.active).toBe(true)
-    expect(w.events.some(ev => ev.type === 'boltCut')).toBe(false)
-  })
-
-  it('never writes a verdict inside the masonry, where it could not be answered', () => {
-    const w = createWorld(3, 'empty')
-    const e = w.spawnEnemy('warden', w.arena.inner.x0 + 8, w.arena.inner.y0 + 8)!
-    w.player.x = w.arena.inner.x0 + 2
-    w.player.y = w.arena.inner.y0 + 2
-    e.attackId = ATTACK.scales
-    e.state = 'windup'; e.stateTick = 0
-    for (let i = 0; i < 200; i++) {
-      stepWorld(w, emptyInput())
-      const spoke = w.events.some(ev => ev.type === 'enemyAttack')
-      w.events.length = 0
-      if (spoke) break
-    }
-    for (const m of w.projectiles.filter(b => b.active && b.kind === 'verdict')) {
-      expect(overlapsSolid(w.arena, m.x, m.y, 4)).toBe(false)
-    }
-  })
-})
-
 // The elite exists to make the heavy necessary rather than merely available. These pin the three
 // answers, because a rule with only one answer is a wall.
 describe('the Oath-Bound Hoplite', () => {
@@ -1028,7 +930,7 @@ describe('the Oath-Bound Hoplite', () => {
     const e = facing(w, w.player.x + 40, w.player.y)
     const hp0 = e.hp
     const toward = Math.atan2(e.y - w.player.y, e.x - w.player.x)
-    damageEnemy(w, e, 2, toward, 90, false, 3)
+    damageEnemyForTest(w, e, 2, toward, 90, false, 3)
     expect(e.hp).toBe(hp0)
     expect(w.events.some(ev => ev.type === 'guardBlocked')).toBe(true)
     expect(w.events.some(ev => ev.type === 'hit')).toBe(false)
@@ -1047,7 +949,8 @@ describe('the Oath-Bound Hoplite', () => {
     w.player.dodgeProcTick = -1
     for (let i = 0; i < 20; i++) {
       const brandBefore = e.brand
-      if (damageEnemy(w, e, 2, toward, 90, false, 3)) resolveWeaponOnHit(w, e, false, brandBefore, toward)
+      const result = damageEnemyForTest(w, e, 2, toward, 90, false, 3)
+      if (result.landed) resolveWeaponOnHit(w, e, false, brandBefore, toward, 17, result)
       e.lastHitSwingId = 0
     }
     expect(e.brand).toBe(0)
@@ -1072,17 +975,15 @@ describe('the Oath-Bound Hoplite', () => {
   it('names which case Minos is delivering, so only the gavel draws an impact', () => {
     const w = createWorld(5, 'boss')
     w.player.god = true
-    const seen = new Set<number>()
+    const seen = new Set<string>()
     for (let t = 0; t < 4000 && seen.size < 2; t++) {
       const m = w.enemies.find(e => e.active && e.kind === 'warden')
       if (m && !m.phase) m.hp = Math.min(m.hp, Math.floor(m.maxHp / 2))
       stepWorld(w, emptyInput())
       for (const ev of w.events) {
         if (ev.type !== 'enemyAttack' || ev.kind !== 'warden') continue
-        // An optional field that is never populated fails silently the other way: every attack
-        // would take the non-gavel branch and the gavel would lose its impact entirely.
-        expect(ev.attack).toBeDefined()
-        seen.add(ev.attack!)
+        expect(ev.pattern).toBeDefined()
+        seen.add(ev.pattern)
       }
       w.events.length = 0
     }
@@ -1098,7 +999,7 @@ describe('the Oath-Bound Hoplite', () => {
     stepWorld(w, emptyInput())
     const hp0 = e.hp
     const toward = Math.atan2(e.y - w.player.y, e.x - w.player.x)
-    damageEnemy(w, e, 2, toward, 90, false, 3)
+    damageEnemyForTest(w, e, 2, toward, 90, false, 3)
     expect(e.hp).toBe(hp0)
     expect(w.events.some(ev => ev.type === 'guardBlocked')).toBe(true)
   })
@@ -1108,7 +1009,7 @@ describe('the Oath-Bound Hoplite', () => {
     const e = facing(w, w.player.x + 40, w.player.y)
     const hp0 = e.hp
     const toward = Math.atan2(e.y - w.player.y, e.x - w.player.x)
-    damageEnemy(w, e, 4, toward, 260, true, 8)
+    damageEnemyForTest(w, e, 4, toward, 260, true, 8)
     expect(e.hp).toBe(hp0 - 4)
     expect(e.state).toBe('stagger')
   })
@@ -1118,7 +1019,7 @@ describe('the Oath-Bound Hoplite', () => {
     const e = facing(w, w.player.x + 40, w.player.y)
     const hp0 = e.hp
     // struck from behind: the blow travels the same way the shade is looking
-    damageEnemy(w, e, 2, e.aimAngle, 90, false, 3)
+    damageEnemyForTest(w, e, 2, e.aimAngle, 90, false, 3)
     expect(e.hp).toBe(hp0 - 2)
   })
 
@@ -1127,10 +1028,10 @@ describe('the Oath-Bound Hoplite', () => {
     const e = facing(w, w.player.x + 40, w.player.y)
     const toward = Math.atan2(e.y - w.player.y, e.x - w.player.x)
     expect(guardUp(e)).toBe(true)
-    applyBurn(w, e, 1)
+    applyBurn(w, e, 1, 23)
     expect(guardUp(e)).toBe(false)
     const hp0 = e.hp
-    damageEnemy(w, e, 2, toward, 90, false, 3)
+    damageEnemyForTest(w, e, 2, toward, 90, false, 3)
     expect(e.hp).toBe(hp0 - 2)
   })
 
@@ -1145,7 +1046,7 @@ describe('the Oath-Bound Hoplite', () => {
     const w = armed()
     const e = facing(w, w.player.x + 40, w.player.y)
     const hp0 = e.hp
-    damageEnemy(w, e, 1, Math.atan2(e.y - w.player.y, e.x - w.player.x), 0, false, 0, 0, { silent: true })
+    damageEnemyForTest(w, e, 1, Math.atan2(e.y - w.player.y, e.x - w.player.x), 0, false, 0, 0, { silent: true })
     expect(e.hp).toBe(hp0 - 1)
   })
 })
@@ -1161,9 +1062,9 @@ describe('regressions', () => {
     const ea = a.spawnEnemy('brute', 200, 120)!
     const eb = b.spawnEnemy('brute', 200, 120)!
     expect(hashWorld(a)).toBe(hashWorld(b))
-    applyBurn(a, ea, 2)
+    applyBurn(a, ea, 2, 29)
     expect(hashWorld(a)).not.toBe(hashWorld(b))
-    applyBurn(b, eb, 2)
+    applyBurn(b, eb, 2, 29)
     expect(hashWorld(a)).toBe(hashWorld(b))
   })
 
@@ -1173,17 +1074,13 @@ describe('regressions', () => {
     const w = createWorld(1, 'empty')
     stepWorld(w, emptyInput())
     const minos = w.spawnEnemy('warden', w.player.x, w.player.y - 150)!
-    minos.attackId = ATTACK.verdict
+    minos.phase = 1
     minos.state = 'windup'; minos.stateTick = 0
     minos.aimAngle = Math.atan2(w.player.y - minos.y, w.player.x - minos.x)
-    for (let i = 0; i < 200; i++) {
-      stepWorld(w, emptyInput())
-      w.events.length = 0
-      if (w.projectiles.filter(b => b.active).length >= 3) break
-    }
+    const bolt = w.fireProjectile(minos.x, minos.y, minos.aimAngle, 96, 3, 60, 0, 1, 0, 'bolt', 'warden')!
     // Whatever he is doing, he must not be carrying a value that looks like a projectile id.
     const liveIds = w.projectiles.filter(b => b.active).map(b => b.id)
-    expect(liveIds.length).toBeGreaterThan(0)
+    expect(liveIds).toContain(bolt.id)
     expect(liveIds).not.toContain(minos.targetX)
   })
 })

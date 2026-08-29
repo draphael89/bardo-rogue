@@ -1,0 +1,14 @@
+Create an original dark-mythic pixel-art warrior sprite sheet on a uniform #00ff00 chroma
+background. Strict 4x4 equal square grid, one centered non-overlapping character per cell, viewed
+clearly from the front and facing south/down in every standing pose. Match one identity throughout:
+a split horned helm with a narrow gold faceplate, broad wine-red and indigo armor, bone skirt,
+muted-gold trim, and an oversized physically held silver greatsword. Row-major poses: idle; run A;
+run B; hurt; light-1 anticipation; light-1 southward contact; light-1 recovery; light-2 anticipation;
+light-2 contact; light-2 recovery; heavy anticipation; heavy southward contact; dodge launch; dodge
+travel; dodge land; dead. Hard readable pixel clusters, limited palette, stable scale and feet. No
+rear view, labels, grid lines, floor, shadows, scenery, VFX, text, logo, watermark, or extra objects.
+The contact keys must put the faceplate, foreshortened blade, and hit zone on one vertical southward
+axis. Dodge travel must be a compact front-view vertical tumble, not a rotated side pose.
+
+One compact front-view tumble with the boots leading south, helm folded behind, asymmetric cloth,
+and sword trailing north-west. Preserve the accepted character scale, palette, and chroma background.

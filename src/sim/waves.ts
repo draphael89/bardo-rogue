@@ -201,8 +201,7 @@ export function updateWaves(world: World): void {
       for (const b of world.projectiles) {
         if (!b.active || b.team !== 0) continue
         b.active = false
-        // A sentence that never fell is dismissed, not deflected: it earns no impact sound.
-        if (b.kind !== 'verdict') world.emit({ type: 'boltHitWall', x: b.x, y: b.y })
+        world.emit({ type: 'boltHitWall', x: b.x, y: b.y })
       }
       if (world.doorOpen) setDoorWalkable(world.arena, true)
       world.emit({ type: 'roomClear', hasNext: world.hasNextRoom(), reward: !!reward, victory })

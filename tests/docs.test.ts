@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { FLAG } from '@/sim/replay'
 
@@ -35,5 +35,12 @@ describe('harness documentation', () => {
       if (conventional.has(name)) continue
       expect(harness, `HARNESS.md should document \`pnpm ${name}\``).toContain(`pnpm ${name}`)
     }
+  })
+
+  it('states that the workflow template is parked and the gates are manual', () => {
+    expect(existsSync('.github/workflows/ci.yml')).toBe(false)
+    expect(readFileSync('ci/github-actions.yml', 'utf8')).toContain('NOT ACTIVE WHERE IT SITS')
+    expect(harness).toContain('parked template, not active CI')
+    expect(harness).toContain('run the documented typecheck, test, build, matrix')
   })
 })

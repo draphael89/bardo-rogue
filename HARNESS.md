@@ -25,6 +25,14 @@ per tick: `stepWorld(world, inputFrame)`.
 | `pnpm poses` | Pose sheet of key animation frames (`tools/poses.ts`) |
 | `pnpm strip -- ...` | Frame strip of anything that moves, for judging motion (`tools/strip.ts`; writes a JSON state/event sidecar beside the PNG) |
 | `pnpm assets` / `pnpm tiles` | Regenerate `public/assets/` (Kenney subset, then the original bardo tilesets). Both rewrite `manifest.json`; run `tiles` **after** `assets` or the bardo sprites drop out. |
+| `pnpm build` | Web build, then `tools/check-build.ts` gates the payload (no evidence, no video, no missing asset, within budget) |
+| `pnpm check:build` | Re-run the built-payload gate against the current `dist/` |
+| `pnpm art` / `pnpm palette` / `pnpm fx` | Run the authored-art gates, canonical-palette gate, or rebuild the Bardo FX sheets |
+| `pnpm desktop:dev` | Electron shell against the already-running `:5173`. Does NOT start Vite; HMR still works inside the shell. |
+| `pnpm desktop:build` | `pnpm build` (payload gate included) then compiles `desktop/*.cts` to `desktop/out/*.cjs` |
+| `pnpm desktop:start` | Runs the PACKAGED code path (`app://bardo/`) against the local `dist/`, without packaging anything |
+| `pnpm smoke:desktop` | Tier-3: drives the real Electron app under Playwright and checks hosting, incl. replay-hash parity with `pnpm sim` |
+| `pnpm desktop:dist` | Phase 7: electron-builder arm64 dmg+zip. Needs macOS and the electron-builder devDependency (not installed). |
 
 `pnpm sim -- --scenario wave3 --bot naive-melee --seeds 1-20 --ticks 10800` prints one row per seed:
 swings, hitsLanded, whiffSwings, kills, dodges, successfulDodges, boltsFired, boltsCut, enemyAttacks, damageTaken
@@ -39,12 +47,17 @@ A stock combat scenario stops 2 s after clear or death; the production `loop` st
 - `scenario`: `loop` is the default production game: Bardo rack → Threshold → one of two branches → Black Step → Warden → Bardo, with three deterministic boon offers. Debug scenarios remain: `empty`, `dummy`, `blessed`, `bow`, `boss`, `brute-only`, `caster-only`, `charger-swarm`, `wave1`, `wave2`, `wave3`, `full`, `run`, and `shore`.
 - Death or victory then confirm: `loop` returns to the Bardo in the same world and clears run power. Legacy `run` also returns on death. Stock combat scenarios still set `wantsRestart` and rebuild the same fight.
 - `seed`: integer, default 1. Same seed + same inputs = same run.
+- `save=off`: run against a fresh profile and write nothing. `pnpm shot` and `pnpm poses` pass it by
+  default (pass `--save on` to opt out), so a machine that has actually played cannot tint a capture
+  or move a `loop` hash -- `hashWorld` folds `session.meta` into that scenario's hash.
 - `debug=1`: F1 overlay on. `mute=1`: no audio. `god=1`: player cannot take damage. `reduced=1` caps flashes, camera movement, zoom, and disables chromatic pulses (`reduced=0` overrides an OS preference).
 - `bot=idle|naive-melee|kite|slice-naive|slice-kite`: a scripted player drives the sim. The `slice-*` bots physically prepare, navigate either branch by seed parity, choose boons, fight the Warden, and return; their suffix selects the combat policy.
 
 Combat slow-motion: `__game.state().slow` is `{ rate, ticks }` — rate is per-mille, 1000 is full speed. Force it with `__game.world.slowRate = 250; __game.world.slowTicks = 120`.
 
 Keys in the game: WASD move, arrows aim (8-way, and holding one pins the facing so you strafe), mouse aim, left-click/J/Z light attack, right-click/L/C heavy attack, Space/Shift/K/X dodge, P/Escape pause, V reduced effects, F fullscreen. With no arrow and an untouched mouse, aim follows movement. Rewards use A/D or left/right, then Enter/Space/attack to claim. The same confirm returns after death or victory.
+While paused, E exports the save file and I imports one; an import is refused during a live run, and
+refused if either file came from a newer build than this one.
 F1 toggles the debug overlay, F2 toggles recording, F3 downloads the last recording.
 
 ## `window.__game` (src/debug/api.ts)
@@ -81,11 +94,16 @@ Available once the page has booted (`await page.waitForFunction(() => !!window._
 
 ## Record and replay
 
-A replay is `{ v: 1, seed, scenario, god?, frames: InputFrame[] }` (`src/sim/replay.ts`). On disk it is run-length
+A replay is `{ v: 1, seed, scenario, god?, meta?: MetaStateV1, frames: InputFrame[] }` (`src/sim/replay.ts`). On disk it is run-length
 encoded: `runs: [moveX, moveY, aimX, aimY, flags, count]` with axes as ints x10000 and flags bits
 `1 aimSoft, 2 attack, 4 dodge, 8 restart, 16 attackHeld, 32 confirm, 64 choice-left, 128 choice-right, 256 heavy`
-(the table in `src/sim/replay.ts` is the source of truth; CI fails if this line drifts from it). The browser quantizes every frame to 1/10000 before the sim sees it, so
-what was played and what is stored are identical.
+(the table in `src/sim/replay.ts` is the source of truth; `pnpm test` fails if this line drifts from it). The browser quantizes every frame to 1/10000 before the sim sees it, so
+what was played and what is stored are identical. A `loop` replay's hash depends on its `meta`, because `hashWorld` folds
+attempts and victories in for that scenario; the pinned fixtures are all non-`loop` and carry none.
+
+The workflow at `ci/github-actions.yml` is a parked template, not active CI. Until a separately
+authorised move to `.github/workflows/ci.yml`, run the documented typecheck, test, build, matrix,
+browser-smoke, art, and desktop gates manually before merging.
 
 - Browser: F2 starts a fresh run and records; F2 again stops; F3 downloads `<scenario>-<seed>-<ticks>.json`. Move the
   file into `replays/`. A restart (R) ends the recording. "REC" blinks top-centre while recording, "REPLAY" while replaying.
@@ -113,6 +131,16 @@ pins the hash of each fixture in `replays/`. If a hash test fails, the sim chang
 - `src/sim/`: `world.ts` (state), `session.ts` (run/meta boundary), `rooms.ts` + `waves.ts` (graph/encounters),
   `rewards.ts` + `boons.ts` (offers/build effects), `preparation.ts`, `storage.ts`, `step.ts`, `player.ts`, `combat.ts`,
   `enemies/`, `projectiles.ts`, `scenarios.ts`, `bots.ts`, `metrics.ts`, `hash.ts`, `replay.ts`, `rng.ts` (never `Math.random`).
+  `save.ts` is the canonical save document (envelope, validation, migrations) and `storage.ts` the two
+  pre-envelope keys it migrates from; both are pure and NEITHER is reachable from `stepWorld`, which
+  `tests/sim/boundary.test.ts` asserts -- editing them cannot move a replay hash.
+- `src/platform/`: the seam. `index.ts` (Platform + SaveStore + `detectPlatform`), `web.ts`
+  (localStorage store with a `.bak` rotation, legacy upgrade, persistence hint), `desktop.ts` (the
+  Electron bridge), `saveFile.ts` (recovery order: save -> backup -> defaults), `dom.ts`. This is the
+  only directory in `src/` allowed to name a host API.
+- `desktop/`: the Electron host (`main.cts`, `preload.cts`, `save-store.cts`, `ipc-saves.cts`), compiled
+  to `desktop/out/*.cjs` by its own tsconfig. It never imports from `src/`, and nothing in `src/`
+  imports it. Tier-3 only: no gameplay change should ever need it.
 - `src/render/`: `presenter.ts` reads world + events and drives sprites, particles, shake, decals, HUD; `reward.ts` owns rewards, victory, pause, build, and meta overlays.
 - `src/input/`: keyboard/mouse/gamepad to `InputFrame`; `recorder.ts` captures frames.
 - `src/debug/`: `api.ts` (`window.__game`), `overlay.ts` (F1).

@@ -7,15 +7,15 @@ import { ARM } from './weapons'
 import { BOON } from './boons'
 
 // Stable integer codes. Enum order is part of the hash contract: append, never reorder.
-const PLAYER_STATE: Record<PlayerState, number> = { free: 0, dodge: 1, attack: 2, dead: 3 }
+const PLAYER_STATE: Record<PlayerState, number> = { free: 0, dodge: 1, attack: 2, dead: 3, hurt: 4 }
 const ENEMY_STATE: Record<EnemyState, number> = {
   idle: 0, chase: 1, windup: 2, attack: 3, recover: 4, stagger: 5, dead: 6,
-  position: 7, aim: 8, hover: 9, freeze: 10, dash: 11,
+  position: 7, aim: 8, hover: 9, freeze: 10, dash: 11, phase: 12,
 }
 const ENEMY_KIND: Record<EnemyKind, number> = { brute: 0, caster: 1, charger: 2, dummy: 3, warden: 4, oathbound: 5 }
 const WAVE_STATE: Record<WaveState, number> = { idle: 0, pending: 1, active: 2, done: 3 }
 const ROOM_PHASE: Record<RoomPhase, number> = { town: 0, entering: 1, fighting: 2, reward: 3, exits: 4, transitioning: 5, resolved: 6 }
-const PROJECTILE_KIND: Record<ProjectileKind, number> = { bolt: 0, arrow: 1, mirror: 2, echo: 3, verdict: 4 }
+const PROJECTILE_KIND: Record<ProjectileKind, number> = { bolt: 0, arrow: 1, mirror: 2, echo: 3 }
 const RITE: Record<RiteId, number> = { toll: 0 }
 
 // FNV-1a over a canonical snapshot of everything the sim's outcome depends on.
@@ -83,9 +83,12 @@ export function hashWorld(world: World): number {
   num(p.x); num(p.y); num(p.px); num(p.py); num(p.vx); num(p.vy); num(p.kbx); num(p.kby)
   int(p.hp); int(p.maxHp); int(p.facing)
   num(p.aimAngle); num(p.moveAngle); num(p.dodgeDirX); num(p.dodgeDirY)
-  int(p.swingIndex); num(p.swingAngle); int(p.swingId); flag(p.swingFromRoll); flag(p.swingLanded); int(p.assistTargetId)
+  int(p.swingIndex); num(p.swingAngle); int(p.swingId)
+  flag(p.swingFromRoll); flag(p.bladeActionConnected); int(p.assistTargetId)
   int(p.controlTick); int(p.attackQueuedAt); int(p.heavyQueuedAt); int(p.dodgeQueuedAt); int(p.dodgeTick)
   int(p.iframes); num(p.flash); int(p.dodgeRead)
+  // Preserve the historical byte stream for worlds that never earn this opt-in mechanic.
+  if (p.reversalTicks || p.reversalActionId !== -1) { int(p.reversalTicks); int(p.reversalActionId) }
   num(p.moveX); num(p.moveY); int(p.footTick); int(p.deathTick); flag(p.god)
   byte(p.arm); flag(p.armed)
 
@@ -100,9 +103,12 @@ export function hashWorld(world: World): number {
     num(e.aimAngle); num(e.targetX); num(e.targetY)
     int(e.lastHitSwingId); num(e.flash); flag(e.hitDone)
     num(e.orbitAngle); int(e.orbitDir); int(e.hoverTicks); int(e.cooldown); int(e.dashTicks); int(e.spawnTick)
-    byte(e.phase); byte(e.attackId)
+    byte(e.phase); flag(e.phasePending); byte(e.actionPhase); byte(e.pattern); int(e.patternCursor); int(e.patternStep)
     byte(e.brand); int(e.brandTicks)
-    byte(e.burn); int(e.burnTicks); int(e.burnAcc)
+    byte(e.burn); int(e.burnTicks); int(e.burnAcc); int(e.burnActionId)
+    // poseTick is a cosmetic clock, like visualRng above: deterministic presentation state, but it
+    // cannot affect an outcome and therefore is deliberately outside the gameplay hash contract.
+    flag(e.knockbackHeavy); int(e.knockbackActionId)
   }
 
   let bolts = 0

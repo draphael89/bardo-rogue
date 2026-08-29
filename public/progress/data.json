@@ -515,7 +515,7 @@
     },
     {
       "t": "20:14",
-      "text": "CI + browser smoke + acceptance matrix. The matrix immediately reported that mashing wins 2%."
+      "text": "Parked CI template + manual browser smoke + acceptance matrix. The matrix immediately reported that mashing wins 2%."
     },
     {
       "t": "20:19",
@@ -527,7 +527,7 @@
     },
     {
       "t": "20:52",
-      "text": "Minos: three attacks, recombining at half life. The old tell drew a slam under every one of them."
+      "text": "Minos inherits the Warden mastery contract: taught slam, ring, and fan patterns with a safe half-life transition."
     },
     {
       "t": "21:05",
@@ -856,8 +856,8 @@
     },
     {
       "id": "ci-instruments",
-      "status": "done",
-      "title": "CI, a golden-path browser smoke of both endings, a seeded acceptance matrix, and doc tests that pin HARNESS.md to the encoder",
+      "status": "parked",
+      "title": "Manual golden-path browser smoke, seeded acceptance matrix, and doc tests; CI workflow template parked pending authorization",
       "rounds": 1
     },
     {
@@ -887,7 +887,7 @@
     {
       "id": "minos",
       "status": "done",
-      "title": "Minos: gavel, verdict sweep, and the scales, recombining in phase two; per-attack telegraphs that no longer lie",
+      "title": "Minos identity around the Warden's slam, ring, and fan mastery contract; per-pattern telegraphs that do not lie",
       "rounds": 1
     },
     {

@@ -119,7 +119,7 @@ const solo = await page.evaluate(async ({ files, bands }) => {
     ['dodgeEnd', { type: 'dodgeEnd', ...P }],
     ['swing', { type: 'swing', ...P, angle: 0, swing: 0, heavy: false }],
     ['swing/heavy', { type: 'swing', ...P, angle: 0, swing: 2, heavy: true }],
-    ['playerHurt', { type: 'playerHurt', ...P, angle: 0, hp: 3 }],
+    ['playerHurt', { type: 'playerHurt', ...P, angle: 0, hp: 3, maxHp: 5 }],
     ['hit killing', { type: 'hit', ...E, angle: 0, damage: 4, heavy: true, targetId: 1, kind: 'brute', killed: true }],
     ['hit/brute', { type: 'hit', ...E, angle: 0, damage: 2, heavy: false, targetId: 1, kind: 'brute', killed: false }],
     ['hit/charger', { type: 'hit', ...E, angle: 0, damage: 2, heavy: false, targetId: 1, kind: 'charger', killed: false }],

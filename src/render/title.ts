@@ -17,6 +17,7 @@ export class TitleOverlay {
   private texts: Text[] = []
   private key = ''
   private shown = false
+  private soundGate = false
   private t = 0
 
   constructor(layer: Container) {
@@ -34,13 +35,19 @@ export class TitleOverlay {
     this.key = ''
   }
 
+  setSoundGate(gated: boolean): void {
+    if (this.soundGate === gated) return
+    this.soundGate = gated
+    this.key = ''
+  }
+
   relayout(): void { this.key = '' }
 
   update(world: World, dtSec: number): void {
     if (!this.shown) return
     this.t += dtSec
     const m = world.session.meta
-    const next = `${tuning.view.width}|${m.attempts}|${m.victories}`
+    const next = `${tuning.view.width}|${m.attempts}|${m.victories}|${this.soundGate}`
     // The card is static; only the prompt breathes. Twice a second is not often, but this is the
     // first screen the game ever shows and it was destroying eleven display objects and rasterising
     // ten new text textures on every beat to recolour one label — a hitch landing exactly on the
@@ -92,7 +99,12 @@ export class TitleOverlay {
 
     // The prompt is the only thing on screen that moves, so it is unmistakably the thing to answer.
     // Built white so the tint reads as the authored colour rather than multiplying two of them.
-    const prompt = label(returning ? 'PRESS ENTER TO DESCEND AGAIN' : 'PRESS ENTER TO DESCEND', 11, 0xffffff)
+    const prompt = label(
+      this.soundGate
+        ? 'CLICK OR PRESS A KEY TO ENABLE SOUND'
+        : returning ? 'PRESS ENTER TO DESCEND AGAIN' : 'PRESS ENTER TO DESCEND',
+      11, 0xffffff,
+    )
     prompt.tint = this.beat ? P.gold : P.bone
     prompt.position.set(W / 2, H - 74); this.add(prompt)
     this.prompt = prompt

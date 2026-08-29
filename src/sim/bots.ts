@@ -2,10 +2,11 @@
 import type { World, Enemy } from './world'
 import { emptyInput, type InputFrame } from './input'
 import { tuning } from '@/tuning'
-import { hasLineOfSight } from './arena'
-import { overlapsSolid } from './collision'
+import { hasLineOfSight, overlapsSolid } from './collision'
 import { pathWaypoint, waypointX, waypointY } from './nav'
 import { guardUp } from './enemies/oathbound'
+import { WARDEN_PATTERN, wardenWindup } from './enemies/warden'
+import { wardenLaneThreatensPoint, wardenProjectileAngle, wardenProjectileContract } from './enemies/warden-contract'
 
 export type Bot = (world: World) => InputFrame
 export type BotName = 'idle' | 'naive-melee' | 'kite' | 'slice-naive' | 'slice-kite'
@@ -73,7 +74,7 @@ function makeSliceBot(combat: Bot): Bot {
     // fourth vow and the smaller life bar, or the debt that wades into the Hall of Minos.
     if (world.roomPhase === 'entering') {
       const rite = world.session.run?.pendingRite
-      if (rite && (world.seed & 2) !== 0 && rite.focus === 0) inp.choiceDelta = 1
+      if (rite && (world.seed & 1) === 0 && rite.focus === 0) inp.choiceDelta = 1
       else inp.confirm = true
       return inp
     }
@@ -139,6 +140,19 @@ function aimAt(inp: InputFrame, world: World, e: Enemy): number {
   return d
 }
 
+function wardenProjectileThreatensPlayer(world: World, e: Enemy): boolean {
+  const pattern = e.pattern === WARDEN_PATTERN.ring ? 'ring' : e.pattern === WARDEN_PATTERN.fan ? 'fan' : null
+  if (!pattern) return false
+  const contract = wardenProjectileContract(pattern, e.actionPhase)
+  for (let volley = 0; volley < contract.volleys; volley++) {
+    for (let i = 0; i < contract.count; i++) {
+      const angle = wardenProjectileAngle(contract, e.aimAngle, e.patternCursor, i, volley)
+      if (wardenLaneThreatensPoint(world.arena, e.x, e.y, angle, contract, world.player.x, world.player.y)) return true
+    }
+  }
+  return false
+}
+
 // Walks at the nearest enemy and mashes attack. Dodges only when a brute is mid-windup nearby.
 function naiveMelee(world: World): InputFrame {
   const inp = emptyInput()
@@ -148,8 +162,8 @@ function naiveMelee(world: World): InputFrame {
   if (d > 18) { inp.moveX = inp.aimX; inp.moveY = inp.aimY }
   if (d <= tuning.player.attack.swings[0].radius) inp.attack = world.tick % 4 === 0
   if (e.kind === 'brute' && e.state === 'windup' && e.stateTick > 12 && d < 40) { inp.dodge = true; inp.moveX = -inp.aimX; inp.moveY = -inp.aimY }
-  const wardenDodgeTick = (e.phase ? tuning.warden.windup2 : tuning.warden.windup) - 10
-  if (e.kind === 'warden' && e.state === 'windup' && e.stateTick > wardenDodgeTick && d < tuning.warden.slamRadius + 6) {
+  const wardenDodgeTick = e.kind === 'warden' ? wardenWindup(e) - 10 : 0
+  if (e.kind === 'warden' && e.pattern === WARDEN_PATTERN.slam && e.state === 'windup' && e.stateTick > wardenDodgeTick && d < tuning.warden.slamRadius + 6) {
     inp.dodge = true; inp.moveX = -inp.aimX; inp.moveY = -inp.aimY
   }
   return inp
@@ -165,21 +179,33 @@ function kite(world: World): InputFrame {
   const threat = world.enemies.some(x => {
     if (!x.active || x.state === 'dead') return false
     if (x.state !== 'windup' && x.state !== 'freeze') return false
-    const reach = x.kind === 'warden' ? tuning.warden.slamRadius + 8 : 48
-    if (Math.hypot(x.x - p.x, x.y - p.y) >= reach) return false
+    if (x.kind === 'warden') {
+      const late = x.stateTick > wardenWindup(x) - 10
+      if (!late) return false
+      if (x.pattern === WARDEN_PATTERN.ring || x.pattern === WARDEN_PATTERN.fan) {
+        return wardenProjectileThreatensPlayer(world, x)
+      }
+      return Math.hypot(x.x - p.x, x.y - p.y) < tuning.warden.slamRadius + tuning.player.radius
+    }
+    if (Math.hypot(x.x - p.x, x.y - p.y) >= 48) return false
     // Land the Warden roll inside the newly authored full-travel i-frame window. The old fixed
     // tick 20 launched too early for the 36-tick tell and was already in landing when the slam hit.
-    const late = x.kind === 'brute' ? 12 : x.kind === 'warden' ? (x.phase ? tuning.warden.windup2 : tuning.warden.windup) - 10 : 10
+    const late = x.kind === 'brute' ? 12 : 10
     return x.stateTick > late
   })
-  const incomingBolt = world.projectiles.some(b => b.active && Math.hypot(b.x - p.x, b.y - p.y) < 22)
+  const incomingBolt = world.projectiles.find(b => b.active && b.team === 0
+    && Math.hypot(b.x - p.x, b.y - p.y) < 30
+    && (p.x - b.x) * b.vx + (p.y - b.y) * b.vy > 0)
   if ((threat || incomingBolt) && p.state !== 'dodge') {
     inp.dodge = true
     // Prefer the old left-hand sidestep, but do not ask the collision regression probe to roll into
     // a pillar when the equally valid opposite lane is open. This keeps the bot measuring combat
     // decisions instead of an obsolete corner-pop escape.
-    const left = { x: -inp.aimY, y: inp.aimX }
-    const right = { x: inp.aimY, y: -inp.aimX }
+    const boltSpeed = incomingBolt ? Math.hypot(incomingBolt.vx, incomingBolt.vy) || 1 : 1
+    const axisX = incomingBolt ? incomingBolt.vx / boltSpeed : inp.aimX
+    const axisY = incomingBolt ? incomingBolt.vy / boltSpeed : inp.aimY
+    const left = { x: -axisY, y: axisX }
+    const right = { x: axisY, y: -axisX }
     const room = (d: { x: number; y: number }) => {
       let clear = 0
       for (let n = 8; n <= tuning.player.dodge.distance; n += 8) {
@@ -198,26 +224,24 @@ function kite(world: World): InputFrame {
     return inp
   }
   const punishable = e.state === 'recover' || e.state === 'stagger' || e.state === 'aim' || e.state === 'idle' || e.kind === 'caster'
-  // The committed swing is what a punish window is FOR. A body that has just spent its attack is
-  // open long enough to eat the plant, and against a brute the heavy is the only thing that breaks
-  // poise — so the probe spends it there and nowhere else, which is the read a player has to make.
   const heavy = tuning.player.attack.swings[tuning.player.attack.swings.length - 1]
   // A raised shield is the other place the weight is the answer. A human learns this in one
   // encounter — light blows visibly bounce off bronze — so the probe has to know it too, or it is
   // measuring a policy no player would keep using.
   const guarded = guardUp(e)
-  const openWide = (e.state === 'recover' || e.state === 'stagger') && e.stateTick < 14 || guarded
+  const committedOpening = e.kind === 'warden'
+    && (e.state === 'recover' || e.state === 'stagger') && e.stateTick < 14
   if (punishable || e.kind === 'charger') {
     if (d > 20) { inp.moveX = inp.aimX; inp.moveY = inp.aimY }
-    if (d <= heavy.radius && openWide) inp.heavy = true
-    else if (d <= 42 && !guarded) inp.attack = world.tick % 3 === 0
+    if (d <= heavy.radius && (guarded || committedOpening)) inp.heavy = true
+    else if (d <= 42) inp.attack = world.tick % 3 === 0
   } else {
     // Close to a real punish distance. The old 34–44 px dead band could stare at a brute across a
     // pillar forever; a human routes around it, so the control probe must keep expressing intent too.
     if (d < 23) { inp.moveX = -inp.aimX; inp.moveY = -inp.aimY }
     else if (d > 25) { inp.moveX = inp.aimX; inp.moveY = inp.aimY }
-    if (d <= heavy.radius && openWide) inp.heavy = true
-    else if (d <= 27 && e.state === 'chase' && !guarded) inp.attack = world.tick % 3 === 0
+    if (d <= heavy.radius && (guarded || committedOpening)) inp.heavy = true
+    else if (d <= 27 && e.state === 'chase') inp.attack = world.tick % 3 === 0
   }
   return inp
 }

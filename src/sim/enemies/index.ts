@@ -10,6 +10,7 @@ import { tickStatuses } from '../status'
 export function updateEnemies(world: World): void {
   for (const e of world.enemies) {
     if (!e.active) continue
+    e.poseTick++
     e.stateTick++
     if (e.flash > 0) e.flash--
     tickStatuses(world, e)

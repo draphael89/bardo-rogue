@@ -170,6 +170,10 @@ export function enterRoom(world: World, index: number, via: 'door' | 'return' = 
   p.dodgeTick = -1
   p.dodgeRead = 0
   p.dodgeProcTick = -1
+  p.reversalTicks = 0
+  p.reversalActionId = -1
+  p.bladeActionConnected = false
+  p.swingFromRoll = false
   p.state = 'free'
   p.stateTick = 0
   restoreRunHealth(world)

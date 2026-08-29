@@ -1,0 +1,68 @@
+{
+  "input": "art/approved/bardo_hero_north_roll_alpha_v3.png",
+  "output": "public/assets/sprites/bardo_hero_north_roll.png",
+  "source": {
+    "width": 1254,
+    "height": 1254
+  },
+  "atlas": {
+    "cols": 2,
+    "rows": 2,
+    "cell": 32,
+    "width": 64,
+    "height": 64,
+    "colors": 15,
+    "partialAlpha": 0,
+    "shadowLift": 0,
+    "midtoneFloor": 0,
+    "fit": "pose",
+    "margin": 5
+  },
+  "pass": true,
+  "frames": [
+    {
+      "index": 0,
+      "opaque": 201,
+      "colors": 15,
+      "bounds": {
+        "x": 8,
+        "y": 5,
+        "w": 16,
+        "h": 22
+      }
+    },
+    {
+      "index": 1,
+      "opaque": 297,
+      "colors": 15,
+      "bounds": {
+        "x": 5,
+        "y": 5,
+        "w": 21,
+        "h": 22
+      }
+    },
+    {
+      "index": 2,
+      "opaque": 142,
+      "colors": 14,
+      "bounds": {
+        "x": 11,
+        "y": 5,
+        "w": 9,
+        "h": 22
+      }
+    },
+    {
+      "index": 3,
+      "opaque": 177,
+      "colors": 15,
+      "bounds": {
+        "x": 9,
+        "y": 5,
+        "w": 14,
+        "h": 22
+      }
+    }
+  ]
+}

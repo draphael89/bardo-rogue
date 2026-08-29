@@ -1,0 +1,40 @@
+# CONFIGURATION ONLY -- nothing here runs yet. electron-builder is deliberately NOT a devDependency:
+# producing or validating a real .app, and any signing or notarisation, requires macOS. This file is
+# what `pnpm desktop:dist` will use on an Apple Silicon Mac once that dependency is added.
+appId: com.bardorogue.game
+productName: Bardo Rogue
+directories:
+  output: release
+  buildResources: build
+# Only what the app actually needs at runtime. dist/ is what app://bardo serves, and it has already
+# passed tools/check-build.ts by the time desktop:dist runs, so gauntlet evidence cannot reach a
+# package. Source maps are excluded deliberately: they carry the whole of src/ and a player build has
+# no use for them.
+files:
+  - package.json
+  - desktop/out/**/*
+  - dist/**/*
+  - '!dist/**/*.map'
+asar: true      # safe because the protocol handler reads with fs.promises.readFile, which is asar-aware
+mac:
+  category: public.app-category.games
+  target:
+    - target: dmg
+      arch: [arm64]
+    - target: zip
+      arch: [arm64]      # zip is the Steam- and updater-friendly artifact; dmg is what a tester double-clicks
+  # No `icon:` key on purpose. An explicitly configured resource must exist or electron-builder
+  # aborts; with buildResources: build it auto-discovers build/icon.icns once that is authored, and
+  # falls back to the stock Electron icon until then.
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  darkModeSupport: true
+  notarize: false        # flip on once a Developer ID certificate and the Apple credentials exist
+  extendInfo:
+    NSHighResolutionCapable: true
+dmg:
+  contents:
+    - { x: 130, y: 220 }
+    - { x: 410, y: 220, type: link, path: /Applications }

@@ -1,9 +1,11 @@
 import { Container, Graphics, Sprite, Texture } from 'pixi.js'
 import type { Enemy } from '@/sim/world'
 import { tuning, DT } from '@/tuning'
-import { TILE, ARENA_COLS, ARENA_ROWS } from '@/sim/arena'
+import { TILE, type Arena } from '@/sim/arena'
+import { raycastSolidDistance } from '@/sim/collision'
 import { chargerLockTick } from '@/sim/enemies/charger'
 import { lerp, clamp01, easeOutCubic } from '../anim'
+import { isDangerCorridorPointVisible } from '../terrain'
 import { EntityView, type EnemyFrame, type Pose } from './shared'
 
 // The charger's sentence is "count the tremble".
@@ -13,12 +15,12 @@ import { EntityView, type EnemyFrame, type Pose } from './shared'
 //
 //   hover, last 10 ticks   a ring gathers under it                "this one is picking its moment"
 //   freeze 0-3             it rears up, no shake yet               "it has stopped"
-//   freeze 4 / 9           a lane grows out of it toward you; on each beat it lands a rung and
+//   freeze 1 / 3 / 5       a lane grows out of it toward you; on each beat it lands a rung and
 //                          trembles once. Loose and amber while it is still tracking you.
-//   freeze 13              the sim stops re-aiming (chargerLockTick). The lane IGNITES: two ticks
+//   freeze 7               the sim stops re-aiming (chargerLockTick). The lane IGNITES: two ticks
 //                          of white-hot wash, then it settles into a red beam with white-hot rails,
-//                          an arrowhead, and one white front that runs the length of it. Third
-//                          tremble. Three beats and it is gone.
+//                          an arrowhead, and one white front that runs the length of it. The player
+//                          now owns nine full committed ticks to cross the promised lane.
 //   dash 0-8               the floor telegraph burns off AHEAD of it, the point it left from keeps
 //                          flashing, and a white-cored wake grows behind it along the whole travel.
 //                          The charger is the brightest object in the room for all 34 ticks.
@@ -105,10 +107,9 @@ const IGNITE_TICKS = 2.6 // how long the lock flash takes to fall back to the st
 // allowed inside the silhouette that the player has to read the crouch off.
 const BODY_CLEAR = 6
 
-// How much of the lane's width the mark is allowed to paint. A telegraph is a warning written on
-// the floor: the floor, and anything standing on it, has to survive underneath. At hw = 9 the mark
-// owns pixel 11 (outline), 9-10 (red body) and 8 (white core) on each side - 8 of 18 px - and the
-// middle 14 px carry nothing but a tint.
+// The lane's width is mechanical: charger radius + player radius. Floor stain, grout cuts and beat
+// marks all pass the same exact corridor predicate, so tile texture can add character without making
+// an 18px hit lane read as a three-tile-wide carpet.
 // The dash. At 160 px/s the charger only clears 2.7 px a tick, so honest one-tick afterimages would
 // stack on top of each other and read as nothing: the ghosts are spaced by DISTANCE, not by frame,
 // and the wake is a drawn volume rather than a smear of past positions.
@@ -139,12 +140,6 @@ const WOUND = 0x8a1c10   // locked tile stain: red enough to read as danger, not
 const EDGE = 0x08040c    // near-black outline: holds the rail's edge over both the lit floor and the dark tile
 const GLOW_T = 0xff6a14   // spill while it is still tracking you
 const GLOW_L = 0xff2c12   // spill once it has committed
-
-// Walkable rect, mirroring Arena.inner. The lane has to stop at the wall or it paints over the
-// stone, and updateChargerView is handed no world (EnemyFrame carries no arena), so the two arena
-// constants are the only honest source. If Arena.inner stops being the border ring, this wants the
-// arena passed in instead.
-const INNER = { x0: TILE, y0: 2 * TILE, x1: (ARENA_COLS - 1) * TILE, y1: (ARENA_ROWS - 1) * TILE }
 
 // One heat container per world, shared by every charger, inserted directly above the lightmap and
 // below layers.fx so particles and explosions still land on top of the beam. Found by looking for
@@ -258,13 +253,13 @@ function laneFor(v: EntityView): Lane {
   return lane
 }
 
-export function updateChargerView(v: EntityView, e: Enemy, f: EnemyFrame, out: Pose): void {
+export function updateChargerView(v: EntityView, e: Enemy, f: EnemyFrame, out: Pose, arena: Arena): void {
   const { time, tk, speed } = f
   const C = tuning.charger
   const LOCK = chargerLockTick()
   let sx = 1, sy = 1, rot = 0, hop = 0, tint = 0xffffff
 
-  drawLane(laneFor(v), v, e, f)
+  drawLane(laneFor(v), v, e, f, arena)
 
   if (e.state === 'hover') {
     if (speed > 5) { hop = Math.abs(Math.sin(time * 22)) * 1.5; sx = 1 + Math.sin(time * 22) * 0.08 }
@@ -304,7 +299,7 @@ export function updateChargerView(v: EntityView, e: Enemy, f: EnemyFrame, out: P
   } else if (e.state === 'recover') {
     const u = easeOutCubic(tk / C.recovery)
     sx = lerp(1.3, 1, u); sy = lerp(0.75, 1, u); rot = Math.sin(time * 8) * 0.15 * (1 - u)
-  } else if (e.state === 'stagger') { rot = 0.5; sx = 0.9; sy = 1.1 }
+  } else if (e.state === 'stagger') { rot = -e.facing * 0.5; sx = 0.9; sy = 1.1 }   // mirrored, like every other kind: the epilogue flips scale.x but never negates rotation
 
   out.sx = sx; out.sy = sy; out.rot = rot; out.hop = hop; out.tint = tint
 }
@@ -322,13 +317,13 @@ function dashPose(e: Enemy, u: number): { sx: number; sy: number; rot: number; h
 
 // ---------------------------------------------------------------- floor mark
 
-function drawLane(lane: Lane, v: EntityView, e: Enemy, f: EnemyFrame): void {
+function drawLane(lane: Lane, v: EntityView, e: Enemy, f: EnemyFrame, arena: Arena): void {
   lane.gm.clear()
   lane.hot.clear()
   lane.hide()
   if (e.state === 'hover') drawArmedRing(lane, e, f)
-  else if (e.state === 'freeze') { capture(lane, e, f); drawTelegraph(lane, e, f) }
-  else if (e.state === 'dash') drawDash(lane, v, e, f)
+  else if (e.state === 'freeze') { capture(lane, e, f, arena); drawTelegraph(lane, e, f, arena) }
+  else if (e.state === 'dash') drawDash(lane, v, e, f, arena)
   else if (e.state === 'recover') drawResidue(lane, e, f)
 }
 
@@ -360,13 +355,13 @@ function ring(g: Graphics, f: EnemyFrame, r: number, color: number, alpha: numbe
 }
 
 // The aim swings until the lock, so the lane is re-measured every frame until then.
-function capture(lane: Lane, e: Enemy, f: EnemyFrame): void {
+function capture(lane: Lane, e: Enemy, f: EnemyFrame, arena: Arena): void {
   const C = tuning.charger
   lane.ox = f.x; lane.oy = f.y; lane.ang = e.aimAngle
-  lane.len = rayLimit(f.x, f.y, Math.cos(e.aimAngle), Math.sin(e.aimAngle), C.dashDist, e.radius)
+  lane.len = raycastSolidDistance(arena, f.x, f.y, e.aimAngle, C.dashDist, e.radius)
 }
 
-function drawTelegraph(lane: Lane, e: Enemy, f: EnemyFrame): void {
+function drawTelegraph(lane: Lane, e: Enemy, f: EnemyFrame, arena: Arena): void {
   const g = lane.gm, hg = lane.hot
   const LOCK = chargerLockTick()
   const tk = f.tk
@@ -377,17 +372,18 @@ function drawTelegraph(lane: Lane, e: Enemy, f: EnemyFrame): void {
   const cx = Math.cos(ang), cy = Math.sin(ang)
   const { k, beat } = laneClock(tk, LOCK)
   const grow = clamp01(k / BEATS)
-  const reach = locked ? len : Math.max(BODY_CLEAR + 6, grow * len)
+  if (len <= 0.5) return
+  const reach = locked ? len : Math.min(len, Math.max(BODY_CLEAR + 6, grow * len))
   // every continuous stroke starts outside the body, so the crouch is never under paint
-  const d0 = Math.min(BODY_CLEAR, reach - 2)
+  const d0 = Math.max(0, Math.min(BODY_CLEAR, reach - 2))
   const strobe = locked ? (strobeFrame(f.time) ? 1 : 0.72) : 1
   const ignite = locked ? clamp01(1 - (tk - LOCK) / IGNITE_TICKS) ** 0.7 : 0
 
-  // w2r7 still lost: a rotated stain quad is a pasted rectangle. The tell has to be the floor
-  // tiles themselves going bad — axis-aligned, grout-cut, no overlay sprite.
-  stainTiles(g, ox, oy, cx, cy, d0, reach, hw, locked ? WOUND : SCORCH, locked ? 0.50 * strobe : 0.10 + 0.16 * grow)
-  stainTiles(g, ox, oy, cx, cy, d0, d0 + 24, hw, WOUND, locked ? 0.18 : 0.05)
-  groutCuts(g, hg, ox, oy, cx, cy, d0, reach, hw, locked, strobe, k, beat)
+  // w2r7 still lost: a rotated stain quad is a pasted rectangle. The tell follows the floor's
+  // axis-aligned tiles and grout, but every emitted pixel stays inside the real collision corridor.
+  stainTiles(g, arena, ox, oy, cx, cy, d0, reach, hw, locked ? WOUND : SCORCH, locked ? 0.50 * strobe : 0.10 + 0.16 * grow)
+  stainTiles(g, arena, ox, oy, cx, cy, d0, Math.min(reach, d0 + 24), hw, WOUND, locked ? 0.18 : 0.05)
+  groutCuts(g, hg, arena, ox, oy, cx, cy, d0, reach, hw, locked, strobe, k, beat)
 
   if (ignite > 0.02) burst(hg, ox + cx * (d0 + 2), oy + cy * (d0 + 2), 7 + ignite * 9, 0.62 * ignite ** 0.6, WHITE, cx, cy)
 }
@@ -396,7 +392,7 @@ function drawTelegraph(lane: Lane, e: Enemy, f: EnemyFrame): void {
 //
 // The strike. Everything here exists so a single still of the lunge states speed and direction with
 // the sprite cropped out, and so the frame gets BRIGHTER at the moment the hit exists, not darker.
-function drawDash(lane: Lane, v: EntityView, e: Enemy, f: EnemyFrame): void {
+function drawDash(lane: Lane, v: EntityView, e: Enemy, f: EnemyFrame, arena: Arena): void {
   const g = lane.gm, hg = lane.hot
   // The lane is normally measured on the freeze frames. It is NOT safe to require that: a view can
   // be created mid-dash, and the pose/headless harnesses step the sim many ticks between renders,
@@ -408,7 +404,7 @@ function drawDash(lane: Lane, v: EntityView, e: Enemy, f: EnemyFrame): void {
     ang = e.aimAngle
     const travelled = f.tk * tuning.charger.dashSpeed * DT
     ox = f.x - Math.cos(ang) * travelled; oy = f.y - Math.sin(ang) * travelled
-    len = rayLimit(ox, oy, Math.cos(ang), Math.sin(ang), tuning.charger.dashDist, e.radius)
+    len = raycastSolidDistance(arena, ox, oy, ang, tuning.charger.dashDist, e.radius)
     lane.ox = ox; lane.oy = oy; lane.ang = ang; lane.len = len   // the rest of the lunge reuses it
   }
   const cx = Math.cos(ang), cy = Math.sin(ang)
@@ -433,8 +429,8 @@ function drawDash(lane: Lane, v: EntityView, e: Enemy, f: EnemyFrame): void {
   const fade = clamp01(1 - f.tk / FORWARD_TICKS)
   const left = len - dist
   if (fade > 0.02 && left > 2) {
-    stainTiles(g, ox, oy, cx, cy, dist, len, hw, SCORCH, 0.28 * fade)
-    groutCuts(g, hg, ox, oy, cx, cy, dist, len, hw, true, fade, BEATS, 1)
+    stainTiles(g, arena, ox, oy, cx, cy, dist, len, hw, SCORCH, 0.28 * fade)
+    groutCuts(g, hg, arena, ox, oy, cx, cy, dist, len, hw, true, fade, BEATS, 1)
   }
 
   // 3b. and the point it left from keeps burning for nine ticks. Without it the first third of the
@@ -566,10 +562,11 @@ function drawResidue(lane: Lane, e: Enemy, f: EnemyFrame): void {
 
 // ---------------------------------------------------------------- primitives
 
-function eachLaneTile(ox: number, oy: number, cx: number, cy: number, d0: number, reach: number, hw: number,
-                      visit: (tx: number, ty: number, along: number) => void): void {
+function drawLaneTileField(g: Graphics, arena: Arena, ox: number, oy: number, cx: number, cy: number,
+                           d0: number, reach: number, hw: number, stain: boolean): void {
   if (reach <= d0) return
-  const pad = hw + TILE * 0.55
+  const tileRadius = TILE * Math.SQRT1_2
+  const pad = hw + tileRadius
   const x0 = Math.min(ox + cx * d0, ox + cx * reach) - pad
   const x1 = Math.max(ox + cx * d0, ox + cx * reach) + pad
   const y0 = Math.min(oy + cy * d0, oy + cy * reach) - pad
@@ -580,39 +577,54 @@ function eachLaneTile(ox: number, oy: number, cx: number, cy: number, d0: number
     for (let tx = tx0; tx <= tx1; tx++) {
       const mx = tx * TILE + TILE * 0.5
       const my = ty * TILE + TILE * 0.5
+      if (tx < 0 || ty < 0 || tx >= arena.cols || ty >= arena.rows || arena.solid[ty * arena.cols + tx]) continue
       const dx = mx - ox, dy = my - oy
-      if (dx * dx + dy * dy < (BODY_CLEAR + 4) * (BODY_CLEAR + 4)) continue
       const along = dx * cx + dy * cy
-      if (along < d0 - 4 || along > reach + 6) continue
+      if (along < d0 - tileRadius || along > reach + tileRadius) continue
       const across = Math.abs(dx * -cy + dy * cx)
-      if (across > hw + TILE * 0.45) continue
-      visit(tx, ty, along)
+      if (across > hw + tileRadius) continue
+      const x = tx * TILE, y = ty * TILE
+      if (stain) {
+        for (let py = y; py < y + TILE; py++) {
+          let start = -1
+          for (let px = x; px <= x + TILE; px++) {
+            const visible = px < x + TILE && isDangerCorridorPointVisible(arena, ox, oy, cx, cy,
+              d0, reach, hw, px, py, tuning.player.radius)
+            if (visible && start < 0) start = px
+            else if (!visible && start >= 0) {
+              g.rect(start, py, px - start, 1)
+              start = -1
+            }
+          }
+        }
+      } else if (Math.abs(cx) >= Math.abs(cy)) {
+        const gx = cx >= 0 ? x + TILE - 1 : x
+        for (let i = 0; i < TILE; i += 2) {
+          if (isDangerCorridorPointVisible(arena, ox, oy, cx, cy, d0, reach, hw,
+            gx, y + i, tuning.player.radius)) g.rect(gx, y + i, 1, 1)
+        }
+      } else {
+        const gy = cy >= 0 ? y + TILE - 1 : y
+        for (let i = 0; i < TILE; i += 2) {
+          if (isDangerCorridorPointVisible(arena, ox, oy, cx, cy, d0, reach, hw,
+            x + i, gy, tuning.player.radius)) g.rect(x + i, gy, 1, 1)
+        }
+      }
     }
   }
 }
 
-function stainTiles(g: Graphics, ox: number, oy: number, cx: number, cy: number,
+function stainTiles(g: Graphics, arena: Arena, ox: number, oy: number, cx: number, cy: number,
                     d0: number, reach: number, hw: number, color: number, alpha: number): void {
   if (alpha <= 0.02) return
-  eachLaneTile(ox, oy, cx, cy, d0, reach, hw, (tx, ty) => {
-    g.rect(tx * TILE, ty * TILE, TILE, TILE)
-  })
+  drawLaneTileField(g, arena, ox, oy, cx, cy, d0, reach, hw, true)
   g.fill({ color, alpha })
 }
 
-function groutCuts(g: Graphics, hg: Graphics, ox: number, oy: number, cx: number, cy: number,
+function groutCuts(g: Graphics, hg: Graphics, arena: Arena, ox: number, oy: number, cx: number, cy: number,
                    d0: number, reach: number, hw: number, locked: boolean, kAlpha: number,
                    clock: number, beat: number): void {
-  eachLaneTile(ox, oy, cx, cy, d0, reach, hw, (tx, ty) => {
-    const x = tx * TILE, y = ty * TILE
-    if (Math.abs(cx) >= Math.abs(cy)) {
-      const gx = cx >= 0 ? x + TILE - 1 : x
-      for (let i = 0; i < TILE; i += 2) g.rect(gx, y + i, 1, 1)
-    } else {
-      const gy = cy >= 0 ? y + TILE - 1 : y
-      for (let i = 0; i < TILE; i += 2) g.rect(x + i, gy, 1, 1)
-    }
-  })
+  drawLaneTileField(g, arena, ox, oy, cx, cy, d0, reach, hw, false)
   g.fill({ color: EDGE, alpha: (locked ? 0.72 : 0.4) * kAlpha })
 
   for (let i = 0; i < BEATS; i++) {
@@ -624,7 +636,10 @@ function groutCuts(g: Graphics, hg: Graphics, ox: number, oy: number, cx: number
     const gx = Math.abs(cx) >= Math.abs(cy) ? (cx >= 0 ? px + 4 : px - 4) : px
     const gy = Math.abs(cx) >= Math.abs(cy) ? py : (cy >= 0 ? py + 4 : py - 4)
     for (let s = -5; s <= 5; s += 2) {
-      hg.rect(gx + (Math.abs(cx) >= Math.abs(cy) ? 0 : s), gy + (Math.abs(cx) >= Math.abs(cy) ? s : 0), 1, 1)
+      const qx = gx + (Math.abs(cx) >= Math.abs(cy) ? 0 : s)
+      const qy = gy + (Math.abs(cx) >= Math.abs(cy) ? s : 0)
+      if (isDangerCorridorPointVisible(arena, ox, oy, cx, cy, d0, reach, hw,
+        qx, qy, tuning.player.radius)) hg.rect(qx, qy, 1, 1)
     }
     hg.fill({ color: locked ? RED_HOT : EMBER, alpha: 0.7 * flare * kAlpha })
   }
@@ -672,17 +687,6 @@ function burst(g: Graphics, x: number, y: number, r: number, alpha: number, colo
     }
   }
   g.fill({ color, alpha })
-}
-
-// How far the charger can travel before a border wall stops it (moveWithWalls clamps its centre to
-// the walkable rect inset by its radius).
-function rayLimit(ox: number, oy: number, cx: number, cy: number, max: number, r: number): number {
-  let t = max
-  if (cx > 1e-6) t = Math.min(t, (INNER.x1 - r - ox) / cx)
-  else if (cx < -1e-6) t = Math.min(t, (INNER.x0 + r - ox) / cx)
-  if (cy > 1e-6) t = Math.min(t, (INNER.y1 - r - oy) / cy)
-  else if (cy < -1e-6) t = Math.min(t, (INNER.y0 + r - oy) / cy)
-  return Math.max(10, t)
 }
 
 function armLevel(e: Enemy): number {

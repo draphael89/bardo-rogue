@@ -1,0 +1,200 @@
+{
+  "input": "art/approved/bardo_hero_north_alpha_v7.png",
+  "output": "public/assets/sprites/bardo_hero_north.png",
+  "source": {
+    "width": 1254,
+    "height": 1254
+  },
+  "atlas": {
+    "cols": 4,
+    "rows": 4,
+    "cell": 32,
+    "width": 128,
+    "height": 128,
+    "colors": 15,
+    "partialAlpha": 0,
+    "shadowLift": 0,
+    "midtoneFloor": 0,
+    "fit": "grid",
+    "margin": 2
+  },
+  "pass": true,
+  "frames": [
+    {
+      "index": 0,
+      "opaque": 165,
+      "colors": 15,
+      "bounds": {
+        "x": 11,
+        "y": 9,
+        "w": 17,
+        "h": 20
+      }
+    },
+    {
+      "index": 1,
+      "opaque": 148,
+      "colors": 15,
+      "bounds": {
+        "x": 11,
+        "y": 9,
+        "w": 16,
+        "h": 20
+      }
+    },
+    {
+      "index": 2,
+      "opaque": 155,
+      "colors": 15,
+      "bounds": {
+        "x": 9,
+        "y": 9,
+        "w": 17,
+        "h": 20
+      }
+    },
+    {
+      "index": 3,
+      "opaque": 171,
+      "colors": 15,
+      "bounds": {
+        "x": 4,
+        "y": 9,
+        "w": 20,
+        "h": 20
+      }
+    },
+    {
+      "index": 4,
+      "opaque": 164,
+      "colors": 15,
+      "bounds": {
+        "x": 5,
+        "y": 6,
+        "w": 16,
+        "h": 21
+      }
+    },
+    {
+      "index": 5,
+      "opaque": 136,
+      "colors": 15,
+      "bounds": {
+        "x": 10,
+        "y": 1,
+        "w": 10,
+        "h": 27
+      }
+    },
+    {
+      "index": 6,
+      "opaque": 151,
+      "colors": 15,
+      "bounds": {
+        "x": 9,
+        "y": 3,
+        "w": 9,
+        "h": 29
+      }
+    },
+    {
+      "index": 7,
+      "opaque": 173,
+      "colors": 15,
+      "bounds": {
+        "x": 0,
+        "y": 6,
+        "w": 18,
+        "h": 21
+      }
+    },
+    {
+      "index": 8,
+      "opaque": 142,
+      "colors": 15,
+      "bounds": {
+        "x": 12,
+        "y": 0,
+        "w": 9,
+        "h": 25
+      }
+    },
+    {
+      "index": 9,
+      "opaque": 150,
+      "colors": 15,
+      "bounds": {
+        "x": 11,
+        "y": 3,
+        "w": 9,
+        "h": 24
+      }
+    },
+    {
+      "index": 10,
+      "opaque": 165,
+      "colors": 15,
+      "bounds": {
+        "x": 8,
+        "y": 0,
+        "w": 10,
+        "h": 27
+      }
+    },
+    {
+      "index": 11,
+      "opaque": 161,
+      "colors": 15,
+      "bounds": {
+        "x": 4,
+        "y": 5,
+        "w": 18,
+        "h": 20
+      }
+    },
+    {
+      "index": 12,
+      "opaque": 159,
+      "colors": 15,
+      "bounds": {
+        "x": 10,
+        "y": 0,
+        "w": 13,
+        "h": 23
+      }
+    },
+    {
+      "index": 13,
+      "opaque": 134,
+      "colors": 14,
+      "bounds": {
+        "x": 7,
+        "y": 5,
+        "w": 17,
+        "h": 15
+      }
+    },
+    {
+      "index": 14,
+      "opaque": 136,
+      "colors": 13,
+      "bounds": {
+        "x": 8,
+        "y": 3,
+        "w": 11,
+        "h": 18
+      }
+    },
+    {
+      "index": 15,
+      "opaque": 118,
+      "colors": 15,
+      "bounds": {
+        "x": 0,
+        "y": 14,
+        "w": 25,
+        "h": 9
+      }
+    }
+  ]
+}

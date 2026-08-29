@@ -24,14 +24,16 @@ const C = {
   slate1: 0x2e3a4e, slate2: 0x425066, slate3: 0x58667c, slateHi: 0x76849a,
   // panel face. Deliberately mid-value (L~56, the scene's own mean): a survival readout that is the darkest
   // object in the frame is a readout nobody can find. Every plate() shares it, so the HUD stays one hand.
-  scrim: 0x32384a,
+  scrim: 0x2e3a4e,          // canon slate1
   iron: 0x26262e, ironHi: 0x4c4c56,
   goldDim: 0x8c7040, gold: 0xd4b060, goldHot: 0xf0d080,
   ember: 0xff7a18, emberHi: 0xffcc56, emberLo: 0xb03010,
   // the lit ramp for a vessel of life: body L~171, core L~224. A spent socket peaks at iron (L~38), so full
   // vs empty is a ~5x luminance step AND a hue step, not the 1.6x wash it used to be.
-  wick: 0xff9a30, wickHot: 0xffd24a, wickWhite: 0xfff6e2,
-  boneLo: 0x5a4e42, boneDim: 0x90806c, bone: 0xd0c0a8, cope: 0xd2d8e2,
+  wick: 0xff7a18, wickHot: 0xffcc56, wickWhite: 0xecf0f6,   // canon ember / emberHi / copeHi
+  boneLo: 0x5a4e42, boneDim: 0x90806c, bone: 0xd0c0a8, cope: 0xd2d8e2, copeHi: 0xecf0f6,
+  // the player-damage hue, canon and reserved (§6.7): nothing static wears it
+  hurt: 0xff2a2a, hurtHi: 0xff6a3a,
   purple0: 0x2a0e1c, purple1: 0x4e1c2e, purple2: 0x762e40, purple3: 0x9e4658,
 }
 
@@ -494,7 +496,7 @@ export class Hud {
       if (i < p.hp) { this.pipFlame(g, s.x, s.y); continue }
       if (i !== p.hp || hurtAge < 0 || hurtAge > 8) continue
       // the wick you just lost: punch to 1.4x, bleach to bone, hold one tick, then fall out of the cup over six
-      if (hurtAge <= 1) g.rect(s.x - 1, s.y - 1, 5, 6).fill(0xffffff)
+      if (hurtAge <= 1) g.rect(s.x - 1, s.y - 1, 5, 6).fill(C.copeHi)
       else if (hurtAge === 2) g.rect(s.x - 1, s.y - 1, 5, 6).fill(C.bone)
       else {
         const t = hurtAge - 3                              // 0..5
@@ -537,10 +539,10 @@ export class Hud {
     const vk = hurtAge <= 1 ? 1 : 0.45
     for (let i = 0; i < 9; i++) {
       const a = (1 - i / 9) * 0.55 * vk
-      g.rect(0, i, V.width, 1).fill({ color: 0xff2a2a, alpha: a })
-      g.rect(0, V.height - 1 - i, V.width, 1).fill({ color: 0xff2a2a, alpha: a })
-      g.rect(i, 0, 1, V.height).fill({ color: 0xff2a2a, alpha: a * 0.85 })
-      g.rect(V.width - 1 - i, 0, 1, V.height).fill({ color: 0xff2a2a, alpha: a * 0.85 })
+      g.rect(0, i, V.width, 1).fill({ color: C.hurt, alpha: a })
+      g.rect(0, V.height - 1 - i, V.width, 1).fill({ color: C.hurt, alpha: a })
+      g.rect(i, 0, 1, V.height).fill({ color: C.hurt, alpha: a * 0.85 })
+      g.rect(V.width - 1 - i, 0, 1, V.height).fill({ color: C.hurt, alpha: a * 0.85 })
     }
     if (!at) return
 
@@ -551,17 +553,17 @@ export class Hud {
     const cx = at.x, cy = at.y
     if (hurtAge <= 1) {
       const r = hurtAge === 0 ? 8 : 10
-      ring(g, cx, cy, r, 0xffffff, 1)
-      ring(g, cx, cy, r - 1, 0xffffff, 1)
+      ring(g, cx, cy, r, C.copeHi, 1)
+      ring(g, cx, cy, r - 1, C.copeHi, 1)
       ring(g, cx, cy, r + 4, C.wickWhite, hurtAge === 0 ? 0.6 : 0.4)
       // four square spikes, square to the frame: light thrown off the body, not another crescent
       for (const [dx, dy] of [[0, -1], [0, 1], [-1, 0], [1, 0]]) {
-        g.rect(cx + dx * (r + 1) - (dy ? 1 : 0), cy + dy * (r + 1) - (dx ? 1 : 0), dy ? 3 : 5, dx ? 3 : 5).fill(0xffffff)
+        g.rect(cx + dx * (r + 1) - (dy ? 1 : 0), cy + dy * (r + 1) - (dx ? 1 : 0), dy ? 3 : 5, dx ? 3 : 5).fill(C.copeHi)
       }
     } else {
       const r = hurtAge === 2 ? 13 : 16
       ring(g, cx, cy, r, C.bone, hurtAge === 2 ? 0.8 : 0.4)
-      ring(g, cx, cy, r - 1, 0xff6a3a, hurtAge === 2 ? 0.55 : 0.25)
+      ring(g, cx, cy, r - 1, C.hurtHi, hurtAge === 2 ? 0.55 : 0.25)
     }
   }
 
@@ -622,7 +624,7 @@ export class Hud {
       if (lit) { this.haloFlame(g, x, 0); this.drawFlame(g, x, 0, C.ember, C.wick, C.wickHot, i % 3) }
       else if (dying) {
         const hot = hurtAge < 4
-        this.drawFlame(g, x, 0, hot ? C.wickWhite : C.emberLo, hot ? C.wickWhite : C.emberLo, hot ? 0xffffff : C.ember, i % 3)
+        this.drawFlame(g, x, 0, hot ? C.wickWhite : C.emberLo, hot ? C.wickWhite : C.emberLo, hot ? C.copeHi : C.ember, i % 3)
       } else this.drawEmptyHeart(g, x, 0)   // §7.5: spent is a boneDim outline, not a grey fill
       if (!lit && i === p.hp && hurtAge >= 6 && hurtAge < 34) {
         const t = hurtAge - 6

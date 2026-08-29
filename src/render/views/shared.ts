@@ -1,5 +1,7 @@
 import { Container, Sprite, Texture } from 'pixi.js'
 import type { Atlas } from '../atlas'
+import type { ContactClass } from '../contact'
+import type { EnemyKind } from '@/sim/events'
 
 // Kenney Tiny Dungeon indices (atlas.tile / atlas.white, 12 columns).
 // The Oath-Bound shares the Fallen Hoplite's body on purpose: it is the same shade, still under
@@ -15,6 +17,9 @@ export class EntityView {
   squash = 0
   redFlash = 0
   hitAngle = 0             // latest contact direction; persists through the full held flinch
+  hitClass: ContactClass = 'body'
+  hitKind: EnemyKind = 'dummy'
+  hitHeavy = false
   private normalTex; private whiteTex
   constructor(atlas: Atlas, tile: number, weaponTile: number | null, layers: { entities: Container; shadows: Container }) {
     this.normalTex = atlas.tile(tile); this.whiteTex = atlas.white(tile)
@@ -34,8 +39,10 @@ export class EntityView {
     this.whiteTex = whiteTex
     this.body.texture = tex
   }
+  // The contact shadow is the authored 16px hard disc (tools/make-bardo-fx.ts), not a soft 64px
+  // Kenney blob: §3.2.8 wants cast shadows "hard-edged... never a blur".
   setShadow(x: number, y: number, w: number, h: number, alpha = 0.35) {
-    this.shadow.position.set(Math.round(x), Math.round(y)); this.shadow.scale.set(w / 64, h / 64); this.shadow.alpha = alpha
+    this.shadow.position.set(Math.round(x), Math.round(y)); this.shadow.scale.set(w / 16, h / 16); this.shadow.alpha = alpha
   }
   destroy() { this.body.destroy(); this.weapon?.destroy(); this.shadow.destroy() }
 }

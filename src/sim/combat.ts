@@ -2,12 +2,12 @@ import { tuning, type SwingDef } from '@/tuning'
 import { angleDiff, deg } from './math'
 import { SLOW_FULL } from './world'
 import type { World, Enemy } from './world'
-import type { DeathKind } from './events'
+import type { DeathKind, GrazeSource, HitSource } from './events'
 import { finishRun } from './session'
+import { ARM, armOf } from './weapons'
 import { guardBlocks } from './enemies/oathbound'
-// boons.ts imports damageEnemy from here, so this pair is circular. Both sides are hoisted function
-// declarations, so the cycle resolves before either is ever called; keep it that way (no top-level
-// work in either module) rather than adding a registration hook nothing else would use.
+// boons.ts imports damageEnemy. Both sides expose hoisted function declarations and do no top-level
+// work, so the cycle is stable without a registration layer.
 import { resolveKill } from './boons'
 
 // --- swing curves -------------------------------------------------------------------------------
@@ -76,66 +76,117 @@ export function clearBulletTime(world: World): void {
   world.slowTicks = 0
 }
 
-/**
- * `silent` is damage with no blow behind it: a status burning a body down. It still kills, and the
- * kill still reads, but it earns no hit-stop, no knockback, no stagger and no contact stamp — a
- * crowd on fire would otherwise stutter the whole fight and stun-lock itself on its own damage.
- *
- * Returns whether the blow LANDED. Callers need this because the rider layer above them —  Brand,
- * the perfect-dodge prime, the whiff penalty — is not part of this function, and a shield that
- * turns a blow has to turn everything the blow was carrying, not just its damage.
- */
-export function damageEnemy(world: World, e: Enemy, damage: number, angle: number, knockback: number, heavy: boolean, hitstop: number, sourceActionId = world.player.swingId, opts?: { silent?: boolean }): boolean {
-  if (!e.active || e.state === 'dead') return false
-  const silent = !!opts?.silent
-  // The Oath-Bound's shield turns light blows that land on its face. Status damage passes: fire is
-  // not something you can hold a shield against, and it is also what makes it drop the shield.
+export interface HitProvenance {
+  source: HitSource
+  originX: number; originY: number
+  direction: number
+  sweep: number
+  cleave: boolean
+  contactDepth: number
+}
+
+export type DamageResult =
+  | { outcome: 'ignored'; landed: false; killed: false; guarded: false; interrupted: false; resolvedDamage: 0 }
+  | { outcome: 'blocked'; landed: false; killed: false; guarded: true; interrupted: false; resolvedDamage: 0 }
+  | { outcome: 'landed'; landed: true; killed: boolean; guarded: boolean; interrupted: boolean; resolvedDamage: number }
+
+const IGNORED_DAMAGE: DamageResult = {
+  outcome: 'ignored', landed: false, killed: false, guarded: false, interrupted: false, resolvedDamage: 0,
+}
+const BLOCKED_DAMAGE: DamageResult = {
+  outcome: 'blocked', landed: false, killed: false, guarded: true, interrupted: false, resolvedDamage: 0,
+}
+
+export function damageEnemy(
+  world: World,
+  e: Enemy,
+  damage: number,
+  angle: number,
+  knockback: number,
+  heavy: boolean,
+  hitstop: number,
+  sourceActionId: number,
+  provenance: HitProvenance,
+  options: { silent?: boolean } = {},
+): DamageResult {
+  if (!e.active || e.state === 'dead') return IGNORED_DAMAGE
+  const silent = options.silent === true
   if (!silent && guardBlocks(e, angle, heavy)) {
     e.kbx += Math.cos(angle) * tuning.oathbound.blockKnockback
     e.kby += Math.sin(angle) * tuning.oathbound.blockKnockback
     addFreeze(world, tuning.oathbound.blockHitstop)
-    world.emit({ type: 'guardBlocked', id: e.id, x: e.x, y: e.y, angle })
-    return false
+    world.emit({ type: 'guardBlocked', id: e.id, x: e.x, y: e.y, angle, actionId: sourceActionId })
+    return BLOCKED_DAMAGE
   }
-  e.hp -= damage
-  e.flash = tuning.juice.flashTicks
   const kind = e.kind
+  const priorState = e.state
+  const attemptedDamage = damage
+  // The Warden's lesson is punish timing, not raw health. His veil halves (and integer-clamps)
+  // damage while composed; recover and stagger are the authored full-damage openings. The hit event
+  // carries the resolved value, so every feedback channel tells the same truth as the health bar.
+  const guarded = !silent && kind === 'warden' && e.state !== 'recover' && e.state !== 'stagger'
+  if (guarded) {
+    damage = Math.max(1, Math.floor(damage * tuning.warden.guardDamageScale))
+  }
+  const mitigatedDamage = Math.max(0, attemptedDamage - damage)
+  e.hp -= damage
+  if (!silent) e.flash = tuning.juice.flashTicks
   const killed = e.hp <= 0
   const actionId = sourceActionId
   const scale = kind === 'dummy' ? 0 : tuning[kind].knockbackScale
   const kb = silent ? 0 : killed ? knockback * 1.5 : knockback * scale
   e.kbx += Math.cos(angle) * kb
   e.kby += Math.sin(angle) * kb
+  // Compound effects may add a smaller shove after the committed contact (Final Judgment is the
+  // canonical example). A qualifying cause latches until terrain or decay spends it; a later light
+  // result cannot erase the provenance of momentum still carrying the body.
+  if (heavy && !guarded && kb >= tuning.wallSlamMinSpeed) {
+    e.knockbackHeavy = true
+    e.knockbackActionId = sourceActionId
+  }
   if (!silent) e.facing = Math.cos(angle) > 0 ? -1 : 1 // face the attacker
 
+  // Copy the complete contact sentence before any later action can change the player or projectile.
+  // Provenance is deliberately mandatory: a future weapon cannot silently reconstruct an old hit
+  // from the player's newest pose. Tests that do not care about provenance use the explicitly named
+  // helper below rather than weakening this production boundary.
+  const { source, originX, originY, direction, sweep, cleave, contactDepth } = provenance
+  const hit = {
+    type: 'hit' as const,
+    x: e.x, y: e.y, angle, damage, heavy, targetId: e.id, kind, killed,
+    actionId, attemptedDamage, mitigatedDamage, guarded,
+    source, originX, originY, direction, sweep, cleave,
+    contactDepth: Math.max(0, Math.min(1, contactDepth)),
+  }
+  const resolvedHitstop = guarded ? tuning.warden.guardHitstop : hitstop
+
   // A heavy is the committed swing. The world takes a short breath; the player does not.
-  // Dummies are a training bag — they must not put the room in slow motion.
-  if (heavy && kind !== 'dummy' && !silent) addBulletTime(world, tuning.bullet.heavyTicks, tuning.bullet.heavyRate)
+  // Dummies are a training bag, and the Warden's intact veil is a refusal rather than an opening:
+  // neither may borrow the full heavy-connect slow-motion sentence.
+  if (heavy && kind !== 'dummy' && !guarded) addBulletTime(world, tuning.bullet.heavyTicks, tuning.bullet.heavyRate)
 
   if (killed) {
     e.state = 'dead'
     e.stateTick = 0
-    if (!silent) addFreeze(world, hitstop + tuning.hitstop.killBonus)
-    // A killing burn tick is still silent. Emitting `hit` here gave directionless status damage the
-    // whole weapon-contact package — stamp, impact sound, damage number, flash, camera kick — on the
-    // one tick a body happened to burn out, while every non-lethal tick before it correctly had
-    // none. The kill still reads; only the blow that never happened is withheld.
-    if (!silent) world.emit({ type: 'hit', x: e.x, y: e.y, angle, damage, heavy, targetId: e.id, kind, killed: true, actionId })
+    if (!silent) {
+      addFreeze(world, resolvedHitstop + tuning.hitstop.killBonus)
+      world.emit(hit)
+    }
     world.emit({ type: 'kill', x: e.x, y: e.y, angle, kind, id: e.id, actionId })
-    // Anything the body still owed is settled here, while its marks are readable and before the
-    // slot is recycled.
     resolveKill(world, e)
     e.active = false
-    return true
+    return { outcome: 'landed', landed: true, killed: true, guarded, interrupted: false, resolvedDamage: damage }
   }
-  if (silent) return true   // fire is a consequence, not a blow: no stamp, no freeze, no poise break
-  addFreeze(world, hitstop)
-  world.emit({ type: 'hit', x: e.x, y: e.y, angle, damage, heavy, targetId: e.id, kind, killed: false, actionId })
+  if (silent) return { outcome: 'landed', landed: true, killed: false, guarded: false, interrupted: false, resolvedDamage: damage }
+  addFreeze(world, resolvedHitstop)
+  world.emit(hit)
 
   // poise: brutes only stagger from the heavy; the warden only from a heavy while not committed;
   // dummies never; everyone else staggers on any hit
   if (kind === 'warden') {
-    const armored = e.state === 'windup' || e.state === 'attack'
+    // The veil break is also a committed authored beat. Damage still lands, but a heavy cannot erase
+    // the only non-damaging announcement of phase two.
+    const armored = e.state === 'windup' || e.state === 'attack' || e.state === 'phase'
     if (heavy && !armored) {
       e.state = 'stagger'
       e.stateTick = 0
@@ -158,21 +209,62 @@ export function damageEnemy(world: World, e: Enemy, damage: number, angle: numbe
     e.hitDone = false
     world.emit({ type: 'enemyStagger', id: e.id, x: e.x, y: e.y })
   }
-  return true
+  const interrupted = (priorState === 'windup' || priorState === 'aim' || priorState === 'freeze')
+    && e.state === 'stagger'
+  return { outcome: 'landed', landed: true, killed: false, guarded, interrupted, resolvedDamage: damage }
+}
+
+// Test/debug convenience only. Production combat must call damageEnemy with a complete immutable
+// source snapshot; this helper makes a synthetic blade contact explicit at every low-level test site.
+export function damageEnemyForTest(
+  world: World,
+  e: Enemy,
+  damage: number,
+  angle: number,
+  knockback: number,
+  heavy: boolean,
+  hitstop: number,
+  sourceActionId = world.player.swingId,
+  options: { silent?: boolean } = {},
+): DamageResult {
+  return damageEnemy(world, e, damage, angle, knockback, heavy, hitstop, sourceActionId, {
+    source: 'blade',
+    originX: world.player.x,
+    originY: world.player.y,
+    direction: angle,
+    sweep: tuning.player.attack.swings[world.player.swingIndex]?.sweep ?? 0,
+    cleave: false,
+    contactDepth: 0.65,
+  }, options)
 }
 
 // Returns true if damage was applied. During dodge i-frames the sim records a successful dodge instead.
-// `by`/`ranged` name the source: the run keeps them so the death card states a fact instead of a guess.
 export function hurtPlayer(world: World, angle: number, damage: number, by: DeathKind = 'none', ranged = false): boolean {
   const p = world.player
   if (p.state === 'dead') return false
-  if (isPlayerInvulnerable(world)) {
-    if (p.dodgeTick >= 0 && p.dodgeRead < 2) {
+  const dodgeInvulnerable = isPlayerDodgeInvulnerable(world)
+  if (p.iframes > 0 || dodgeInvulnerable) {
+    // Hurt immunity prevents damage, but only this roll's authored safety window earns a read.
+    // Otherwise a player landing inside old hurt i-frames can be rewarded for an attack they did
+    // not dodge.
+    if (dodgeInvulnerable && p.iframes <= 0 && p.dodgeRead < 2) {
       p.dodgeRead = 2
       p.dodgeProcTick = world.tick
+      p.reversalTicks = tuning.player.dodge.reversalWindow
       // the read is the reward: the world drops to a crawl and the player's clock does not
       addBulletTime(world, tuning.bullet.ticks, tuning.bullet.rate)
       world.emit({ type: 'dodged', x: p.x, y: p.y })
+      // A late roll-cancel is already an authored answer. If the threat crosses the remaining
+      // travel during its startup, promote that exact action instead of offering an unusable future
+      // window that expires inside the swing.
+      if (p.state === 'attack' && p.dodgeTick >= 0) {
+        p.reversalTicks = 0
+        p.reversalActionId = p.swingId
+        world.emit({
+          type: 'reversal', x: p.x, y: p.y, angle: p.swingAngle, actionId: p.swingId,
+          weapon: armOf(world) === ARM.bow ? 'bow' : 'blade',
+        })
+      }
     }
     return false
   }
@@ -186,13 +278,14 @@ export function hurtPlayer(world: World, angle: number, damage: number, by: Deat
   p.kbx += Math.cos(angle) * tuning.player.hurtKnockback * 6
   p.kby += Math.sin(angle) * tuning.player.hurtKnockback * 6
   addFreeze(world, tuning.player.hurtHitstop)
-  // The event reports what was TAKEN, not what was swung: a 2-damage blow on the last vessel took
-  // one. Metrics sum this into vessels lost, and an overkill inflating it would skew exactly the
-  // lethal hits the balance experiments care about.
-  world.emit({ type: 'playerHurt', x: p.x, y: p.y, angle, hp: p.hp, damage: hpBefore - p.hp })
+  world.emit({ type: 'playerHurt', x: p.x, y: p.y, angle, hp: p.hp, maxHp: p.maxHp, damage: hpBefore - p.hp })
   if (p.hp <= 0) {
     p.state = 'dead'
     p.stateTick = 0
+    p.bladeActionConnected = false
+    p.swingFromRoll = false
+    p.reversalTicks = 0
+    p.reversalActionId = -1
     p.deathTick = world.tick
     world.timeScale = tuning.player.deathSlowmo
     world.slowmoTicks = tuning.player.deathSlowmoTicks
@@ -200,13 +293,45 @@ export function hurtPlayer(world: World, angle: number, damage: number, by: Deat
     if (run) { run.killedBy = by; run.killedRanged = ranged }
     world.emit({ type: 'playerDeath', x: p.x, y: p.y, by, ranged })
     finishRun(world, 'lost')
+  } else {
+    beginPlayerHurtReaction(world)
   }
   return true
 }
 
+function beginPlayerHurtReaction(world: World): void {
+  const p = world.player
+  if (p.state === 'attack' && p.reversalActionId === p.swingId) {
+    clearBulletTime(world)
+    p.reversalActionId = -1
+  }
+  const d = tuning.player.dodge
+  // Damage and authored dodge travel are mutually exclusive today, but close the lifecycle
+  // defensively for any future piercing hit. Landing already emitted dodgeEnd at `travel`, so it is
+  // cancelled silently and the bookkeeping edge can never fire twice.
+  if (p.dodgeTick >= 0 && p.dodgeTick < d.travel) world.emit({ type: 'dodgeEnd', x: p.x, y: p.y })
+  p.dodgeTick = -1
+  p.dodgeRead = 0
+  p.dodgeProcTick = -1
+  p.reversalTicks = 0
+  p.state = 'hurt'
+  p.stateTick = 0
+  p.bladeActionConnected = false
+  p.swingFromRoll = false
+  // Kill the interrupted lunge without erasing hostile knockback, which has its own velocity lane.
+  p.vx *= tuning.player.hurtVelocityRetain
+  p.vy *= tuning.player.hurtVelocityRetain
+}
+
 export function isPlayerInvulnerable(world: World): boolean {
   const p = world.player
-  if (p.iframes > 0) return true
+  return p.iframes > 0 || isPlayerDodgeInvulnerable(world)
+}
+
+// The roll's own promise, deliberately separate from general damage immunity. Reward systems and
+// projectile pass-through use this narrower answer; damage rejection uses isPlayerInvulnerable.
+export function isPlayerDodgeInvulnerable(world: World): boolean {
+  const p = world.player
   const d = tuning.player.dodge
   return p.dodgeTick >= d.iStart && p.dodgeTick <= d.iEnd
 }
@@ -214,7 +339,7 @@ export function isPlayerInvulnerable(world: World): boolean {
 // A hostile hitbox passed close during the roll (or just as the i-frames ended) without overlapping.
 // Once per roll; a later overlap still upgrades to the jackpot. The graze emits only a short cyan
 // scratch and small breath; the cold ring and bright body rim stay reserved for a real pass-through.
-export function noteNearMiss(world: World, angle = 0, nearX?: number, nearY?: number): void {
+export function noteNearMiss(world: World, angle: number, nearX: number, nearY: number, source: GrazeSource): void {
   const p = world.player
   if (p.dodgeRead) return
   const d = tuning.player.dodge
@@ -222,8 +347,6 @@ export function noteNearMiss(world: World, angle = 0, nearX?: number, nearY?: nu
   p.dodgeRead = 1
   addBulletTime(world, tuning.bullet.grazeTicks, tuning.bullet.grazeRate)
   world.emit({
-    type: 'graze', x: p.x, y: p.y, angle,
-    nearX: nearX ?? p.x - Math.cos(angle) * (p.radius + 3),
-    nearY: nearY ?? p.y - Math.sin(angle) * (p.radius + 3),
+    type: 'graze', x: p.x, y: p.y, angle, nearX, nearY, source,
   })
 }

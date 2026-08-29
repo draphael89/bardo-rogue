@@ -4,7 +4,7 @@ import { emptyInput } from '@/sim/input'
 import { stepWorld } from '@/sim/step'
 import { TILE } from '@/sim/arena'
 import { activeBoons, applyBrand, applyBurn, BOONS, grantBoon, hasBoon, resolveWeaponOnHit, swingReach, triggerPerfectDodge } from '@/sim/boons'
-import { damageEnemy, hurtPlayer } from '@/sim/combat'
+import { damageEnemyForTest, hurtPlayer, type DamageResult } from '@/sim/combat'
 import { hashWorld } from '@/sim/hash'
 import { loadMeta, loadSettings, META_KEY, saveMeta, saveSettings, SETTINGS_KEY, type StorageLike } from '@/sim/storage'
 import { tuning } from '@/tuning'
@@ -13,6 +13,10 @@ import { makeBot } from '@/sim/bots'
 import { offerReward } from '@/sim/rewards'
 import { quantizeFrame, runReplay, type Replay } from '@/sim/replay'
 import { tryCollectOffering } from '@/sim/offering'
+
+const landed = (interrupted = false): DamageResult => ({
+  outcome: 'landed', landed: true, killed: false, guarded: false, interrupted, resolvedDamage: 1,
+})
 
 function prepareAndDescend(world = createWorld(1, 'loop')) {
   const rack = world.arena.rack!
@@ -286,7 +290,7 @@ describe('boon interactions', () => {
     expect(marked.brand).toBe(3)
     const hp = nearby.hp
     const brand = marked.brand
-    damageEnemy(world, marked, 1, 0, 0, true, 0)
+    damageEnemyForTest(world, marked, 1, 0, 0, true, 0)
     resolveWeaponOnHit(world, marked, true, brand, 0)
     expect(marked.brand).toBe(0)
     expect(nearby.hp).toBe(hp - brand * tuning.boons.judgmentDamage)
@@ -301,7 +305,7 @@ describe('boon interactions', () => {
     grantBoon(world, 'finalJudgment')
     triggerPerfectDodge(world)
     const nearbyHp = nearby.hp
-    damageEnemy(world, marked, 1, 0, 0, true, 0)
+    damageEnemyForTest(world, marked, 1, 0, 0, true, 0)
     resolveWeaponOnHit(world, marked, true, 0, 0)
     expect(world.session.run?.primedBrand).toBe(false)
     expect(marked.brand).toBe(0)
@@ -446,7 +450,7 @@ describe('death attribution', () => {
     const p = world.player
     const caster = world.spawnEnemy('caster', p.x + 60, p.y)!
     world.fireProjectile(p.x - 30, p.y, 0, 200, 3, 60, 0, 1, 0, 'bolt', 'caster')
-    damageEnemy(world, caster, 999, 0, 0, false, 0)
+    damageEnemyForTest(world, caster, 999, 0, 0, false, 0)
     p.hp = 1
     for (let i = 0; i < 40 && p.state !== 'dead'; i++) stepWorld(world, emptyInput())
     expect(p.state).toBe('dead')
@@ -466,7 +470,7 @@ describe('statuses', () => {
     const w = armed()
     const e = w.spawnEnemy('brute', 200, 120)!
     e.state = 'chase'
-    applyBurn(w, e, 2)
+    applyBurn(w, e, 2, 41)
     expect(e.burn).toBe(2)
     const hp0 = e.hp
     let freezes = 0
@@ -491,7 +495,7 @@ describe('statuses', () => {
     const e = w.spawnEnemy('brute', 200, 120)!
     e.state = 'chase'
     e.hp = 1
-    applyBurn(w, e, 1)
+    applyBurn(w, e, 1, 43)
     let hits = 0, kills = 0
     for (let i = 0; i < tuning.status.burn.interval + 2; i++) {
       stepWorld(w, emptyInput())
@@ -512,7 +516,7 @@ describe('statuses', () => {
     // world clock the status rides on. That coupling is correct - hit-stop freezes everything - but
     // it is not what this test is about.
     const e = w.spawnEnemy('dummy', 200, 120)!
-    applyBurn(w, e, 1)
+    applyBurn(w, e, 1, 47)
     for (let i = 0; i < tuning.status.burn.ticks + 4; i++) stepWorld(w, emptyInput())
     expect(e.burn).toBe(0)
     const settled = e.hp
@@ -524,7 +528,7 @@ describe('statuses', () => {
   it('caps stacks so a crowd cannot be melted by re-ignition alone', () => {
     const w = armed()
     const e = w.spawnEnemy('brute', 200, 120)!
-    for (let i = 0; i < 10; i++) applyBurn(w, e, 3)
+    for (let i = 0; i < 10; i++) applyBurn(w, e, 3, 53)
     expect(e.burn).toBe(tuning.status.burn.maxStacks)
   })
 
@@ -532,7 +536,7 @@ describe('statuses', () => {
     const w = armed()
     const e = w.spawnEnemy('charger', 200, 120)!
     e.hp = 1
-    applyBurn(w, e, 1)
+    applyBurn(w, e, 1, 59)
     for (let i = 0; i < tuning.status.burn.interval + 2; i++) {
       stepWorld(w, emptyInput())
       if (w.events.some(ev => ev.type === 'kill')) break
@@ -555,7 +559,7 @@ describe('the vows of the Kindly One and Hecate', () => {
     const w = armed()
     grantBoon(w, 'emberKiss')
     const e = w.spawnEnemy('brute', 200, 120)!
-    resolveWeaponOnHit(w, e, true, 0, 0)
+    resolveWeaponOnHit(w, e, true, 0, 0, 61, landed())
     expect(e.burn).toBe(tuning.boons.emberKissBurn)
   })
 
@@ -564,15 +568,18 @@ describe('the vows of the Kindly One and Hecate', () => {
     grantBoon(w, 'unanswered')
     const caught = w.spawnEnemy('brute', 200, 120)!
     caught.hp = 99
+    caught.state = 'windup'
     const hp0 = caught.hp
-    resolveWeaponOnHit(w, caught, true, 0, 0, 'windup')
-    expect(hp0 - caught.hp).toBe(tuning.boons.unansweredDamage)
+    const caughtResult = damageEnemyForTest(w, caught, 1, 0, 0, true, 0, 67)
+    resolveWeaponOnHit(w, caught, true, 0, 0, 67, caughtResult)
+    expect(hp0 - caught.hp).toBe(1 + tuning.boons.unansweredDamage)
 
     const chasing = w.spawnEnemy('brute', 240, 120)!
     chasing.hp = 99
     const before = chasing.hp
-    resolveWeaponOnHit(w, chasing, true, 0, 0, 'chase')
-    expect(chasing.hp).toBe(before)
+    const chasingResult = damageEnemyForTest(w, chasing, 1, 0, 0, true, 0, 71)
+    resolveWeaponOnHit(w, chasing, true, 0, 0, 71, chasingResult)
+    expect(chasing.hp).toBe(before - 1)
   })
 
   it('Unanswered reads the state the target was in, not the one the blow left it in', () => {
@@ -583,8 +590,8 @@ describe('the vows of the Kindly One and Hecate', () => {
     e.state = 'aim'
     const hp0 = e.hp
     // A light staggers a caster; a heavy landing on the same tick must still count the wind-up.
-    damageEnemy(w, e, 1, 0, 0, true, 0)
-    resolveWeaponOnHit(w, e, true, 0, 0, 'aim')
+    const result = damageEnemyForTest(w, e, 1, 0, 0, true, 0, 73)
+    resolveWeaponOnHit(w, e, true, 0, 0, 73, result)
     expect(hp0 - e.hp).toBeGreaterThanOrEqual(tuning.boons.unansweredDamage)
   })
 
@@ -594,7 +601,7 @@ describe('the vows of the Kindly One and Hecate', () => {
     const dying = w.spawnEnemy('charger', 200, 120)!
     const heir = w.spawnEnemy('brute', 200 + tuning.boons.debtRange - 8, 120)!
     applyBrand(w, dying, 3)
-    damageEnemy(w, dying, 999, 0, 0, false, 0)
+    damageEnemyForTest(w, dying, 999, 0, 0, false, 0, 79)
     expect(dying.active).toBe(false)
     expect(heir.brand).toBe(3)
   })
@@ -605,7 +612,7 @@ describe('the vows of the Kindly One and Hecate', () => {
     const dying = w.spawnEnemy('charger', 60, 120)!
     const far = w.spawnEnemy('brute', 60 + tuning.boons.debtRange + 40, 120)!
     applyBrand(w, dying, 2)
-    damageEnemy(w, dying, 999, 0, 0, false, 0)
+    damageEnemyForTest(w, dying, 999, 0, 0, false, 0, 83)
     expect(far.brand).toBe(0)
   })
 

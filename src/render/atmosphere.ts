@@ -3,6 +3,7 @@ import type { Atlas } from './atlas'
 import type { World } from '@/sim/world'
 import { TILE, doorOpens, type ArenaDoor } from '@/sim/arena'
 import { tuning } from '@/tuning'
+import { FX_UNIT, FOG_UNIT, quantizeFxAlpha, quantizeFxRotation } from './fxUnits'
 
 interface Mote {
   s: Sprite
@@ -63,7 +64,9 @@ export class Atmosphere {
       this.rays.push(r)
     }
 
-    const smokes = ['smoke_01', 'smoke_02', 'smoke_03', 'smoke_04', 'smoke_05'] as const
+    // Dedicated 32px stepped-alpha haze shapes, not the 16px dust puffs: fog is the one effect that
+    // must cover a large area, and blowing a 16px puff up to 120px would read as a blocky lozenge.
+    const smokes = ['fog_01', 'fog_02', 'fog_03', 'fog_04', 'fog_05'] as const
     for (let i = 0; i < A.fogCount; i++) {
       const f = new Sprite(atlas.particle(smokes[i % smokes.length]))
       f.anchor.set(0.5)
@@ -88,7 +91,10 @@ export class Atmosphere {
         vx: ((i * 13) % 7 - 3) * 0.35,
         vy: -A.moteSpeed * (0.35 + (i % 5) * 0.12),
         phase: i * 1.7,
-        scale: 2.5 + (i % 5),
+        // 1.5-2.5 px, not 2.5-6.5. §6.3 sizes ambient specks at 1-2 px, and the old range only looked
+        // right because Kenney's soft 64px disc sampled down to a faint smudge at any size; against a
+        // hard authored disc the same numbers render solid coins hanging on the wall.
+        scale: 1.5 + (i % 3) * 0.5,
       })
     }
 
@@ -152,10 +158,10 @@ export class Atmosphere {
     for (let i = 0; i < this.fog.length; i++) {
       const f = this.fog[i]
       const u = (this.t * (4 + i * 0.7) + i * 50) % (spanX + 90)
-      f.position.set(inner.x0 - 40 + u, inner.y0 + 18 + ((i * 41) % Math.max(8, spanY - 28)))
-      f.scale.set((70 + i * 14) / 64)
-      f.alpha = A.fogAlpha * fade * (0.65 + Math.sin(this.t * 0.45 + i) * 0.35)
-      f.rotation = this.t * 0.04 * (i % 2 === 0 ? 1 : -1)
+      f.position.set(Math.round(inner.x0 - 40 + u), Math.round(inner.y0 + 18 + ((i * 41) % Math.max(8, spanY - 28))))
+      f.scale.set((70 + i * 14) / FOG_UNIT)
+      f.alpha = A.fogAlpha * quantizeFxAlpha(fade * (0.65 + Math.sin(this.t * 0.45 + i) * 0.35))
+      f.rotation = quantizeFxRotation(this.t * 0.04 * (i % 2 === 0 ? 1 : -1))
     }
 
     for (const m of this.motes) {
@@ -168,7 +174,7 @@ export class Atmosphere {
       }
       const twinkle = 0.30 + 0.70 * (0.5 + 0.5 * Math.sin(this.t * 2.3 + m.phase))
       m.s.position.set(Math.round(m.x), Math.round(m.y + Math.sin(this.t + m.phase) * 2))
-      m.s.scale.set(m.scale / 64)
+      m.s.scale.set(m.scale / FX_UNIT)
       m.s.alpha = A.moteAlpha * fade * twinkle
     }
   }

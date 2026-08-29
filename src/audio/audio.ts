@@ -271,6 +271,10 @@ export class AudioSystem {
   private liveCtx: AudioContext | null = null
   private suspendGen = 0
   get suspended(): boolean { return this._suspended }
+  /** Whether browser policy is still withholding the live clock from non-gesture input. */
+  get needsGesture(): boolean {
+    return !this._muted && this.liveCtx !== null && this.liveCtx.state !== 'running'
+  }
 
   /**
    * Pause owns the whole clock, not the master fader. Fading alone would leave the bed's loops and
@@ -299,6 +303,15 @@ export class AudioSystem {
     const c = this.liveCtx
     if (!c || c.state === 'running') return
     void c.resume().catch(() => { /* refused without a gesture; we will ask again */ })
+  }
+
+  /** Resume inside a real pointer/key activation and report the browser's actual decision. */
+  async resumeFromGesture(): Promise<boolean> {
+    this.setSuspended(false)
+    const c = this.liveCtx
+    if (this._muted || !c) return true
+    try { await c.resume() } catch { return false }
+    return c.state === 'running'
   }
 
   setSuspended(s: boolean): void {

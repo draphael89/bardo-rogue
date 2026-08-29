@@ -37,9 +37,11 @@ async function boot() {
   const mute = q.get('mute') === '1'
   const botName = q.get('bot') as BotName | null
   // `?playtest=<condition>` arms a playtest session: the whole session records itself from tick 0,
-  // the named verb condition filters LIVE input only (bots and replays bypass it, and the filtered
-  // frames are what gets recorded, so an exported bundle replays exactly as the tester played), and
-  // F4 downloads the session bundle. Conditions and protocol: PLAYTEST.md.
+  // the condition applies to LIVE play only (bots bypass it), and F4 downloads the session bundle.
+  // The two conditions are not the same kind of thing. no-heavy is a frame filter, so it is baked
+  // into the recording; no-dash closes the cancel WINDOW, which is not in the frames, so the bundle
+  // carries the condition and every replay path re-applies it (src/playtest.ts). Protocol and the
+  // session interlocks that keep a bundle honest: PLAYTEST.md.
   const playtestRaw = q.get('playtest')
   const playtest = asPlaytestCondition(playtestRaw)
   if (playtestRaw && !playtest) console.log(`[playtest] unknown condition "${playtestRaw}"; expected ${PLAYTEST_CONDITIONS.join(' | ')}`)
@@ -101,7 +103,16 @@ async function boot() {
   let storedSfx = savedSave.settings.sfx
   let reducedEffects = q.has('reduced') ? q.get('reduced') !== '0' : storedReducedEffects
   let world: World = createWorld(seed, scenario, { god, ...(scenario === 'loop' ? { meta: savedSave.meta } : {}) })
-  const resumed = scenario === 'loop' && !!savedSave.checkpoint && restoreCheckpoint(world, savedSave.checkpoint)
+  // A playtest session never resumes. The recorder's header says (seed, scenario, meta) and nothing
+  // else, so replaying a bundle rebuilds a FRESH Bardo -- but a resumed world starts mid-descent at
+  // the saved node. Arming a recording on one produces a bundle that is well-formed, carries the
+  // right condition, passes the organizer's check, and replays frames from the Cistern into an
+  // empty hub: a run that never happened, reported without a warning. The other three interlocks
+  // (abandon hidden, F2/F3 locked, import refused) exist for exactly this reason; a reload mid-run
+  // is the fourth. The tester loses that run, which is the outcome PLAYTEST.md already prescribes
+  // for one that ended early, and the checkpoint is consumed below either way.
+  const resumed = scenario === 'loop' && !playtest && !!savedSave.checkpoint
+    && restoreCheckpoint(world, savedSave.checkpoint)
   // Set only for the roomEnter that the resume itself emits; cleared by the first arrival.
   let resumeEntryPending = resumed
   // Raised by a mid-run debit of PERMANENT currency, lowered by the next write that also stores a
@@ -112,7 +123,8 @@ async function boot() {
     // Consumed either way. A resumed checkpoint must not outlive its own load, or the same room can
     // be retried from its entry HP without limit; a refused one must not be retried every boot.
     savedSave = { ...savedSave, checkpoint: null }
-    if (!resumed) console.log('[save] checkpoint could not be restored; starting in the Bardo')
+    if (playtest) console.log('[playtest] a session is armed, so the saved descent was NOT resumed — that run is over, note it and discard its bundle')
+    else if (!resumed) console.log('[save] checkpoint could not be restored; starting in the Bardo')
   }
   // Spatial audio starts with the player's actual spawn, before the first enemy tell can arrive.
   audio.setListener(world.player.x, world.player.y)

@@ -4,7 +4,7 @@ import { BOON, type BoonId, type Deity } from './boons'
 import { ARM, grantArm, type ArmId } from './weapons'
 import type { RiteId } from './rites'
 import { Rng } from './rng'
-import { FIRST_GATE, buildSliceRooms, installRoute, templateForSeed, type RouteNodeKind, type RunMap } from './route'
+import { FIRST_GATE, buildSliceRooms, installRoute, mapFromRooms, templateForSeed, type RouteNodeKind, type RunMap } from './route'
 import { enterRoomById } from './rooms'
 import type { MysteryChoice, MysteryOffer, RewardFamily, RewardOffer, RiteAnswer, RiteOffer, RoomPhase, RoomVisit, ShopGood, ShopOffer } from './session'
 import type { World } from './world'
@@ -89,6 +89,8 @@ export interface RunCheckpoint {
   pendingShop: CheckpointShop | null
   pendingMystery: CheckpointMystery | null
   mysteryHunt: boolean
+  /** The answer the Smith has not spoken to yet. Session state, not run state, but it dies with a reload. */
+  lastMystery: MysteryChoice | null
   obols: number
   rerolls: number
 }
@@ -174,6 +176,9 @@ export function captureCheckpoint(world: World): RunCheckpoint | null {
     pendingShop: cloneShop(run.pendingShop),
     pendingMystery: cloneMystery(run.pendingMystery),
     mysteryHunt: run.mysteryHunt || world.spawnQueue.some(s => s.hunt),
+    // Held on the session rather than the run, because the Smith answers it after the descent ends
+    // -- but a reload built a fresh session and the one-time UNBURIED line was simply never spoken.
+    lastMystery: world.session.lastMystery,
     obols: run.obols,
     rerolls: run.rerolls,
   }
@@ -193,6 +198,12 @@ export function restoreCheckpoint(world: World, snap: RunCheckpoint): boolean {
   const template = templateForSeed(snap.seed)
   const rooms = buildSliceRooms(template, new Rng(snap.seed))
   if (!rooms.some(r => r.id === snap.roomId)) return false
+  // A content update can leave snap.roomId present while moving the doors around it. The rebuilt
+  // rooms are what door traversal and the map overlay actually read, so a changed topology would
+  // walk the player down a route their snapshot never generated -- silently, and only for saves
+  // that crossed the update. Refusing sends them back to the Bardo with the attempt lost, which is
+  // the honest outcome: `map` is the route as it was, and it is either still true or it is not.
+  if (snap.map && routeSignature(mapFromRooms(rooms, template)) !== routeSignature(snap.map)) return false
   world.session.preparedWeapon = snap.weapon
   world.session.run = {
     seed: snap.seed,
@@ -227,6 +238,7 @@ export function restoreCheckpoint(world: World, snap: RunCheckpoint): boolean {
   world.boonBits = snap.boonBits
   world.player.hp = snap.hp
   world.player.maxHp = snap.maxHp
+  world.session.lastMystery = snap.lastMystery
   world.player.armed = true
   grantArm(world, snap.weapon)
   installRoute(world, rooms, template)
@@ -243,6 +255,15 @@ export function restoreCheckpoint(world: World, snap: RunCheckpoint): boolean {
   // enterRoom rebuilds the node; keep the door shut if this snapshot was a modal.
   if (snap.pendingReward || snap.pendingRite || snap.pendingShop || snap.pendingMystery) setDoorWalkable(world.arena, false)
   return world.rooms[world.roomIndex]?.id === snap.roomId
+}
+
+/**
+ * Route topology as one comparable string: node order, each node's kind, and every edge in order.
+ * Deliberately not a deep-equal on the objects -- CheckpointMap and RunMap are separate types that
+ * carry the same shape, and only that shape is what "the same route" means here.
+ */
+function routeSignature(map: { nodes: ReadonlyArray<{ id: string; kind: string; edges: ReadonlyArray<{ dir: string; to: string; mark: string }> }> }): string {
+  return map.nodes.map(n => `${n.id}:${n.kind}:${n.edges.map(e => `${e.dir}>${e.to}@${e.mark}`).join(',')}`).join('|')
 }
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
@@ -416,6 +437,11 @@ export function parseCheckpoint(input: unknown): RunCheckpoint | null {
   if (obols === null || obols < 0) return null
   const rerolls = input.rerolls === undefined ? 0 : int(input.rerolls)
   if (rerolls === null || rerolls < 0) return null
+  let lastMystery: MysteryChoice | null = null
+  if (input.lastMystery !== undefined && input.lastMystery !== null) {
+    if (typeof input.lastMystery !== 'string' || !Object.prototype.hasOwnProperty.call(MYSTERY, input.lastMystery)) return null
+    lastMystery = input.lastMystery as MysteryChoice
+  }
   const elapsed = input.elapsed === undefined ? 0 : int(input.elapsed)
   if (elapsed === null || elapsed < 0) return null
   return normalizeCheckpoint({
@@ -442,6 +468,7 @@ export function parseCheckpoint(input: unknown): RunCheckpoint | null {
     pendingShop,
     pendingMystery,
     mysteryHunt,
+    lastMystery,
     obols,
     rerolls,
   })
@@ -479,6 +506,7 @@ export function normalizeCheckpoint(cp: RunCheckpoint): RunCheckpoint {
     pendingShop: cloneShop(cp.pendingShop),
     pendingMystery: cloneMystery(cp.pendingMystery),
     mysteryHunt: cp.mysteryHunt,
+    lastMystery: cp.lastMystery,
     obols: cp.obols,
     rerolls: cp.rerolls,
   }

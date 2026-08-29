@@ -182,3 +182,54 @@ describe('a resumed attempt keeps its own clock', () => {
     expect(parseCheckpoint(older)!.elapsed).toBe(0)
   })
 })
+
+describe('a checkpoint is refused when the route it describes no longer exists', () => {
+  // snap.roomId surviving a content update is not enough: the rebuilt rooms are what door traversal
+  // and the overlay read, so a moved door would walk the player down a route their snapshot never
+  // generated -- silently, and only for saves that crossed the update.
+  it('refuses a snapshot whose saved topology disagrees with the rebuilt one', () => {
+    const world = beginFirstCombat()
+    const snap = captureCheckpoint(world)!
+    const moved = {
+      ...snap,
+      map: {
+        ...snap.map!,
+        nodes: snap.map!.nodes.map((n, i) => i === 0 ? { ...n, edges: [] } : n),
+      },
+    }
+    expect(restoreCheckpoint(createWorld(11, 'loop'), moved)).toBe(false)
+  })
+
+  it('still accepts one whose topology is unchanged', () => {
+    const world = beginFirstCombat()
+    const snap = captureCheckpoint(world)!
+    expect(restoreCheckpoint(createWorld(11, 'loop'), snap)).toBe(true)
+  })
+
+  it('accepts a mapless snapshot, which predates the route entirely', () => {
+    const world = beginFirstCombat()
+    const snap = captureCheckpoint(world)!
+    expect(restoreCheckpoint(createWorld(11, 'loop'), { ...snap, map: null })).toBe(true)
+  })
+})
+
+describe('the Smith keeps the answer he has not spoken to yet', () => {
+  // lastMystery lives on the session, not the run, and the Smith consumes it after the descent. A
+  // reload built a fresh session, so the one-time UNBURIED line was simply never spoken.
+  it('carries a pending LEAVE HIM across the reload', () => {
+    const world = beginFirstCombat()
+    world.session.lastMystery = 'leave'
+    const snap = captureCheckpoint(world)!
+    expect(snap.lastMystery).toBe('leave')
+    const fresh = createWorld(11, 'loop')
+    expect(restoreCheckpoint(fresh, snap)).toBe(true)
+    expect(fresh.session.lastMystery).toBe('leave')
+  })
+
+  it('reads a document written before the field existed as nothing pending', () => {
+    const world = beginFirstCombat()
+    const snap = captureCheckpoint(world)!
+    const { lastMystery: _dropped, ...older } = snap
+    expect(parseCheckpoint(older)!.lastMystery).toBeNull()
+  })
+})

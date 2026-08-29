@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { pauseRows, resolvePause, wrapPauseFocus } from '@/render/titleMenu'
+import { clampPauseFocus, pauseRows, resolvePause, wrapPauseFocus } from '@/render/titleMenu'
 
 // Whether a descent can be given back has TWO answers, and they are not the same question.
 // `canAbandon(world)` asks the sim: is there a live run to abandon. The shell's `canGiveBack()`
@@ -36,6 +36,18 @@ describe('one authority decides whether the pause card can abandon', () => {
     // Every pause-card question goes through the shell's answer.
     expect(main).toMatch(/backPause\(canGiveBack\(\)\)/)
     expect(main).toMatch(/setLeaving\(canGiveBack\(\)\)/)
+  })
+
+  it('pulls a parked focus back onto the card when the abandon row goes', () => {
+    // F2 is reachable while the card is open, so the row count can change under the highlight.
+    // RewardOverlay.setLeaving runs exactly this; the overlay itself needs a live Pixi context to
+    // construct, which is why the rule is a pure function rather than a method.
+    expect(clampPauseFocus('menu', 2, false)).toBe(1)   // SETTINGS was row 2, is now row 1
+    expect(clampPauseFocus('menu', 2, true)).toBe(2)    // three rows: nothing to pull back
+    expect(clampPauseFocus('menu', 1, false)).toBe(1)
+    expect(clampPauseFocus('menu', 0, false)).toBe(0)
+    // The settings page is five rows whatever the answer, so a focused meter never moves.
+    for (let f = 0; f < 5; f++) expect(clampPauseFocus('settings', f, false)).toBe(f)
   })
 
   it('the two answers really do produce different cards', () => {

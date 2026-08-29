@@ -1,7 +1,41 @@
 import { describe, expect, it } from 'vitest'
-import { arrivalBanner, backPause, backTitle, confirmTitle, deathCarriedLine, deathClose, deathReachedLine, deathSentLine, deathTakenLine, duoFooter, hideFightChrome, hidePlaceCaption, homeBanner, keptLabel, meetingVeil, offerAct, offerSpoken, pauseFooter, pauseNudge, pauseRows, resolvePause, runStartBanner, shopAct, shopSpoken, showBuildStrip, titleDescend, titleNudge, titleRows, townTally, victoryKeptLine, wrapPauseFocus, wrapTitleFocus } from '@/render/titleMenu'
+import { arrivalBanner, backPause, backTitle, confirmTitle, deathCarriedLadder, deathCarriedLine, deathClose, deathReachedLine, deathSentLine, deathTakenLine, duoFooter, hideFightChrome, hidePlaceCaption, homeBanner, keptLabel, meetingVeil, offerAct, offerSpoken, pauseFooter, pauseNudge, pauseRows, resolvePause, runStartBanner, shopAct, shopSpoken, showBuildStrip, titleDescend, titleNudge, titleRows, townTally, victoryKeptLine, wrapPauseFocus, wrapTitleFocus } from '@/render/titleMenu'
 import { SHOP_COPY } from '@/sim/economy'
 import { clampSlider, nudgeSlider } from '@/sim/storage'
+
+describe('the death card cannot outgrow its stele', () => {
+  // Each row is one unwrapped, unmasked Text 164px wide. Two full vow names draw past the card, so
+  // hud.ts measures the rendered row and asks for the counted form when it will not fit.
+  it('offers shorter forms for a pair, ending at the vow alone', () => {
+    const two = ["PHLEGETHON'S KISS", 'CLEAVING GRACE']
+    expect(deathCarriedLadder(two)).toEqual([
+      "YOU CARRIED PHLEGETHON'S KISS · CLEAVING GRACE",
+      "YOU CARRIED PHLEGETHON'S KISS · +1",
+      "YOU CARRIED PHLEGETHON'S KISS",
+    ])
+  })
+
+  it('skips the doomed full form once there are three', () => {
+    // The three-vow line has always been the counted one, and it overflows at 173px, so the ladder
+    // has to continue past it rather than treat it as the answer.
+    expect(deathCarriedLadder(['A', 'B', 'C'])).toEqual(['YOU CARRIED A · +2', 'YOU CARRIED A'])
+  })
+
+  it('leaves the forms that already fit as one rung', () => {
+    expect(deathCarriedLadder([])).toEqual(['AN UNMARKED BLADE'])
+    expect(deathCarriedLadder(['CLEAVING GRACE'])).toEqual(['YOU CARRIED CLEAVING GRACE'])
+  })
+
+  it('always ends on a rung no wider than the single-vow form', () => {
+    // The renderer stops at the first entry that measures inside the row, so the last rung is the
+    // guarantee: if even it overflowed the card would still spill.
+    for (const n of [2, 3, 4, 5]) {
+      const names = Array.from({ length: n }, (_, i) => `VOW ${i}`)
+      const ladder = deathCarriedLadder(names)
+      expect(ladder[ladder.length - 1]).toBe('YOU CARRIED VOW 0')
+    }
+  })
+})
 
 describe('title menu', () => {
   it('counts a first death as one descent, not one attempts', () => {

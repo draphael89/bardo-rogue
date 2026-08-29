@@ -127,7 +127,10 @@ export function beginRoomFight(world: World): void {
   // Only into a room that is going to run waves: a body queued into a room with no wave tracking
   // would arrive after the door had already opened, with nothing left to clear it.
   if (room.boss && room.waves?.length) collectDebt(world)
-  if (room.waves?.length) collectHunt(world)
+  // Gated on the boss room exactly as the debt is. LEAVE HIM promises "He follows you to the judge"
+  // (mystery.ts), but an ungated collect consumed the hunt in whichever combat room came next --
+  // Cocytus or the Antechamber -- so the one consequence the choice sells never reached Minos.
+  if (room.boss && room.waves?.length) collectHunt(world)
   if (room.waves?.length) {
     startWaves(world, room.waves)
     world.roomPhase = 'fighting'

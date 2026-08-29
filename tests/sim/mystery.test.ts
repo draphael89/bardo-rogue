@@ -176,3 +176,25 @@ describe("the Unburied's mooring", () => {
     expect(hashWorld(hunted)).not.toBe(hashWorld(quiet))
   })
 })
+
+describe('the Unburied follows you to the judge, not to the next fight', () => {
+  // LEAVE HIM's whole promise is "He follows you to the judge." collectHunt was ungated while
+  // collectDebt was gated on the boss room, so the hunt was consumed by whichever combat room came
+  // next -- Cocytus or the Antechamber -- and Minos met you alone. The test above missed it by
+  // stepping straight from the mooring to the warden.
+  it('is not consumed by an ordinary combat room on the way', () => {
+    const world = atMooring()
+    world.session.run!.mysteryHunt = true
+    const here = world.rooms[world.roomIndex]?.id
+    const plain = world.rooms.find(r => !r.boss && r.waves?.length && r.id !== here)
+    expect(plain, 'the route should contain a non-boss wave room').toBeTruthy()
+
+    enterRoomById(world, plain!.id)
+    expect(world.session.run!.mysteryHunt).toBe(true)
+    expect(world.spawnQueue.some(s => s.hunt)).toBe(false)
+
+    enterRoomById(world, 'warden')
+    expect(world.session.run!.mysteryHunt).toBe(false)
+    expect(world.spawnQueue.some(s => s.hunt)).toBe(true)
+  })
+})

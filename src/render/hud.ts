@@ -5,7 +5,7 @@ import type { EnemyKind, WardenAttackPattern } from '@/sim/events'
 import type { World } from '@/sim/world'
 import { hideWaveTally, remainingLabel, takenBy } from './shadeNames'
 import { minosLifeInk } from './minosInk'
-import { deathCarriedLine, deathClose, deathReachedLine, deathSentLine, deathTakenLine, hideFightChrome, hidePlaceCaption } from './titleMenu'
+import { deathCarriedLadder, deathCarriedLine, deathClose, deathReachedLine, deathSentLine, deathTakenLine, hideFightChrome, hidePlaceCaption } from './titleMenu'
 import { BOONS, hasBoon } from '@/sim/boons'
 import { HUB_ID } from '@/sim/rooms'
 import { tuning } from '@/tuning'
@@ -71,6 +71,8 @@ const BANNER_Y = 44, BAND_H = 28, OPEN = 8, CLOSE = 10   // the card sits clear 
 // (§8.2.1 still owns the arch: star-sky, never a pasted still of the room).
 const CARD = { w: 216, h: 190, top: 42, left: 10 }
 const CARD_X = CARD.left
+// The width a death-card row has to live in: the card less its equal left and right insets.
+const ROW_W = CARD.w - 26 * 2
 const CARD_CX = CARD_X + Math.round(CARD.w / 2)
 const ARCH_TOP = CARD.top + 14
 const ARCH_ROWS = 46, SILL_ROWS = 4, CROWN_ROWS = 4
@@ -962,6 +964,16 @@ export class Hud {
       const r = this.cardRows[i]
       if (r.label.text !== '') r.label.text = ''
       if (r.value.text !== lines[i]) r.value.text = lines[i]
+      // Only the build line can outgrow the stele, and it is measured rather than guessed at: with
+      // the shipped font two full vow names come to 240px against a 164px row, and the counted form
+      // the three-vow case has always used is 171-173px -- so the counted form overflowed too.
+      // Walk the ladder and stop at the first entry that actually fits.
+      if (i === 1) {
+        for (const alt of deathCarriedLadder(names)) {
+          if (r.value.text !== alt) r.value.text = alt
+          if (Math.round(r.value.width) <= ROW_W) break
+        }
+      }
       r.label.visible = false
       r.value.visible = age >= CT.rows[i]
       r.value.anchor.set(0, 0)

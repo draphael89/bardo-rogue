@@ -32,7 +32,10 @@ per tick: `stepWorld(world, inputFrame)`.
 | `pnpm desktop:build` | `pnpm build` (payload gate included) then compiles `desktop/*.cts` to `desktop/out/*.cjs` |
 | `pnpm desktop:start` | Runs the PACKAGED code path (`app://bardo/`) against the local `dist/`, without packaging anything |
 | `pnpm smoke:desktop` | Tier-3: drives the real Electron app under Playwright and checks hosting, incl. replay-hash parity with `pnpm sim` |
-| `pnpm desktop:dist` | Phase 7: electron-builder arm64 dmg+zip. Needs macOS and the electron-builder devDependency (not installed). |
+| `pnpm desktop:dist:signed-local` | Build a Developer ID-signed arm64 app, dmg, and zip without contacting Apple's notarization service. |
+| `pnpm desktop:verify` | Verify the local app signature, identity, Hardened Runtime, entitlements, icon, arm64 executable, dmg, and zip. |
+| `APPLE_KEYCHAIN_PROFILE=bardo-notary pnpm desktop:dist` | Build, sign, notarize, and staple the release artifacts on macOS. |
+| `pnpm desktop:verify:notarized` | Run the local checks plus Gatekeeper assessment and stapling validation. |
 
 `pnpm sim -- --scenario wave3 --bot naive-melee --seeds 1-20 --ticks 10800` prints one row per seed:
 swings, hitsLanded, whiffSwings, kills, dodges, successfulDodges, boltsFired, boltsCut, enemyAttacks, damageTaken

@@ -56,7 +56,9 @@ export class DamageNumbers {
       const rise = Math.round(easeOutCubic(u) * (d.heavy ? 16 : 11))
       d.t.position.set(d.x, d.y - rise)
       // stepped pop and stepped fade: pixel type snaps between whole poses, it never eases like a web page
-      d.t.scale.set(age < 2 ? 2 : age < 4 ? 1.5 : 1)
+      // Whole steps only: 1.5 resamples a pixel face onto half its own grid, which is the same
+      // defect the type ramp in ui.ts exists to prevent. The pop reads as well at 2 -> 1.
+      d.t.scale.set(age < 3 ? 2 : 1)
       d.t.alpha = u < 0.6 ? 1 : u < 0.78 ? 0.75 : u < 0.9 ? 0.45 : 0.2
     }
   }

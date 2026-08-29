@@ -245,7 +245,7 @@ async function boot() {
     replayIdx = 0
   }
 
-  const recText = new Text({ text: '', style: { fontFamily: 'Kenney Pixel', fontSize: 16, fill: 0xff5050 }, resolution: 1 })
+  const recText = new Text({ text: '', style: { fontFamily: 'Kenney Mini', fontSize: 16, fill: 0xff5050 }, resolution: 1 })
   recText.anchor.set(0.5, 0); recText.position.set(tuning.view.width / 2, 4)
   ra.layers.hud.addChild(recText)
   const updateRecText = () => {

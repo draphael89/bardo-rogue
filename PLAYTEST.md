@@ -22,10 +22,14 @@ explain mid-playtest. The build stays pinned until the last tester finishes.
   onboarding sample). Use the same browser for all three runs so later runs draw new seeds.
 - **What you may say before run 1** (verbatim, nothing more): "WASD moves, mouse aims and clicks to
   attack. A controller works too. Everything else the game teaches. I can't help while you play."
-- **Recording.** At the death or victory card, the tester presses F4 — or clicks the export control
-  on the summary — and a telemetry bundle file downloads. One bundle per run. The tester sends every
-  bundle to the organizer. Rename each to `T<n>-run<r>-<condition>.json` before sending. (The export
-  is being wired in parallel — see `HARNESS.md` for the final key and control.)
+- **Recording.** At the death or victory card, the tester presses **F4** and a telemetry bundle file
+  downloads. One bundle per run — each carries the whole session so far, so a later bundle supersedes
+  an earlier one if any go missing. The tester sends every bundle to the organizer. Rename each to
+  `T<n>-run<r>-<condition>.json` before sending.
+- **Ending a run.** Runs end by dying or by beating Minos — there is no giving up. The pause card's
+  abandon row is deliberately hidden during a playtest session, because abandoning would break the
+  bundle's promise to replay exactly what the tester played. F2 and F3 are locked out for the same
+  reason. If a tester must stop early, note it and discard that run's bundle.
 - **Session shape.** Per tester: intro → run 1 → micro-questions → run 2 → run 3 → micro-questions →
   survey. Budget 45–60 minutes. Three runs minimum; more runs are welcome and also get bundles.
 

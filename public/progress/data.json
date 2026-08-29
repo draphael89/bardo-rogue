@@ -1,7 +1,7 @@
 {
   "title": "Bardo Rogue",
   "subtitle": "The Greek gate: two powers, twelve vows, fire, an elite that turns a light blade, a ferryman who is owed, and Minos",
-  "updated": "2026-08-28T23:39-04:00",
+  "updated": "2026-08-29T07:58-04:00",
   "now": "phase-0",
   "round": 2,
   "timeline": [
@@ -564,6 +564,10 @@
     {
       "t": "23:39",
       "text": "Phase 0 shipped in four commits: the pause card is an operable pad-ready menu (volume sliders on a schema-3 save, held abandon), the death stele carries the weapon and vows behind a minimum reveal beat, and ?playtest= arms recorded sessions with verb conditions and an F4 bundle that replays headlessly. 524 tests, hashes byte-identical, matrix 100/100 (kite 70%, naive 0%), smoke both endings, build 2.0 MB."
+    },
+    {
+      "t": "07:58",
+      "text": "An eight-angle adversarial review of Phase 0 found ten findings; eight fixed, two investigated and rejected with evidence. The worst was a seam the tests could not see: the shell pause stops sample(), so the Enter that chose RESUME was still latched and confirmed the boon offer underneath. Also fixed: a held pad A could never open the pause card, abandon and playtest recording were mutually incoherent (now interlocked), the schema bump had broken the desktop smoke, and the master slider answered on a different loudness curve than the two beside it."
     }
   ],
   "pieces": [

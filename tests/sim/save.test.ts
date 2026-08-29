@@ -12,15 +12,15 @@ const LEGACY_SETTINGS = JSON.stringify({ version: 1, reducedEffects: true })
 // The canonical bytes, in the exact key order serializeSave emits. This string is the cross-host
 // contract: the browser adapter and the desktop adapter must both read and write exactly this.
 const CANONICAL = '{"schemaVersion":3,"contentRevision":"0.1.0","profileId":"default","revision":4,'
-  + '"settings":{"version":2,"reducedEffects":true,"volMaster":1,"volMusic":0.7,"volSfx":1},'
-  + '"meta":{"version":1,"attempts":9,"victories":2,"unlockedWeapons":["blade"]},"checkpoint":null}'
+  + '"settings":{"version":2,"reducedEffects":true,"master":1,"music":0.875,"sfx":1},'
+  + '"meta":{"version":1,"attempts":9,"victories":2,"remembrances":0,"rerollUnlocked":false,"vesselUnlocked":false,"unlockedWeapons":["blade"]},"checkpoint":null}'
 
-// The schema-2 fixture (settings V1, no volume sliders) — the bump's required migration evidence.
+// The schema-2 fixture (settings V1, no master slider, no checkpoint) — the bump's migration evidence.
 const CANONICAL_V2 = '{"schemaVersion":2,"contentRevision":"0.1.0","profileId":"default","revision":4,'
   + '"settings":{"version":1,"reducedEffects":true},'
   + '"meta":{"version":1,"attempts":9,"victories":2,"unlockedWeapons":["blade"]},"checkpoint":null}'
 
-const DEFAULT_SETTINGS = { version: 2, reducedEffects: false, volMaster: 1, volMusic: 1, volSfx: 1 }
+const DEFAULT_SETTINGS = { version: 2, reducedEffects: false, master: 1, music: 1, sfx: 1 }
 
 describe('save envelope', () => {
   it('starts a fresh profile at revision 0 with the current schema and content revision', () => {
@@ -65,9 +65,9 @@ describe('parseSave', () => {
     ['an empty object', '{}', 'bad-schema-version'],
     ['a string schemaVersion', '{"schemaVersion":"2"}', 'bad-schema-version'],
     ['a fractional schemaVersion', '{"schemaVersion":1.5}', 'bad-schema-version'],
-    ['a wrong-typed meta', '{"schemaVersion":2,"meta":42}', 'bad-meta'],
-    ['an unknown meta version', '{"schemaVersion":2,"meta":{"version":99,"attempts":50}}', 'bad-meta'],
-    ['a wrong-typed settings', '{"schemaVersion":2,"settings":true}', 'bad-settings'],
+    ['a wrong-typed meta', '{"schemaVersion":3,"meta":42}', 'bad-meta'],
+    ['an unknown meta version', '{"schemaVersion":3,"meta":{"version":99,"attempts":50}}', 'bad-meta'],
+    ['a wrong-typed settings', '{"schemaVersion":3,"settings":true}', 'bad-settings'],
   ]
   it.each(CORRUPT)('reports %s as corrupt and keeps the bytes for the store to preserve', (_label, raw, reason) => {
     const r = parseSave(raw)
@@ -111,7 +111,7 @@ describe('parseSave', () => {
 
   it('clamps garbage counters the way loadMeta does', () => {
     const r = parseSave('{"schemaVersion":2,"settings":{"version":1,"reducedEffects":false},"meta":{"version":1,"attempts":-5,"victories":1.9,"unlockedWeapons":"blade"}}')
-    expect(r.save.meta).toEqual({ version: 1, attempts: 0, victories: 1, unlockedWeapons: ['blade'] })
+    expect(r.save.meta).toEqual({ version: 1, attempts: 0, victories: 1, remembrances: 0, rerollUnlocked: false, vesselUnlocked: false, unlockedWeapons: ['blade'] })
   })
 
   it('drops a counter that JSON parsed to Infinity, exactly as loadMeta does', () => {
@@ -156,7 +156,7 @@ describe('parseSave', () => {
   })
 
   it('never lets an injected __proto__ key ride along into the document', () => {
-    const r = parseSave('{"schemaVersion":2,"__proto__":{"polluted":true},"settings":{"version":1,"reducedEffects":false},"meta":{"version":1,"attempts":3}}')
+    const r = parseSave('{"schemaVersion":3,"__proto__":{"polluted":true},"settings":{"version":1,"reducedEffects":false},"meta":{"version":1,"attempts":3}}')
     expect(Object.keys(r.save)).toEqual(['schemaVersion', 'contentRevision', 'profileId', 'revision', 'settings', 'meta', 'checkpoint'])
     expect(({} as Record<string, unknown>).polluted).toBeUndefined()
   })
@@ -178,24 +178,26 @@ describe('migrateSave', () => {
     expect(r.save.checkpoint).toBeNull()
   })
 
-  it('migrates a v2 envelope, defaulting the volume sliders and keeping reduced effects', () => {
+  // Schema 3 carries BOTH halves, so a v2 document must gain a null checkpoint AND the new sliders.
+  it('upgrades a v2 envelope: null checkpoint, defaulted sliders, reduced effects kept', () => {
     const r = parseSave(CANONICAL_V2)
     expect(r.kind).toBe('migrated')
     if (r.kind !== 'migrated') return
     expect(r.from).toBe(2)
-    expect(r.save.settings).toEqual({ version: 2, reducedEffects: true, volMaster: 1, volMusic: 1, volSfx: 1 })
+    expect(r.save.schemaVersion).toBe(3)
+    expect(r.save.settings).toEqual({ version: 2, reducedEffects: true, master: 1, music: 1, sfx: 1 })
+    expect(r.save.checkpoint).toBeNull()
     expect(r.save.meta.attempts).toBe(9)
     expect(r.save.revision).toBe(4)
-    expect((JSON.parse(serializeSave(r.save)) as { schemaVersion: number }).schemaVersion).toBe(SAVE_SCHEMA_VERSION)
   })
 
-  it('clamps out-of-range or garbage volume sliders to the authored mix', () => {
+  it('clamps out-of-range or garbage sliders to the authored mix', () => {
     const r = parseSave(CANONICAL.replace(
-      '"volMaster":1,"volMusic":0.7,"volSfx":1',
-      '"volMaster":-2,"volMusic":9,"volSfx":"loud"'))
-    expect(r.save.settings.volMaster).toBe(0)
-    expect(r.save.settings.volMusic).toBe(1)
-    expect(r.save.settings.volSfx).toBe(1)
+      '"master":1,"music":0.875,"sfx":1',
+      '"master":-2,"music":9,"sfx":"loud"'))
+    expect(r.save.settings.master).toBe(0)
+    expect(r.save.settings.music).toBe(1)
+    expect(r.save.settings.sfx).toBe(1)
   })
 })
 
@@ -203,7 +205,7 @@ describe('legacy key migration', () => {
   it('carries attempts, victories and settings out of the two old keys', () => {
     const s = migrateLegacySave(LEGACY_META, LEGACY_SETTINGS)
     expect(s).not.toBeNull()
-    expect(s?.meta).toEqual({ version: 1, attempts: 9, victories: 2, unlockedWeapons: ['blade'] })
+    expect(s?.meta).toEqual({ version: 1, attempts: 9, victories: 2, remembrances: 0, rerollUnlocked: false, vesselUnlocked: false, unlockedWeapons: ['blade'] })
     expect(s?.settings.reducedEffects).toBe(true)
     expect(s?.schemaVersion).toBe(SAVE_SCHEMA_VERSION)
     expect(s?.revision).toBe(0)

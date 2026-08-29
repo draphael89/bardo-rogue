@@ -4,7 +4,7 @@ import { createWorld } from '@/sim/scenarios'
 import { emptyInput } from '@/sim/input'
 import { stepWorld } from '@/sim/step'
 import { makeBot } from '@/sim/bots'
-import { WARDEN_PATTERN, wardenWindup } from '@/sim/enemies/warden'
+import { WARDEN_PATTERN, wardenCompanion, wardenWindup } from '@/sim/enemies/warden'
 import {
   wardenLaneThreatensPoint,
   wardenProjectileAngle,
@@ -56,41 +56,42 @@ describe('Warden projectile threat contract', () => {
     expect(wardenLaneThreatensPoint(world.arena, 80, 88, 0, c, 80 + c.fullDangerReach + 0.01, 88)).toBe(false)
   })
 
-  it('turns phase two into an ordered swept return instead of a duplicate fan', () => {
-    const c = wardenProjectileContract('fan', 1)
-    expect(c.volleys).toBe(2)
-    for (const cursor of [1, 2]) {
-      const first = wardenProjectileAngle(c, 0.2, cursor, 2, 0)
-      const second = wardenProjectileAngle(c, 0.2, cursor, 2, 1)
-      const signed = ((second - first + Math.PI) % TAU + TAU) % TAU - Math.PI
-      expect(Math.abs(signed)).toBeCloseTo(tuning.warden.fanVolleySweepDeg * Math.PI / 180, 10)
-      expect(Math.sign(signed)).toBe(cursor & 1 ? 1 : -1)
+  it('keeps the taught projectile sentence in both phases', () => {
+    for (const pattern of ['ring', 'fan'] as const) {
+      const a = wardenProjectileContract(pattern, 0)
+      const b = wardenProjectileContract(pattern, 1)
+      expect(b.count).toBe(a.count)
+      expect(b.volleys).toBe(1)
+      expect(b.speed).toBe(a.speed)
+      expect(b.lifeTicks).toBe(a.lifeTicks)
     }
+    expect(wardenCompanion(WARDEN_PATTERN.slam, 0)).toBeNull()
+    expect(wardenCompanion(WARDEN_PATTERN.slam, 1)).toBe(WARDEN_PATTERN.ring)
+    expect(wardenCompanion(WARDEN_PATTERN.ring, 1)).toBe(WARDEN_PATTERN.fan)
+    expect(wardenCompanion(WARDEN_PATTERN.fan, 1)).toBe(WARDEN_PATTERN.slam)
   })
 
-  it('fires the same shared angles, count, speed, life, and swept second beat used by tells', () => {
+  it('fires the same shared angles, count, speed, and life used by tells', () => {
     const world = openWorld()
     const e = world.spawnEnemy('warden', 160, 120)!
-    e.state = 'attack'; e.pattern = WARDEN_PATTERN.fan; e.phase = 1; e.actionPhase = 1
+    e.state = 'attack'; e.pattern = WARDEN_PATTERN.fan; e.phase = 0; e.actionPhase = 0
     e.patternCursor = 3; e.aimAngle = 0.15; e.stateTick = 0
     world.events.length = 0
-    const c = wardenProjectileContract('fan', 1)
+    const c = wardenProjectileContract('fan', 0)
     const releases: number[][] = []
-    for (let tick = 0; tick <= tuning.warden.fanVolleyGap + 1; tick++) {
+    for (let tick = 0; tick <= 2; tick++) {
       stepWorld(world, emptyInput())
       const angles = world.events.filter(x => x.type === 'boltFired').map(x => x.type === 'boltFired' ? x.angle : 0)
       if (angles.length) releases.push(angles)
       world.events.length = 0
     }
-    expect(releases).toHaveLength(2)
+    expect(releases).toHaveLength(1)
     expect(releases[0]).toHaveLength(c.count)
-    expect(releases[1]).toHaveLength(c.count)
-    for (let volley = 0; volley < 2; volley++) for (let i = 0; i < c.count; i++) {
-      expect(angleDelta(releases[volley]![i]!, wardenProjectileAngle(c, e.aimAngle, e.patternCursor, i, volley))).toBeLessThan(1e-10)
+    for (let i = 0; i < c.count; i++) {
+      expect(angleDelta(releases[0]![i]!, wardenProjectileAngle(c, e.aimAngle, e.patternCursor, i, 0))).toBeLessThan(1e-10)
     }
     for (const b of world.projectiles.filter(x => x.active)) {
       expect(Math.hypot(b.vx, b.vy)).toBeCloseTo(c.speed, 10)
-      // Earlier bolts have spent deterministic ticks, but every one was authored with this same life.
       expect(b.life).toBeLessThan(c.lifeTicks)
       expect(b.radius).toBe(c.boltRadius)
     }
@@ -117,12 +118,13 @@ describe('Warden-aware control policy', () => {
     expect(gap.input.dodge).toBe(false)
   })
 
-  it('reads the phase-two swept return even when the first fan misses', () => {
-    const c = wardenProjectileContract('fan', 1)
-    const cursor = 1
-    const returnAngle = wardenProjectileAngle(c, 0, cursor, c.count - 1, 1)
-    const firstNearest = wardenProjectileAngle(c, 0, cursor, c.count - 1, 0)
-    expect(angleDelta(returnAngle, firstNearest)).toBeGreaterThan(c.combinedHurtRadius / 82)
-    expect(windup(WARDEN_PATTERN.fan, 1, cursor, returnAngle).input.dodge).toBe(true)
+  it('reads the phase-two companion slam when standing in the circle', () => {
+    const world = openWorld()
+    const e = world.spawnEnemy('warden', 180, 120)!
+    world.player.x = world.player.px = e.x + 28
+    world.player.y = world.player.py = e.y
+    e.state = 'windup'; e.pattern = WARDEN_PATTERN.fan; e.phase = 1; e.actionPhase = 1
+    e.patternCursor = 1; e.aimAngle = 0; e.stateTick = wardenWindup(e) - 6
+    expect(makeBot('kite')(world).dodge).toBe(true)
   })
 })

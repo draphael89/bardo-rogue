@@ -4,8 +4,9 @@ import { emptyInput, type InputFrame } from './input'
 import { tuning } from '@/tuning'
 import { hasLineOfSight, overlapsSolid } from './collision'
 import { pathWaypoint, waypointX, waypointY } from './nav'
+import { canAffordMystery } from './mystery'
 import { guardUp } from './enemies/oathbound'
-import { WARDEN_PATTERN, wardenWindup } from './enemies/warden'
+import { WARDEN_PATTERN, wardenCompanion, wardenWindup } from './enemies/warden'
 import { wardenLaneThreatensPoint, wardenProjectileAngle, wardenProjectileContract } from './enemies/warden-contract'
 
 export type Bot = (world: World) => InputFrame
@@ -70,6 +71,13 @@ function makeSliceBot(combat: Bot, toll: 'paid' | 'refused'): Bot {
     if (world.session.run?.result === 'won') { inp.confirm = true; finished = true; return inp }
     if (world.roomPhase === 'transitioning') return inp
     if (world.roomPhase === 'reward') {
+      const mystery = world.session.run?.pendingMystery
+      if (mystery) {
+        // Coin if the landing paid; otherwise walk the cards until Leave Him, which is always free.
+        if (!canAffordMystery(world, mystery.choices[mystery.focus])) inp.choiceDelta = 1
+        else inp.confirm = true
+        return inp
+      }
       const reward = world.session.run?.pendingReward
       // The skilled proof follows the projectile/dodge vocabulary it actually demonstrates at the
       // Warden. A random first card can make a sound policy look weak simply by offering its
@@ -102,7 +110,8 @@ function makeSliceBot(combat: Bot, toll: 'paid' | 'refused'): Bot {
     }
     if (world.roomPhase === 'exits') {
       const room = world.rooms[world.roomIndex]
-      const dir = room.id === 'threshold' && (world.seed & 1) === 0 ? 'east' : 'north'
+      const hasEast = (room.exits ?? []).some(e => e.dir === 'east')
+      const dir = hasEast && (world.seed & 1) === 0 ? 'east' : 'north'
       const door = world.arena.doors.find(d => d.dir === dir) ?? world.arena.doors[0]
       const tx = dir === 'east' ? door.col * 16 + 4 : (door.col + 0.5) * 16
       const ty = dir === 'east' ? (door.row + 0.5) * 16 : 24
@@ -154,9 +163,7 @@ function aimAt(inp: InputFrame, world: World, e: Enemy): number {
   return d
 }
 
-function wardenProjectileThreatensPlayer(world: World, e: Enemy): boolean {
-  const pattern = e.pattern === WARDEN_PATTERN.ring ? 'ring' : e.pattern === WARDEN_PATTERN.fan ? 'fan' : null
-  if (!pattern) return false
+function wardenProjectileThreatensPlayer(world: World, e: Enemy, pattern: 'ring' | 'fan'): boolean {
   const contract = wardenProjectileContract(pattern, e.actionPhase)
   for (let volley = 0; volley < contract.volleys; volley++) {
     for (let i = 0; i < contract.count; i++) {
@@ -164,6 +171,21 @@ function wardenProjectileThreatensPlayer(world: World, e: Enemy): boolean {
       if (wardenLaneThreatensPoint(world.arena, e.x, e.y, angle, contract, world.player.x, world.player.y)) return true
     }
   }
+  return false
+}
+
+function wardenSlamThreatensPlayer(world: World, e: Enemy): boolean {
+  return Math.hypot(e.x - world.player.x, e.y - world.player.y) < tuning.warden.slamRadius + tuning.player.radius
+}
+
+function wardenThreatensPlayer(world: World, e: Enemy): boolean {
+  if (e.pattern === WARDEN_PATTERN.slam && wardenSlamThreatensPlayer(world, e)) return true
+  if ((e.pattern === WARDEN_PATTERN.ring || e.pattern === WARDEN_PATTERN.fan)
+    && wardenProjectileThreatensPlayer(world, e, e.pattern === WARDEN_PATTERN.ring ? 'ring' : 'fan')) return true
+  const companion = wardenCompanion(e.pattern, e.actionPhase)
+  if (companion === WARDEN_PATTERN.slam) return wardenSlamThreatensPlayer(world, e)
+  if (companion === WARDEN_PATTERN.ring) return wardenProjectileThreatensPlayer(world, e, 'ring')
+  if (companion === WARDEN_PATTERN.fan) return wardenProjectileThreatensPlayer(world, e, 'fan')
   return false
 }
 
@@ -177,7 +199,7 @@ function naiveMelee(world: World): InputFrame {
   if (d <= tuning.player.attack.swings[0].radius) inp.attack = world.tick % 4 === 0
   if (e.kind === 'brute' && e.state === 'windup' && e.stateTick > 12 && d < 40) { inp.dodge = true; inp.moveX = -inp.aimX; inp.moveY = -inp.aimY }
   const wardenDodgeTick = e.kind === 'warden' ? wardenWindup(e) - 10 : 0
-  if (e.kind === 'warden' && e.pattern === WARDEN_PATTERN.slam && e.state === 'windup' && e.stateTick > wardenDodgeTick && d < tuning.warden.slamRadius + 6) {
+  if (e.kind === 'warden' && e.state === 'windup' && e.stateTick > wardenDodgeTick && wardenThreatensPlayer(world, e)) {
     inp.dodge = true; inp.moveX = -inp.aimX; inp.moveY = -inp.aimY
   }
   return inp
@@ -195,11 +217,7 @@ function kite(world: World): InputFrame {
     if (x.state !== 'windup' && x.state !== 'freeze') return false
     if (x.kind === 'warden') {
       const late = x.stateTick > wardenWindup(x) - 10
-      if (!late) return false
-      if (x.pattern === WARDEN_PATTERN.ring || x.pattern === WARDEN_PATTERN.fan) {
-        return wardenProjectileThreatensPlayer(world, x)
-      }
-      return Math.hypot(x.x - p.x, x.y - p.y) < tuning.warden.slamRadius + tuning.player.radius
+      return late && wardenThreatensPlayer(world, x)
     }
     if (Math.hypot(x.x - p.x, x.y - p.y) >= 48) return false
     // Land the Warden roll inside the newly authored full-travel i-frame window. The old fixed

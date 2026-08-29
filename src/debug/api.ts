@@ -9,6 +9,8 @@ import type { Loop } from '@/loop'
 import { seedFx } from '@/render/fxRng'
 import { activeBoons } from '@/sim/boons'
 import { ARM, armOf } from '@/sim/weapons'
+import { enterRoomById } from '@/sim/rooms'
+import { prepareWeapon, startRun } from '@/sim/session'
 
 // window.__game: what an agent (or Playwright) uses to drive and inspect the live game.
 export interface GameApi {
@@ -22,6 +24,10 @@ export interface GameApi {
   setInput(frame: Partial<InputFrame> | null): void
   bot(name: BotName | null): void
   pause(p?: boolean): boolean
+  /** Player-facing pause (the card). Distinct from `pause`, which is the debug hold. */
+  shellPause(p?: boolean): boolean
+  /** Give the attempt back and wake in the Bardo. No-op without an active run. */
+  abandon(): boolean
   hash(): number
   state(): unknown
   frameStats(): unknown
@@ -33,6 +39,9 @@ export interface GameApi {
   stopRecord(): Replay
   download(name?: string): void
   replay(r: Replay | EncodedReplay): void
+  inspectSave(): unknown
+  gotoRoom(id: string, opts?: { skipRite?: boolean }): boolean
+  giveRemembrances(n: number): number
 }
 
 export function installApi(host: {
@@ -42,6 +51,8 @@ export function installApi(host: {
   setOverride(f: InputFrame | null): void
   setBot(b: ((w: World) => InputFrame) | null): void
   pause(p?: boolean): boolean
+  shellPause(p?: boolean): boolean
+  abandon(): boolean
   loop: Loop
   presenter: unknown
   metrics: Metrics
@@ -52,6 +63,7 @@ export function installApi(host: {
   stopRecord(): Replay
   download(name?: string): void
   replay(r: Replay | EncodedReplay): void
+  inspectSave(): unknown
 }): GameApi {
   const api: GameApi = {
     get world() { return host.getWorld() },
@@ -65,6 +77,8 @@ export function installApi(host: {
     setInput: f => host.setOverride(f ? { moveX: 0, moveY: 0, aimX: 1, aimY: 0, aimSoft: false, attack: false, attackHeld: false, heavy: false, dodge: false, restart: false, ...f } : null),
     bot: name => host.setBot(name ? makeBot(name) : null),
     pause: p => host.pause(p),
+    shellPause: p => host.shellPause(p),
+    abandon: () => host.abandon(),
     hash: () => hashWorld(host.getWorld()),
     state: () => {
       const w = host.getWorld()
@@ -77,6 +91,7 @@ export function installApi(host: {
           name: w.roomName,
           doorOpen: w.doorOpen,
           kind: w.arena.kind,
+          layout: w.rooms[w.roomIndex]?.layout,
           hasNext: w.hasNextRoom(),
           exits: w.rooms[w.roomIndex]?.exits ?? [],
           phase: w.roomPhase,
@@ -90,6 +105,8 @@ export function installApi(host: {
         returns: w.returns,
         session: {
           preparedWeapon: w.session.preparedWeapon,
+          remembrances: w.session.meta.remembrances,
+          lastBanked: w.session.lastBanked,
           meta: { ...w.session.meta },
           run: w.session.run ? {
             seed: w.session.run.seed,
@@ -102,6 +119,11 @@ export function installApi(host: {
             boons: w.session.run.boons.map(b => b.id),
             killedBy: w.session.run.killedBy,
             killedRanged: w.session.run.killedRanged,
+            obols: w.session.run.obols,
+            rerolls: w.session.run.rerolls,
+            shop: w.session.run.pendingShop ? { ...w.session.run.pendingShop } : null,
+            mystery: w.session.run.pendingMystery ? { ...w.session.run.pendingMystery } : null,
+            hunt: w.session.run.mysteryHunt,
             reward: w.session.run.pendingReward ? { ...w.session.run.pendingReward } : null,
             rite: w.session.run.pendingRite ? { ...w.session.run.pendingRite } : null,
             riteAnswer: w.session.run.riteAnswer,
@@ -114,7 +136,7 @@ export function installApi(host: {
           ? { kind: w.arena.offering.kind, x: +w.arena.offering.x.toFixed(1), y: +w.arena.offering.y.toFixed(1), taken: !!w.arena.offeringTaken }
           : null,
         boons: activeBoons(w),
-        enemies: w.enemies.filter(e => e.active).map(e => ({ id: e.id, kind: e.kind, x: +e.x.toFixed(1), y: +e.y.toFixed(1), hp: e.hp, state: e.state, stateTick: e.stateTick, phase: e.phase })),
+        enemies: w.enemies.filter(e => e.active).map(e => ({ id: e.id, kind: e.kind, x: +e.x.toFixed(1), y: +e.y.toFixed(1), hp: e.hp, state: e.state, stateTick: e.stateTick, phase: e.phase, hunt: e.hunt, debt: e.debt })),
         bolts: w.projectiles.filter(b => b.active).length,
         metrics: host.metrics.summary(),
       }
@@ -129,6 +151,22 @@ export function installApi(host: {
     stopRecord: () => host.stopRecord(),
     download: name => host.download(name),
     replay: r => host.replay(r),
+    inspectSave: () => host.inspectSave(),
+    giveRemembrances: n => {
+      const meta = host.getWorld().session.meta
+      meta.remembrances = Math.max(0, meta.remembrances + Math.floor(n))
+      return meta.remembrances
+    },
+    gotoRoom: (id, opts) => {
+      const w = host.getWorld()
+      if (w.scenario === 'loop' && !w.session.run) {
+        prepareWeapon(w, 'blade')
+        if (!startRun(w, id)) return false
+      }
+      if (opts?.skipRite && w.session.run && !w.session.run.riteAnswer) w.session.run.riteAnswer = 'paid'
+      enterRoomById(w, id)
+      return w.rooms[w.roomIndex]?.id === id
+    },
   }
   ;(window as unknown as { __game: GameApi }).__game = api
   return api

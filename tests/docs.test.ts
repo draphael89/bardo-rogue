@@ -10,7 +10,7 @@ describe('harness documentation', () => {
   it('documents the replay flag bits exactly as the encoder defines them', () => {
     const label: Record<keyof typeof FLAG, string> = {
       aimSoft: 'aimSoft', attack: 'attack', dodge: 'dodge', restart: 'restart',
-      attackHeld: 'attackHeld', confirm: 'confirm', choiceLeft: 'choice-left', choiceRight: 'choice-right', heavy: 'heavy',
+      attackHeld: 'attackHeld', confirm: 'confirm', choiceLeft: 'choice-left', choiceRight: 'choice-right', heavy: 'heavy', reroll: 'reroll',
     }
     for (const [key, bit] of Object.entries(FLAG)) {
       const expected = `${bit} ${label[key as keyof typeof FLAG]}`
@@ -21,7 +21,7 @@ describe('harness documentation', () => {
   it('lists every input field the debug API accepts', () => {
     const setInput = harness.split('\n').find(l => l.includes('`setInput(partial | null)`'))
     expect(setInput).toBeDefined()
-    for (const field of ['moveX', 'moveY', 'aimX', 'aimY', 'aimSoft', 'attack', 'attackHeld', 'heavy', 'dodge', 'restart', 'choiceDelta', 'confirm']) {
+    for (const field of ['moveX', 'moveY', 'aimX', 'aimY', 'aimSoft', 'attack', 'attackHeld', 'heavy', 'dodge', 'restart', 'choiceDelta', 'confirm', 'reroll']) {
       expect(setInput, `setInput docs should mention ${field}`).toContain(field)
     }
   })

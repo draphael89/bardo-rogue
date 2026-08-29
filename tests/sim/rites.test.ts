@@ -3,9 +3,12 @@ import { createWorld } from '@/sim/scenarios'
 import { emptyInput } from '@/sim/input'
 import { stepWorld } from '@/sim/step'
 import { enterRoomById, roomsFor } from '@/sim/rooms'
+import { ensureUtility, pinUtility } from '@/sim/route'
 import { prepareWeapon, startRun } from '@/sim/session'
 import { activeBoons, grantBoon, hasBoon } from '@/sim/boons'
 import { hashWorld } from '@/sim/hash'
+import { hurtPlayer } from '@/sim/combat'
+import { takenBy } from '@/render/shadeNames'
 import { tuning } from '@/tuning'
 
 type W = ReturnType<typeof createWorld>
@@ -15,6 +18,8 @@ function atLanding(seed = 7): W {
   // Walking the whole slice to get here is the golden-path test's job, not this one.
   prepareWeapon(world, 'blade')
   startRun(world, 'threshold')
+  ensureUtility(world)
+  pinUtility(world, 'shop')
   enterRoomById(world, 'black-step')
   return world
 }
@@ -84,18 +89,20 @@ describe('the toll', () => {
   it('pays out a fourth vow, from the other side of the crossroads', () => {
     const world = atLanding()
     answer(world, 'pay')
+    world.session.run!.obols = 20
     clearRoom(world)
-    const first = world.session.run!.pendingReward!
-    expect(first.family).toBe('veil')
+    expect(world.session.run!.pendingShop).not.toBeNull()
+    expect(world.session.run!.pendingReward).toBeNull()
     armThenConfirm(world)
-    // Not 'exits' yet: the ferryman still owes.
+    // The stall took a sip. The ferryman still owes the blade he was paid with.
     expect(world.roomPhase).toBe('reward')
-    const second = world.session.run!.pendingReward!
-    expect(second.family).toBe('blade')
+    const payout = world.session.run!.pendingReward!
+    expect(payout.family).toBe('blade')
+    expect(payout.fromRite).toBe(true)
     expect(world.session.run?.riteBoonOwed).toBe(false)
     armThenConfirm(world)
     expect(world.roomPhase).toBe('exits')
-    expect(activeBoons(world)).toHaveLength(2)
+    expect(activeBoons(world)).toHaveLength(1)
     expect(world.doorOpen).toBe(true)
   })
 
@@ -105,6 +112,7 @@ describe('the toll', () => {
     const world = atLanding()
     for (const id of ['cleave', 'ashenEdge', 'emberKiss'] as const) grantBoon(world, id)
     answer(world, 'pay')
+    world.session.run!.obols = 20
     clearRoom(world)
     armThenConfirm(world)
     const payout = world.session.run!.pendingReward!
@@ -120,7 +128,9 @@ describe('the toll', () => {
     expect(world.session.run?.riteDebt).toBe(true)
     expect(world.player.maxHp).toBe(tuning.player.hp)
     // Nothing extra on the ferryman's own bank: the fight he holds up is the authored one.
-    expect(world.spawnQueue.filter(s => s.kind === tuning.rites.toll.debtKind)).toHaveLength(0)
+    // The opening tell is already down (the door flash was the hold). THE ACCOUNT is not.
+    expect(world.spawnQueue.filter(s => s.debt)).toHaveLength(0)
+    expect(world.spawnQueue.length).toBeGreaterThan(0)
 
     enterRoomById(world, 'warden')
     const debt = world.spawnQueue.find(s => s.kind === tuning.rites.toll.debtKind)!
@@ -161,6 +171,20 @@ describe('the toll', () => {
     expect(world.events.some(e => e.type === 'riteDebtCalled')).toBe(true)
   })
 
+  it('names the account on the stone, not an Empusa', () => {
+    const world = atLanding()
+    answer(world, 'swim')
+    enterRoomById(world, 'warden')
+    for (let i = 0; i < tuning.rites.toll.debtDelay; i++) stepWorld(world, emptyInput())
+    const body = world.enemies.find(e => e.active && e.debt)
+    expect(body?.kind).toBe(tuning.rites.toll.debtKind)
+    world.player.hp = 1
+    hurtPlayer(world, 0, 1, body!.kind, false, undefined, { debt: body!.debt })
+    const death = world.events.find(e => e.type === 'playerDeath')
+    expect(death).toMatchObject({ by: 'charger', debt: true })
+    expect(takenBy('charger', undefined, { debt: true })).toBe('THE ACCOUNT')
+  })
+
   it('is asked once per run, whatever re-enters the room', () => {
     const world = atLanding()
     const before = world.player.maxHp
@@ -195,9 +219,9 @@ describe('the toll', () => {
     const before = tuning.rites.toll.lifeCost
     try {
       tuning.rites.toll.lifeCost = 1
-      expect(RITES.toll.choices[0].cost).toContain('ONE VESSEL OF LIFE')
+      expect(RITES.toll.choices[0].cost).toBe('A LIFE, FOR GOOD')
       tuning.rites.toll.lifeCost = 2
-      expect(RITES.toll.choices[0].cost).toContain('TWO VESSELS OF LIFE')
+      expect(RITES.toll.choices[0].cost).toBe('TWO LIVES, FOR GOOD')
     } finally {
       tuning.rites.toll.lifeCost = before
     }

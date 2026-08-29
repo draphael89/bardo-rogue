@@ -7,11 +7,14 @@ import { updateSpawnQueue, updateWaves } from './waves'
 import { tryEnterDoor, updateRoomTransition } from './rooms'
 import { tryCollectOffering } from './offering'
 import { tryPrepareWeapon } from './preparation'
+import { tryTalkSmith } from './smith'
 import { canReturn, returnToHub } from './return'
 import { separate } from './collision'
 import { clearBulletTime } from './combat'
 import { SLOW_FULL } from './world'
 import { triggerPerfectDodge } from './boons'
+import { updateShop } from './economy'
+import { updateMystery } from './mystery'
 import { updateReward } from './rewards'
 import { updateRite } from './rites'
 import { tuning } from '@/tuning'
@@ -35,7 +38,9 @@ export function stepWorld(world: World, input: InputFrame): void {
     return
   }
   if (world.roomPhase === 'reward') {
-    updateReward(world, input)
+    if (world.session.run?.pendingShop) updateShop(world, input)
+    else if (world.session.run?.pendingMystery) updateMystery(world, input)
+    else updateReward(world, input)
     return
   }
   // A rite holds the room the same way an offer does: nothing moves until it is answered.
@@ -65,6 +70,7 @@ export function stepWorld(world: World, input: InputFrame): void {
 
   updatePlayer(world, playerInput)
   tryPrepareWeapon(world)
+  tryTalkSmith(world)
   tryEnterDoor(world)
   tryCollectOffering(world)
 

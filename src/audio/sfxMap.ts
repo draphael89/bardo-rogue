@@ -140,8 +140,16 @@ export function playEventSfx(a: AudioSystem, ev: SimEvent, listener?: Readonly<{
         a.bell(0.72, 2100, 0.3, 'sfx', 0, { ...at, partials: 'tone', glideTo: 3600, strike: 0.25, cap: 'tell' })
         a.play('laserRetro', { ...at, gain: 0.22, pitch: 1.6, lead: true })
       } else if (ev.kind === 'warden') {
-        a.bell(1.35, 196, 0.7, 'sfx', 0, { ...at, partials: 'plate', glideTo: 130, strike: 0.7, cap: 'tell' })
-        a.play('creature', { ...at, gain: 0.4, pitch: 0.5 })
+        if (ev.pattern === 'slam') {
+          a.bell(1.35, 196, 0.7, 'sfx', 0, { ...at, partials: 'plate', glideTo: 130, strike: 0.7, cap: 'tell' })
+          a.play('creature', { ...at, gain: 0.4, pitch: 0.5 })
+        } else if (ev.pattern === 'ring') {
+          a.bell(0.95, 720, 0.4, 'sfx', 0, { ...at, partials: 'tone', glideTo: 1280, strike: 0.28, cap: 'tell' })
+          a.play('laserRetro', { ...at, gain: 0.24, pitch: 1.15, lead: true })
+        } else {
+          a.bell(1.05, 1480, 0.32, 'sfx', 0, { ...at, partials: 'plate', glideTo: 2100, strike: 0.35, cap: 'tell' })
+          a.play('woosh2', { ...at, gain: 0.34, pitch: 1.25, lead: true })
+        }
       } else if (ev.kind === 'oathbound') {
         // Bronze, and rising: a shield being set rather than a body winding up. It shares nothing
         // with the Empusa's bell, because a player who has learned the roster by ear must not get
@@ -271,6 +279,51 @@ export function playEventSfx(a: AudioSystem, ev: SimEvent, listener?: Readonly<{
       else a.bell(0.6, 130.81, 4.2, 'ui', 0, { partials: 'plate', glideTo: 87.31, strike: 0.35 })
       a.bell(0.34, ev.paid ? 329.63 : 98, 2.4, 'music', 0.22)
       break
+    case 'shopOffered':
+      a.bell(0.7, 110, 3.4, 'ui', 0, { partials: 'plate', strike: 1 })
+      a.bell(0.28, 220, 2.2, 'music', 0.2)
+      break
+    case 'shopFocus':
+      a.play('impactGeneric_light', { gain: 0.14, pitch: 1.25 + ev.focus * 0.08, bus: 'ui' })
+      break
+    case 'shopBought':
+      a.bell(0.62, 220, 2.4, 'ui', 0, { partials: 'tone', strike: 0.8 })
+      a.play('impactGeneric_light', { gain: 0.2, pitch: 1.4, bus: 'ui' })
+      break
+    case 'mysteryOffered':
+      a.bell(0.55, 98, 3.2, 'ui', 0, { partials: 'plate', strike: 0.7 })
+      break
+    case 'mysteryFocus':
+      a.play('impactGeneric_light', { gain: 0.14, pitch: 1.15 + ev.focus * 0.08, bus: 'ui' })
+      break
+    case 'mysteryChosen':
+      if (ev.choice === 'leave') a.bell(0.5, 87.31, 3.6, 'ui', 0, { partials: 'plate', glideTo: 65.41, strike: 0.3 })
+      else a.bell(0.55, 196, 2.4, 'ui', 0, { partials: 'tone', strike: 0.7 })
+      break
+    case 'mysteryHuntCalled':
+      a.bell(0.48, 82.41, 4.0, 'music', 0, { partials: 'plate', glideTo: 61.74, strike: 0.2 })
+      break
+    case 'obolsGained':
+      a.play('impactGeneric_light', { gain: 0.1, pitch: 1.8, bus: 'ui' })
+      break
+    case 'remembrancesBanked':
+      if (ev.amount > 0) a.bell(0.4, 196, 2.4, 'music')
+      break
+    case 'smithSpoke':
+      a.play('impactGeneric_light', { ...at, gain: 0.16, pitch: 0.85, bus: 'ui' })
+      break
+    case 'rerollUnlocked':
+      a.bell(0.7, 146.83, 2.8, 'ui', 0, { partials: 'plate', strike: 0.9 })
+      a.bell(0.35, 220, 2.2, 'music', 0.18)
+      break
+    case 'vesselUnlocked':
+      a.bell(0.7, 164.81, 2.8, 'ui', 0, { partials: 'tone', strike: 0.85 })
+      a.bell(0.32, 246.94, 2.2, 'music', 0.18)
+      break
+    case 'rewardRerolled':
+      a.play('swordMetal', { gain: 0.4, pitch: 1.15, bus: 'ui' })
+      a.bell(0.45, 196, 1.8, 'ui')
+      break
     case 'riteDebtCalled':
       // The same falling figure, an octave down and much later. It is the only cue in the game that
       // quotes an earlier one, because it is the only consequence that crosses a room boundary.
@@ -345,7 +398,7 @@ export function playEventSfx(a: AudioSystem, ev: SimEvent, listener?: Readonly<{
 function listen(a: AudioSystem, ev: SimEvent): void {
   switch (ev.type) {
     case 'footstep': case 'swing': case 'dodge': case 'dodgeWall': case 'dodgeEnd': case 'dodged': case 'reversal': case 'graze':
-    case 'draw': case 'arrowLoose': case 'weaponPrepared': case 'boonChosen': case 'riteChosen':
+    case 'draw': case 'arrowLoose': case 'weaponPrepared': case 'boonChosen': case 'riteChosen': case 'mysteryChosen':
     case 'playerHurt': case 'playerDeath': case 'returned': a.setListener(ev.x, ev.y)
   }
 }

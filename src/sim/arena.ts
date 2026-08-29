@@ -23,6 +23,7 @@ export const T = {
   doorClosed: 71, doorOpen: 72, windowL: 73, windowR: 74, relief: 75,
   pillarTop: 76, pillarBase: 77,
   crackA: 78, crackB: 79, pit: 80,
+  silt: 81, water: 82, grate: 83, reed: 84, poppy: 85, coin: 86, beam: 87,
 } as const
 
 // Indices into the bardo_props sheet (4 columns, 32×32). The first four cells are one
@@ -30,11 +31,12 @@ export const T = {
 export const PROP = {
   bellNW: 0, bellNE: 1, bellSW: 2, bellSE: 3,
   brazier: 4, ossuary: 5, shard: 6, pew: 7,
+  reed: 8, prow: 9, pole: 10, pan: 11,
 } as const
 
 export type RoomKind = 'bardo' | 'threshold' | 'crossing' | 'shore'
 export type DoorDir = 'north' | 'east'
-export type DoorMark = 'combat' | 'gift' | 'blade' | 'veil' | 'hard' | 'boss'
+export type DoorMark = 'combat' | 'gift' | 'blade' | 'veil' | 'hard' | 'elite' | 'boss'
 export type OfferingKind = 'life'
 
 export interface ArenaOffering {
@@ -66,7 +68,7 @@ export interface ArenaDoor {
 export interface Prop { x: number; y: number; tile: number; sortY: number; sheet: 'room' | 'prop' }
 // A light source authored with the room, not with the renderer: the room decides where the
 // key is and how far it reaches; tuning owns the flicker and the tint ramp (§3.2).
-export interface RoomLight { x: number; y: number; radius: number; strength: number }
+export interface RoomLight { x: number; y: number; radius: number; strength: number; tint?: number }
 export interface Arena {
   kind: RoomKind
   cols: number; rows: number
@@ -88,6 +90,8 @@ export interface Arena {
   offeringTaken?: boolean
   rack?: ArenaRack                 // Bardo preparation; walk into the weapon to ready the threshold
   rackTaken?: boolean
+  smith?: { x: number; y: number } // west of the rack: remember, then prepare
+  smithNear?: boolean
 }
 
 export const ARENA_COLS = 26
@@ -128,6 +132,8 @@ export function setDoorWalkable(a: Arena, open: boolean): void {
   }
 }
 
+// Geometry implementation behind `layouts.ts`. A new room is a RoomDef + a layout id;
+// only a genuinely new floor adds a kind (and a case) here.
 // rng here is World.visualRng (or a derived visual stream): cosmetic only, never mixed into the world hash.
 export function buildArena(rng: Rng, kind: RoomKind = 'threshold'): Arena {
   switch (kind) {
@@ -425,6 +431,7 @@ function buildBardo(rng: Rng): Arena {
   const { base, overlay, solid, idx } = s
   const focal = { x: 5.5 * TILE, y: 7.5 * TILE }
   const rack = { x: 19.5 * TILE, y: 8.3 * TILE, arm: 'blade' as const }
+  const smith = { x: 7.5 * TILE, y: 10.2 * TILE }
   const furrow = { x0: focal.x + 18, y0: focal.y + 20, x1: 13 * TILE, y1: 2.4 * TILE }
 
   pave(s, makeLevelAt({
@@ -468,9 +475,10 @@ function buildBardo(rng: Rng): Arena {
     braziers: [
       { x: focal.x, y: focal.y, radius: 92, strength: 0.8 },
       { x: rack.x, y: rack.y, radius: 74, strength: 0.72 },
+      { x: smith.x, y: smith.y, radius: 52, strength: 0.55 },
     ],
     windows: [{ x: 4.5 * TILE, y: 1.5 * TILE, radius: 48, strength: 0.62 }],
-    furrow, focal, rack, rackTaken: false,
+    furrow, focal, rack, rackTaken: false, smith, smithNear: false,
     inner: { x0: TILE, y0: 2 * TILE, x1: (cols - 1) * TILE, y1: (rows - 1) * TILE },
   }
 }

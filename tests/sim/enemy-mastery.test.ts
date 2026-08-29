@@ -6,9 +6,10 @@ import { makeBot } from '@/sim/bots'
 import { updateProjectiles } from '@/sim/projectiles'
 import { chargerLockTick } from '@/sim/enemies/charger'
 import { WARDEN_PATTERN, wardenAttackTicks, wardenWindup } from '@/sim/enemies/warden'
+import { wardenSentenceOf } from '@/sim/events'
 import type { EnemyState, World } from '@/sim/world'
 import { tuning } from '@/tuning'
-import { damageEnemyForTest } from '@/sim/combat'
+import { damageEnemyForTest, hurtPlayer } from '@/sim/combat'
 
 function warden(world = createWorld(1, 'empty')) {
   world.arena.solid.fill(0)
@@ -145,7 +146,7 @@ describe('Warden timing truth and mastery', () => {
     expect(e.state).toBe('chase')
   })
 
-  it('gives the three patterns mechanically different outcomes and escalates the fan', () => {
+  it('gives the three patterns mechanically different outcomes and recombines them after the veil', () => {
     const slam = warden()
     slam.e.state = 'attack'; slam.e.pattern = WARDEN_PATTERN.slam; slam.e.actionPhase = 0; slam.e.stateTick = 0
     slam.e.x = slam.world.player.x; slam.e.y = slam.world.player.y - 20
@@ -159,15 +160,27 @@ describe('Warden timing truth and mastery', () => {
     expect(ring.world.events.filter(x => x.type === 'boltFired')).toHaveLength(tuning.warden.boltCount)
     expect(ring.world.events.some(x => x.type === 'playerHurt')).toBe(false)
 
+    const joined = warden()
+    joined.e.state = 'attack'; joined.e.pattern = WARDEN_PATTERN.slam
+    joined.e.phase = 1; joined.e.actionPhase = 1; joined.e.stateTick = 0
+    joined.e.x = joined.world.player.x; joined.e.y = joined.world.player.y - 20
+    stepWorld(joined.world, emptyInput())
+    expect(joined.world.events.some(x => x.type === 'playerHurt')).toBe(true)
+    expect(joined.world.events.filter(x => x.type === 'boltFired')).toHaveLength(tuning.warden.boltCount)
+
     const fan = warden()
     fan.e.state = 'attack'; fan.e.pattern = WARDEN_PATTERN.fan; fan.e.phase = 1; fan.e.actionPhase = 1; fan.e.stateTick = 0
+    fan.e.x = fan.world.player.x; fan.e.y = fan.world.player.y - 20
     let bolts = 0
+    let slammed = false
     for (let t = 0; t <= wardenAttackTicks(fan.e); t++) {
       stepWorld(fan.world, emptyInput())
       bolts += fan.world.events.filter(x => x.type === 'boltFired').length
+      if (fan.world.events.some(x => x.type === 'playerHurt')) slammed = true
       fan.world.events.length = 0
     }
-    expect(bolts).toBe(tuning.warden.fanCount2 * tuning.warden.fanVolleys2)
+    expect(bolts).toBe(tuning.warden.fanCount)
+    expect(slammed).toBe(true)
   })
 
   it('shows all three patterns in both phases during a representative skilled fight', () => {
@@ -239,5 +252,64 @@ describe('enemy cadence and projectile authority', () => {
     updateProjectiles(world)
     expect(p.hp).toBe(tuning.player.hp - 3)
     expect(world.events.some(x => x.type === 'playerHurt' && x.hp === tuning.player.hp - 3)).toBe(true)
+  })
+})
+
+describe('Minos death sentences', () => {
+  it('keeps the numeric pattern and the spoken sentence on the same order', () => {
+    expect(wardenSentenceOf(WARDEN_PATTERN.slam)).toBe('slam')
+    expect(wardenSentenceOf(WARDEN_PATTERN.ring)).toBe('ring')
+    expect(wardenSentenceOf(WARDEN_PATTERN.fan)).toBe('fan')
+  })
+
+  it('names the sentence that took you, and leaves other deaths unnamed', () => {
+    const slam = warden()
+    slam.world.player.hp = 1
+    slam.e.pattern = WARDEN_PATTERN.slam
+    slam.world.events.length = 0
+    hurtPlayer(slam.world, 0, 1, 'warden')
+    expect(slam.world.events.find(x => x.type === 'playerDeath')).toMatchObject({
+      type: 'playerDeath', by: 'warden', sentence: 'slam', ranged: false,
+    })
+
+    const veil = warden()
+    veil.world.player.hp = 1
+    veil.e.pattern = WARDEN_PATTERN.ring
+    veil.world.events.length = 0
+    hurtPlayer(veil.world, 0, 1, 'warden', true)
+    expect(veil.world.events.find(x => x.type === 'playerDeath')).toMatchObject({
+      type: 'playerDeath', by: 'warden', sentence: 'ring', ranged: true,
+    })
+
+    const fan = warden()
+    fan.world.player.hp = 1
+    fan.e.pattern = WARDEN_PATTERN.fan
+    fan.world.events.length = 0
+    hurtPlayer(fan.world, 0, 1, 'warden', true)
+    expect(fan.world.events.find(x => x.type === 'playerDeath')).toMatchObject({
+      type: 'playerDeath', by: 'warden', sentence: 'fan',
+    })
+
+    const hoplite = createWorld(1, 'empty')
+    hoplite.player.hp = 1
+    hoplite.events.length = 0
+    hurtPlayer(hoplite, 0, 1, 'brute')
+    const death = hoplite.events.find(x => x.type === 'playerDeath')
+    expect(death).toMatchObject({ type: 'playerDeath', by: 'brute' })
+    expect(death && 'sentence' in death ? death.sentence : undefined).toBeUndefined()
+  })
+
+  it('names the companion veil, not the circle that threw it', () => {
+    const { world, e } = warden()
+    world.player.hp = 1
+    e.pattern = WARDEN_PATTERN.slam
+    const bolt = world.fireProjectile(world.player.x, world.player.y, 0, 0, 3, 20, 0, 1, 0, 'bolt', 'warden')
+    expect(bolt).toBeTruthy()
+    bolt!.sentence = 'ring'
+    world.events.length = 0
+    updateProjectiles(world)
+    expect(world.events.find(x => x.type === 'playerDeath')).toMatchObject({
+      type: 'playerDeath', by: 'warden', sentence: 'ring', ranged: true,
+    })
   })
 })

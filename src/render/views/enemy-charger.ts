@@ -7,6 +7,7 @@ import { chargerLockTick } from '@/sim/enemies/charger'
 import { lerp, clamp01, easeOutCubic } from '../anim'
 import { isDangerCorridorPointVisible } from '../terrain'
 import { EntityView, type EnemyFrame, type Pose } from './shared'
+import { EMPUSA } from '../empusaInk'
 
 // The charger's sentence is "count the tremble".
 //
@@ -16,7 +17,7 @@ import { EntityView, type EnemyFrame, type Pose } from './shared'
 //   hover, last 10 ticks   a ring gathers under it                "this one is picking its moment"
 //   freeze 0-3             it rears up, no shake yet               "it has stopped"
 //   freeze 1 / 3 / 5       a lane grows out of it toward you; on each beat it lands a rung and
-//                          trembles once. Loose and amber while it is still tracking you.
+//                          trembles once. Wine-dark while it is still tracking you.
 //   freeze 7               the sim stops re-aiming (chargerLockTick). The lane IGNITES: two ticks
 //                          of white-hot wash, then it settles into a red beam with white-hot rails,
 //                          an arrowhead, and one white front that runs the length of it. The player
@@ -119,27 +120,25 @@ const CORE_BANDS = 4     // white-hot core, the full length of the trail
 const GHOSTS = 3
 const GHOST_STEP = 6     // px between afterimages
 const GHOST_ALPHA = [0.34, 0.21, 0.11]
-const GHOST_TINT = [0xffc890, 0xff6a24, 0xff2410]  // hot cream -> RED_HOT -> RED
+const GHOST_TINT = [...EMPUSA.ghosts]
 const RESIDUE_TICKS = 10 // how long the wake cools for after the lunge ends
 const FORWARD_TICKS = 9  // how long the unspent telegraph takes to burn off ahead of the charger
 const LAUNCH_TICKS = 12  // how long the flash at the point it left from holds
-const WAKE_HEAD = 0xff9a3c
+const WAKE_HEAD = EMPUSA.wakeHead
 
 // One colour family, so four of them in a room are four instances of the same sentence and not four
-// unrelated marks. Heat counts the beats: dull ember while it is still choosing, saturated red the
-// moment it commits, white only where the light actually is.
-const EMBER = 0xff5a14    // tracking rail: hot enough to never read as wood or gold trim
-const EMBER_HOT = 0xffd08a
-const RED = 0xff2410      // committed rail body
-const RED_HOT = 0xff6a24
-const WHITE = 0xffffff
-const SCORCH = 0x4a1208  // the ground the lane claims: at 0.34 over the room's blue-grey floor this
-                         // lands warm, not neutral. 0x240e0a was so dark that the tint read as plain
-                         // grey concrete once the alpha came down off the old opaque 0.86.
-const WOUND = 0x8a1c10   // locked tile stain: red enough to read as danger, not a shadow on blue stone
-const EDGE = 0x08040c    // near-black outline: holds the rail's edge over both the lit floor and the dark tile
-const GLOW_T = 0xff6a14   // spill while it is still tracking you
-const GLOW_L = 0xff2c12   // spill once it has committed
+// unrelated marks. Heat counts the beats: wine-dark while it is still choosing, wine-hot the
+// moment it commits, white only where the light actually is. Ember is fire on a body, not a lane.
+const EMBER = EMPUSA.track
+const EMBER_HOT = EMPUSA.trackHot
+const RED = EMPUSA.commit
+const RED_HOT = EMPUSA.commitHot
+const WHITE = EMPUSA.white
+const SCORCH = EMPUSA.scorch
+const WOUND = EMPUSA.wound
+const EDGE = EMPUSA.edge
+const GLOW_T = EMPUSA.glowTrack
+const GLOW_L = EMPUSA.glowLock
 
 // One heat container per world, shared by every charger, inserted directly above the lightmap and
 // below layers.fx so particles and explosions still land on top of the beam. Found by looking for
@@ -264,7 +263,7 @@ export function updateChargerView(v: EntityView, e: Enemy, f: EnemyFrame, out: P
   if (e.state === 'hover') {
     if (speed > 5) { hop = Math.abs(Math.sin(time * 22)) * 1.5; sx = 1 + Math.sin(time * 22) * 0.08 }
     const arm = armLevel(e)                                    // last breaths before it commits
-    if (arm > 0) { sx += 0.10 * arm; sy -= 0.08 * arm; tint = mixTint(0xffffff, 0xffd2a0, arm) }
+    if (arm > 0) { sx += 0.10 * arm; sy -= 0.08 * arm; tint = mixTint(0xffffff, EMPUSA.coil, arm) }
   } else if (e.state === 'freeze') {
     // A. rear up for three ticks: anticipation, so the crouch is a fall into the pounce rather
     //    than a linear squash that starts the moment it stops moving.
@@ -273,13 +272,13 @@ export function updateChargerView(v: EntityView, e: Enemy, f: EnemyFrame, out: P
     // B. coil: it collapses wide and low across the beats.
     const coilU = easeOutCubic(clamp01((tk - 3) / (LOCK - 3)))
     sx = lerp(sx, 1.34, coilU); sy = lerp(sy, 0.72, coilU); hop = lerp(hop, 0, coilU)
-    tint = mixTint(0xffffff, 0xffbe78, coilU)
+    tint = mixTint(0xffffff, EMPUSA.coil, coilU)
     // C. commit: the aim is locked, it presses into the floor and strobes.
     let shake: number
     if (tk >= LOCK) {
       const cu = clamp01((tk - LOCK) / (C.freezeTicks - LOCK))
       sx = lerp(sx, 1.46, cu); sy = lerp(sy, 0.62, cu); hop = lerp(hop, -1, cu)
-      tint = strobeFrame(time) ? 0xfff0d8 : RED_HOT
+      tint = strobeFrame(time) ? EMPUSA.coil : RED_HOT
       shake = 1
     } else {
       const { k, beat } = laneClock(tk, LOCK)
@@ -295,7 +294,7 @@ export function updateChargerView(v: EntityView, e: Enemy, f: EnemyFrame, out: P
   } else if (e.state === 'dash') {
     const p = dashPose(e, tk / Math.max(1, e.dashTicks))
     sx = p.sx; sy = p.sy; rot = p.rot; hop = p.hop
-    tint = mixTint(0xfff0d8, 0xffffff, clamp01(tk / 6))
+    tint = mixTint(EMPUSA.coil, WHITE, clamp01(tk / 6))
   } else if (e.state === 'recover') {
     const u = easeOutCubic(tk / C.recovery)
     sx = lerp(1.3, 1, u); sy = lerp(0.75, 1, u); rot = Math.sin(time * 8) * 0.15 * (1 - u)

@@ -9,6 +9,7 @@ import { isDangerPointVisible } from '../terrain'
 import { lerp, clamp01, easeOutCubic, easeOutBack, lerpAngle } from '../anim'
 import { casterLockTick } from '@/sim/enemies/caster'
 import { EntityView, HALF_PI, type EnemyFrame, type Pose } from './shared'
+import { LAMPAD } from '../lampadInk'
 
 // Presentation for "cross the line or cut the bolt": a telegraph that searches, hardens on the
 // exact tick the sim commits, and a bolt shaped like something you are meant to cut.
@@ -28,9 +29,9 @@ const GATHER_TICKS = 6        // last ticks of the aim: the line pulls in and th
 // saturated one flattens the art into a two-channel cutout: tried on the body at the sever and it
 // turned a 16x16 character into a flat magenta parallelogram, so the body only ever gets a mild
 // wash and the saturated colour goes on the STAFF, which is small enough to be an accent.
-const TINT_LOCK = 0xff70ff     // it has committed: a chromatic wash, not the old pale pink
-const TINT_SEVER = 0xff00ff    // the sever runs back up the staff for the first beats of the backlash
-const TINT_SEVER_2 = 0xff70ff  // one flat step out of it, not a fade
+const TINT_LOCK = LAMPAD.tintLock
+const TINT_SEVER = LAMPAD.tintSever
+const TINT_SEVER_2 = LAMPAD.tintSever2
 
 // drawAimLine is dispatched later by the shared presenter, which deliberately owns only the enemy.
 // Remember the authoritative arena supplied by updateEnemyView without broadening that hot API or
@@ -134,7 +135,7 @@ function updateCasterWeapon(v: EntityView, e: Enemy, x: number, y: number, alpha
 //   2. CHROMA COLLAPSE. The 0.30 mix toward a neutral shadow plus sat 0.82 costs ~43% of chroma. The
 //      old body 0xf082fa graded to rgb(172,105,183) - chroma 78 - and that single pixel was the most
 //      saturated thing in the entire strip. To land a rim above chroma 150 the input must be a fully
-//      saturated hue with a channel at zero. 0xff00ff grades to rgb(163,8,166): chroma 158.
+//      saturated hue with a channel at zero. Wine-dark hot grades under the multiply; white is the cut.
 //
 // So the dart is a WHITE CORE inside a two-step magenta ramp, over a NEAR-BLACK DROP ROW - flat
 // opaque values spanning luminance 8 to 240 with the chroma peak at 202, instead of four pale
@@ -178,12 +179,12 @@ const ECHOES = 4
 const HALO = 1                 // rows of additive halo outside the head's silhouette
 // Post-grade luminance / chroma, measured under the R1 grade. Ranked around a pale floor of 148:
 // 8 < 28 < 65 < 118 < 240. The head owns the top of the range; nothing behind it may.
-const COL_BOLT_RIM = 0x160320    // lum   8, chroma   8 - hard 1px drop row under the whole shape
-const COL_BOLT_BODY = 0xff40ff   // lum 118, chroma 166 - the head's interior shoulder
-const COL_BOLT_SAT = 0xff00ff    // lum  65, chroma 202 - the head's rim, and the near trail
-const COL_BOLT_CORE = 0xffffff   // lum 240, chroma  10 - clipped; the brightest pixel in the frame
-const COL_TRAIL_DIM = 0x9000a8   // lum  28, chroma 104 - the far trail and the last ember
-const COL_BOLT_GLOW = 0xff00ff
+const COL_BOLT_RIM = LAMPAD.boltRim
+const COL_BOLT_BODY = LAMPAD.boltBody
+const COL_BOLT_SAT = LAMPAD.boltSat
+const COL_BOLT_CORE = LAMPAD.boltCore
+const COL_TRAIL_DIM = LAMPAD.trailDim
+const COL_BOLT_GLOW = LAMPAD.glow
 
 // Half-thickness of the head by px behind the nose. Max 2, so the opaque head is 5 rows and 6 with
 // its drop row: the critic's ceiling is ~6 native px across, and the reference's enemy bullets are
@@ -255,7 +256,7 @@ export class BoltView {
     this.glowG.alpha = on ? 0.18 : 1
   }
   // one additive pixel, at most once per frame per pixel (see the stamp note above)
-  private addPix(gg: Graphics, px: number, py: number, alpha: number, color = COL_BOLT_GLOW): void {
+  private addPix(gg: Graphics, px: number, py: number, alpha: number, color: number = COL_BOLT_GLOW): void {
     const li = (py - this.scy + ST_CY) * ST_W + (px - this.scx + ST_CX)
     if (li < 0 || li >= stamp.length || stamp[li] === stampGen) return
     stamp[li] = stampGen
@@ -457,7 +458,7 @@ export class BoltView {
 // It obeys the same budget as the bolt, and that INVERTED it. The old line was COL_LOCK 0xff9cff:
 // luminance 143 against a floor at 113 - thirty units of contrast, chroma 66, and ~50 segments of it,
 // so the telegraph was a pale mid-value smear competing with the bolt core for the top of the range
-// while carrying almost no colour. The line is now DARK and SATURATED (0xff00ff: lum 52, chroma 158)
+// while carrying almost no colour. The line is now DARK and SATURATED wine (not Hecate magenta)
 // with only its flash, nodes and end-brackets clipping to white. That is 61 units of contrast
 // against the same floor instead of 30 - strictly more legible - it hands the whole top of the value
 // range to the shot itself, and it survives a re-graded darker floor because the white pips stay.
@@ -479,12 +480,11 @@ export class BoltView {
 //   - the muzzle charge COLLAPSES inward (radius 3 -> 1) instead of blooming outward.
 // Measured after: 45-64 in-lane px through the whole aim. Value contrast is untouched - the white
 // pips, the near-black drop row and the chroma-158 ray are the same colours - only area moved.
-const COL_SEARCH = 0x9000a8   // lum  28, chroma 104 - the searching rails, below the floor
-const COL_LOCK = 0xff00ff     // lum  52, chroma 158 - the committed ray
-const COL_NODE = 0xff40ff     // lum  89, chroma 120 - the beads on it
-const COL_SIGHT = 0xffc8ff    // the lock still: bright enough to read as a lane, not a tinted thread
-const COL_HOT = 0xffffff      // lum 197 - flash, nodes under the flash, end brackets, muzzle pip
-const COL_UNDER = 0x160320    // lum   3 - drop pixel so the line keeps its edge on a pale floor
+const COL_SEARCH = LAMPAD.search
+const COL_LOCK = LAMPAD.lock
+const COL_NODE = LAMPAD.node
+const COL_HOT = LAMPAD.hot
+const COL_UNDER = LAMPAD.under
 
 export function drawAimLine(g: Graphics, e: Enemy, alpha: number): void {
   const C = tuning.caster
@@ -552,10 +552,10 @@ export function drawAimLine(g: Graphics, e: Enemy, alpha: number): void {
     const px = Math.round(ox + ca * d), py = Math.round(oy + sa * d)
     if (arena && !isDangerPointVisible(arena, ox, oy, px, py)) continue
     const hot = clamp01(1 - Math.abs(d - flashD) / FLASH_WIDTH)
-    // A sight, not a shot: 1px chromatic lock over a floor bite. The racing flash is the only
-    // white on the ray — a filled core the whole length reads as already hitting.
+    // A sight, not a shot: 1px wine lock over a floor bite. The racing flash is the only
+    // white on the ray — a pale core the whole length read as a beam already hitting.
     if (!arena || isDangerPointVisible(arena, ox, oy, px, py + 1)) g.rect(px, py + 1, 1, 1).fill({ color: COL_UNDER })
-    g.rect(px, py, 1, 1).fill({ color: hot > 0.28 ? COL_HOT : COL_SIGHT })
+    g.rect(px, py, 1, 1).fill({ color: hot > 0.28 ? COL_HOT : COL_LOCK })
   }
   for (let d = NODE_STEP; d < reach; d += NODE_STEP) {
     const px = Math.round(ox + ca * d), py = Math.round(oy + sa * d)

@@ -93,19 +93,6 @@ export class InputSystem {
     c.addEventListener('contextmenu', e => e.preventDefault())
   }
 
-  /**
-   * The shell pause stops sample() from running, so key pulses latch behind it and pad edges go
-   * stale — the Enter or A that operated the pause menu would otherwise fire into the first resumed
-   * tick (claiming a focused boon, confirming a return, or rolling the player). Called by the shell
-   * on resume: pulses are dropped, and every held controller control must return neutral first.
-   * Held KEYS stay held on purpose — resuming with W down should keep walking.
-   */
-  absorbLatched(): void {
-    this.pressed.clear()
-    this.mousePressed = false; this.mouseHeavyPressed = false
-    this.controllerRearm.disarmAll()
-  }
-
   sample(world: World): InputFrame {
     const modal = modalInput(world)
     // The boundary is keyed, not merely flagged: `modal` itself still gates aim and the menu branch
@@ -275,12 +262,19 @@ export class InputSystem {
     // be swung at a menu. `entering` is the rite; `reward` is the offer.
     // One definition of "the confirm was pressed", shared by the two modal branches below — a
     // confirm source added to one and not the other would answer menus but fail to answer a return.
-    const confirmPressed = this.pressed.has('Enter') || this.pressed.has('Space') || this.pressed.has('KeyJ') || this.pressed.has('KeyZ') || this.mousePressed || padAttackEdge || dodge || heavy
+    // One definition of "the confirm was pressed", shared by the two modal branches below — a
+    // confirm source added to one and not the other would answer menus but fail to answer a return.
+    // Heavy is deliberately NOT folded in: on a reward screen it is the Smith's reroll instead, so
+    // each branch adds it on its own terms.
+    const confirmBase = this.pressed.has('Enter') || this.pressed.has('Space') || this.pressed.has('KeyJ') || this.pressed.has('KeyZ') || this.mousePressed || padAttackEdge || dodge
     if (world.roomPhase === 'reward' || world.roomPhase === 'entering') {
       const left = this.pressed.has('ArrowLeft') || this.pressed.has('KeyA')
       const right = this.pressed.has('ArrowRight') || this.pressed.has('KeyD')
       f.choiceDelta = left === right ? padChoiceDelta : left ? -1 : 1
-      f.confirm = confirmPressed
+      // A heavy on a live offer is the reroll, not the claim; anywhere else it still confirms.
+      const reforging = world.roomPhase === 'reward' && heavy && !!world.session.run?.pendingReward
+      f.confirm = confirmBase || (!reforging && heavy)
+      f.reroll = reforging
       f.moveX = 0; f.moveY = 0; f.attack = false; f.attackHeld = false; f.heavy = false; f.dodge = false
     } else if (world.player.state === 'dead' || (world.roomPhase === 'resolved' && world.session.run?.result !== 'active')) {
       // The reveal owns its opening beats: canReturn() is true on the killing tick itself, so a
@@ -297,7 +291,7 @@ export class InputSystem {
       if (revealStart >= 0 && world.tick - revealStart < (dead ? tuning.reveal.deathMinTicks : tuning.reveal.victoryMinTicks)) {
         f.restart = false   // restart returns too (src/sim/step.ts:22), so it waits with confirm
       } else {
-        f.confirm = confirmPressed
+        f.confirm = confirmBase || heavy
       }
     }
     this.pressed.clear(); this.mousePressed = false; this.mouseHeavyPressed = false
@@ -307,5 +301,25 @@ export class InputSystem {
   // Presentation may read the live hold-to-lock target, but cannot write it or leak it into the
   // deterministic world. A null target means Q is up or the retained target is no longer valid.
   get hardLockTargetId(): number | null { return this.lockedTargetId }
+
+  /**
+   * Drop latched combat intent when the player-facing pause opens or closes. WASD on the pause
+   * card must not walk the first unpaused tick, and a held confirm (A / J) must not dodge or swing.
+   * Pad edges stay armed against the buttons that are still down so a held A does not fire as a new press.
+   */
+  releaseHeldIntent(): void {
+    this.down.clear()
+    this.pressed.clear()
+    this.mousePressed = false
+    this.mouseHeld = false
+    this.mouseHeavyPressed = false
+    this.mouseOwnsAim = false
+    this.lockedTargetId = null
+    this.retainedExplicitAim.clear()
+    this.controllerRearm.disarmAll()
+    const pads = typeof navigator !== 'undefined' && navigator.getGamepads ? navigator.getGamepads() : []
+    const pad = pads && pads[0]
+    this.padPrev = pad ? Array.from({ length: 16 }, (_, i) => !!pad.buttons[i]?.pressed) : []
+  }
 
 }

@@ -3,12 +3,10 @@ import { loadAtlas, loadFonts } from '@/render/atlas'
 import { Presenter } from '@/render/presenter'
 import { createWorld } from '@/sim/scenarios'
 import { stepWorld } from '@/sim/step'
-import { abandonRun, canReturn } from '@/sim/return'
-import { pauseRowKinds } from '@/render/reward'
+import { abandonRun, canAbandon, canReturn } from '@/sim/return'
 import type { World } from '@/sim/world'
 import type { InputFrame } from '@/sim/input'
 import { InputSystem, PAD_CHOICE_LEFT, PAD_CHOICE_RIGHT, PAD_MENU_CONFIRM, PAD_MENU_DOWN, PAD_MENU_UP, PAD_RESTART } from '@/input'
-import { vol01 } from '@/sim/storage'
 import { Loop } from '@/loop'
 import { AudioSystem } from '@/audio/audio'
 import { playEventSfx } from '@/audio/sfxMap'
@@ -22,9 +20,12 @@ import { downloadJson, Recorder } from '@/input/recorder'
 import { tuning } from '@/tuning'
 import { Text } from 'pixi.js'
 import { defaultMetaState, type MetaStateV1 } from '@/sim/session'
+import { captureCheckpoint, restoreCheckpoint } from '@/sim/checkpoint'
 import { bumpRevision, defaultSave, serializeSave, parseSave, CONTENT_REVISION, type BardoSave } from '@/sim/save'
 import { detectPlatform, PROFILE_ID } from '@/platform'
 import { loadSave, saveFilename } from '@/platform/saveFile'
+import { titleNudge, townTally } from '@/render/titleMenu'
+import { nudgeSlider } from '@/sim/storage'
 
 async function boot() {
   const q = new URLSearchParams(location.search)
@@ -97,31 +98,41 @@ async function boot() {
   // `?reduced=` is a debug override of the second only -- persisting it would let a URL param
   // permanently rewrite a player's setting the next time any autosave fires.
   let storedReducedEffects = savedSave.settings.reducedEffects
+  let storedMaster = savedSave.settings.master
+  let storedMusic = savedSave.settings.music
+  let storedSfx = savedSave.settings.sfx
   let reducedEffects = q.has('reduced') ? q.get('reduced') !== '0' : storedReducedEffects
-  // The three sliders the pause card shows. Applied immediately: setLevel stores the value even
-  // before the AudioContext exists, and buildGraph honours it when the first gesture arrives.
-  const volumes = { master: savedSave.settings.volMaster, music: savedSave.settings.volMusic, sfx: savedSave.settings.volSfx }
-  const applyVolumes = () => {
-    audio.setLevel('master', volumes.master)
-    audio.setLevel('music', volumes.music); audio.setLevel('ambience', volumes.music)
-    audio.setLevel('sfx', volumes.sfx); audio.setLevel('ui', volumes.sfx)
-  }
-  applyVolumes()
   let world: World = createWorld(seed, scenario, { god, ...(scenario === 'loop' ? { meta: savedSave.meta } : {}) })
+  const resumed = scenario === 'loop' && !!savedSave.checkpoint && restoreCheckpoint(world, savedSave.checkpoint)
+  if (scenario === 'loop' && savedSave.checkpoint && !resumed) {
+    savedSave = { ...savedSave, checkpoint: null }
+    console.log('[save] checkpoint could not be restored; starting in the Bardo')
+  }
   // Spatial audio starts with the player's actual spawn, before the first enemy tell can arrive.
   audio.setListener(world.player.x, world.player.y)
+  audio.setLayout(world.rooms[world.roomIndex]?.layout ?? 'bardo')
   platform.setRunActive(world.session.run !== null)
   let userPaused = false
   let debugPaused = false
   let metrics = new Metrics()
   const presenter = new Presenter(ra, atlas, world)
   presenter.setReducedEffects(reducedEffects)
+  const applyMix = (): void => {
+    audio.setLevel('master', storedMaster)
+    audio.setLevel('music', storedMusic)
+    audio.setLevel('ambience', storedMusic)
+    audio.setLevel('sfx', storedSfx)
+    audio.setLevel('ui', storedSfx)
+    presenter.title.setLevels(storedMaster, storedMusic, storedSfx)
+    presenter.reward.setLevels(storedMaster, storedMusic, storedSfx)
+  }
+  applyMix()
   presenter.particles.attachRenderer(ra.app.renderer)
   // Refresh the ears immediately before every sound. Footsteps are cadence, not authority: a
   // stationary player and a freshly reset room must spatialize enemy tells just as accurately.
   presenter.onEvent = ev => playEventSfx(audio, ev, world.player)
   ra.viewOverride = viewOverride
-  ra.onViewResize = () => { presenter.rebuildRoom(); presenter.hud.relayout(); presenter.reward.relayout(); presenter.title.relayout() }
+  ra.onViewResize = () => { presenter.rebuildRoom(); presenter.hud.relayout(); presenter.reward.relayout(); presenter.routeMap.relayout(); presenter.title.relayout() }
   const input = new InputSystem(ra)
   const overlay = new DebugOverlay(ra.layers.debug, ra.layers.hud)
   overlay.setVisible(debug)
@@ -138,6 +149,7 @@ async function boot() {
     const meta = sc === 'loop' ? (suppliedMeta ? opts.meta : world.scenario === 'loop' ? world.session.meta : undefined) : undefined
     world = createWorld(s, sc, { ...opts, ...(meta ? { meta } : {}) })
     audio.setListener(world.player.x, world.player.y)
+    audio.setLayout(world.rooms[world.roomIndex]?.layout ?? 'bardo')
     platform.setRunActive(world.session.run !== null)
     metrics = new Metrics()
     replayFrames = null
@@ -185,7 +197,10 @@ async function boot() {
       if (!noSave && !suppressedPersistShown) { suppressedPersistShown = true; presenter.hud.showBanner('PROGRESS NOT SAVING', 'this profile cannot be written', 3.0) }
       return Promise.resolve(false)
     }
-    savedSave = bumpRevision({ ...savedSave, settings: { version: 2, reducedEffects: storedReducedEffects, volMaster: volumes.master, volMusic: volumes.music, volSfx: volumes.sfx } })
+    savedSave = bumpRevision({
+      ...savedSave,
+      settings: { version: 2, reducedEffects: storedReducedEffects, master: storedMaster, music: storedMusic, sfx: storedSfx },
+    })
     const payload = serializeSave(savedSave)
     return new Promise(resolve => {
       if (queued) {
@@ -208,6 +223,37 @@ async function boot() {
     return f
   }
 
+  const flushEvents = () => {
+    metrics.consume(world, world.events)
+    presenter.handleEvents(world.events)
+    // tests/sim/harness.test.ts hand-copies this ordering to prove the browser and headless agree
+    // across a mid-replay restart. Keep the save write here -- after the events are handled, before
+    // they are cleared -- and keep it read-only against `world`.
+    if (world.scenario === 'loop' && world.events.some(ev =>
+      ev.type === 'runStarted' || ev.type === 'roomEnter' || ev.type === 'boonChosen' || ev.type === 'riteChosen'
+      || ev.type === 'shopBought' || ev.type === 'mysteryChosen' || ev.type === 'rerollUnlocked' || ev.type === 'vesselUnlocked'
+      || ev.type === 'runWon' || ev.type === 'runLost' || ev.type === 'returned'
+    )) {
+      // An explicit copy: reset() builds a NEW meta object, so holding the live one would leave this
+      // pointing at a dead object and persist stale counters.
+      savedSave = {
+        ...savedSave,
+        meta: { ...world.session.meta, unlockedWeapons: [...world.session.meta.unlockedWeapons] },
+        checkpoint: captureCheckpoint(world),
+      }
+      void persist()
+      platform.setRunActive(world.session.run !== null)   // so a desktop quit can ask before binning a run
+    }
+    world.events.length = 0
+  }
+
+  const giveTheAttemptBack = () => {
+    if (!abandonRun(world)) return false
+    flushEvents()
+    setPaused(false)
+    return true
+  }
+
   const tick = () => {
     // The Start press that confirms a death/victory return is consumed by THIS tick — and by the
     // time render() runs, canReturn is already false again. Latch the pre-tick state so the pause
@@ -225,19 +271,8 @@ async function boot() {
     } else frame = quantizeFrame(bot ? bot(world) : filterVerbs(live))
     recorder.capture(frame)
     stepWorld(world, frame)
-    metrics.consume(world, world.events)
-    presenter.handleEvents(world.events)
-    // tests/sim/harness.test.ts hand-copies this ordering to prove the browser and headless agree
-    // across a mid-replay restart. Keep the save write here -- after the events are handled, before
-    // they are cleared -- and keep it read-only against `world`.
-    if (world.scenario === 'loop' && world.events.some(ev => ev.type === 'runStarted' || ev.type === 'runWon' || ev.type === 'returned')) {
-      // An explicit copy: reset() builds a NEW meta object, so holding the live one would leave this
-      // pointing at a dead object and persist stale counters.
-      savedSave = { ...savedSave, meta: { ...world.session.meta, unlockedWeapons: [...world.session.meta.unlockedWeapons] } }
-      void persist()
-      platform.setRunActive(world.session.run !== null)   // so a desktop quit can ask before binning a run
-    }
-    world.events.length = 0
+    flushEvents()
+    audio.setLayout(world.rooms[world.roomIndex]?.layout ?? 'bardo')
     if (world.wantsRestart) {
       // reset() clears replayFrames; a restart *inside* a replay keeps playing, matching runReplay()
       const frames = replayFrames, idx = replayIdx
@@ -295,8 +330,26 @@ async function boot() {
       const pad = firstPad()
       const titleWasUp = presenter.title.visible
       const titleStartNow = padWantsStart(pad)
-      if (titleWasUp && titleStartNow && !padTitlePrev) void dismissTitle()
+      const titleUp = !!pad?.buttons[12]?.pressed
+      const titleDown = !!pad?.buttons[13]?.pressed
+      const titleLeft = !!pad?.buttons[14]?.pressed
+      const titleRight = !!pad?.buttons[15]?.pressed
+      if (titleWasUp) {
+        if (presenter.title.soundGated) {
+          if (titleStartNow && !padTitlePrev) void dismissTitle()
+        } else {
+          if (titleUp && !padTitleUpPrev) presenter.title.move(-1)
+          if (titleDown && !padTitleDownPrev) presenter.title.move(1)
+          if (titleLeft && !padTitleLeftPrev) nudgeTitleLevel(-1)
+          if (titleRight && !padTitleRightPrev) nudgeTitleLevel(1)
+          if (titleStartNow && !padTitlePrev) answerTitle(false)
+        }
+      }
       padTitlePrev = titleStartNow
+      padTitleUpPrev = titleUp
+      padTitleDownPrev = titleDown
+      padTitleLeftPrev = titleLeft
+      padTitleRightPrev = titleRight
       // Start is the controller's pause. During the loop's live gameplay the sim ignores the pad's
       // legacy restart mapping entirely, so a controller-only player had NO route to the pause
       // screen — the only listeners are keyboard P and Escape. Edge-triggered against its own
@@ -309,48 +362,29 @@ async function boot() {
         setPaused(!userPaused)
       }
       padStartPrev = startNow
-      returnOpenThisFrame = false
-      // The pause card's pad navigation, polled here for the same reason Start is: the sim (and with
-      // it the input system) is stopped while paused. Buttons come from src/input, so a remap moves
-      // the menu and the game together.
       if (userPaused && !titleWasUp) {
-        const up = !!pad?.buttons[PAD_MENU_UP]?.pressed, down = !!pad?.buttons[PAD_MENU_DOWN]?.pressed
-        const left = !!pad?.buttons[PAD_CHOICE_LEFT]?.pressed, right = !!pad?.buttons[PAD_CHOICE_RIGHT]?.pressed
-        const a = !!pad?.buttons[PAD_MENU_CONFIRM]?.pressed
-        if (up && !padMenuPrev.up) movePauseFocus(-1)
-        if (down && !padMenuPrev.down) movePauseFocus(1)
-        if (left && !padMenuPrev.left) pauseAdjust(-1)
-        if (right && !padMenuPrev.right) pauseAdjust(1)
-        // pauseActivate is already inert on the abandon row, which is hold-driven.
-        if (a && !padMenuPrev.a) pauseActivate()
-        padMenuPrev.up = up; padMenuPrev.down = down; padMenuPrev.left = left; padMenuPrev.right = right; padMenuPrev.a = a
-      } else if (padMenuPrev.a || padMenuPrev.up || padMenuPrev.down || padMenuPrev.left || padMenuPrev.right) {
-        padMenuPrev.up = padMenuPrev.down = padMenuPrev.left = padMenuPrev.right = padMenuPrev.a = false
+        const leaving = canAbandon(world)
+        const up = !!pad?.buttons[12]?.pressed
+        const down = !!pad?.buttons[13]?.pressed
+        const left = !!pad?.buttons[14]?.pressed
+        const right = !!pad?.buttons[15]?.pressed
+        if (up && !padPauseUpPrev) presenter.reward.movePause(-1, leaving)
+        if (down && !padPauseDownPrev) presenter.reward.movePause(1, leaving)
+        if (left && !padPauseLeftPrev) nudgePauseLevel(-1)
+        if (right && !padPauseRightPrev) nudgePauseLevel(1)
+        padPauseUpPrev = up
+        padPauseDownPrev = down
+        padPauseLeftPrev = left
+        padPauseRightPrev = right
+        const choose = PAD_PAUSE_CHOOSE.some(i => !!pad?.buttons[i]?.pressed)
+        if (choose && !padPauseChoosePrev) answerPause(leaving)
+        padPauseChoosePrev = choose
+      } else {
+        padPauseUpPrev = padPauseDownPrev = padPauseLeftPrev = padPauseRightPrev = padPauseChoosePrev = false
       }
-      // Abandon is a held confirmation, advanced on the render clock because the sim is paused.
-      const holdingAbandon = userPaused && pauseRowKind() === 'abandon' && (abandonKeyHeld || padMenuPrev.a)
-      abandonHold = holdingAbandon ? Math.min(1, abandonHold + dt / tuning.menu.abandonHoldSec) : 0
-      if (holdingAbandon && abandonHold >= 1) {
-        abandonKeyHeld = false
-        abandonRun(world)
-        // The abandon mutates the world from outside the tick loop, so the tick-driven event scan
-        // has nothing to report to the host until the sim runs again — and under a debug pause it
-        // never does. Tell the host here, so a desktop quit cannot warn about a run already gone.
-        platform.setRunActive(false)
-        setPaused(false)
-        presenter.hud.showBanner('THE RUN ENDS HERE', 'the bardo takes you back', 2.2)
-      }
-      presenter.reward.setPadActive(!!pad)
-      if (userPaused) {
-        presenter.reward.setPauseMenu({
-          focus: pauseFocus,
-          volumes: { ...volumes },
-          reduced: reducedEffects,
-          runActive: pauseRunActive(),
-          hold: abandonHold,
-        })
-      }
+      returnOpenThisFrame = false
       presenter.reward.setPaused(userPaused)
+      presenter.routeMap.setPaused(userPaused)
       presenter.render(alpha, dt)
       overlay.update(world, loop)
       updateRecText()
@@ -363,8 +397,18 @@ async function boot() {
   // The pause listens to PAD_RESTART, the input system's own Start mapping, so remapping the button
   // there moves both jobs together.
   const PAD_START = [0, 2, 3, 5, 7, ...PAD_RESTART]
+  const PAD_PAUSE_CHOOSE = [0, 2]
   let padStartPrev = false
   let padTitlePrev = false
+  let padTitleUpPrev = false
+  let padTitleDownPrev = false
+  let padTitleLeftPrev = false
+  let padTitleRightPrev = false
+  let padPauseUpPrev = false
+  let padPauseDownPrev = false
+  let padPauseLeftPrev = false
+  let padPauseRightPrev = false
+  let padPauseChoosePrev = false
   let returnOpenThisFrame = false
   const firstPad = (): Gamepad | null => {
     const pads = typeof navigator !== 'undefined' && navigator.getGamepads ? navigator.getGamepads() : []
@@ -374,48 +418,6 @@ async function boot() {
     !!pad && PAD_RESTART.some(i => !!pad.buttons[i]?.pressed)
   const padWantsStart = (pad: Gamepad | null): boolean =>
     !!pad && PAD_START.some(i => !!pad.buttons[i]?.pressed)
-
-  // ---- pause menu ------------------------------------------------------------------------------
-  // The card's rows live in pauseRowKinds (shared with the painter); its feel numbers in tuning.menu.
-  let pauseFocus = 0
-  let abandonHold = 0
-  let abandonKeyHeld = false
-  const padMenuPrev = { up: false, down: false, left: false, right: false, a: false }
-  // A playtest session records every frame it plays, and an abandon changes the world from outside
-  // that frame stream — the exported bundle would replay a run the tester had already ended. The
-  // row is therefore absent while a session is armed, which is an interlock rather than a warning.
-  const pauseRunActive = () =>
-    !playtest && !!world.session.run && world.session.run.result === 'active' && world.player.state !== 'dead'
-  const pauseRowKind = () => pauseRowKinds(pauseRunActive())[pauseFocus] ?? 'resume'
-  const movePauseFocus = (dir: number) => {
-    const rows = pauseRowKinds(pauseRunActive())
-    pauseFocus = (pauseFocus + dir + rows.length) % rows.length
-    abandonKeyHeld = false   // the hold itself drains on the next rendered frame
-  }
-  const toggleReduced = () => {
-    reducedEffects = !reducedEffects
-    storedReducedEffects = reducedEffects       // an explicit player choice, so it is the one that persists
-    presenter.setReducedEffects(reducedEffects)
-    void persist()
-  }
-  const pauseAdjust = (dir: number) => {
-    const kind = pauseRowKind()
-    if (kind === 'master' || kind === 'music' || kind === 'sfx') {
-      const next = vol01(Math.round((volumes[kind] + dir * tuning.menu.volumeStep) * 10) / 10)
-      // A notch against the rail changes nothing, and persisting it would rotate the backup copy
-      // once per key repeat for an identical payload.
-      if (next === volumes[kind]) return
-      volumes[kind] = next
-      applyVolumes()
-      void persist()
-    } else if (kind === 'reduced') toggleReduced()
-  }
-  const pauseActivate = () => {
-    const kind = pauseRowKind()
-    if (kind === 'resume') setPaused(false)
-    else if (kind === 'reduced') toggleReduced()
-    // 'abandon' is hold-driven (see render), so a stray tap can never end a run
-  }
 
   installApi({
     getWorld: () => world,
@@ -427,6 +429,11 @@ async function boot() {
       loop.paused = debugPaused || userPaused || presenter.title.visible
       return loop.paused
     },
+    shellPause: p => {
+      setPaused(p ?? !userPaused)
+      return userPaused
+    },
+    abandon: () => giveTheAttemptBack(),
     loop,
     presenter,
     get metrics() { return metrics },
@@ -440,6 +447,13 @@ async function boot() {
     debug: v => { overlay.setVisible(v ?? !overlay.visible); return overlay.visible },
     record, stopRecord, replay,
     download: name => { if (recorder.recording) stopRecord(); recorder.download(name) },
+    inspectSave: () => ({
+      schemaVersion: savedSave.schemaVersion,
+      contentRevision: savedSave.contentRevision,
+      revision: savedSave.revision,
+      meta: savedSave.meta,
+      checkpoint: savedSave.checkpoint,
+    }),
   })
 
   // Re-running resize() after a fullscreen change lets the view re-fit to the new aspect. The
@@ -450,7 +464,7 @@ async function boot() {
     // hand the player a zeroed file labelled as their backup of the inaccessible profile.
     if (loaded.source === 'unreadable') { presenter.hud.showBanner('NOTHING TO EXPORT', 'the save could not be read', 2.4); return }
     // For a save from a newer build, export the bytes as they were READ: re-serialising would emit a
-    // schemaVersion-2 document with the newer build's fields quietly dropped, which is indistinguishable
+    // current-schema document with the newer build's fields quietly dropped, which is indistinguishable
     // from a real one.
     // The call has to happen inside the keydown the browser is still processing (the download click
     // needs that gesture), so it is started before anything is awaited.
@@ -476,28 +490,32 @@ async function boot() {
       if (world.session.run) { presenter.hud.showBanner('A RUN IS UNDERWAY', 'return to the bardo first', 2.2); return }
       const priorSave = savedSave
       const priorStoredReducedEffects = storedReducedEffects
+      const priorStoredMusic = storedMusic
+      const priorStoredSfx = storedSfx
       savedSave = parsed.save
       storedReducedEffects = savedSave.settings.reducedEffects
+      storedMaster = savedSave.settings.master
+      storedMusic = savedSave.settings.music
+      storedSfx = savedSave.settings.sfx
       // The imported counters and success banner are applied only after the coalesced writer says
       // the exact logical update is durable. A refused disk write therefore cannot look successful.
       if (!await persist()) {
         savedSave = priorSave
         storedReducedEffects = priorStoredReducedEffects
+        storedMusic = priorStoredMusic
+        storedSfx = priorStoredSfx
         presenter.hud.showBanner('SAVE NOT IMPORTED', 'the file could not be written', 2.4)
         return
       }
       reducedEffects = savedSave.settings.reducedEffects
       presenter.setReducedEffects(reducedEffects)
-      volumes.master = savedSave.settings.volMaster
-      volumes.music = savedSave.settings.volMusic
-      volumes.sfx = savedSave.settings.volSfx
-      applyVolumes()
+      applyMix()
       setPaused(false)
       // reset() rebuilds the world with the imported meta and rebinds the presenter. Deliberately not a
       // reload: that would drop ?bot=/?seed=, destroy window.__game mid-evaluate and break an attached
       // Playwright page.
       if (world.scenario === 'loop') reset(cur.seed, cur.scenario, { god: cur.god, meta: savedSave.meta })
-      presenter.hud.showBanner('SAVE IMPORTED', `${savedSave.meta.attempts} ATTEMPTS · ${savedSave.meta.victories} VICTORIES`, 2.2)
+      presenter.hud.showBanner('SAVE IMPORTED', townTally(savedSave.meta.attempts, savedSave.meta.victories, savedSave.meta.remembrances), 2.2)
     } finally { importing = false }
   }
 
@@ -534,30 +552,18 @@ async function boot() {
   // The title is held over the living hub: the simulation is stopped but the loop keeps rendering,
   // so the room the player is about to stand in gutters and drifts behind its own name. A run driven
   // by a bot or a replay skips it - those are measurements, not first impressions.
-  const wantsTitle = scenario === 'loop' && !botName
+  const wantsTitle = scenario === 'loop' && !botName && !resumed
   presenter.title.setShown(wantsTitle)
 
   // One place decides what "paused" means, so the sim, the audio clock and the overlay can never
   // disagree. Pausing used to stop only the simulation: the bed kept playing behind the overlay and
   // a backgrounded tab kept a synthesiser running indefinitely.
   const setPaused = (p: boolean) => {
-    if (p && !userPaused) {
-      pauseFocus = 0; abandonHold = 0; abandonKeyHeld = false
-      // Seed the menu's pad edges from the buttons that are ALREADY down. Without this, a player
-      // holding attack (A) when they hit Start reads as a fresh press on the opening frame and the
-      // card closes again immediately — a pad player holding A could never pause at all.
-      const pad = firstPad()
-      padMenuPrev.up = !!pad?.buttons[PAD_MENU_UP]?.pressed
-      padMenuPrev.down = !!pad?.buttons[PAD_MENU_DOWN]?.pressed
-      padMenuPrev.left = !!pad?.buttons[PAD_CHOICE_LEFT]?.pressed
-      padMenuPrev.right = !!pad?.buttons[PAD_CHOICE_RIGHT]?.pressed
-      padMenuPrev.a = !!pad?.buttons[PAD_MENU_CONFIRM]?.pressed
-    }
     // Resuming: the press that operated the card must not also reach the game. sample() is what
     // drains latched pulses and ages pad edges, and it has not run since the pause began — so the
     // Enter that chose RESUME would confirm the modal underneath, and A would roll the player.
-    if (!p && userPaused) input.absorbLatched()
     const playerHeld = p || presenter.title.visible
+    if (userPaused !== p) input.releaseHeldIntent()
     userPaused = p
     loop.paused = playerHeld || debugPaused
     // The debug hold freezes deterministic captures but deliberately leaves the rendered/audio
@@ -593,9 +599,53 @@ async function boot() {
     if (document.hidden && !presenter.title.visible) setPaused(true)
   })
 
-  // A click answers the title too. Registered on the window rather than the canvas so a player who
-  // clicks the letterbox is not left staring at a screen that ignores them.
-  window.addEventListener('mousedown', () => { void dismissTitle(true) })
+  const applyReduced = (next: boolean) => {
+    reducedEffects = next
+    storedReducedEffects = next
+    presenter.setReducedEffects(reducedEffects)
+    void persist()
+  }
+
+  const applyLevelNudge = (which: 'master' | 'music' | 'sfx', delta: -1 | 1): void => {
+    if (which === 'master') storedMaster = nudgeSlider(storedMaster, delta)
+    else if (which === 'music') storedMusic = nudgeSlider(storedMusic, delta)
+    else storedSfx = nudgeSlider(storedSfx, delta)
+    applyMix()
+    void persist()
+  }
+
+  const nudgeTitleLevel = (delta: -1 | 1): void => {
+    const which = titleNudge(presenter.title.currentPage(), presenter.title.currentFocus())
+    if (which === 'none') return
+    applyLevelNudge(which, delta)
+  }
+
+  const nudgePauseLevel = (delta: -1 | 1): void => {
+    const which = presenter.reward.nudgePause()
+    if (which === 'none') return
+    applyLevelNudge(which, delta)
+  }
+
+  const answerPause = (leaving: boolean): void => {
+    const act = presenter.reward.confirmPause(leaving)
+    if (act === 'resume') setPaused(false)
+    else if (act === 'abandon') giveTheAttemptBack()
+    else if (act === 'toggle-still') applyReduced(!reducedEffects)
+  }
+
+  const answerTitle = (gesture: boolean): void => {
+    if (presenter.title.soundGated) { void dismissTitle(gesture); return }
+    const act = presenter.title.confirm()
+    if (act === 'descend') void dismissTitle(gesture)
+    else if (act === 'toggle-still') applyReduced(!reducedEffects)
+  }
+
+  // A click answers the focused title verb. Registered on the window rather than the canvas so a
+  // player who clicks the letterbox is not left staring at a screen that ignores them.
+  window.addEventListener('mousedown', () => {
+    if (!presenter.title.visible) return
+    answerTitle(true)
+  })
 
   window.addEventListener('keydown', e => {
     // F belongs to the host even while the title is holding the sim. Treating every title key as
@@ -604,27 +654,40 @@ async function boot() {
     if (e.code === 'KeyF' && !e.repeat) { e.preventDefault(); void platform.fullscreen(); return }
     if (presenter.title.visible) {
       if (e.repeat) return
-      e.preventDefault()
-      void dismissTitle(true)
-      return
-    }
-    if ((e.code === 'Escape' || e.code === 'KeyP') && !e.repeat) { e.preventDefault(); setPaused(!userPaused) }
-    if (e.code === 'KeyV' && !e.repeat && !importing) toggleReduced()
-    // The pause card's keyboard navigation. Sliders accept key repeat (holding a direction slides);
-    // the toggle and the rows do not, or one hold would flip them like a strobe.
-    if (userPaused && !importing) {
-      if (e.code === 'ArrowUp' || e.code === 'KeyW') { e.preventDefault(); if (!e.repeat) movePauseFocus(-1) }
-      if (e.code === 'ArrowDown' || e.code === 'KeyS') { e.preventDefault(); if (!e.repeat) movePauseFocus(1) }
-      if (e.code === 'ArrowLeft' || e.code === 'KeyA') { e.preventDefault(); if (!e.repeat || pauseRowKind() !== 'reduced') pauseAdjust(-1) }
-      if (e.code === 'ArrowRight' || e.code === 'KeyD') { e.preventDefault(); if (!e.repeat || pauseRowKind() !== 'reduced') pauseAdjust(1) }
-      // Enter only — Space is the dodge key, and a press latched behind the pause would roll the
-      // player the instant the card closes.
-      if ((e.code === 'Enter' || e.code === 'NumpadEnter') && !e.repeat) {
+      // F1–F3 stay harness keys on the title; everything else is a verb or is swallowed so a
+      // stray letter cannot descend, and so Escape on the gate cannot open the pause card.
+      if (e.code !== 'F1' && e.code !== 'F2' && e.code !== 'F3') {
         e.preventDefault()
-        if (pauseRowKind() === 'abandon') abandonKeyHeld = true
-        else pauseActivate()
+        if (presenter.title.soundGated) { void dismissTitle(true); return }
+        if (e.code === 'ArrowUp' || e.code === 'KeyW') { presenter.title.move(-1); return }
+        if (e.code === 'ArrowDown' || e.code === 'KeyS') { presenter.title.move(1); return }
+        if (e.code === 'ArrowLeft' || e.code === 'KeyA') { nudgeTitleLevel(-1); return }
+        if (e.code === 'ArrowRight' || e.code === 'KeyD') { nudgeTitleLevel(1); return }
+        if (e.code === 'Escape') { presenter.title.back(); return }
+        if (e.code === 'Enter' || e.code === 'Space' || e.code === 'KeyJ') { answerTitle(true); return }
+        if (e.code === 'KeyV') applyReduced(!reducedEffects)
+        return
       }
     }
+    if ((e.code === 'Escape' || e.code === 'KeyP') && !e.repeat) {
+      e.preventDefault()
+      if (e.code === 'Escape' && userPaused && presenter.reward.backPause(canAbandon(world))) return
+      setPaused(!userPaused)
+      return
+    }
+    if (userPaused && !e.repeat) {
+      const leaving = canAbandon(world)
+      if (e.code === 'ArrowUp' || e.code === 'KeyW') { e.preventDefault(); presenter.reward.movePause(-1, leaving); return }
+      if (e.code === 'ArrowDown' || e.code === 'KeyS') { e.preventDefault(); presenter.reward.movePause(1, leaving); return }
+      if (e.code === 'ArrowLeft' || e.code === 'KeyA') { e.preventDefault(); nudgePauseLevel(-1); return }
+      if (e.code === 'ArrowRight' || e.code === 'KeyD') { e.preventDefault(); nudgePauseLevel(1); return }
+      if (e.code === 'Enter' || e.code === 'Space' || e.code === 'KeyJ') {
+        e.preventDefault()
+        answerPause(leaving)
+        return
+      }
+    }
+    if (e.code === 'KeyV' && !e.repeat && !importing) applyReduced(!reducedEffects)
     if (e.code === 'F1') { e.preventDefault(); overlay.toggle() }
     // The dev recording keys are locked out while a playtest session is armed: F2 would restart the
     // recorder against a mutated meta and F3 would end the session outright, either way silently
@@ -636,13 +699,6 @@ async function boot() {
     if (userPaused && !importing && e.code === 'KeyE' && !e.repeat) { e.preventDefault(); void exportSave() }
     if (userPaused && !importing && e.code === 'KeyI' && !e.repeat) { e.preventDefault(); void importSave() }
   })
-  // Releasing the confirm key mid-hold cancels the abandon; the render loop drains the bar to zero.
-  window.addEventListener('keyup', e => {
-    if (e.code === 'Enter' || e.code === 'NumpadEnter') abandonKeyHeld = false
-  })
-  // A window that loses focus never delivers the keyup, and rAF keeps running while it is merely
-  // unfocused (the visibility pause needs document.hidden), so the bar would fill with nothing held.
-  window.addEventListener('blur', () => { abandonKeyHeld = false })
   if (!noSave) {
     platform.watchForeignWrites?.(() => {
       if (!savable) return

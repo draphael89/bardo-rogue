@@ -114,6 +114,11 @@ export const tuning = {
     grazeRate: 500, grazeTicks: 6, grazePx: 8,
   },
   spawnTelegraphTicks: 40,
+  // Stock arenas keep the old half-second hold so pinned hashes stay put. The loop's door
+  // flash is the hold (`loopLeadTicks` === `transitionTicks`). `startWaves` does not wait it
+  // again — the first tell is already on the floor when the room is visible.
+  waveLeadTicks: 30,
+  loopLeadTicks: 8,
   // One short breath between curriculum beats. A 1.5 s reset lets the kill release, clears visual
   // residue, and gives the next formation a clean first read. It also keeps the fastest seeded route
   // above the 55-second control-proof floor without padding enemy health or weakening mastery.
@@ -154,6 +159,37 @@ export const tuning = {
   // lifeCost is a whole vessel out of five, which is the same unit the shore's offering gives back —
   // paying is meant to be felt for the rest of the descent, not shrugged off.
   // The refusal is not paid here: it is paid in the Hall of Minos, where the account is read out.
+  // Run coins and the home-banked shade-memory. Obols die with the attempt; Remembrances do not.
+  // Shop prices assume the landing pack has paid out — heal is the affordable default the bots take.
+  economy: {
+    obolsPerKill: { brute: 2, caster: 2, charger: 2, dummy: 0, warden: 4, oathbound: 3 },
+    obolsPerClear: 3,
+    remembrancePerDepth: 1,
+    remembranceOnVictory: 3,
+    shop: {
+      healCost: 6, healAmount: 2,
+      vesselCost: 10, vesselAmount: 1,
+      vowCost: 12,
+    },
+    smith: {
+      rerollCost: 3,
+      vesselCost: 5,
+      vesselAmount: 1,
+      radius: 18,
+    },
+    mystery: {
+      chance: 0.5,
+      coinCost: 8,
+      coinHeal: 2,
+      memoryCost: 1,
+      memoryVessel: 1,
+      huntKind: 'brute' as const,
+      huntX: 22,
+      huntY: 12,
+      huntDelay: 150,
+    },
+  },
+
   rites: {
     toll: {
       lifeCost: 1,
@@ -237,8 +273,9 @@ export const tuning = {
   // MINOS, JUDGE OF THE FIRST GATE. The code name stays `warden` because the enemy kind is an
   // append-only hashed enum. Three deterministic sentences rotate: leave the judgment circle, read the gaps in
   // an outward veil burst, then cross an aimed fan. At half life the veil breaks in its own safe
-  // beat before faster tells, a denser ring, and a second fan volley arrive. Poise: lights bounce;
-  // heavies stagger only while he is not committed.
+  // beat, then each sentence brings the next one with it — circle+veil, veil+fan, fan+circle.
+  // The tell that named a sentence does not get shorter. Poise: lights bounce; heavies stagger
+  // only while he is not committed.
   warden: {
     hp: 80, radius: 10, speed: 28, orbitMin: 52, orbitMax: 76, orbitSpeed: 0.9,
     phaseThreshold: 0.5, phaseTransitionTicks: 45, phaseShards: 12,
@@ -441,14 +478,14 @@ export const tuning = {
       playerLightRadius: 32, playerLightAlpha: 0.12,
       flameRate: 16,         // flame particles per second per brazier
       deathFadeSec: 1.6,     // slow red vignette after playerDeath
-      doorRadius: 64, doorFlicker: 0.10, doorTint: 0xffe8c0, doorAlpha: 0.36,
+      doorRadius: 64, doorFlicker: 0.10, doorTint: 0xffe8c0, doorOpenTint: 0xd4b060, doorAlpha: 0.36,
       windowRadius: 88, windowFlicker: 0.10, windowTint: 0xc8d8ff, windowAlpha: 0.70,
     },
     atmosphere: {
       moteCount: 28, moteSpeed: 7, moteAlpha: 0.55, moteTint: 0xffe4b0,
       fogCount: 5, fogAlpha: 0.10, fogTint: 0x5a6080,
       rayCount: 2, rayAlpha: 0.06, rayTint: 0xffd8a0,
-      doorGlowRadius: 36, doorGlowAlpha: 0.10, doorGlowTint: 0xffe8b8,
+      doorGlowRadius: 36, doorGlowAlpha: 0.10, doorGlowTint: 0xffe8b8, doorOpenTint: 0xd4b060,
     },
     grade: {
       strength: 1,

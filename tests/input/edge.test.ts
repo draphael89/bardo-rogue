@@ -659,9 +659,10 @@ describe('mouse aim follows the live camera transform', () => {
   })
 })
 
-describe('absorbLatched: the press that operated the pause card stays out of the game', () => {
+describe('releaseHeldIntent: the press that operated the pause card stays out of the game', () => {
   // The shell pause stops the loop, so sample() — the only thing that drains latched pulses and
-  // ages pad edges — does not run while the card is up. main.ts calls absorbLatched() on resume.
+  // ages pad edges — does not run while the card is up. main.ts calls releaseHeldIntent on both
+  // edges of the pause.
 
   it('drops a latched Enter instead of confirming the modal underneath', () => {
     const h = harness()
@@ -669,10 +670,10 @@ describe('absorbLatched: the press that operated the pause card stays out of the
     prepareWeapon(w)
     startRun(w, 'bardo')
     finishRun(w, 'won')
-    w.tick += tuning.reveal.victoryMinTicks   // past the reveal: only the absorb can stop this press
+    w.tick += tuning.reveal.victoryMinTicks   // past the reveal: only the release can stop this press
 
-    h.win.fire('keydown', key('Enter'))       // the press that chose RESUME while paused
-    h.input.absorbLatched()
+    h.win.fire('keydown', key('Enter'))       // the press that chose RISE while paused
+    h.input.releaseHeldIntent()
     expect(h.input.sample(w).confirm ?? false).toBe(false)
   })
 
@@ -681,7 +682,7 @@ describe('absorbLatched: the press that operated the pause card stays out of the
     const h = harness(pad)
     const w = createWorld(1, 'dummy')
     pad.buttons[0]!.pressed = true            // A, held to operate the card
-    h.input.absorbLatched()
+    h.input.releaseHeldIntent()
     expect(h.input.sample(w).dodge).toBe(false)
     expect(h.input.sample(w).dodge).toBe(false)   // still held: still disarmed
     pad.buttons[0]!.pressed = false
@@ -690,11 +691,14 @@ describe('absorbLatched: the press that operated the pause card stays out of the
     expect(h.input.sample(w).dodge).toBe(true)
   })
 
-  it('leaves held movement keys alone — resuming with W down keeps walking', () => {
+  it('drops held movement too, so WASD steering the card cannot walk the first unpaused tick', () => {
     const h = harness()
     const w = createWorld(1, 'dummy')
     h.win.fire('keydown', key('KeyW'))
-    h.input.absorbLatched()
+    h.input.releaseHeldIntent()
+    expect(h.input.sample(w).moveY).toBe(0)
+    // A fresh press after the card closes walks again.
+    h.win.fire('keydown', key('KeyW'))
     expect(h.input.sample(w).moveY).toBeLessThan(0)
   })
 })

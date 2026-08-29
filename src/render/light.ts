@@ -5,6 +5,7 @@ import type { World } from '@/sim/world'
 import { doorOpens, type ArenaDoor } from '@/sim/arena'
 import type { Particles } from './particles'
 import { tuning } from '@/tuning'
+import { atmosphereFor, brazierFlame } from './atmospherePresets'
 import { noise } from './camera'
 import { lerp } from './anim'
 import { fxRng } from './fxRng'
@@ -17,7 +18,7 @@ export class Lighting {
   private base: Sprite
   private vignette: Sprite
   private braziers: Sprite[] = []
-  private cores: Array<{ s: Sprite; src: { radius: number; strength: number } }> = []
+  private cores: Array<{ s: Sprite; src: { radius: number; strength: number; tint?: number } }> = []
   private windows: Sprite[] = []
   private door: Sprite
   private extraDoors: Array<{ s: Sprite; d: ArenaDoor }> = []
@@ -48,9 +49,11 @@ export class Lighting {
 
   rebind(arena: World['arena']): void {
     for (const s of this.braziers) s.destroy()
+    for (const c of this.cores) c.s.destroy()
     for (const s of this.windows) s.destroy()
     for (const { s } of this.extraDoors) s.destroy()
     this.braziers = []
+    this.cores = []
     this.windows = []
     this.extraDoors = []
     this.layoutLights(arena)
@@ -133,15 +136,18 @@ export class Lighting {
     this.vignette.alpha = L.vignette + d * 0.34
     this.vignette.tint = d > 0 ? lerpColor(0xffffff, 0xf0e4e0, d) : 0xffffff
 
+    const air = atmosphereFor(world.rooms[world.roomIndex]?.layout ?? 'threshold')
     const src = world.arena.braziers
     for (let i = 0; i < this.braziers.length; i++) {
       const s = this.braziers[i]
       const a = src[i]
+      if (!a) { s.visible = false; continue }
+      s.visible = true
       const n = noise(this.t * 9 + i * 37) * 0.6 + noise(this.t * 23 + i * 91) * 0.4
       const f = 1 + n * L.brazierFlicker
       s.scale.set((a.radius * 2 * f) / 128)
       s.alpha = (0.85 + n * 0.15) * a.strength * (1 - d * 0.8)
-      s.tint = L.brazierTint
+      s.tint = a.tint ?? air.keyTint
       s.rotation = i * 1.7 + this.t * 0.15
     }
 
@@ -149,18 +155,20 @@ export class Lighting {
       const n = noise(this.t * 6 + 3) * 0.6 + noise(this.t * 17 + 21) * 0.4
       c.s.scale.set((c.src.radius * 0.46 * 2 * (1 + n * L.brazierFlicker * 0.5)) / 128)
       c.s.alpha = Math.min(1, c.src.strength - 1) * (0.88 + n * 0.12) * (1 - d * 0.8)
-      c.s.tint = L.brazierTint
+      c.s.tint = c.src.tint ?? air.keyTint
     }
 
     const wsrc = world.arena.windows
     for (let i = 0; i < this.windows.length; i++) {
       const s = this.windows[i]
       const w = wsrc[i]
+      if (!w) { s.visible = false; continue }
+      s.visible = true
       const n = noise(this.t * 4 + i * 21) * 0.5 + noise(this.t * 11 + i * 8) * 0.5
       const f = 1 + n * L.windowFlicker
       s.scale.set((w.radius * 2 * f) / 128)
       s.alpha = L.windowAlpha * w.strength * (1 - d * 0.75)
-      s.tint = L.windowTint
+      s.tint = w.tint ?? air.keyTint
     }
 
     const doorN = noise(this.t * 7 + 11) * 0.55 + noise(this.t * 19 + 4) * 0.45
@@ -175,12 +183,12 @@ export class Lighting {
     const open = doorOpens(world.arena.door, world.doorOpen) ? 1 : 0
     this.door.scale.set((L.doorRadius * 1.6 * doorF * (open ? 1.7 : 0.62)) / 128)
     this.door.alpha = L.doorAlpha * (open ? 2.5 : shut) * (1 - d * 0.85)
-    this.door.tint = open ? 0xff8a40 : L.doorTint
+    this.door.tint = open ? air.doorOpenTint : air.doorGlowTint
     for (const { s, d: dr } of this.extraDoors) {
       const o = doorOpens(dr, world.doorOpen) ? 1 : 0
       s.scale.set((L.doorRadius * 1.2 * doorF * (o ? 1.55 : 0.58)) / 128)
       s.alpha = L.doorAlpha * (o ? 2.2 : shut) * (1 - d * 0.85)
-      s.tint = o ? 0xffe090 : L.doorTint
+      s.tint = o ? air.doorOpenTint : air.doorGlowTint
     }
 
     const px = lerp(p.px, p.x, alpha), py = lerp(p.py, p.y, alpha)
@@ -194,7 +202,8 @@ export class Lighting {
     while (this.flameAcc >= 1) {
       this.flameAcc -= 1
       const bz = src[fxRng.light.int(0, src.length - 1)]
-      this.particles.flame(bz.x, bz.y - 6)
+      const tongue = brazierFlame(air)
+      this.particles.flame(bz.x, bz.y - 6, tongue.tint, tongue.tint1)
     }
 
     this.renderer.render({ container: this.scene, target: this.rt, clear: true })

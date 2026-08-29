@@ -28,12 +28,13 @@ export interface RiteChoice {
   detail: string
 }
 
-// The card has to say the number the sim actually charges. Writing 'ONE VESSEL' beside a tuning
+// The card has to say the number the sim actually charges. Writing 'A LIFE' beside a tuning
 // value of two is exactly the trick the comment above forbids, so the words are built from the
 // number — as a getter, because `tuning` is live-editable through the debug API.
 const VESSELS = ['NO', 'ONE', 'TWO', 'THREE', 'FOUR', 'FIVE']
 function vesselPrice(n: number): string {
-  return `${VESSELS[n] ?? n} VESSEL${n === 1 ? '' : 'S'} OF LIFE, FOR GOOD`
+  if (n === 1) return 'A LIFE, FOR GOOD'
+  return `${VESSELS[n] ?? n} LIVES, FOR GOOD`
 }
 
 export interface RiteDef {
@@ -126,6 +127,7 @@ export function beginRoomFight(world: World): void {
   // Only into a room that is going to run waves: a body queued into a room with no wave tracking
   // would arrive after the door had already opened, with nothing left to clear it.
   if (room.boss && room.waves?.length) collectDebt(world)
+  if (room.waves?.length) collectHunt(world)
   if (room.waves?.length) {
     startWaves(world, room.waves)
     world.roomPhase = 'fighting'
@@ -145,4 +147,12 @@ function collectDebt(world: World): void {
   run.riteDebt = false
   const T = tuning.rites.toll
   queueSpawn(world, { kind: T.debtKind, x: T.debtX, y: T.debtY }, { ticks: T.debtDelay, debt: true })
+}
+
+function collectHunt(world: World): void {
+  const run = world.session.run
+  if (!run?.mysteryHunt) return
+  run.mysteryHunt = false
+  const M = tuning.economy.mystery
+  queueSpawn(world, { kind: M.huntKind, x: M.huntX, y: M.huntY }, { ticks: M.huntDelay, hunt: true })
 }

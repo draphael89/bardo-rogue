@@ -1,7 +1,11 @@
 import { Container, Graphics, Text } from 'pixi.js'
 import type { World } from '@/sim/world'
 import { tuning } from '@/tuning'
-import { label, placeCentered, P } from './ui'
+import {
+  backTitle, confirmTitle, titleDescend, townTally, wrapTitleFocus,
+  type TitleAct, type TitlePage,
+} from './titleMenu'
+import { label, placeCentered, placeLeft, P, type TypeTier } from './ui'
 
 // The title is held OVER the living hub rather than staged as a separate scene. The Bardo is already
 // the most authored thing the game owns — its braziers gutter, its motes drift, its lightmap breathes
@@ -18,6 +22,12 @@ export class TitleOverlay {
   private key = ''
   private shown = false
   private soundGate = false
+  private page: TitlePage = 'menu'
+  private focus = 0
+  private reducedEffects = false
+  private master = 1
+  private music = 1
+  private sfx = 1
   private t = 0
 
   constructor(layer: Container) {
@@ -27,11 +37,16 @@ export class TitleOverlay {
   }
 
   get visible(): boolean { return this.shown }
+  get soundGated(): boolean { return this.soundGate }
+  currentPage(): TitlePage { return this.page }
+  currentFocus(): number { return this.focus }
 
   setShown(shown: boolean): void {
     if (this.shown === shown) return
     this.shown = shown
     this.root.visible = shown
+    this.page = 'menu'
+    this.focus = 0
     this.key = ''
   }
 
@@ -41,13 +56,53 @@ export class TitleOverlay {
     this.key = ''
   }
 
+  setReducedEffects(reduced: boolean): void {
+    if (this.reducedEffects === reduced) return
+    this.reducedEffects = reduced
+    this.key = ''
+  }
+
+  setLevels(master: number, music: number, sfx: number): void {
+    if (this.master === master && this.music === music && this.sfx === sfx) return
+    this.master = master
+    this.music = music
+    this.sfx = sfx
+    this.key = ''
+  }
+
+  move(delta: -1 | 1): void {
+    if (!this.shown || this.soundGate) return
+    this.focus = wrapTitleFocus(this.page, this.focus, delta)
+    this.key = ''
+  }
+
+  confirm(): TitleAct {
+    if (!this.shown) return 'none'
+    if (this.soundGate) return 'none'
+    const next = confirmTitle(this.page, this.focus)
+    this.page = next.page
+    this.focus = next.focus
+    this.key = ''
+    return next.act
+  }
+
+  back(): boolean {
+    if (!this.shown || this.soundGate) return false
+    if (this.page === 'menu') return false
+    const next = backTitle(this.page)
+    this.page = next.page
+    this.focus = next.focus
+    this.key = ''
+    return true
+  }
+
   relayout(): void { this.key = '' }
 
   update(world: World, dtSec: number): void {
     if (!this.shown) return
     this.t += dtSec
     const m = world.session.meta
-    const next = `${tuning.view.width}|${m.attempts}|${m.victories}|${this.soundGate}`
+    const next = `${tuning.view.width}|${m.attempts}|${m.victories}|${m.remembrances}|${this.soundGate}|${this.page}|${this.focus}|${this.reducedEffects ? 1 : 0}|${this.master}|${this.music}|${this.sfx}`
     // The card is static; only the prompt breathes. Twice a second is not often, but this is the
     // first screen the game ever shows and it was destroying eleven display objects and rasterising
     // ten new text textures on every beat to recolour one label — a hitch landing exactly on the
@@ -75,8 +130,9 @@ export class TitleOverlay {
     const returning = m.attempts > 0
 
     // A veil, not a blackout: the room has to stay legible under it or there was no point holding
-    // the title over the room at all.
-    g.rect(0, 0, W, H).fill({ color: P.void, alpha: 0.62 })
+    // the title over the room at all. 0.62 buried the rack and the body; 0.48 keeps the Bardo the
+    // picture and the type the frame.
+    g.rect(0, 0, W, H).fill({ color: P.void, alpha: 0.48 })
     // Two rails frame the type and nothing else. They stop short of the edges so the room breathes
     // past them.
     const inset = 46
@@ -92,35 +148,122 @@ export class TitleOverlay {
 
     g.rect(W / 2 - 58, 116, 116, 1).fill({ color: P.red, alpha: 0.85 })
 
-    const premise = label('You fell in wars that were never yours.', 'body', P.bone)
-    placeCentered(premise, W / 2, 134); this.add(premise)
-    const premise2 = label('Every underworld you filled is waiting its turn.', 'body', P.bone)
-    placeCentered(premise2, W / 2, 150); this.add(premise2)
+    if (this.soundGate) {
+      this.paintSoundGate(W, H)
+      return
+    }
+    switch (this.page) {
+      case 'menu': this.paintMenu(W, H, returning, m.attempts, m.victories, m.remembrances); break
+      case 'settings': this.paintSettings(W, H); break
+      case 'credits': this.paintCredits(W, H); break
+      default: { const _: never = this.page; return _ }
+    }
+  }
 
-    // The prompt is the only thing on screen that moves, so it is unmistakably the thing to answer.
-    // Built white so the tint reads as the authored colour rather than multiplying two of them.
-    const prompt = label(
-      this.soundGate
-        ? 'CLICK OR PRESS A KEY TO ENABLE SOUND'
-        : returning ? 'PRESS ENTER TO DESCEND AGAIN' : 'PRESS ENTER TO DESCEND',
-      'head', 0xffffff,
-    )
+  private paintSoundGate(W: number, H: number): void {
+    // Same column as the menu: the first frame a browser shows is this gate, and a centered
+    // second line used to sit on the rack.
+    this.paintPremise(36)
+    const prompt = label('WAKE THE ROOM', 'head', 0xffffff)
     prompt.tint = this.beat ? P.gold : P.bone
     placeCentered(prompt, W / 2, H - 74); this.add(prompt)
     this.prompt = prompt
+  }
 
-    // The title remembers you. A returning player is greeted by their own count before they touch a key.
-    if (returning) {
-      const tally = label(
-        m.victories > 0
-          ? `${m.attempts} DESCENTS  ·  ${m.victories} RETURNED`
-          : `${m.attempts} DESCENTS  ·  NONE RETURNED`,
-        'meta', P.dim,
-      )
-      placeCentered(tally, W / 2, H - 38); this.add(tally)
-    } else {
-      const keys = label('ENTER / ATTACK / START', 'meta', P.dim)
-      placeCentered(keys, W / 2, H - 38); this.add(keys)
+  private paintMenu(W: number, H: number, returning: boolean, attempts: number, victories: number, remembrances: number): void {
+    // Left column: the long centered premise sat on the rack, and the three verbs sat on the body.
+    // The monument stays centered; the living room keeps the right and the floor.
+    const col = 36
+    this.paintPremise(col)
+
+    const descend = titleDescend(returning)
+    this.paintRowLeft(col, 176, descend, this.focus === 0)
+    this.paintRowLeft(col, 192, 'SETTINGS', this.focus === 1)
+    this.paintRowLeft(col, 208, 'CREDITS', this.focus === 2)
+
+    // Left with the verbs. A centered tally sat on the body; DAMNED was a score sitting on a name.
+    const foot = returning ? townTally(attempts, victories, remembrances) : 'THE GATE IS OPEN'
+    this.paintLineLeft(col, H - 38, foot, 'meta', P.dim)
+  }
+
+  private paintSettings(W: number, H: number): void {
+    const still = this.reducedEffects ? 'THE ROOM IS STILL' : 'STILL THE ROOM'
+    this.paintRow(W / 2, 148, still, this.focus === 0)
+    this.paintMeter(W / 2, 166, 'MASTER', this.master, this.focus === 1)
+    this.paintMeter(W / 2, 184, 'MUSIC', this.music, this.focus === 2)
+    this.paintMeter(W / 2, 202, 'SOUND', this.sfx, this.focus === 3)
+    this.paintRow(W / 2, 204, 'RISE', this.focus === 3)
+    const foot = label('THE ROOM LISTENS', 'meta', P.dim)
+    placeCentered(foot, W / 2, H - 38); this.add(foot)
+  }
+
+  private paintMeter(cx: number, y: number, name: string, value: number, selected: boolean): void {
+    const steps = 8
+    const pip = 5
+    const gap = 3
+    const nameT = label(name, 'head', selected ? P.bone : P.dim)
+    const nameW = Math.round(nameT.width)
+    const barW = steps * pip + (steps - 1) * gap
+    const total = nameW + 12 + barW
+    const x0 = Math.round(cx - total / 2)
+    placeLeft(nameT, x0, y)
+    this.add(nameT)
+    const filled = Math.round(value * steps)
+    const bx = x0 + nameW + 12
+    for (let i = 0; i < steps; i++) {
+      const x = bx + i * (pip + gap)
+      this.g.rect(x, y - 2, pip, 4).fill({ color: i < filled ? P.gold : P.dim, alpha: i < filled ? 0.95 : 0.35 })
+    }
+    if (selected) this.g.rect(x0, y + 7, total, 1).fill({ color: P.gold, alpha: 0.7 })
+  }
+
+  private paintCredits(W: number, H: number): void {
+    const lines: Array<[string, TypeTier, number]> = [
+      ['REMEMBERED HERE', 'meta', P.gold],
+      ['THE SMITH  ·  THE FERRYMAN', 'body', P.bone],
+      ['THE UNBURIED  ·  THE JUDGE', 'body', P.bone],
+      ['AND YOU', 'body', P.bone],
+    ]
+    let y = 142
+    for (const [text, tier, color] of lines) {
+      const row = label(text, tier, color)
+      placeCentered(row, W / 2, y); this.add(row)
+      y += tier === 'meta' ? 18 : 16
+    }
+    this.paintRow(W / 2, 204, 'RISE', true)
+    const foot = label('THE FIRST GATE', 'meta', P.dim)
+    placeCentered(foot, W / 2, H - 38); this.add(foot)
+  }
+
+  private paintPremise(col: number): void {
+    this.paintLineLeft(col, 128, 'You fell in wars that were never yours.', 'body', P.bone)
+    this.paintLineLeft(col, 142, 'Every underworld you filled', 'body', P.bone)
+    this.paintLineLeft(col, 156, 'is waiting its turn.', 'body', P.bone)
+  }
+
+  private paintLineLeft(x: number, y: number, text: string, tier: TypeTier, color: number): void {
+    const t = label(text, tier, color)
+    placeLeft(t, x, y)
+    this.add(t)
+  }
+
+  private paintRowLeft(x: number, y: number, text: string, selected: boolean): void {
+    const row = label(text, 'head', selected ? P.bone : P.dim)
+    placeLeft(row, x, y)
+    this.add(row)
+    if (selected) {
+      const w = Math.min(220, Math.round(row.width) + 8)
+      this.g.rect(x, y + 7, w, 1).fill({ color: P.gold, alpha: 0.7 })
+    }
+  }
+
+  private paintRow(cx: number, y: number, text: string, selected: boolean): void {
+    const row = label(text, 'head', selected ? P.bone : P.dim)
+    placeCentered(row, cx, y)
+    this.add(row)
+    if (selected) {
+      const w = Math.min(220, Math.round(row.width) + 20)
+      this.g.rect(Math.round(cx - w / 2), y + 7, w, 1).fill({ color: P.gold, alpha: 0.7 })
     }
   }
 

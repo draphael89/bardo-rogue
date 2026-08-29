@@ -18,7 +18,7 @@ export interface EncodedReplay { v: 1; seed: number; scenario: string; god?: boo
 export const Q = 10000
 // Exported so the harness documentation can be checked against it: the flag table drifted from
 // HARNESS.md once already, and a wrong bit list is worse than none for anyone decoding a fixture.
-export const FLAG = { aimSoft: 1, attack: 2, dodge: 4, restart: 8, attackHeld: 16, confirm: 32, choiceLeft: 64, choiceRight: 128, heavy: 256 } as const
+export const FLAG = { aimSoft: 1, attack: 2, dodge: 4, restart: 8, attackHeld: 16, confirm: 32, choiceLeft: 64, choiceRight: 128, heavy: 256, reroll: 512 } as const
 
 function copyMeta(meta: MetaStateV1): MetaStateV1 {
   if (meta.version !== 1) return defaultMetaState()
@@ -26,6 +26,9 @@ function copyMeta(meta: MetaStateV1): MetaStateV1 {
     version: 1,
     attempts: Number.isFinite(meta.attempts) ? Math.max(0, Math.floor(meta.attempts)) : 0,
     victories: Number.isFinite(meta.victories) ? Math.max(0, Math.floor(meta.victories)) : 0,
+    remembrances: Number.isFinite(meta.remembrances) ? Math.max(0, Math.floor(meta.remembrances)) : 0,
+    rerollUnlocked: !!meta.rerollUnlocked,
+    vesselUnlocked: !!meta.vesselUnlocked,
     // Blade is the only valid production weapon in v1; unknown replay ids never enter the sim.
     unlockedWeapons: ['blade'],
   }
@@ -42,7 +45,8 @@ export function encodeReplay(r: Replay): EncodedReplay {
   for (const f of r.frames) {
     const flags = (f.aimSoft ? FLAG.aimSoft : 0) | (f.attack ? FLAG.attack : 0) | (f.dodge ? FLAG.dodge : 0) | (f.restart ? FLAG.restart : 0)
       | (f.attackHeld ? FLAG.attackHeld : 0) | (f.heavy ? FLAG.heavy : 0)
-      | (f.confirm ? FLAG.confirm : 0) | (f.choiceDelta === -1 ? FLAG.choiceLeft : f.choiceDelta === 1 ? FLAG.choiceRight : 0)
+      | (f.confirm ? FLAG.confirm : 0) | (f.reroll ? FLAG.reroll : 0)
+      | (f.choiceDelta === -1 ? FLAG.choiceLeft : f.choiceDelta === 1 ? FLAG.choiceRight : 0)
     const row: EncodedRun = [Math.round(f.moveX * Q), Math.round(f.moveY * Q), Math.round(f.aimX * Q), Math.round(f.aimY * Q), flags, 1]
     const last = runs[runs.length - 1]
     if (last && last[0] === row[0] && last[1] === row[1] && last[2] === row[2] && last[3] === row[3] && last[4] === row[4]) last[5]++
@@ -63,6 +67,7 @@ export function decodeReplay(e: EncodedReplay): Replay {
       aimSoft: !!(flags & FLAG.aimSoft), attack: !!(flags & FLAG.attack), attackHeld: !!(flags & FLAG.attackHeld), heavy: !!(flags & FLAG.heavy), dodge: !!(flags & FLAG.dodge), restart: !!(flags & FLAG.restart),
     }
     if (flags & FLAG.confirm) f.confirm = true
+    if (flags & FLAG.reroll) f.reroll = true
     if (flags & FLAG.choiceLeft) f.choiceDelta = -1
     else if (flags & FLAG.choiceRight) f.choiceDelta = 1
     for (let i = 0; i < count; i++) frames.push(f)

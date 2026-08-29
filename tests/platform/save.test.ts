@@ -19,7 +19,7 @@ class HostileStorage extends MemoryStorage {
 }
 
 const ID = 'default'
-const withMeta = (attempts: number, victories = 0): BardoSave => ({ ...defaultSave(), meta: { version: 1, attempts, victories, unlockedWeapons: ['blade'] } })
+const withMeta = (attempts: number, victories = 0): BardoSave => ({ ...defaultSave(), meta: { version: 1, attempts, victories, remembrances: 0, rerollUnlocked: false, vesselUnlocked: false, unlockedWeapons: ['blade'] } })
 
 describe('web save store', () => {
   it('round-trips a payload', async () => {

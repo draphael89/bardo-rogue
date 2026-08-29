@@ -1,4 +1,5 @@
 import { CanvasTextMetrics, Text, TextStyle } from 'pixi.js'
+import { clamp01 } from './anim'
 import { crispText } from './textCrisp'
 import { TYPE, type TypeTier } from './type'
 
@@ -111,4 +112,37 @@ export function wrappedExtent(text: string, tier: TypeTier, wrapWidth: number): 
   style.wordWrapWidth = wrapWidth
   const metrics = CanvasTextMetrics.measureText(text, style)
   return { lines: metrics.lines.length, step: Math.round(metrics.lineHeight) }
+}
+
+/**
+ * HOW ANYTHING HOLDING TYPE FADES. Two functions, because the two halves of a panel cannot fade the
+ * same way, and getting this wrong looks like a bug rather than like a fade.
+ *
+ * A PLATE fades by alpha. A Graphics carries no filter, so alpha is exactly coverage — and tint is
+ * NOT a fade for one: a Graphics multiplied toward black is a black rectangle at full opacity, which
+ * is how the reward overlay used to punch three solid holes in the room on the frame it opened.
+ *
+ * TYPE fades by tint. Every `label()` here carries `crispText`, whose fragment thresholds coverage
+ * at `step(0.5, c.a)` — and Pixi bakes container alpha into the glyph vertices BEFORE the filter
+ * runs, so an alpha ramp holds a label at full brightness, erodes its letterforms from ~0.85, and
+ * then deletes all of it in one frame at 0.5. Multiplying toward black leaves alpha at 1, reads as
+ * an arrival against these near-black plates, and propagates through a Container to every child.
+ */
+export function fadeToBlack(t: number): number {
+  const v = Math.round(clamp01(t) * 255)
+  return (v << 16) | (v << 8) | v
+}
+
+/**
+ * Where the TYPE is when the plate under it is at `t`.
+ *
+ * The two fade by different means and therefore at different apparent rates: a plate at 30% alpha
+ * over a near-black room is still invisible, while type multiplied to 30% grey is already legible
+ * against it. Run flat, the words arrive before the thing they are written on — and on the way out
+ * they outlive it. Holding the type back for the first third of the plate's own ramp puts them in
+ * the order the eye expects in both directions: surface, then writing.
+ */
+const TYPE_LAG = 0.35
+export function typeBehindPlate(t: number): number {
+  return clamp01((t - TYPE_LAG) / (1 - TYPE_LAG))
 }

@@ -8,40 +8,11 @@ import { MYSTERY_COPY, canAffordMystery } from '@/sim/mystery'
 import type { MysteryOffer, RewardOffer, ShopOffer } from '@/sim/session'
 import { tuning } from '@/tuning'
 import { backPause, buildStripLadder, clampPauseFocus, duoFooter, meetingVeil, offerAct, offerCardHeight, offerSpoken, pauseFooter, pauseNudge, resolvePause, shopAct, shopSpoken, showBuildStrip, townTally, victoryKeptLine, wrapPauseFocus, type PauseAct, type PausePage, type TitleNudge } from './titleMenu'
-import { label, placeCentered, placeLeft, placeRight, wrappedCentered, wrappedExtent, P } from './ui'
+import { fadeToBlack, label, placeCentered, placeLeft, placeRight, typeBehindPlate, wrappedCentered, wrappedExtent, P } from './ui'
 import { clamp01 } from './anim'
 
-/**
- * Fade by TINT, never by alpha, for anything holding type.
- *
- * `crispText` thresholds coverage at `step(0.5, alpha)`, so a filtered label at 35% opacity does not
- * come out faint — it disappears outright, and at 60% it is fully opaque. Measured: dropping the
- * filter instead costs the boon card 28 distinct colours and 5.7% intermediate pixels against 9 and
- * 0.7%, which at a 4x upscale is visible fringing, so the filter stays and the fade goes elsewhere.
- * Multiplying toward black leaves alpha at 1, reads as an arrival against these near-black plates,
- * and propagates through a Container to every child at once.
- */
-function fadeToBlack(t: number): number {
-  const v = Math.round(clamp01(t) * 255)
-  return (v << 16) | (v << 8) | v
-}
-
-/**
- * Where the TYPE is when the plate under it is at `t`.
- *
- * The two fade by different means and therefore at different apparent rates: a plate at 30% alpha
- * over a near-black room is still invisible, while type multiplied to 30% grey is already legible
- * against it. Run flat, the words arrive before the thing they are written on and the card reads as
- * text floating over the room. Holding the type back for the first third of the plate's own fade
- * puts them in the order the eye expects — surface, then writing.
- */
 // The fight band's own row: under the life plate (y 2..28), above the play area's own business.
 const STRIP_Y = 30
-
-const TYPE_LAG = 0.35
-function behind(t: number): number {
-  return clamp01((t - TYPE_LAG) / (1 - TYPE_LAG))
-}
 
 export class RewardOverlay {
   root = new Container()
@@ -239,7 +210,7 @@ export class RewardOverlay {
     // lands on the room rather than on a scrim that was already there.
     const t0 = clamp01(age / R.scrimTicks)
     this.scrim.alpha = t0
-    this.body.tint = fadeToBlack(behind(t0))
+    this.body.tint = fadeToBlack(typeBehindPlate(t0))
     // Tint alone was never a fade for a PLATE. A Graphics multiplied to black is a black rectangle at
     // full opacity, so the old reveal punched three solid holes in the room on frame zero — 29% of a
     // 480x270 frame gone instantly — and then coloured them in. Coverage has to be alpha, and alpha is
@@ -248,7 +219,7 @@ export class RewardOverlay {
     this.g.alpha = t0
     this.cards.forEach(({ box, plate }, i) => {
       const t = clamp01((age - R.scrimTicks - i * R.cardStagger) / R.cardTicks)
-      box.tint = fadeToBlack(behind(t))
+      box.tint = fadeToBlack(typeBehindPlate(t))
       plate.alpha = t
       // Whole pixels only: a card easing through a fraction of a row drags every glyph on it
       // off the grid, which is the whole reason the type in here reads at all.

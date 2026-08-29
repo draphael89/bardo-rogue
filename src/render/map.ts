@@ -3,7 +3,7 @@ import type { DoorMark } from '@/sim/arena'
 import { mapPlan, type MapPlan } from '@/sim/route'
 import type { World } from '@/sim/world'
 import { tuning } from '@/tuning'
-import { label, placeLeft, P } from './ui'
+import { fadeToBlack, label, placeLeft, typeBehindPlate, P } from './ui'
 import { OATH } from './oathMetal'
 
 function markColor(mark: DoorMark): number {
@@ -26,6 +26,12 @@ function markColor(mark: DoorMark): number {
 export class RouteMap {
   root = new Container()
   private g = new Graphics()
+  // The type is its own child so it can leave by TINT while the plate under it leaves by ALPHA.
+  // See `fadeToBlack` in ui.ts: every label here carries `crispText`, and Pixi bakes container alpha
+  // into the glyph vertices before that filter runs — so an alpha ramp holds the words at full
+  // brightness, erodes their letterforms, and then deletes the lot in one frame at 0.5, over a plate
+  // that is still politely fading. The reward overlay's own reveal makes exactly this distinction.
+  private type = new Container()
   private texts: Text[] = []
   private key = ''
   private paused = false
@@ -33,7 +39,7 @@ export class RouteMap {
 
   constructor(layer: Container) {
     this.root.visible = false
-    this.root.addChild(this.g)
+    this.root.addChild(this.g, this.type)
     layer.addChild(this.root)
   }
 
@@ -60,7 +66,10 @@ export class RouteMap {
       && age < R.holdTicks + R.fadeTicks
     this.root.visible = show
     if (!show) return
-    this.root.alpha = age < R.holdTicks ? 1 : Math.max(0, 1 - (age - R.holdTicks) / R.fadeTicks)
+    const t = age < R.holdTicks ? 1 : Math.max(0, 1 - (age - R.holdTicks) / R.fadeTicks)
+    this.g.alpha = t
+    // Words first, then the surface they were written on — the same order the reveal arrives in.
+    this.type.tint = fadeToBlack(typeBehindPlate(t))
     const path = run.roomHistory.map(v => v.id).join('>')
     const plan = mapPlan(world.rooms, room.id)
     const next = plan.doors.map(d => `${d.mark}:${d.dest}`).join('|')
@@ -119,11 +128,13 @@ export class RouteMap {
   private clear(): void {
     for (const t of this.texts) t.destroy()
     this.texts = []
+    this.type.removeChildren()
+    this.type.tint = 0xffffff
     this.root.removeChildren()
     this.g.destroy()
     this.g = new Graphics()
-    this.root.addChild(this.g)
+    this.root.addChild(this.g, this.type)
   }
 
-  private add(t: Text): void { this.texts.push(t); this.root.addChild(t) }
+  private add(t: Text): void { this.texts.push(t); this.type.addChild(t) }
 }

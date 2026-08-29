@@ -293,6 +293,14 @@ export class InputSystem {
       } else {
         f.confirm = confirmBase || heavy
       }
+      // A victory leaves the player ALIVE in a resolved room, and stepWorld does not stop for the
+      // summary — so mashing to dismiss it was starting swings and rolls behind the card. The
+      // reward and rite modals already blank these; a reveal is a modal too.
+      // Only when a card is actually up: a stock scenario idles in 'resolved' with no run and no
+      // card, and blanking there would freeze the player in every wave/dummy scenario.
+      if (revealStart >= 0) {
+        f.moveX = 0; f.moveY = 0; f.attack = false; f.attackHeld = false; f.heavy = false; f.dodge = false
+      }
     }
     this.pressed.clear(); this.mousePressed = false; this.mouseHeavyPressed = false
     return f

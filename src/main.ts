@@ -104,6 +104,8 @@ async function boot() {
   let reducedEffects = q.has('reduced') ? q.get('reduced') !== '0' : storedReducedEffects
   let world: World = createWorld(seed, scenario, { god, ...(scenario === 'loop' ? { meta: savedSave.meta } : {}) })
   const resumed = scenario === 'loop' && !!savedSave.checkpoint && restoreCheckpoint(world, savedSave.checkpoint)
+  // Set only for the roomEnter that the resume itself emits; cleared by the first arrival.
+  let resumeEntryPending = resumed
   if (scenario === 'loop' && savedSave.checkpoint) {
     // Consumed either way. A resumed checkpoint must not outlive its own load, or the same room can
     // be retried from its entry HP without limit; a refused one must not be retried every boot.
@@ -214,14 +216,10 @@ async function boot() {
   }
 
   // The A/B verb conditions, applied to live device input only. no-heavy removes the independent
-  // heavy verb (the chain's committed third swing is untouched, which IS the pre-verb behaviour).
-  // no-dash drops attack intent while the body is rolling, so the dodge-to-attack cancel never sees
-  // a press; a swing after the roll needs a fresh press on landing.
+  // heavy verb by filtering the press at the source, so it can never be queued; the chain's
+  // committed third swing is untouched, which IS the pre-verb behaviour under test.
   const filterVerbs = (f: InputFrame): InputFrame => {
     if (playtest === 'no-heavy' && f.heavy) return { ...f, heavy: false }
-    if (playtest === 'no-dash' && world.player.state === 'dodge' && (f.attack || f.attackHeld || f.heavy)) {
-      return { ...f, attack: false, attackHeld: false, heavy: false }
-    }
     return f
   }
 
@@ -242,17 +240,35 @@ async function boot() {
       // event here still persists meta (Remembrances are banked as they are earned) but leaves the
       // checkpoint alone: a snapshot taken after a room's reward banked would, on resume, re-enter
       // that room and grant the reward a second time — once per reload, forever.
-      const atBoundary = world.events.some(ev => ev.type === 'runStarted' || ev.type === 'roomEnter')
+      // An attempt that is over must leave nothing to resume into, or closing the game in the Bardo
+      // and reopening it restores the last room as a live run.
+      const terminal = world.events.some(ev => ev.type === 'runWon' || ev.type === 'runLost' || ev.type === 'returned')
+      // Only an actual room ARRIVAL writes one. `runStarted` is flushed during the transition,
+      // before enterRoom has recorded the visit or replaced the seed boundaryRng, so a checkpoint
+      // taken there restores with empty history, depth 0 and RNG state 0.
+      const arrived = !terminal && world.events.some(ev => ev.type === 'roomEnter')
+      // A resume emits its own roomEnter (rooms.ts). Without this the checkpoint consumed at boot is
+      // written straight back on the first tick, and the fight can be reloaded from entry HP forever.
+      const fromResume = arrived && resumeEntryPending
+      if (arrived) resumeEntryPending = false
+      const checkpointWrite = terminal ? { checkpoint: null }
+        : arrived && !fromResume ? { checkpoint: captureCheckpoint(world) }
+        : {}
       savedSave = {
         ...savedSave,
         meta: { ...world.session.meta, unlockedWeapons: [...world.session.meta.unlockedWeapons] },
-        ...(atBoundary ? { checkpoint: captureCheckpoint(world) } : {}),
+        ...checkpointWrite,
       }
       void persist()
       platform.setRunActive(world.session.run !== null)   // so a desktop quit can ask before binning a run
     }
     world.events.length = 0
   }
+
+  // Abandoning mutates the world from outside the recorded frame stream, so a replay of any
+  // recording that spans one never returns to the hub and diverges from everything after it. The
+  // row is therefore absent while ANY recording is live, not only a playtest session.
+  const canGiveBack = () => !playtest && !recorder.recording && canAbandon(world)
 
   const giveTheAttemptBack = () => {
     if (!abandonRun(world)) return false
@@ -370,7 +386,7 @@ async function boot() {
       }
       padStartPrev = startNow
       if (userPaused && !titleWasUp) {
-        const leaving = canAbandon(world)
+        const leaving = canGiveBack()
         const up = !!pad?.buttons[12]?.pressed
         const down = !!pad?.buttons[13]?.pressed
         const left = !!pad?.buttons[14]?.pressed
@@ -495,8 +511,12 @@ async function boot() {
       if (!savable) { presenter.hud.showBanner('PROFILE IS READ ONLY', 'this session must not overwrite it', 2.4); return }
       // A live run holds sim state no import can reconcile; refuse rather than half-apply it.
       if (world.session.run) { presenter.hud.showBanner('A RUN IS UNDERWAY', 'return to the bardo first', 2.2); return }
+      // An import calls reset(), which stops the recorder; a playtest session has no way to rearm
+      // it, so every later F4 would report that nothing is recording.
+      if (playtest) { presenter.hud.showBanner('A PLAYTEST IS ARMED', 'reload without ?playtest to import', 2.4); return }
       const priorSave = savedSave
       const priorStoredReducedEffects = storedReducedEffects
+      const priorStoredMaster = storedMaster
       const priorStoredMusic = storedMusic
       const priorStoredSfx = storedSfx
       savedSave = parsed.save
@@ -509,6 +529,7 @@ async function boot() {
       if (!await persist()) {
         savedSave = priorSave
         storedReducedEffects = priorStoredReducedEffects
+        storedMaster = priorStoredMaster
         storedMusic = priorStoredMusic
         storedSfx = priorStoredSfx
         presenter.hud.showBanner('SAVE NOT IMPORTED', 'the file could not be written', 2.4)
@@ -529,6 +550,16 @@ async function boot() {
   // Arm the playtest session: record from tick zero (the world is fresh here, so no reset is
   // needed), and keep the meta snapshot the recorder was handed — the exported bundle must carry
   // the exact counters the run seed was derived from, not the ones the session has mutated since.
+  // no-dash closes the cancel WINDOW rather than filtering presses. Starving the sim of input
+  // cannot work here: a dodge and an attack pressed on the same free tick both pass (the body is
+  // not rolling yet), and an attack buffered just before the roll is already queued — either one
+  // still reaches the cancel at travel tick 9 and launches the dash attack, quietly contaminating
+  // the condition it was supposed to remove. Lifting the gate past the roll's own travel removes
+  // the mechanism instead, so a queued swing simply lands after the roll like any other.
+  if (playtest === 'no-dash' && !botName) {
+    tuning.player.dodge.attackCancelFrom = tuning.player.dodge.travel + 99
+    console.log('[playtest] no-dash: the dodge-to-attack cancel is disabled for this session')
+  }
   if (playtest && !botName) {
     // The recorder takes its own defensive copy of meta and holds it for the whole session, so the
     // bundle is always stamped with the counters the run seeds were derived from.
@@ -566,6 +597,18 @@ async function boot() {
   // disagree. Pausing used to stop only the simulation: the bed kept playing behind the overlay and
   // a backgrounded tab kept a synthesiser running indefinitely.
   const setPaused = (p: boolean) => {
+    // Seed the pause card's pad edges from the buttons ALREADY down when it opens. A controller
+    // player pausing mid-attack holds A; without this the card sees A down with no previous state,
+    // reads it as a fresh press, confirms the focused RISE row and closes on the frame it opened —
+    // so pausing was impossible in exactly the case you most want to pause.
+    if (p && !userPaused) {
+      const pad = firstPad()
+      padPauseUpPrev = !!pad?.buttons[PAD_MENU_UP]?.pressed
+      padPauseDownPrev = !!pad?.buttons[PAD_MENU_DOWN]?.pressed
+      padPauseLeftPrev = !!pad?.buttons[PAD_CHOICE_LEFT]?.pressed
+      padPauseRightPrev = !!pad?.buttons[PAD_CHOICE_RIGHT]?.pressed
+      padPauseChoosePrev = PAD_PAUSE_CHOOSE.some(i => !!pad?.buttons[i]?.pressed)
+    }
     // Resuming: the press that operated the card must not also reach the game. sample() is what
     // drains latched pulses and ages pad edges, and it has not run since the pause began — so the
     // Enter that chose RESUME would confirm the modal underneath, and A would roll the player.
@@ -683,7 +726,7 @@ async function boot() {
       return
     }
     if (userPaused && !e.repeat) {
-      const leaving = canAbandon(world)
+      const leaving = canGiveBack()
       if (e.code === 'ArrowUp' || e.code === 'KeyW') { e.preventDefault(); presenter.reward.movePause(-1, leaving); return }
       if (e.code === 'ArrowDown' || e.code === 'KeyS') { e.preventDefault(); presenter.reward.movePause(1, leaving); return }
       if (e.code === 'ArrowLeft' || e.code === 'KeyA') { e.preventDefault(); nudgePauseLevel(-1); return }

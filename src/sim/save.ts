@@ -181,6 +181,13 @@ export function migrateSave(input: unknown, opts: ParseSaveOptions = {}): Migrat
   // MIGRATED document, absent is simply a field that version predates.
   if (obj.meta !== undefined && (!isObj(obj.meta) || (obj.meta.version !== undefined && obj.meta.version !== 1))) return { kind: 'corrupt', reason: 'bad-meta' }
   if (obj.settings !== undefined && (!isObj(obj.settings) || (obj.settings.version !== undefined && obj.settings.version !== 1 && obj.settings.version !== 2))) return { kind: 'corrupt', reason: 'bad-settings' }
+  // A document ALREADY at the current schema must carry the current settings shape. Schema 3 exists
+  // partly to require V2, so a v3 envelope holding v1 settings is a mixed-generation or damaged
+  // file, not a readable one: accepting it would parse 'ok', skip the good backup, and let the next
+  // write normalize and rotate the damaged document instead of recovering from it. V1 settings are
+  // legitimate only on a document still being migrated UP from schema 1 or 2.
+  if (sv === SAVE_SCHEMA_VERSION && isObj(obj.settings) && obj.settings.version !== undefined
+    && obj.settings.version !== 2) return { kind: 'corrupt', reason: 'bad-settings' }
 
   // Every ENVELOPE version (2 and up) has always carried both payloads, so a sparse one was never
   // written by us and is damage. Treating it as valid-with-defaults would be worse than corruption --

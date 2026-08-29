@@ -23,8 +23,9 @@ explain mid-playtest. The build stays pinned until the last tester finishes.
 - **What you may say before run 1** (verbatim, nothing more): "WASD moves, mouse aims and clicks to
   attack. A controller works too. Everything else the game teaches. I can't help while you play."
 - **Recording.** At the death or victory card, the tester presses **F4** and a telemetry bundle file
-  downloads. One bundle per run — each carries the whole session so far, so a later bundle supersedes
-  an earlier one if any go missing. The tester sends every bundle to the organizer. Rename each to
+  downloads. One bundle per run. A bundle covers only the session since the last page load, so changing
+  the URL between runs starts a fresh recording: **every run's file must be collected**, and a
+  later one cannot stand in for a missing earlier one. The tester sends every bundle to the organizer. Rename each to
   `T<n>-run<r>-<condition>.json` before sending.
 - **Ending a run.** Runs end by dying or by beating Minos — there is no giving up. The pause card's
   abandon row is deliberately hidden during a playtest session, because abandoning would break the
@@ -39,9 +40,9 @@ Three URL conditions:
 
 | Condition | URL | What changes |
 |---|---|---|
-| baseline | `?profile=baseline` | All verbs available. |
-| no-heavy | `?profile=no-heavy` | The independent heavy input is off. The heavy exists only as the chain's third swing. |
-| no-dash | `?profile=no-dash` | The dodge-to-attack cancel window is closed. |
+| baseline | `?playtest=baseline` | All verbs available. |
+| no-heavy | `?playtest=no-heavy` | The independent heavy input is off. The heavy exists only as the chain's third swing. |
+| no-dash | `?playtest=no-dash` | The dodge-to-attack cancel window is closed. |
 
 **Run 1 is always baseline, for everyone.** It is the comparable onboarding sample; do not vary it.
 Runs 2–3 follow this table. Recruit testers in order T1, T2, … — the table keeps every condition at

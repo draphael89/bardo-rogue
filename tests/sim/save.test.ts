@@ -93,6 +93,22 @@ describe('parseSave', () => {
     }
   })
 
+  it('refuses a current-schema document that still carries V1 settings', () => {
+    // Schema 3 exists partly to require the V2 slider shape, so a v3 envelope holding v1 settings is
+    // mixed-generation damage. Accepting it would parse 'ok', skip the good backup, and let the next
+    // write rotate the damaged document over the last recoverable one.
+    const mixed = CANONICAL.replace('"version":2,"reducedEffects":true,"master":1,"music":0.875,"sfx":1',
+      '"version":1,"reducedEffects":true')
+    const r = parseSave(mixed)
+    expect(r.kind).toBe('corrupt')
+    if (r.kind === 'corrupt') expect(r.reason).toBe('bad-settings')
+  })
+
+  it('still accepts V1 settings on a document being migrated up', () => {
+    const r = parseSave(CANONICAL_V2)   // schemaVersion 2, settings version 1
+    expect(r.kind).toBe('migrated')
+  })
+
   it('refuses a pre-current document that carries neither payload', () => {
     // {"schemaVersion":1} was never written by anything: migrateLegacySave always builds a v1 around
     // at least one payload. Migrating it into all-defaults would let importing such a file wipe real

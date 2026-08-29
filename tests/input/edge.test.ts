@@ -702,3 +702,28 @@ describe('releaseHeldIntent: the press that operated the pause card stays out of
     expect(h.input.sample(w).moveY).toBeLessThan(0)
   })
 })
+
+describe('the reveal is a modal: combat input does not run behind the card', () => {
+  it('blanks movement and attacks while the victory summary is up', () => {
+    const h = harness()
+    const w = createWorld(1, 'loop')
+    prepareWeapon(w)
+    startRun(w, 'bardo')
+    finishRun(w, 'won')
+    h.win.fire('keydown', key('KeyW'))
+    h.win.fire('keydown', key('KeyJ'))
+    const f = h.input.sample(w)
+    expect(f.moveY).toBe(0)
+    expect(f.attack).toBe(false)
+    expect(f.dodge).toBe(false)
+  })
+
+  it('leaves a stock scenario idling in resolved fully playable', () => {
+    // No run, so no card — blanking here would freeze every wave and dummy scenario.
+    const h = harness()
+    const w = createWorld(1, 'dummy')
+    w.roomPhase = 'resolved'
+    h.win.fire('keydown', key('KeyW'))
+    expect(h.input.sample(w).moveY).toBeLessThan(0)
+  })
+})

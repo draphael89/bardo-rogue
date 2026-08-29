@@ -174,6 +174,13 @@ export function captureCheckpoint(world: World): RunCheckpoint | null {
 export function restoreCheckpoint(world: World, snap: RunCheckpoint): boolean {
   if (world.scenario !== 'loop') return false
   if (snap.version !== 1) return false
+  // Build the route this snapshot implies and ask it about the room FIRST. Returning false further
+  // down — after the run is installed, the player armed and the route replaced — left the caller
+  // holding a live run it had just been told did not restore: the player stood in the Bardo while
+  // the host reported an attempt in progress, and abandoning banked that stale run's depth.
+  const template = templateForSeed(snap.seed)
+  const rooms = buildSliceRooms(template, new Rng(snap.seed))
+  if (!rooms.some(r => r.id === snap.roomId)) return false
   world.session.preparedWeapon = snap.weapon
   world.session.run = {
     seed: snap.seed,
@@ -208,8 +215,7 @@ export function restoreCheckpoint(world: World, snap: RunCheckpoint): boolean {
   world.player.maxHp = snap.maxHp
   world.player.armed = true
   grantArm(world, snap.weapon)
-  const template = templateForSeed(snap.seed)
-  installRoute(world, buildSliceRooms(template, new Rng(snap.seed)), template)
+  installRoute(world, rooms, template)
   world.rng = Rng.fromState(snap.boundaryRng)
   if (snap.map) world.session.run.map = {
     template: snap.map.template === FIRST_GATE.id ? FIRST_GATE.id : snap.map.template,
@@ -219,11 +225,6 @@ export function restoreCheckpoint(world: World, snap: RunCheckpoint): boolean {
       edges: n.edges.map(e => ({ dir: e.dir, to: e.to, mark: e.mark })),
     })),
   }
-  // Ask the installed route whether this node exists BEFORE entering it. The old guard compared
-  // run.roomId against snap.roomId, but run.roomId was assigned from the snapshot forty lines above,
-  // so it could never be false — a checkpoint naming a room this build's route does not contain
-  // reported success and stranded the player in the hub with a live run, every reload.
-  if (!world.rooms.some(r => r.id === snap.roomId)) return false
   enterRoomById(world, snap.roomId, 'resume')
   // enterRoom rebuilds the node; keep the door shut if this snapshot was a modal.
   if (snap.pendingReward || snap.pendingRite || snap.pendingShop || snap.pendingMystery) setDoorWalkable(world.arena, false)

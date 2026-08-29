@@ -11,15 +11,22 @@ const LEGACY_SETTINGS = JSON.stringify({ version: 1, reducedEffects: true })
 
 // The canonical bytes, in the exact key order serializeSave emits. This string is the cross-host
 // contract: the browser adapter and the desktop adapter must both read and write exactly this.
-const CANONICAL = '{"schemaVersion":2,"contentRevision":"0.1.0","profileId":"default","revision":4,'
+const CANONICAL = '{"schemaVersion":3,"contentRevision":"0.1.0","profileId":"default","revision":4,'
+  + '"settings":{"version":2,"reducedEffects":true,"master":1,"music":0.875,"sfx":1},'
+  + '"meta":{"version":1,"attempts":9,"victories":2,"remembrances":0,"rerollUnlocked":false,"vesselUnlocked":false,"unlockedWeapons":["blade"]},"checkpoint":null}'
+
+// The schema-2 fixture (settings V1, no master slider, no checkpoint) — the bump's migration evidence.
+const CANONICAL_V2 = '{"schemaVersion":2,"contentRevision":"0.1.0","profileId":"default","revision":4,'
   + '"settings":{"version":1,"reducedEffects":true},'
   + '"meta":{"version":1,"attempts":9,"victories":2,"unlockedWeapons":["blade"]},"checkpoint":null}'
+
+const DEFAULT_SETTINGS = { version: 2, reducedEffects: false, master: 1, music: 1, sfx: 1 }
 
 describe('save envelope', () => {
   it('starts a fresh profile at revision 0 with the current schema and content revision', () => {
     expect(defaultSave()).toEqual({
       schemaVersion: SAVE_SCHEMA_VERSION, contentRevision: CONTENT_REVISION, profileId: DEFAULT_PROFILE_ID,
-      revision: 0, settings: { version: 1, reducedEffects: false }, meta: defaultMetaState(), checkpoint: null,
+      revision: 0, settings: DEFAULT_SETTINGS, meta: defaultMetaState(), checkpoint: null,
     })
   })
 
@@ -58,9 +65,9 @@ describe('parseSave', () => {
     ['an empty object', '{}', 'bad-schema-version'],
     ['a string schemaVersion', '{"schemaVersion":"2"}', 'bad-schema-version'],
     ['a fractional schemaVersion', '{"schemaVersion":1.5}', 'bad-schema-version'],
-    ['a wrong-typed meta', '{"schemaVersion":2,"meta":42}', 'bad-meta'],
-    ['an unknown meta version', '{"schemaVersion":2,"meta":{"version":99,"attempts":50}}', 'bad-meta'],
-    ['a wrong-typed settings', '{"schemaVersion":2,"settings":true}', 'bad-settings'],
+    ['a wrong-typed meta', '{"schemaVersion":3,"meta":42}', 'bad-meta'],
+    ['an unknown meta version', '{"schemaVersion":3,"meta":{"version":99,"attempts":50}}', 'bad-meta'],
+    ['a wrong-typed settings', '{"schemaVersion":3,"settings":true}', 'bad-settings'],
   ]
   it.each(CORRUPT)('reports %s as corrupt and keeps the bytes for the store to preserve', (_label, raw, reason) => {
     const r = parseSave(raw)
@@ -72,16 +79,34 @@ describe('parseSave', () => {
     expect(r.save).toEqual(defaultSave())    // never a half-read save
   })
 
-  it('refuses a sparse current-schema document rather than reading it as defaults', () => {
-    // Every v2 envelope this build ever wrote carries all seven fields, so `{"schemaVersion":2}` was
+  it('refuses a sparse envelope-versioned document rather than reading it as defaults', () => {
+    // Every envelope (v2 and up) this project ever wrote carries all its fields, so a sparse one was
     // never written by us. Parsing it as valid-with-defaults would skip the backup at boot, accept it
     // on import, and let the next autosave rotate the last good generation away under zeroes.
-    const bare = parseSave('{"schemaVersion":2}')
-    expect(bare.kind).toBe('corrupt')
-    if (bare.kind === 'corrupt') expect(bare.reason).toBe('missing-meta')
-    const metaOnly = parseSave('{"schemaVersion":2,"meta":{"version":1,"attempts":3}}')
-    expect(metaOnly.kind).toBe('corrupt')
-    if (metaOnly.kind === 'corrupt') expect(metaOnly.reason).toBe('missing-settings')
+    for (const sv of [2, 3]) {
+      const bare = parseSave(`{"schemaVersion":${sv}}`)
+      expect(bare.kind).toBe('corrupt')
+      if (bare.kind === 'corrupt') expect(bare.reason).toBe('missing-meta')
+      const metaOnly = parseSave(`{"schemaVersion":${sv},"meta":{"version":1,"attempts":3}}`)
+      expect(metaOnly.kind).toBe('corrupt')
+      if (metaOnly.kind === 'corrupt') expect(metaOnly.reason).toBe('missing-settings')
+    }
+  })
+
+  it('refuses a current-schema document that still carries V1 settings', () => {
+    // Schema 3 exists partly to require the V2 slider shape, so a v3 envelope holding v1 settings is
+    // mixed-generation damage. Accepting it would parse 'ok', skip the good backup, and let the next
+    // write rotate the damaged document over the last recoverable one.
+    const mixed = CANONICAL.replace('"version":2,"reducedEffects":true,"master":1,"music":0.875,"sfx":1',
+      '"version":1,"reducedEffects":true')
+    const r = parseSave(mixed)
+    expect(r.kind).toBe('corrupt')
+    if (r.kind === 'corrupt') expect(r.reason).toBe('bad-settings')
+  })
+
+  it('still accepts V1 settings on a document being migrated up', () => {
+    const r = parseSave(CANONICAL_V2)   // schemaVersion 2, settings version 1
+    expect(r.kind).toBe('migrated')
   })
 
   it('refuses a pre-current document that carries neither payload', () => {
@@ -97,12 +122,12 @@ describe('parseSave', () => {
     // A v1 doc with no settings key is a real settings-less legacy player, not damage.
     const r = migrateSave({ schemaVersion: 1, meta: { version: 1, attempts: 3, victories: 0, unlockedWeapons: ['blade'] } })
     expect(r.kind).toBe('ok')
-    if (r.kind === 'ok') expect(r.save.settings).toEqual({ version: 1, reducedEffects: false })
+    if (r.kind === 'ok') expect(r.save.settings).toEqual(DEFAULT_SETTINGS)
   })
 
   it('clamps garbage counters the way loadMeta does', () => {
     const r = parseSave('{"schemaVersion":2,"settings":{"version":1,"reducedEffects":false},"meta":{"version":1,"attempts":-5,"victories":1.9,"unlockedWeapons":"blade"}}')
-    expect(r.save.meta).toEqual({ version: 1, attempts: 0, victories: 1, unlockedWeapons: ['blade'] })
+    expect(r.save.meta).toEqual({ version: 1, attempts: 0, victories: 1, remembrances: 0, rerollUnlocked: false, vesselUnlocked: false, unlockedWeapons: ['blade'] })
   })
 
   it('drops a counter that JSON parsed to Infinity, exactly as loadMeta does', () => {
@@ -147,7 +172,7 @@ describe('parseSave', () => {
   })
 
   it('never lets an injected __proto__ key ride along into the document', () => {
-    const r = parseSave('{"schemaVersion":2,"__proto__":{"polluted":true},"settings":{"version":1,"reducedEffects":false},"meta":{"version":1,"attempts":3}}')
+    const r = parseSave('{"schemaVersion":3,"__proto__":{"polluted":true},"settings":{"version":1,"reducedEffects":false},"meta":{"version":1,"attempts":3}}')
     expect(Object.keys(r.save)).toEqual(['schemaVersion', 'contentRevision', 'profileId', 'revision', 'settings', 'meta', 'checkpoint'])
     expect(({} as Record<string, unknown>).polluted).toBeUndefined()
   })
@@ -168,13 +193,35 @@ describe('migrateSave', () => {
     expect(r.save.meta.attempts).toBe(3)
     expect(r.save.checkpoint).toBeNull()
   })
+
+  // Schema 3 carries BOTH halves, so a v2 document must gain a null checkpoint AND the new sliders.
+  it('upgrades a v2 envelope: null checkpoint, defaulted sliders, reduced effects kept', () => {
+    const r = parseSave(CANONICAL_V2)
+    expect(r.kind).toBe('migrated')
+    if (r.kind !== 'migrated') return
+    expect(r.from).toBe(2)
+    expect(r.save.schemaVersion).toBe(3)
+    expect(r.save.settings).toEqual({ version: 2, reducedEffects: true, master: 1, music: 1, sfx: 1 })
+    expect(r.save.checkpoint).toBeNull()
+    expect(r.save.meta.attempts).toBe(9)
+    expect(r.save.revision).toBe(4)
+  })
+
+  it('clamps out-of-range or garbage sliders to the authored mix', () => {
+    const r = parseSave(CANONICAL.replace(
+      '"master":1,"music":0.875,"sfx":1',
+      '"master":-2,"music":9,"sfx":"loud"'))
+    expect(r.save.settings.master).toBe(0)
+    expect(r.save.settings.music).toBe(1)
+    expect(r.save.settings.sfx).toBe(1)
+  })
 })
 
 describe('legacy key migration', () => {
   it('carries attempts, victories and settings out of the two old keys', () => {
     const s = migrateLegacySave(LEGACY_META, LEGACY_SETTINGS)
     expect(s).not.toBeNull()
-    expect(s?.meta).toEqual({ version: 1, attempts: 9, victories: 2, unlockedWeapons: ['blade'] })
+    expect(s?.meta).toEqual({ version: 1, attempts: 9, victories: 2, remembrances: 0, rerollUnlocked: false, vesselUnlocked: false, unlockedWeapons: ['blade'] })
     expect(s?.settings.reducedEffects).toBe(true)
     expect(s?.schemaVersion).toBe(SAVE_SCHEMA_VERSION)
     expect(s?.revision).toBe(0)

@@ -10,14 +10,21 @@
 //     overwriting it with the fields this build understands would silently destroy the rest.
 //   - the two pre-envelope browser keys are read (see migrateLegacySave) and never deleted, so
 //     a rollback to an older build still finds a player's attempts and victories where it left them.
+import { parseCheckpoint, normalizeCheckpoint, type RunCheckpoint } from './checkpoint'
 import { defaultMetaState, type MetaStateV1 } from './session'
 import { ARM, type ArmId } from './weapons'
-import type { SettingsStateV1 } from './storage'
+import { defaultSettings, normalizeSettings, type SettingsStateV2 } from './storage'
+
+export type { RunCheckpoint }
 
 // Bumped only when the ENVELOPE shape changes; every bump adds one UPGRADES entry and one fixture.
 // 1 is the synthetic shape the two legacy keys deserialize into, so the legacy import and every
 // future upgrade run through the same chain.
-export const SAVE_SCHEMA_VERSION = 2
+// 3 carries TWO changes that landed together: RunCheckpoint stopped being `never` and became a real
+// node-resume payload, and settings grew volume sliders (V2). One version for both on purpose — two
+// builds each stamping 3 for a different document is the one failure the version number exists to
+// prevent, because neither would see the other as 'future' and both would happily overwrite it.
+export const SAVE_SCHEMA_VERSION = 3
 
 // Diagnostic only: which build wrote this file. Hand-maintained against package.json's version --
 // stamping it from the build would drag Vite into src/sim for a string that never gates a load.
@@ -29,17 +36,14 @@ const MAX_COUNTER = 1_000_000_000
 // profileId becomes a filename in the desktop adapter, so it is constrained here, at the source.
 const PROFILE_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/
 
-// RESERVED (see PLATFORM_STRATEGY.md section H). `never` keeps the slot in the type and in the JSON
-// while making it impossible to construct one: filling it in later is a change to this line plus a
-// schemaVersion bump, with no re-key and no churn in consumers.
-export type RunCheckpoint = never
+// Node-boundary resume. A damaged checkpoint is dropped; it must never take the profile with it.
 
 export interface BardoSave {
   schemaVersion: number
   contentRevision: string
   profileId: string
   revision: number
-  settings: SettingsStateV1
+  settings: SettingsStateV2
   meta: MetaStateV1
   checkpoint: RunCheckpoint | null
 }
@@ -95,22 +99,42 @@ function validateMeta(input: unknown): MetaStateV1 {
   if (Array.isArray(v.unlockedWeapons)) {
     for (const id of v.unlockedWeapons) if (isArmId(id) && !seen.has(id)) { seen.add(id); unlockedWeapons.push(id) }
   }
-  return { version: 1, attempts: count(v.attempts), victories: count(v.victories), unlockedWeapons }
+  return {
+    version: 1,
+    attempts: count(v.attempts),
+    victories: count(v.victories),
+    remembrances: count(v.remembrances),
+    rerollUnlocked: v.rerollUnlocked === true,
+    vesselUnlocked: v.vesselUnlocked === true,
+    unlockedWeapons,
+  }
 }
-function validateSettings(input: unknown, preferred: boolean): SettingsStateV1 {
-  const v = isObj(input) ? input : {}
-  return { version: 1, reducedEffects: typeof v.reducedEffects === 'boolean' ? v.reducedEffects : preferred }
+// storage.ts owns the shape and the clamping; this file owns only the envelope around it.
+function validateSettings(input: unknown, preferred: boolean): SettingsStateV2 {
+  return normalizeSettings(isObj(input) ? input : {}, preferred)
 }
 
 // The one place the envelope's key order is written. Fields are enumerated rather than spread so a
 // hostile "__proto__" or an unknown key from JSON.parse can never ride along into the document.
-function envelope(profileId: string, revision: number, contentRevision: string, settings: SettingsStateV1, meta: MetaStateV1): BardoSave {
-  return { schemaVersion: SAVE_SCHEMA_VERSION, contentRevision, profileId, revision, settings, meta, checkpoint: null }
+// The checkpoint parameter is load-bearing: a 5-arg envelope that hardcodes null compiles fine and
+// silently erases a live checkpoint on the next serialize or revision bump.
+function envelope(
+  profileId: string,
+  revision: number,
+  contentRevision: string,
+  settings: SettingsStateV2,
+  meta: MetaStateV1,
+  checkpoint: RunCheckpoint | null = null,
+): BardoSave {
+  return {
+    schemaVersion: SAVE_SCHEMA_VERSION, contentRevision, profileId, revision, settings, meta,
+    checkpoint: checkpoint ? normalizeCheckpoint(checkpoint) : null,
+  }
 }
 
 export function defaultSave(opts: ParseSaveOptions = {}): BardoSave {
   return envelope(profileIdOf(opts.profileId), 0, CONTENT_REVISION,
-    { version: 1, reducedEffects: !!opts.preferredReducedEffects }, defaultMetaState())
+    defaultSettings(!!opts.preferredReducedEffects), defaultMetaState())
 }
 
 // Canonical bytes. Re-normalises on the way out, so serializeSave(parseSave(s).save) is stable and
@@ -118,18 +142,21 @@ export function defaultSave(opts: ParseSaveOptions = {}): BardoSave {
 export function serializeSave(save: BardoSave): string {
   return JSON.stringify(envelope(
     profileIdOf(save.profileId), revisionOf(save.revision), contentRevisionOf(save.contentRevision),
-    validateSettings(save.settings, false), validateMeta(save.meta)))
+    validateSettings(save.settings, false), validateMeta(save.meta), parseCheckpoint(save.checkpoint)))
 }
 
 // Monotonic write counter: the field that makes a backup or a cloud conflict diagnosable.
 export function bumpRevision(save: BardoSave): BardoSave {
   return envelope(profileIdOf(save.profileId), Math.min(Number.MAX_SAFE_INTEGER, revisionOf(save.revision) + 1),
-    CONTENT_REVISION, validateSettings(save.settings, false), validateMeta(save.meta))
+    CONTENT_REVISION, validateSettings(save.settings, false), validateMeta(save.meta), parseCheckpoint(save.checkpoint))
 }
 
 // key = the version being upgraded FROM.
 const UPGRADES: Record<number, (prev: Obj) => Obj> = {
   1: prev => ({ ...prev, schemaVersion: 2, revision: 0, contentRevision: CONTENT_REVISION, checkpoint: null }),
+  // Both halves of 3 are field-level: normalizeSettings defaults the new sliders and parseCheckpoint
+  // defaults a missing checkpoint, so the step only advances the version and carries the payload.
+  2: prev => ({ ...prev, schemaVersion: 3 }),
 }
 
 // Takes an already-parsed value so migrations are testable with plain object fixtures.
@@ -153,15 +180,21 @@ export function migrateSave(input: unknown, opts: ParseSaveOptions = {}): Migrat
   // Present-but-wrong-typed is damage and must not be silently zeroed into a fresh save; on a
   // MIGRATED document, absent is simply a field that version predates.
   if (obj.meta !== undefined && (!isObj(obj.meta) || (obj.meta.version !== undefined && obj.meta.version !== 1))) return { kind: 'corrupt', reason: 'bad-meta' }
-  if (obj.settings !== undefined && (!isObj(obj.settings) || (obj.settings.version !== undefined && obj.settings.version !== 1))) return { kind: 'corrupt', reason: 'bad-settings' }
+  if (obj.settings !== undefined && (!isObj(obj.settings) || (obj.settings.version !== undefined && obj.settings.version !== 1 && obj.settings.version !== 2))) return { kind: 'corrupt', reason: 'bad-settings' }
+  // A document ALREADY at the current schema must carry the current settings shape. Schema 3 exists
+  // partly to require V2, so a v3 envelope holding v1 settings is a mixed-generation or damaged
+  // file, not a readable one: accepting it would parse 'ok', skip the good backup, and let the next
+  // write normalize and rotate the damaged document instead of recovering from it. V1 settings are
+  // legitimate only on a document still being migrated UP from schema 1 or 2.
+  if (sv === SAVE_SCHEMA_VERSION && isObj(obj.settings) && obj.settings.version !== undefined
+    && obj.settings.version !== 2) return { kind: 'corrupt', reason: 'bad-settings' }
 
-  // A document that ARRIVES at the current schema must carry its required fields: every envelope this
-  // build has ever written has all of them, so a sparse one was never written by us. Treating it as
-  // valid-with-defaults would be worse than corruption -- it would parse 'ok', skip the backup, and
-  // the next autosave would rotate the last good generation away under a document full of zeroes.
-  // (A doc migrated UP from an older version keeps the leniency above: a v1 with no settings key is a
-  // real settings-less legacy player, not damage.)
-  if (sv === SAVE_SCHEMA_VERSION) {
+  // Every ENVELOPE version (2 and up) has always carried both payloads, so a sparse one was never
+  // written by us and is damage. Treating it as valid-with-defaults would be worse than corruption --
+  // it would parse 'ok'/'migrated', skip the backup, and the next autosave would rotate the last good
+  // generation away under a document full of zeroes. Only the synthetic v1 keeps the leniency below:
+  // a v1 with no settings key is a real settings-less legacy player, not damage.
+  if (sv >= 2) {
     if (obj.meta === undefined) return { kind: 'corrupt', reason: 'missing-meta' }
     if (obj.settings === undefined) return { kind: 'corrupt', reason: 'missing-settings' }
   } else if (obj.meta === undefined && obj.settings === undefined) {
@@ -175,8 +208,9 @@ export function migrateSave(input: unknown, opts: ParseSaveOptions = {}): Migrat
   const meta = isObj(obj.meta) ? validateMeta(obj.meta) : defaultMetaState()
   const settings = isObj(obj.settings)
     ? validateSettings(obj.settings, !!opts.preferredReducedEffects)
-    : { version: 1 as const, reducedEffects: !!opts.preferredReducedEffects }
-  return { kind: 'ok', from: sv, save: envelope(profileIdOf(opts.profileId), revisionOf(obj.revision), contentRevisionOf(obj.contentRevision), settings, meta) }
+    : defaultSettings(!!opts.preferredReducedEffects)
+  const checkpoint = parseCheckpoint(obj.checkpoint)
+  return { kind: 'ok', from: sv, save: envelope(profileIdOf(opts.profileId), revisionOf(obj.revision), contentRevisionOf(obj.contentRevision), settings, meta, checkpoint) }
 }
 
 // A newer build's fields we do understand, so the player still sees their counters. Display only:
@@ -185,7 +219,7 @@ function bestEffortFuture(parsed: Obj, opts: ParseSaveOptions): BardoSave {
   const meta = isObj(parsed.meta) ? validateMeta(parsed.meta) : defaultMetaState()
   const settings = isObj(parsed.settings)
     ? validateSettings(parsed.settings, !!opts.preferredReducedEffects)
-    : { version: 1 as const, reducedEffects: !!opts.preferredReducedEffects }
+    : defaultSettings(!!opts.preferredReducedEffects)
   return envelope(profileIdOf(opts.profileId), revisionOf(parsed.revision), contentRevisionOf(parsed.contentRevision), settings, meta)
 }
 

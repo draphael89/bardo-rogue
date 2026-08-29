@@ -3,6 +3,8 @@ import { Container, Point } from 'pixi.js'
 import type { RenderApp } from '@/render/app'
 import { InputSystem } from '@/input'
 import { createWorld } from '@/sim/scenarios'
+import { emptyInput } from '@/sim/input'
+import { finishRun, prepareWeapon, startRun } from '@/sim/session'
 import { stepWorld } from '@/sim/step'
 import type { World } from '@/sim/world'
 import { tuning } from '@/tuning'
@@ -269,6 +271,96 @@ describe('modal input', () => {
     expect(aimDeg(rearmed)).toBe(-90)
     expect(rearmed.attack).toBe(true)
     expect(rearmed.attackHeld).toBe(true)
+  })
+})
+
+describe('reveal gate on death and victory', () => {
+  // The gate lives in the device layer only: sample() swallows confirm/restart until the staged
+  // card has actually shown the way out. Bots, replays and the debug override feed the sim
+  // directly (src/main.ts), so the pinned replay fixtures never pass through it.
+
+  it('swallows keyboard confirm and restart until the death card reveals the way out', () => {
+    const h = harness()
+    const w = createWorld(1, 'empty')
+    w.player.state = 'dead'
+    w.player.deathTick = w.tick
+    const N = tuning.reveal.deathMinTicks
+    for (let age = 1; age < N; age++) {
+      w.tick++
+      h.win.fire('keydown', key('Enter')); h.win.fire('keyup', key('Enter'))
+      h.win.fire('keydown', key('KeyR')); h.win.fire('keyup', key('KeyR'))
+      const f = h.input.sample(w)
+      expect(f.confirm ?? false, `confirm leaked at age ${age}`).toBe(false)
+      expect(f.restart, `restart leaked at age ${age}`).toBe(false)
+    }
+    w.tick++                    // age === N: the gate opens
+    h.win.fire('keydown', key('Enter')); h.win.fire('keyup', key('Enter'))
+    expect(h.input.sample(w).confirm).toBe(true)
+    h.win.fire('keydown', key('KeyR')); h.win.fire('keyup', key('KeyR'))
+    expect(h.input.sample(w).restart).toBe(true)
+  })
+
+  it('gates a fresh gamepad press the same way: the gate sits where devices are normalized', () => {
+    const pad: FakePad = { axes: [0, 0, 0, 0], buttons: Array.from({ length: 16 }, () => ({ pressed: false })) }
+    const h = harness(pad)
+    const w = createWorld(1, 'empty')
+    h.input.sample(w)           // one live sample so the modal flip is a boundary, not the first frame
+    w.player.state = 'dead'
+    w.player.deathTick = w.tick
+    w.tick += 2                 // past the boundary, still far inside the gate
+    h.input.sample(w)
+    pad.buttons[2]!.pressed = true          // a fresh edge, not a hold inherited across the boundary
+    expect(h.input.sample(w).confirm ?? false).toBe(false)
+    pad.buttons[2]!.pressed = false
+    h.input.sample(w)
+    w.tick = w.player.deathTick + tuning.reveal.deathMinTicks
+    pad.buttons[2]!.pressed = true
+    expect(h.input.sample(w).confirm).toBe(true)
+  })
+
+  it('holds the victory confirm until the card has been readable', () => {
+    const h = harness()
+    const w = createWorld(1, 'loop')
+    prepareWeapon(w)
+    startRun(w, 'threshold')
+    finishRun(w, 'won')         // sets roomPhase 'resolved' and phaseTick = tick
+    const N = tuning.reveal.victoryMinTicks
+    for (let age = 1; age < N; age++) {
+      w.tick++
+      h.win.fire('keydown', key('Enter')); h.win.fire('keyup', key('Enter'))
+      expect(h.input.sample(w).confirm ?? false, `confirm leaked at age ${age}`).toBe(false)
+    }
+    w.tick++
+    h.win.fire('keydown', key('Enter')); h.win.fire('keyup', key('Enter'))
+    expect(h.input.sample(w).confirm).toBe(true)
+  })
+
+  it('leaves restart alone while the run is live', () => {
+    const h = harness()
+    const w = createWorld(1, 'empty')
+    h.win.fire('keydown', key('KeyR')); h.win.fire('keyup', key('KeyR'))
+    expect(h.input.sample(w).restart).toBe(true)
+  })
+
+  it('the debug override bypasses the gate entirely', () => {
+    const h = harness()
+    const w = createWorld(1, 'empty')
+    w.player.state = 'dead'
+    w.player.deathTick = w.tick
+    w.tick++                    // age 1, deep inside the gate
+    h.input.override = { ...emptyInput(), confirm: true, restart: true }
+    const f = h.input.sample(w)
+    expect(f.confirm).toBe(true)
+    expect(f.restart).toBe(true)
+  })
+
+  it('the sim itself stays ungated: a scripted confirm one tick after death still returns', () => {
+    const w = createWorld(1, 'loop')
+    w.player.state = 'dead'
+    w.player.deathTick = w.tick
+    stepWorld(w, { ...emptyInput(), confirm: true })
+    expect(w.player.state).toBe('free')
+    expect(w.returns).toBe(1)
   })
 })
 
@@ -564,5 +656,74 @@ describe('mouse aim follows the live camera transform', () => {
     const el = Math.hypot(ex, ey)
     expect(f.aimX).toBeCloseTo(ex / el, 4)
     expect(f.aimY).toBeCloseTo(ey / el, 4)
+  })
+})
+
+describe('releaseHeldIntent: the press that operated the pause card stays out of the game', () => {
+  // The shell pause stops the loop, so sample() — the only thing that drains latched pulses and
+  // ages pad edges — does not run while the card is up. main.ts calls releaseHeldIntent on both
+  // edges of the pause.
+
+  it('drops a latched Enter instead of confirming the modal underneath', () => {
+    const h = harness()
+    const w = createWorld(1, 'loop')
+    prepareWeapon(w)
+    startRun(w, 'bardo')
+    finishRun(w, 'won')
+    w.tick += tuning.reveal.victoryMinTicks   // past the reveal: only the release can stop this press
+
+    h.win.fire('keydown', key('Enter'))       // the press that chose RISE while paused
+    h.input.releaseHeldIntent()
+    expect(h.input.sample(w).confirm ?? false).toBe(false)
+  })
+
+  it('makes a held pad button re-arm before it can drive the game again', () => {
+    const pad: FakePad = { axes: [0, 0, 0, 0], buttons: Array.from({ length: 16 }, () => ({ pressed: false })) }
+    const h = harness(pad)
+    const w = createWorld(1, 'dummy')
+    pad.buttons[0]!.pressed = true            // A, held to operate the card
+    h.input.releaseHeldIntent()
+    expect(h.input.sample(w).dodge).toBe(false)
+    expect(h.input.sample(w).dodge).toBe(false)   // still held: still disarmed
+    pad.buttons[0]!.pressed = false
+    h.input.sample(w)                             // neutral sample re-arms it
+    pad.buttons[0]!.pressed = true
+    expect(h.input.sample(w).dodge).toBe(true)
+  })
+
+  it('drops held movement too, so WASD steering the card cannot walk the first unpaused tick', () => {
+    const h = harness()
+    const w = createWorld(1, 'dummy')
+    h.win.fire('keydown', key('KeyW'))
+    h.input.releaseHeldIntent()
+    expect(h.input.sample(w).moveY).toBe(0)
+    // A fresh press after the card closes walks again.
+    h.win.fire('keydown', key('KeyW'))
+    expect(h.input.sample(w).moveY).toBeLessThan(0)
+  })
+})
+
+describe('the reveal is a modal: combat input does not run behind the card', () => {
+  it('blanks movement and attacks while the victory summary is up', () => {
+    const h = harness()
+    const w = createWorld(1, 'loop')
+    prepareWeapon(w)
+    startRun(w, 'bardo')
+    finishRun(w, 'won')
+    h.win.fire('keydown', key('KeyW'))
+    h.win.fire('keydown', key('KeyJ'))
+    const f = h.input.sample(w)
+    expect(f.moveY).toBe(0)
+    expect(f.attack).toBe(false)
+    expect(f.dodge).toBe(false)
+  })
+
+  it('leaves a stock scenario idling in resolved fully playable', () => {
+    // No run, so no card — blanking here would freeze every wave and dummy scenario.
+    const h = harness()
+    const w = createWorld(1, 'dummy')
+    w.roomPhase = 'resolved'
+    h.win.fire('keydown', key('KeyW'))
+    expect(h.input.sample(w).moveY).toBeLessThan(0)
   })
 })

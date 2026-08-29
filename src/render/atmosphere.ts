@@ -3,6 +3,8 @@ import type { Atlas } from './atlas'
 import type { World } from '@/sim/world'
 import { TILE, doorOpens, type ArenaDoor } from '@/sim/arena'
 import { tuning } from '@/tuning'
+import { atmosphereFor, type AtmospherePreset } from './atmospherePresets'
+import type { LayoutId } from '@/sim/layouts'
 import { FX_UNIT, FOG_UNIT, quantizeFxAlpha, quantizeFxRotation } from './fxUnits'
 
 interface Mote {
@@ -40,25 +42,26 @@ export class Atmosphere {
   private t = 0
   private atlas: Atlas
 
-  constructor(atlas: Atlas, parent: Container, arena: World['arena']) {
+  constructor(atlas: Atlas, parent: Container, arena: World['arena'], layout: LayoutId = 'threshold') {
     this.atlas = atlas
     const A = tuning.juice.atmosphere
+    const air = atmosphereFor(layout)
     const doorX = (arena.door.col + 0.5) * TILE
     const doorY = (arena.door.row + 0.85) * TILE
 
     this.doorGlow = new Sprite(atlas.light('circle'))
     this.doorGlow.anchor.set(0.5)
     this.doorGlow.blendMode = 'add'
-    this.doorGlow.tint = A.doorGlowTint
+    this.doorGlow.tint = air.doorGlowTint
     this.doorGlow.position.set(doorX, doorY)
     this.root.addChild(this.doorGlow)
-    this.placeExtraDoorGlows(arena)
+    this.placeExtraDoorGlows(arena, air)
 
     for (let i = 0; i < A.rayCount; i++) {
       const r = new Sprite(atlas.light('circle_noise'))
       r.anchor.set(0.5, 0)
       r.blendMode = 'add'
-      r.tint = A.rayTint
+      r.tint = air.rayTint
       r.position.set(doorX, doorY + 1)
       this.root.addChild(r)
       this.rays.push(r)
@@ -70,7 +73,7 @@ export class Atmosphere {
     for (let i = 0; i < A.fogCount; i++) {
       const f = new Sprite(atlas.particle(smokes[i % smokes.length]))
       f.anchor.set(0.5)
-      f.tint = A.fogTint
+      f.tint = air.fogTint
       this.root.addChild(f)
       this.fog.push(f)
     }
@@ -82,7 +85,7 @@ export class Atmosphere {
       const s = new Sprite(atlas.particle(i % 4 === 0 ? 'star_01' : 'circle_01'))
       s.anchor.set(0.5)
       s.blendMode = 'add'
-      s.tint = i % 5 === 0 ? 0xc8d0ff : A.moteTint
+      s.tint = i % 5 === 0 ? air.moteAccent : air.moteTint
       this.root.addChild(s)
       const seed = motePos(arena, i)
       this.motes.push({
@@ -101,12 +104,17 @@ export class Atmosphere {
     parent.addChildAt(this.root, 0)
   }
 
-  rebind(arena: World['arena']): void {
+  rebind(arena: World['arena'], layout: LayoutId = 'threshold'): void {
+    const air = atmosphereFor(layout)
     const doorX = (arena.door.col + 0.5) * TILE
     const doorY = (arena.door.row + 0.85) * TILE
     this.doorGlow.position.set(doorX, doorY)
-    for (const r of this.rays) r.position.set(doorX, doorY + 1)
-    this.placeExtraDoorGlows(arena)
+    this.doorGlow.tint = air.doorGlowTint
+    for (const r of this.rays) {
+      r.position.set(doorX, doorY + 1)
+      r.tint = air.rayTint
+    }
+    this.placeExtraDoorGlows(arena, air)
     for (let i = 0; i < this.motes.length; i++) {
       const m = this.motes[i]
       const seed = motePos(arena, i)
@@ -131,6 +139,7 @@ export class Atmosphere {
     const spanX = inner.x1 - inner.x0
     const spanY = inner.y1 - inner.y0
 
+    const air = atmosphereFor(world.rooms[world.roomIndex]?.layout ?? 'threshold')
     const glowPulse = 1 + Math.sin(this.t * 2.1) * 0.08
     // Same split as src/render/light.ts: a shut door is not yet a gameplay signal (§3.2.4),
     // so its bloom stays under the key on the focal object. Opening it is what buys the glow —
@@ -139,12 +148,12 @@ export class Atmosphere {
     const open = doorOpens(world.arena.door, world.doorOpen) ? 1 : 0
     this.doorGlow.scale.set((A.doorGlowRadius * 1.7 * glowPulse * (open ? 1.85 : 0.62)) / 128)
     this.doorGlow.alpha = A.doorGlowAlpha * (open ? 3.4 : shut) * doorFade * (0.85 + Math.sin(this.t * 3.2) * 0.15)
-    this.doorGlow.tint = open ? 0xff8a40 : A.doorGlowTint
+    this.doorGlow.tint = open ? air.doorOpenTint : air.doorGlowTint
     for (const { s: g, d: dr } of this.extraDoorGlows) {
       const o = doorOpens(dr, world.doorOpen) ? 1 : 0
       g.scale.set((A.doorGlowRadius * 1.1 * glowPulse * (o ? 1.6 : 0.58)) / 128)
       g.alpha = A.doorGlowAlpha * (o ? 2.6 : shut) * doorFade * (0.85 + Math.sin(this.t * 2.8) * 0.15)
-      g.tint = o ? 0xffe090 : A.doorGlowTint
+      g.tint = o ? air.doorOpenTint : air.doorGlowTint
     }
 
     for (let i = 0; i < this.rays.length; i++) {
@@ -152,7 +161,8 @@ export class Atmosphere {
       const sway = Math.sin(this.t * (0.35 + i * 0.12) + i * 1.4) * 0.06
       r.rotation = (i - 1) * 0.16 + sway
       r.scale.set(0.42 + i * 0.10, 1.9 + i * 0.28)
-      r.alpha = A.rayAlpha * doorFade * (0.40 + i * 0.14) * (0.82 + Math.sin(this.t * 1.5 + i) * 0.18)
+      r.alpha = A.rayAlpha * air.rayAlphaMul * doorFade * (0.40 + i * 0.14) * (0.82 + Math.sin(this.t * 1.5 + i) * 0.18)
+      r.tint = air.rayTint
     }
 
     for (let i = 0; i < this.fog.length; i++) {
@@ -160,11 +170,13 @@ export class Atmosphere {
       const u = (this.t * (4 + i * 0.7) + i * 50) % (spanX + 90)
       f.position.set(Math.round(inner.x0 - 40 + u), Math.round(inner.y0 + 18 + ((i * 41) % Math.max(8, spanY - 28))))
       f.scale.set((70 + i * 14) / FOG_UNIT)
-      f.alpha = A.fogAlpha * quantizeFxAlpha(fade * (0.65 + Math.sin(this.t * 0.45 + i) * 0.35))
+      f.alpha = A.fogAlpha * air.fogAlphaMul * quantizeFxAlpha(fade * (0.65 + Math.sin(this.t * 0.45 + i) * 0.35))
       f.rotation = quantizeFxRotation(this.t * 0.04 * (i % 2 === 0 ? 1 : -1))
+      f.tint = air.fogTint
     }
 
-    for (const m of this.motes) {
+    for (let i = 0; i < this.motes.length; i++) {
+      const m = this.motes[i]!
       m.x += m.vx * dt
       m.y += m.vy * dt
       // recycle a mote back into the light it rose out of, never into a dark corner
@@ -176,19 +188,19 @@ export class Atmosphere {
       m.s.position.set(Math.round(m.x), Math.round(m.y + Math.sin(this.t + m.phase) * 2))
       m.s.scale.set(m.scale / FX_UNIT)
       m.s.alpha = A.moteAlpha * fade * twinkle
+      m.s.tint = i % 5 === 0 ? air.moteAccent : air.moteTint
     }
   }
 
-  private placeExtraDoorGlows(arena: World['arena']): void {
+  private placeExtraDoorGlows(arena: World['arena'], air: AtmospherePreset): void {
     for (const { s } of this.extraDoorGlows) s.destroy()
     this.extraDoorGlows = []
-    const A = tuning.juice.atmosphere
     for (const d of arena.doors) {
       if (d.col === arena.door.col && d.row === arena.door.row) continue
       const s = new Sprite(this.atlas.light('circle'))
       s.anchor.set(0.5)
       s.blendMode = 'add'
-      s.tint = A.doorGlowTint
+      s.tint = air.doorGlowTint
       switch (d.dir) {
         case 'north': s.position.set((d.col + 0.5) * TILE, (d.row + 0.85) * TILE); break
         case 'east': s.position.set(d.col * TILE, (d.row + 0.5) * TILE); break

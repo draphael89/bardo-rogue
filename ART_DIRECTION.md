@@ -362,11 +362,71 @@ Clocks. Hourglasses. Literal scales of justice outside Duat. Mist used as the an
 
 ---
 
-## §9. Three realms
+## §9. Realms
 
 Each realm is a data package: one palette extension, one material set, one architecture silhouette, one lighting recipe, one signature set piece, one reserved hostile hue, one forbidden list. Every realm keeps the canon shadow ramp (`void` / `grout` / `slate0`) and the `gold` accent family. Only the body family and the supernatural hue swap.
 
-Chosen for maximum separation across three axes: **warm/high-value**, **cold/low-chroma**, **dark/high-chroma**. Greek is deliberately deferred — it is the realm that would read as a Hades copy, and we win nothing by inviting that comparison first.
+Chosen for maximum separation across three axes: **warm/high-value**, **cold/low-chroma**, **dark/high-chroma**.
+
+**Greek is the first production realm** because the slice already named its geography (Acheron, Lethe, Asphodel, Charon, Minos) and because the protagonist's first accounting is Mediterranean. The earlier draft deferred it to avoid a Hades copy. That fear is still load-bearing — it is now a **forbidden list**, not a reason to skip the realm. If a frame could be mistaken for the House of Hades or Tartarus at a glance, it fails §7 Originality and this section.
+
+---
+
+### 9.0 THE FIRST GATE — The Greek underworld (production slice)
+
+**Axis:** wine-dark water and unlit stone. Not Olympus. Not a palace. A river country.
+
+This is the country of the *dead*, not of the gods of the sky. No marble colonnades, no laurel wreaths, no red-figure pottery as wallpaper, no neon-orange infernal glow. The living Greek world was bright; this one is the opposite of that memory.
+
+**Palette extension** (extends canon; does not replace it)
+
+| Role | Hex |
+|---|---|
+| River shadow | `#0A1016` |
+| River body | `#121C28` |
+| River lit | `#1C2E3C` |
+| Reed | `#2A3A2C` |
+| Ash-field | `#2C2824` |
+| Ash-field lit | `#3A342C` |
+| Poppy | `#5A2030` |
+| Poppy hot | `#8A3040` |
+| Coin brass | `#8A6A38` |
+| **Wine-dark — hostile hue** | `#3A1428` |
+| Wine-dark hot | `#6A2038` |
+
+Canon `gold` appears only on crossings (door frames, Charon's pole, Minos' beam) — never as palace trim. Canon indigo ambient stays.
+
+**Materials.** Wet basalt, not marble. Reed beds and silt, not mosaic floors. Asphodel is a pale, tired flower — almost grey — never a decorative bouquet. Poppies are rare and reserved for the Field. Coins are dull brass, 2×2 px, never shiny loot sparkles. Charon's craft is black wood, pitched, one lantern.
+
+**Architecture silhouette.** Low banks and a single crossing. Rooms read as *a shore you cannot quite leave*. Horizontal water-line. One vertical only: a stele, a pole, or the scales. No temple pediment. No meander border used as a tile trim.
+
+**Lighting.** One cold river reflection from below (the water is the fill). One warm intrusion: Charon's lantern, or the Kindly One's mask, or the Hall's single coal. The fight ground is darker than Hades' rooms and cooler than our current Bardo masonry. Highest luminance stays on actors and telegraphs (§3.1, §5).
+
+**Signature set piece — The Scales of Minos.** Not a cute balance gadget. A stone beam spanning the Hall, pans at ankle height, one holding a poppy, one empty until you stand under it. The beam does not bounce with HP. It settles once, when the room starts, toward the heavier pan — a composition lock, not a HUD.
+
+**Spaces (dress the four existing builders; do not invent geometry this milestone)**
+
+| Space | Builder | Dress |
+|---|---|---|
+| The Bardo | `bardo` | Unchanged. Hub is not Greek. |
+| The Acheron Gate | `threshold` | Silt line, one reed cluster, north door as a river mouth. |
+| The Lethe Cistern | `crossing` | Black water under a grate. Memory-eating dark, not a fountain. |
+| The Field of Asphodel | `threshold` | Ash-pale floor, sparse poppies at the edge, never in the fight circle. |
+| Charon's Landing | `crossing` | Pole, lantern, a boat that is only a prow cropped by the south wall. |
+| The Cocytus Reach | `threshold` | A weep down the west edge, not a pool. The fight circle stays dry. |
+| The Phlegethon Ford | `threshold` | Ash banks and heat grates. Wine light, never hell-orange. The ford stays bare. |
+| The Styx Gate | `threshold` | Water down both walls, one oath shard. Iron light. No reed, no poppy, no wine. |
+| The Antechamber | `threshold` | A lintel before the judge, not the scales themselves. |
+| The Hall of Minos | `threshold` | A short beam and two pans at different heights. The beam sits west or east. Judicial, not royal. The fight circle stays bare. |
+
+**Forbidden (automatic originality gap)**
+
+- Warm orange hell-glow, skull piles, or "Greek key" borders as filler.
+- Olympian marble, columns in a ring, or a house-of-the-dead living room.
+- Copying any Hades room's prop placement, carpet path, or trident/laurel chrome.
+- Calling anyone Zeus, Hades, or Zagreus. The Kindly Ones, Hecate, Charon, and Minos are already the cast — they were chosen because they belong to the *dead*, not the sky.
+
+**Acceptance.** A player who loves Greek myth should feel the geography. A player who loves Hades should not feel the House. Measure with the §5 table on three exhibits: Acheron, Landing, Hall.
 
 ---
 

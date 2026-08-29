@@ -1,5 +1,15 @@
 # Bardo Vertical Slice Plan
 
+**Date:** 2026-08-29 (revision 3)
+**Audited revision:** `6852aa0` (`cursor/43111337`) — *Greek gate: rites, deities, Minos, and the Oath-Bound elite*
+**Interactive scorecard:** open `bardo-vertical-slice-plan.canvas.tsx` beside the chat.
+
+**Revision 3 — overnight audit.** Re-verified against this worktree, not against earlier write-ups. `pnpm typecheck` green. `pnpm test` **655 / 52 files**. Fresh `slice-kite` seeds 1–8 after the loop-lead fix: **7 wins**, 48.4–54.4 s, seed 6 lost at 56 s; every run home in the Bardo. `slice-naive` seeds 1–8: 0 wins, death at 16.1–34.2 s, two to four chambers, all home. Playwright stills: title over the living Bardo (unarmed body and rack readable), unarmed hub, rack pickup (`THE BLADE REMEMBERS`, door open), Kindly One offer, Charon's Landing toll. Gauntlet wave 2 parked nine pieces on authored art; wave 3 is an asset-kit wave, not another critique grind. C.1 / C.2 are a live re-grade of what a player sits in now (overall loop foundation **76**). The scorecard canvas matches.
+
+---
+
+# Bardo Vertical Slice Plan (historical header)
+
 **Date:** 2026-08-28
 **Audited revision:** `4d44311` (`main`), branch `claude/bardo-vertical-slice-audit-6c7inj`
 **Companion documents:** `VISION.md` (the full-game vision), `COMBAT_FEEL_AUDIT.md` (combat deep audit at `1ef5b18`), `ART_DIRECTION.md` (the art bible), `AUDIT_REPORT.md` / `EXPANDED_GAME_PLAN.md` (historical audits, both now stale — see §A).
@@ -24,19 +34,182 @@ one `git mv` away from being live.
 
 | Plan item | State |
 |---|---|
-| Task 1 — truth pass | **Done.** Attempt-keyed run seeds (a reload no longer replays yesterday's opening); sim-authoritative death cause carried by the blow and by the projectile; the tile router extracted to `src/sim/nav.ts` and used by the loop bots, taking seeded traversal from 95/100 to 100/100; the arena's `solid` mask hashed; pause given ownership of the audio clock and of visibility loss. |
+| Task 1 — truth pass | **Done.** Attempt-keyed run seeds; sim-authoritative death cause; tile router; hashed solids; pause owns audio. The death card names what you carried (the vows), who took you, and — when Minos did — which sentence: THE CIRCLE, THE VEIL, or THE FAN. |
 | Task 1 — CI and instruments | **Instruments done; workflow parked.** `tools/smoke.ts` and `tools/matrix.ts` are manual gates, and `ci/github-actions.yml` is an inactive template pending separate workflow authorization. The matrix separates the hard soft-lock gate from a reported balance band. `tests/docs.test.ts` pins `HARNESS.md` against the encoder so the agent contract cannot rot again. |
 | Task 2 — the heavy as its own verb | **Done** (the prototype half; the human A/B remains). Right mouse / L / C / pad Y, its own queue, priority stated once as roll > heavy > light, a chain-cutting cancel, a roll launch, inert on the bow. Ten contract tests. The dash attack is named in the swing event and given the roll's cold colour and a tighter swish. |
 | Task 7 — statuses, boons, gods | **Done.** Burn joins Brand in `src/sim/status.ts`; twelve vows across two powers with one duo; the offer screen is a meeting with a named, drawn deity. |
-| Boss | **Done, ahead of schedule.** Minos keeps the Warden mastery contract: a taught slam/ring/fan rotation, safe phase transition, and per-pattern telegraphs. |
-| Realm identity (part of Task 8) | **Partly done.** The five spaces and the dead are named; palette and layout work is not started. |
+| Boss | **Done, and phase two now recombines.** Minos still teaches slam, then ring, then fan. After the veil breaks, each sentence brings the next: the circle throws the veil, the veil throws the fan, the fan plants the circle. The tell that named a sentence does not get shorter. |
+| Realm identity (part of Task 8) | **Partly done.** Named spaces have distinct dress. Combat HUD names the shade (HOPLITE / LAMPAD / EMPUSA / OATH-BOUND), not LEFT n. The loop no longer stamps WAVE 1, ROOM CLEARED / WALK NORTH, or a second copy of the room name over the plan. Arrival is the footer. You already pressed Descend. Palette package and authored recast sprites are still later. |
 | Pacing — THE TOLL (not in the plan as written) | **Done.** The run was four fights and three offers with no breath. Charon's Landing now asks before it fights: pay a permanent vessel of life and he hands you a fourth vow from across the crossroads, or cross owed and one more shade wades into the Hall of Minos. It reuses the `entering` room phase the audit had flagged as doing no work, and it is one authored rite rather than an event framework with one entry. `src/sim/rites.ts`, ten tests, and the ferryman is the third portrait on the speaker plate. |
-| Task 10 — shell | **Partly done.** A title screen held over the living hub, and the HUD's missing single chrome toggle. Settings, credits and abandon-run are not built. |
-| Tasks 3–6, 9 | **Not started.** Rooms-as-data, the generated route and map, node-boundary save, the obol/Remembrance economy, and the bow. These remain the next milestone, in the order given below. |
+| Task 10 — shell | **Done (the verbs).** Title over the living hub is DESCEND / SETTINGS / CREDITS. Settings owns STILL THE ROOM (same persist as V) and MUSIC / SOUND in eight steps, pad and keyboard. Pause opens the same mix: RISE / GIVE THE DESCENT BACK / SETTINGS. Credits names the cast, not the toolchain. Pause is BETWEEN BREATHS — no PAUSED. The loop no longer stamps ROOM CLEARED over the plan. A pad-glyph pass remains later. Fullscreen is the host's F. |
+| Task 3 — rooms-as-data | **Done.** `src/sim/content/slice.ts` is the graph; `roomsFor` is a thin reader. Layout ids live in `src/sim/layouts.ts`. |
+| Task 4 — generated route + exits map | **Done.** `startRun` picks `first-gate`, `late-shop`, `field-fork`, `fire-ford`, `styx-gate`, or `ash-march` from the attempt seed. Early shop: landing then Cocytus. Late shop: Cocytus then landing. Field-fork: Acheron is a single door; the Field chooses Lethe or the Reach, never both. Fire-ford: landing then Phlegethon. Styx-gate: the first fight is the oath river. Ash-march: both rivers, no bank. The exits strip names the plan: VEIL, BLADE, BANK, RIVER, OATH, JUDGE. The last row is the rest of the spine, not a THEN header. The footer names this floor; the strip does not reprint it. |
+| Task 4 — six chambers | **Done (the spine).** A path is six rooms: Acheron or Styx → Lethe or Asphodel → Landing → Cocytus or Phlegethon → Antechamber → Minos. The Oath-Bound stands alone in the Antechamber; the Landing no longer teaches the shield inside a crowd. The strip names OATH before JUDGE. |
+| Task 4 — half-recognize | **Done (dress + live fill).** Styx, Cocytus, Phlegethon, and the Antechamber have their own overlays on threshold masonry. A live descent picks a same-kind dress for combat and elite rooms; the catalog and a fixed fill stay the authored floors. Elite door glow matches the seal. |
+| Task 5 — node-boundary save | **Done.** Schema 3, `src/sim/checkpoint.ts`. Resume re-enters the node from `boundaryRng`. |
+| Task 6 — obols / Remembrances / shop | **Done.** Landing's post-fight reward is Charon's stall (`heal` / `vessel` / `vow`). Obols die with the attempt; Remembrances bank on `finishRun`. |
+| Phase 3 — mystery (The Unburied) | **Done.** Live fill flips the utility node: shop **or** the Unburied, never both. Toll stays. Three cards: a coin, a memory, or leave him — leave sends a hunt into the Hall. The body wears the bank; the fight strip and the death card name THE UNBURIED, not a fallen Hoplite. The Smith names the one you left, once. |
+| Phase 4 — Smith reroll | **Done (the unlock).** Walk into the west shade; three Remembrances buy one reforging per descent (`L` / heavy on an offer). |
+| Phase 4 — banked vessel | **Done.** After the reforging, five Remembrances buy one cup that stays: +1 max HP in town and on every later descent. The shop cup still dies with the attempt. |
+| Phase 4 — return home | **Done.** Death or victory banks Remembrances; the Bardo banner names what you kept, or calls you west to the anvil when three are waiting and the Smith has not been paid. |
+| Phase 7 — abandon-run | **Done.** Pause offers RISE or GIVE THE DESCENT BACK (confirm twice). Remembrances bank; the death card does not play. |
+| Task 9 — bow | **Not started.** Debug probe only. |
 
-This document is the unified plan requested by the game-loop audit (Appendix B) and the vertical-slice addendum: one verdict, one gap analysis, one rank-ordered list of what to do next. All claims were re-verified against the current tree, not carried forward from earlier audits.
+### Revision 3 (2026-08-28, audited at `6852aa0`)
 
-**Evidence base for this audit:** full read of `src/sim/` (all 30 files), the entry point, input, tuning, and the render/audio surfaces; `pnpm typecheck` green; `pnpm test` green (**184 tests, 14 files**); fresh headless runs of the production loop (`slice-kite` seeds 1–60, `slice-naive` seeds 1–20); five Playwright screenshots along the golden path (Bardo, Threshold fight, Veiled Crossing fight, reward offer, Warden fight), reproducible via:
+A fresh three-track audit (sim, presentation, tooling) re-verified this block against `main` and locked
+four decisions with the user. The suite at `6852aa0` measures **512 passing tests in 32 files**
+(`pnpm test`, 2026-08-28 — the "275 passing" above was already stale when written); `pnpm matrix`
+holds the hard no-strand gate at 100/100 seeds (measured 2026-08-29 after rebasing onto the modal
+arm gate: kite 73% wins, 39.8–52.3 s clears; naive 0% — both inside the soft band).
+
+**Fresh findings, queued into the revised ordering below:** the death card omits the build the victory
+card shows, and both cards accept confirm on tick 1 before the staged reveal (no minimum beat); the
+reward screen's prompts hardcode keyboard wording on a gamepad (the HUD hint row is device-aware; the
+prompts are not) and it lacks the rite screen's same-frame nudge/commit guard (`rites.ts:81-86`); the
+pause card's three actions are keyboard-only; `audio.ts`'s `setLevel()` is correct and has zero
+callers (no volume control ships); R and Start are dead mid-run (no abandon).
+
+**Decisions of record:**
+1. **Process.** The PR loop (plan → build → multi-agent adversarial review → fix → merge) is the
+   standing directive; the gauntlet is retired (banner in `GAUNTLET.md`, dispositions in
+   `public/progress/data.json`). The blind-critique protocol survives only as the realm-art
+   acceptance gate (three exhibits, §G.5).
+2. **Art budget.** The PixelLab cycle expiring 2026-09-04 deliberately lapses unspent. Generation
+   happens next cycle, inside the realm phase. **Unresolved and owned by PR 6:** the art bible does
+   not merely lack a Greek entry, it *deliberately defers Greek* — "the realm that would read as a
+   Hades copy, and we win nothing by inviting that comparison first" (`ART_DIRECTION.md` §9) — while
+   the shipped game is Acheron, Lethe, Asphodel, Charon, Minos and Hecate throughout. Either the
+   bible's realm order or the realm we built has to move; do not start generating art until that is
+   settled. Then the §9 Greek entry first, followed by the
+   ASSET-KIT order discipline, integration timeboxed with a two-loss stop rule.
+3. **Seed-1 first run.** A brand-new profile's first-ever run being universal (URL seed 1, attempt 1)
+   is kept as an authored decision: it is a tunable onboarding and comparable playtest telemetry.
+   Attempt-keying already fixed reload staleness. When the route generator lands, a test asserts the
+   attempt-0 route is a valid teaching route.
+4. **The toll is not the utility node.** Charon's Landing keeps THE TOLL as the fixed pre-boss beat in
+   every generated route; the utility node (shop XOR *The Unburied*, never both) is a separate
+   mid-route role. *The Unburied* joins `rites.ts` as its second consumer (the debt target
+   generalizes from "the boss room" to "the next room"); the shop is a node handler, not a rite. The
+   toll's price stays vessels, never obols, and is re-tuned once the shop sells healing.
+
+### Revision 4 (2026-08-29) — PR #13 merged in
+
+PR #13 (`first-gate-sitting-loop`) shipped Revision 3's PRs 2–5 in one branch: rooms-as-data plus six
+route spines, the obol/Remembrance economy with the Smith, node-boundary checkpoints, and a realm
+dress pass. Revision 3's remainder table is therefore deleted rather than updated — it planned work
+that now exists. The four decisions above still stand; decision 2's Greek contradiction is still open
+and now more urgent, because the realm dress landed against a bible that defers Greek.
+
+What the merge itself had to settle, recorded here because a future reader will wonder:
+- **One schema 3, not two.** Both branches independently bumped `SAVE_SCHEMA_VERSION` to 3 for
+  different documents — PR #12 for volume sliders, PR #13 for the checkpoint. Two builds each
+  stamping 3 for an incompatible payload is precisely the failure the version exists to prevent, so
+  3 is now defined once as the union: real checkpoint, settings V2, widened meta.
+- **One pause card.** PR #13's paged card (RISE / GIVE THE DESCENT BACK / SETTINGS) won on structure
+  and voice; PR #12's master bus was ported onto it, so the mix is master + music + sound.
+- **One latch release.** PR #13's `releaseHeldIntent` replaced PR #12's `absorbLatched` — both had
+  been auto-merged into the class with no conflict marker, and both were being called.
+
+The live ledger below is PR #13's, kept as written.
+
+### Revision 5 (2026-08-29) — the review round on the merge itself
+
+Three defects in the merge's own work, each found by reading the wiring rather than by a failing
+test, each now covered by a test that goes red without its fix.
+
+- **One authority for the abandon row.** The pause card asked the sim (`canAbandon(world)`) when it
+  drew and asked the shell (`canGiveBack()`) when it navigated. The two disagree exactly where it
+  matters: a playtest session forbids abandoning while a run is plainly live. So the card painted a
+  "GIVE THE DESCENT BACK" row that navigation had no index for, and choosing it opened SETTINGS —
+  and PLAYTEST.md's promise that the row is hidden was simply false. The overlay no longer reaches
+  into the sim; the shell sets `setLeaving()` every frame, and `canAbandon` has one caller.
+- **The Escape key had drifted onto the same wrong answer**, returning a focus index off the end of
+  the shorter card.
+- **A no-dash bundle did not replay as a no-dash run.** `no-heavy` is a frame filter and rides in the
+  recording; `no-dash` closes a cancel WINDOW, and a window is not in the frames. Nothing on the
+  replay side re-applied it, so every no-dash bundle replayed as a baseline run and diverged at the
+  tester's first dodge-into-attack — which would have quietly falsified the condition the fun gate
+  exists to measure. The condition now lives in `src/playtest.ts`, rides in the bundle, and is
+  re-applied by `pnpm sim`, by `pnpm shot`, and by `__game.replay()`. Measured on identical frames:
+  hash 3380115452 baseline against 272518353 no-dash, and `--playtest baseline` reproduces the
+  baseline hash exactly from the no-dash bundle.
+
+Gates after the round: 799 tests / 62 files, matrix 100/100 (kite 88%, naive 0%, unchanged from
+before the round), build ok, smoke both endings, pinned replay hashes untouched.
+
+### Open after the merge (audited 2026-08-29, eleven agents over PR #13)
+
+Fixed in the merge: the double schema-3 collision, the duplicate latch release, the missing master
+bus, and PR #13's three checkpoint holes (reward re-farm on reload, unlimited room retry, and a
+restore guard that could never return false). What the audit found and the merge did NOT close,
+ranked by what a sitting player would notice first. Each is evidenced; none is a hunch.
+
+1. **The realm dress does not change the room.** Seven rooms the ledger describes as river / ash /
+   ice / iron / bronze / wine-fire / wine-hall render as the same blue-grey masonry — measured mean
+   RGB across the play area differs by under 4/255 between Acheron and the Hall. `fogAlpha` 0.10 and
+   `rayAlpha` 0.06 (`tuning.ts:473-474`) are too low for the presets in
+   `render/atmospherePresets.ts:20-105` to register. This is the single biggest gap between what the
+   ledger claims and what renders.
+2. **The map beat does not produce a plan.** Every spine has exactly one fork, at one depth, and both
+   branches rejoin one node later — so `routeTail` returns the same chain for either door
+   (`route.ts:496-504`), and the overlay shows an identical future whichever you pick. §G.1 wanted
+   width 2-3 and choices at three depths. The overlay also never draws the route *so far*:
+   `roomHistory` is read only to build a cache key (`render/map.ts:57-60`).
+3. **One run in six has nowhere to spend.** ASH_MARCH carries no utility node at all — no shop, no
+   Unburied, no toll — so its obols are unspendable (`route.ts:312-354`; 16.8% of seeds). Obols have
+   no scarcity anywhere: a full clear earns 34-51 and the single purchase costs 6-12, so the purse
+   counts up and never bites.
+4. **The Smith spends on proximity.** Walking within 18px buys, with no confirmation and no undo, and
+   the purchase banner is destroyed in the same frame by the next one (`smith.ts:62-76`).
+5. **MetaStateV2 never landed.** The new persistent fields were bolted onto `MetaStateV1` with
+   `version: 1` unchanged (`session.ts:93-101`), so the next meta change has no discriminator to
+   migrate from. The settings payload got its bump in this merge; meta still needs one.
+6. **Determinism seams.** `arena.smithNear` is per-tick state outside `hashWorld` that gates a
+   purchase whose effects ARE hashed; `roomsFor` now returns module-global mutable arrays by
+   reference rather than fresh ones. And no pinned replay fixture covers the `loop` scenario at all,
+   so every line of new hashed state sits outside the fixture net — the "hashes must not move" rule
+   is currently satisfied vacuously.
+7. **Minos fires stacked lanes.** In phase two the veil sentence looses the ring and its fan
+   companion from one origin on one tick, putting two bolts on an identical path — one is invisible.
+   Eleven phase-two warden constants in `tuning.ts` are now dead but still read as authoritative.
+8. **Shell edges.** The death stone's rows are left-anchored with no wrap or mask, so a two-vow death
+   spills off the card; Settings and Credits still paint centred over the hero body that the menu
+   page was moved to avoid; and a mouse cannot operate the shell — clicking SETTINGS starts a run.
+9. **Evidence hygiene.** Every committed Minos and Empusa progress shot was written by the first
+   commit, and the last four commits then rewrote exactly those pixels amber to wine. The progress
+   page shows a renderer that no longer exists.
+10. **Two props fail this PR's own gate.** `ART_DIRECTION.md` §11.1 sets the Mirror test at ≤60%;
+    the committed prow measures 71% and the pan 92%.
+
+The human fun gate remains the one thing bots cannot close, and it is still at zero sessions.
+
+
+### Remaining toward 90+ (live, 2026-08-29)
+
+The sentence in §E is playable. What still reads as unfinished when you sit down:
+
+1. **Settings / Credits** — **Done.** The title is three verbs. Settings stills the room and sets MUSIC / SOUND in eight steps. Pause opens the same mix mid-descent — RISE / GIVE THE DESCENT BACK / SETTINGS — so a run does not have to die to go quiet. Credits names who waits. Pad glyphs remain later. Fullscreen stays the host's F.
+2. **Route variety** — **Done (six spines).** Early shop, late shop, the Field as the fork, the fire ford, the Styx gate, or the ash march. Live dress no longer puts Field poppies on the rivers, the ferry shore, or the Antechamber — the only poppy left is the one on Minos' scale, and that scale can sit west or east. The Oath-Bound's floor is a lintel or an iron court. The Hall is the same wine either way. The air follows the floor: Acheron is cold river, the Landing is gold, Styx is iron, the Hall and Phlegethon are wine. The one bed retunes with the floor. The tell notch does not move. Indigo ambient light stays global. The open door stays gold. Consecutive runs still share the elite node and the judge — not the sitting of the scale.
+3. **Minos look** — recombination is in; the hall dresses as a scale (two pans, short beam, bare circle). The judge lands on the Oath-Bound's clock. A death names the sentence that took you (MINOS · THE CIRCLE / THE VEIL / THE FAN), including the companion blow in phase two. The circle, the veil, and the fan are wine — gold stays on the scale; ember stays on a burning body. The windup sits above the light, so the Hall's dark does not eat the tell. Fan plants the circle with the same plate and lock rim as the taught slam. Veil/fan spokes ride the hi layer. The slam flash and the phase-two body are wine-hot, not cream. The windup bell names the sentence: circle is the low plate, veil rises, fan is a tighter woosh. Authored judge frames stay later.
+4. **Smith bark** — **Done.** The one you left is the first line, even if the same step buys the cup. He asks for what you kept, not for remembrances. After a first death he still says You came back thinner. The anvil still spends. — the banner no longer whispers it in lowercase. A claimed vow keeps its written case too.
+5. **Developer text** — **Mostly done.** The title verbs sit left so the rack and the unarmed body are the picture, not a card over a blackout. The verdict is SIX CHAMBERS. TWO KEPT — no clock. The Hall ends in wine, not cream. A meeting no longer captions itself THE ACHERON GATE under CLAIM. PAUSED is gone. The Hall no longer subtitles itself "the last chamber." The sound gate says WAKE THE ROOM. Coming home says 1 DESCENT. Pause gives the descent back, not the attempt. The fight strip and the stall say NO OBOLS / ONE OBOL. A meeting hides the life plate so five empty sockets do not sit under the ferryman. Pause hushes the same chrome — BETWEEN BREATHS is not a fight. The exits strip no longer stamps FIGHT / HARD / ELITE, NORTH / EAST, FIRE / ICE, THEN, or a second copy of this floor; doors read VEIL, BLADE, BANK, RIVER, OATH, JUDGE, and the last row is the rest of the spine. The footer is HERE. The one you left is THE UNBURIED; the one the river sent is THE ACCOUNT. The verdict card and the home banner name this descent's keep (`lastBanked`), not the lifetime pile. Coming home is a Bardo veil, not the same cream strobe as walking into Acheron. The home beat is 2 KEPT / the blade waits — it does not reprint THE BARDO over the footer. You wake without the blade; the rack is the ritual. A door is a dark lift; a new floor wears its own fog. The Smith asks for what you kept, not for remembrances. The Unburied's memory card costs ONE KEPT, and it does not buy. The death stone is three sentences — A FALLEN HOPLITE TOOK YOU / AN UNMARKED BLADE / ONE CHAMBER IN. NOTHING NEW — and RETURN, not R RETURN. It does not keep the fight strip on the stele. Arrival no longer reprints THE ANTECHAMBER over the footer. Leftovers: stock-scenario ROOM CLEARED / PRESS R / WAVE n (not the loop). A live mix no longer says SHADES. The first fight no longer wears UNMARKED BLADE as an empty inventory. The strip arrives when a vow or a coin does. The title tally is 1 DESCENT · UNNAMED, or N NAMED after Minos; coming home is not a failed return. Coming home asks DESCEND AGAIN; the tally sits with the verbs, not on the body, and it never says DAMNED. The meeting ends on CLAIM, or CLAIM · TURN when the Smith has been paid; a duo names THE KINDLY ONE · HECATE; the ferryman's extra meeting is WHAT THE LAST ONE PAID; the stall ends on PAY, not BUY, and the ferryman is owed, not a clerk who sells; the toll costs A LIFE, FOR GOOD. The meeting no longer says Brand, REFORGE, or names the reforging key. The Kindly One veils the room the way a pause does — she does not black it out. BETWEEN BREATHS no longer advertises E EXPORT · I IMPORT.
+6. **Human fun gate** — zero recorded sessions. Bots cannot close §E. Fresh `slice-kite` seeds 1–8 after the door-flash lead: seven wins, 48–54 s, seed 6 lost in the late rooms; every run home. Fresh `slice-naive` seeds 1–8: eight losses, dead at 16–34 s after two to four chambers, every run home. The sentence plays. A person has not sat down. Do not retune for the kite loss.
+7. **Authored recasts** — Lampad / Empusa / Minos still lean on Kenney. Gauntlet stays parked.
+8. **First-fight lead** — **Done.** Stock arenas still hold 30 ticks. The loop's door flash is the hold (`loopLeadTicks` = `transitionTicks`). The first tell is queued when the room is entered — walking the gate no longer waits that hold a second time on an empty Acheron. The Antechamber's Oath-Bound lands on that clock, a light is bronze, and a heavy is the answer.
+9. **Oath-Bound teach (sim)** — **Done.** Production-clock test: solo `oathbound`, `guardBlocked` on a light, damage on a heavy. The hoplon, the block sparks, and the OATH seal are bronze — gold stays the crossing. A turned blow used to bleach the disc cream-gold; the flash is hotter copper. Authored hoplon frames stay later.
+10. **Spawn tell** — **Done.** Arrival is a wine-dark floor pad at the body's radius — filled, not a dashed reticle. The inner ring closes as the delay runs out. The burst is wine, not cream. THE ACCOUNT's ring and the coin that stays on him are brass, not the door. Two of the same shade read `2 HOPLITES`, not `2 HOPLITE`. Marks still on the floor do not get a second rail of broken gold — that read as four dots under two names. A mix is the names in arrival order — LAMPAD · 2 EMPUSAE — not 3 SHADES. One Oath-Bound is the name; there is no empty pip rail under it. The Empusa's body strobes wine-hot, not cream hell. A heavy that catches a word is a white ring and ember, not cream.
+
+Burn now sits on the body as a vertical ember vein — Brand keeps the diagonal cut and three air slashes. Three cuts, the collection ring, and the stamp at the body stay Kindly fire; they do not borrow the door's gold. The count over the head is three small slashes, not three HUD plates. A shade on fire is readable at room distance; the Oath-Bound's dropped hoplon has something to stand next to. The disc itself is bronze, so a held guard is not another gold door — including the tick a light bounces. The smear wears the vow: Kindly fire is ember and wine — not peach, not cream — Hecate is veil, Cleaving Grace stays steel and only gets wider. A primed Between-Step heats the blade, not a chevron over the helmet. A brazier tongue follows the floor — Acheron is cold river, Phlegethon is wine. Fire on a body stays ember. The Lampad's bolt and lock are wine-dark — the committed ray is wine, not a pale laser. Magenta is Hecate's; a cut-this dart does not wear the veil. The Empusa's lane is the same ink — wine while she chooses, wine-hot when she commits. Ember stays on a burning body, not on the floor she promised. Her body strobes the same wine, not cream hell. Arrival bursts are wine; THE ACCOUNT's ring is brass. Minos's sentences are the Hall: the circle, the veil, and the fan are wine. Gold stays on the scale. The veil-break ring and the slam flash are the same family — not ember, not Hecate. A Lampad dart no longer trails magenta. The one bed retunes with the floor — Acheron thinner, the Hall heavier. The tell band stays put.
+
+Do not grind parked art. Combat-first next: keep the human fun gate honest. Do not invent a seventh spine, an Unburied attempt gate, or a shorter spawn telegraph — the mark is the tell.
+
+This document is the unified plan requested by the game-loop audit (Appendix B) and the vertical-slice addendum: one verdict, one gap analysis, one rank-ordered list of what to do next. Sections A–N below are the original audit; the STATUS table and this remaining list are the living ledger.
+
+**Live evidence (2026-08-29, this window):** `pnpm typecheck` green. `pnpm test` **657 / 52 files**. After the type ramp and this morning's Hall pass: slam / veil / fan floor tells are wine and sit above the light; the fan's planted circle uses the taught slam plate; slam flash and phase-two body are wine-hot; the Empusa coil is wine-hot, not pale rose; Minos's windup bell names the sentence. WAVE / ROOM CLEARED / PRESS R stay gated off the loop. The exits strip still reads VEIL / BLADE and the rest of the spine; the death stone is NOT YET REBORN / RETURN; the title after a return is DESCEND AGAIN and `1 DESCENT · UNNAMED · 2 KEPT`. Coming home is unarmed, rack waiting, and the banner names the keep — 2 KEPT / the blade waits — not THE BARDO again. Pause is BETWEEN BREATHS / RISE / GIVE THE DESCENT BACK / SETTINGS — no export line. The Smith keeps his sentence. Credits name the cast, not the toolchain. The stall ends on PAY. The toll is ANSWER / A LIFE, FOR GOOD / SWIM. The Unburied is A COIN / A MEMORY / LEAVE HIM. The verdict is YOU RETURN WITH YOUR NAME / WAKE IN THE BARDO. Settings is STILL THE ROOM / MUSIC / SOUND. Acheron names 2 HOPLITES. The Antechamber is OATH-BOUND, no empty rail. The Hall's plate samples wine (`#4f1a2c`), not the door; the footer is THE HALL OF MINOS. Live overall loop foundation: **76**. Human sessions: zero. HEAD `62bb548` on [PR #13](https://github.com/draphael89/bardo-rogue/pull/13).
+
+**Evidence base for the original audit:** full read of `src/sim/` (all 30 files), the entry point, input, tuning, and the render/audio surfaces; `pnpm typecheck` green; `pnpm test` green (**184 tests, 14 files**); fresh headless runs of the production loop (`slice-kite` seeds 1–60, `slice-naive` seeds 1–20); five Playwright screenshots along the golden path (Bardo, Threshold fight, Veiled Crossing fight, reward offer, Warden fight), reproducible via:
+
 
 ```bash
 pnpm sim -- --scenario loop --bot slice-kite --seeds 1-60 --ticks 18000
@@ -117,46 +290,50 @@ Grades are 0–100 for **what a player experiences today** (not what the archite
 
 ### C.1 Pillars
 
+Live re-grade 2026-08-29 against the sitting game, not the architecture.
+
 | Pillar | Score | What holds it below 90 |
 |---|---:|---|
-| Combat | **80** | Human tuning unproven; moveset is one weapon + no independent heavy or special; Caster/Charger/Warden lack authored clips; encounter density never stresses the tell hierarchy. The chain itself (input → contact → recovery) is near the bar. |
-| Player (controls/movement/dodge) | **82** | The remaining gaps are validation gaps (latency on real hardware, A/B of landing/perfect-dodge windows, the heavy-input question), not infrastructure gaps. |
-| Enemies | **68** | Three archetypes + one boss are excellently authored questions, but three archetypes cannot fill a realm; no elites, no support enemy, no pattern vocabulary beyond aimed bolts, dashes, and one radial ring. |
-| Encounters | **60** | Slice rooms are distinct authored questions, but there are four of them, no modifiers, no hazards, no environmental verbs. |
-| Hub | **45** | Reads as "home, prepare, depart" — a real achievement in one room — but there is exactly one verb (walk into rack) and nothing that acknowledges your history beyond two counters. |
-| Realm traversal | **40** | One two-way branch that rejoins. Marked doors are a genuinely good primitive; there is no map, no route planning, no unknown to anticipate. |
-| Progression (run + meta) | **45** | Three behavioral boons per run is real run progression; meta progression is two numbers that change nothing (`storage.ts:29` actively clamps unlocks). |
-| Rewards | **50** | Boons are behavioral, deterministic, door-promised — the right foundation. But boons are the *only* reward: no heal, no currency, no economy of choosing between reward types. |
-| Narrative | **25** | Tone is present (room names, vows, "return with your name"); no character, no dialogue, no reactive line has ever been spoken. |
-| Art | **62** | The one environment family is cohesive, moody, authored (verified in screenshots). Everything shares Bardo masonry; no realm identity exists; enemy bodies still lean on Kenney bases + deformation except hero/Brute. |
-| Animation | **70** | Hero and Brute authored sets are strong; roll table excellent; the other three enemies and the bow are procedurally staged. |
-| VFX | **85** | The contact language (crescent, wounds, cold dodge ring, per-action caps) is the closest thing to shipping quality in the repo. Diminishing returns here — deliberately hold. |
-| Audio | **70** | Architecture (buses, ducking, tell band, arbitration) is beyond prototype; content is one synthesized bed; nothing has been validated by listening; pause/audio contract broken. |
-| UI/UX | **45** | Combat HUD and reward cards are clean; there is no title, no settings, no gamepad parity in overlays ("A / D OR ARROWS… ENTER" hard-coded — verified in screenshot), no abandon, no volume control. |
-| Persistence | **35** | Versioned meta with graceful fallback is correct scaffolding; but the first-run seed repeats every reload (`session.ts:88`), nothing mid-run survives a refresh, and unlocks are clamped. |
-| Agent/developer tooling | **88** | Best-in-class for this stage: deterministic replays with pinned hashes, full-loop bots, shot/strip/pose tools, live tuning, metrics. Gaps: no CI, slice-bot exit navigation fails 3–5% of seeds, `HARNESS.md` replay-flag docs drifted from `replay.ts:19`. |
+| Combat | **82** | Independent heavy and a named dash exist. Feel pieces are gauntlet-parked. One production weapon. Human sessions: zero. |
+| Player (controls/movement/dodge) | **84** | The remaining gaps are validation (latency, landing windows) on real hands, not missing verbs. |
+| Enemies | **74** | Oath-Bound is a real elite; Minos has three narratable sentences and a recombining phase two. Still three archetypes + one boss; Lampad / Empusa / Minos still lean Kenney. |
+| Encounters | **72** | Six chambers, live dress, a toll, a shop or the Unburied, a solo elite teach. No hazards, no support enemy. |
+| Hub | **78** | Unarmed wake, rack ritual, Smith, Remembrances, reroll, banked vessel, Greek gate. One room. Unarmed body is still Kenney stock because the authored idle has a baked sword. |
+| Realm traversal | **76** | Six spines from the attempt seed, an exits-phase map, per-layout air. Consecutive runs still share the elite node and Minos. |
+| Progression (run + meta) | **76** | Twelve vows, two gods, one duo, Brand + Burn. Meta plays: reforging and a cup that stays. Bow is still a debug probe. |
+| Rewards | **78** | Meetings, a stall (heal / vessel / vow), the Unburied, a toll that costs a life. The vocabulary is no longer only boons. |
+| Narrative | **64** | Title premise, Smith bark, death sentences, named shades, a ferryman who asks. No dialogue trees (deferred). |
+| Art | **70** | Named floors dress differently; the Hall is a scale; wine is the hostile hue. Authored recasts for Lampad / Empusa / Minos / unarmed hero stay parked. |
+| Animation | **70** | Hero and Brute authored; the rest procedurally staged. Do not grind. |
+| VFX | **86** | Contact language plus wine spawn, wine Minos, bronze oath, ember burn vein. Hold. |
+| Audio | **76** | Pause owns the clock; Settings steps MUSIC / SOUND; the one bed retunes with the floor. Still one synthesized bed, never heard by a sitting player. |
+| UI/UX | **80** | Title / Settings / Credits / pause mix / abandon / map / death stone. The Hall's plate is Minos's life — wine, like the sentences, not a gold door-bar. Pad glyphs later. The verbs sit left so the rack and the body read. |
+| Persistence | **78** | Attempt-keyed seeds, Remembrances, unlocks, node-boundary resume. CI workflow still parked. |
+| Agent/developer tooling | **90** | 655 tests, shot / strip / sim, pinned hashes. CI template is one `git mv` from live. |
 
 ### C.2 Game-loop dimensions (from the loop audit)
 
+Live re-grade 2026-08-29. Kite seeds 1–8 after the loop-lead fix: 7 wins in 48–54 s, seed 6 lost, all home. Naive seeds 1–8 all die at 16–34 s and come home.
+
 | Dimension | Score | What keeps it from 90+ |
 |---|---:|---|
-| Core gameplay loop | **70** | Complete and legible end to end; but compact (bot: 29–36 s; human: minutes), economy-free, and the first run repeats per reload. |
-| Town / home-base clarity | **55** | "This is home, that is the run" reads instantly; nothing else to do or learn there yet. |
-| Run startup | **65** | The physical rack beats any menu; one weapon, no loadout dimension, nothing to weigh before departing. |
-| Room lifecycle | **75** | Explicit phases, tested transitions, HP handoff, projectile cleanup; `entering` does no work, and geometry/waves are code, not content. |
-| Encounter pacing | **55** | Rooms are authored questions with clean arrival tells; the whole run has no valley — three boon screens arrive back-to-back-to-back with no shop, rest, or breath. |
-| Room-to-room progression | **45** | One branch, both sides rejoin next room; door marks promise families truthfully; no anticipation deeper than one door. |
-| Player choice | **55** | 3 boon picks + 1 route pick per run, family-guaranteed doors are honest; the choice vocabulary is one-dimensional (which boon family). |
-| Reward excitement | **50** | The boons themselves change behavior (the bar the loop audit set); the presentation is an anonymous card, and there is never a non-boon option to want. |
-| Build diversity | **45** | Six boons, no stacking, two real synergy lines (Brand→Judgment, dodge-primes). Discoverable in ~3 runs. |
-| Emergent synergy potential | **60** | `resolveWeaponOnHit` as the single hook for blade/mirror/echo is exactly the right shape — the ceiling is high, the pool is small. |
-| Weapon extensibility | **40** | Bow exists and plays differently, but is unreachable in production; weapon logic is `if (armOf(world) === ARM.bow)` branches through the controller and views (`player.ts:68,95,159,182`). |
-| Run-state architecture | **75** | Clean boundary, deterministic, explicitly tested (HP handoff, reset paths); schema is minimal and has no serialization/resume story. |
-| Death / restart loop | **78** | Death-as-return inside the fiction, fast, with persistent counters — the Hades trick works. Death card omits the build, killer attribution is presentation-inferred, no abandon-run. |
-| Meta-progression readiness | **35** | The boundary exists and persists; not one thing a player does changes the next run. |
-| Replayability | **40** | Seed repetition on reload + six boons + one branch = runs 4+ feel solved. The *bones* (seeded variation, mirrored formations, family doors) are ready for far more. |
-| Sense of anticipation | **45** | Marked doors and the boss silhouette door create real pull; nothing is ever unknown, secret, or rare. |
-| **Overall roguelike foundation** | **62** | The loop is proven and the architecture is honest; content breadth, economy, variation, and shell are where a player feels the prototype. |
+| Core gameplay loop | **84** | The First Gate sentence plays. Kite 7/8 after the lead fix; naive 0/8. A person has not sat down. |
+| Town / home-base clarity | **78** | Wake unarmed, take the blade, talk to the Smith, step the gate. Still one room. |
+| Run startup | **76** | The rack is the ritual. One weapon. Nothing to weigh except going. |
+| Room lifecycle | **82** | `entering` is the toll. Layouts are data. Geometry is still four builders. |
+| Encounter pacing | **74** | Landing is a breath; the Unburied is an unknown. Still a short, dense run. |
+| Room-to-room progression | **76** | Six spines, a map that names VEIL / BLADE / BANK / RIVER / OATH / JUDGE. Elite and Minos stay. |
+| Player choice | **74** | Route, rite, shop or leave-him, twelve vows. Still one production weapon. |
+| Reward excitement | **74** | A meeting, a stall, a body on the bank. You can want a cup or a coin, not only a vow. |
+| Build diversity | **70** | Twelve vows, Brand + Burn, one duo. Discoverable in a handful of runs — the proof size, not a catalog. |
+| Emergent synergy potential | **72** | One hit hook + two statuses + one hidden duo. Ceiling is high; pool is still a proof. |
+| Weapon extensibility | **42** | Bow is a debug probe. Controller still branches on arm id. Deferred. |
+| Run-state architecture | **84** | Route, obols, Remembrances, node-boundary resume. Deterministic. |
+| Death / restart loop | **86** | Death is a return. The stone names who took you and what you carried. Pause can give the descent back. |
+| Meta-progression readiness | **76** | Three Remembrances buy a turn; five more buy a cup that stays. Visible in the room. |
+| Replayability | **72** | Six spines + live dress. Consecutive runs still share the elite and the judge. |
+| Sense of anticipation | **70** | The map is five seconds and produces a plan. The Unburied is rare. Nothing is a second realm. |
+| **Overall roguelike foundation** | **76** | The loop is the game. What 90+ still needs is a sitting person, authored recasts, and end-of-run rooms that do not always rhyme. |
 
 ---
 
@@ -280,7 +457,7 @@ Ordering reflects dependency and player value. Phases 0–1 are gates, not featu
 
 ### Phase 5 — Realm identity (Greek)
 - **Objective:** the run reads as *a place*: the five named spaces, palette/material/audio package, enemy recasts, the Oath-Bound elite, two encounter modifiers.
-- **Why now:** content lands on the Phase 2 spine and Phase 4 systems; art identity is the historically slowest loop (the gauntlet's 11-round arena stall) so it gets its own phase with timeboxes and the `ART_DIRECTION.md` §11 gates. **Add a Greek section to `ART_DIRECTION.md` §9 first** — the bible sketches Duat/Niflheim/Mictlan but not the realm we chose to build.
+- **Why now:** content lands on the Phase 2 spine and Phase 4 systems; art identity is the historically slowest loop (the gauntlet's 11-round arena stall) so it gets its own phase with timeboxes and the `ART_DIRECTION.md` §11 gates. **Settle the realm contradiction first** — §9 sketches Duat/Niflheim/Mictlan and explicitly defers Greek as the one realm that would invite a Hades comparison, yet Greek is the realm that shipped. Resolve that, then write the §9 entry for whichever way it lands.
 - **Acceptance:** players identify the realm without reading its title; blind-critique protocol on three exhibits (a combat room, the utility node, the boss arena); the teaching-loop rule holds (the elite is met alone before it joins formations); both modifiers reachable and bot-completable.
 - **Out of scope:** second realm; signature set pieces beyond the Hall of Minos.
 
@@ -449,6 +626,10 @@ Compelling, and not this milestone. Each waits for a named trigger:
 ---
 
 ## N. The Next 10 Tasks
+
+> **Ordering superseded** by the Revision 3 table in the STATUS block (2026-08-28): tasks 1, 2
+> (prototype half), 7, and the boss shipped in PR #9; the remainder runs as PRs 1–7 there. The task
+> specs below remain the definitions of record.
 
 In exact priority order. Each is scoped to be one implementation task/PR. Format per task: **what · why · systems · impact/complexity · depends on · type · done when**.
 

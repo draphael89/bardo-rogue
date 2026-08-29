@@ -5,7 +5,8 @@ import type { World, Player } from '@/sim/world'
 import { tuning } from '@/tuning'
 import { lerp, clamp01, easeOutCubic, easeInCubic, lerpAngle } from '../anim'
 import { swingProgress } from '@/sim/combat'
-import { hasBoon, swingReach } from '@/sim/boons'
+import { activeBoons, hasBoon, swingReach } from '@/sim/boons'
+import { BLADE_SMEAR, bladeDress, type BladeDress } from '../bladeDress'
 import { EntityView, SPRITE, WEAPON, HALF_PI } from './shared'
 import type { Sheet } from '../sheet'
 import { ARM, armOf } from '@/sim/weapons'
@@ -476,7 +477,7 @@ export function updatePlayerView(v: EntityView, p: Player, world: World, alpha: 
   let verticalRollFrame = -1
   const b = v.body
   const speed = Math.hypot(p.vx, p.vy)
-  const bladeEquipped = armOf(world) === ARM.blade
+  const bladeEquipped = armOf(world) === ARM.blade && p.armed
   const heroDirection = authoredDirectionFor(v, p, bladeEquipped)
   const authoredBlade = heroDirection !== null
   const art = playerArt.get(v)
@@ -623,6 +624,7 @@ export function updatePlayerView(v: EntityView, p: Player, world: World, alpha: 
 
 function updateSword(v: EntityView, p: Player, world: World, x: number, y: number, alpha: number, time: number, separateRollWeapon = false): void {
   const w = v.weapon!
+  if (!p.armed) { w.visible = false; return }
   const P = tuning.player
   const f = p.facing
   // rest pose: blade up, resting on the shoulder
@@ -700,12 +702,13 @@ function updateSword(v: EntityView, p: Player, world: World, x: number, y: numbe
   w.zIndex = y + p.radius + 1 + (inFront ? 0.5 : -0.5)
   w.scale.set(ws)
   const hot = p.state === 'attack' && P.attack.swings[p.swingIndex].heavy
-  w.tint = hasBoon(world, 'cleave') ? 0xffc878 : hot ? 0xffe8a0 : 0xffffff
+  const dress = bladeDress(activeBoons(world), !!world.session.run?.primedBrand)
+  w.tint = dress === 'ember' ? 0xff8a20 : dress === 'veil' ? 0xc8b0ff : hot ? 0xffe8a0 : 0xffffff
 }
 
 type SwingArc = {
   a0: number; a1: number; outer: number; thick: number; fade: number
-  x: number; y: number; heavy: boolean; blessed: boolean; hole: number
+  x: number; y: number; heavy: boolean; dress: BladeDress; hole: number
 }
 
 function swingArc(p: Player, alpha: number, world: World): SwingArc | null {
@@ -726,12 +729,12 @@ function swingArc(p: Player, alpha: number, world: World): SwingArc | null {
   const behind = a1 - s.sweep * (Math.PI / 180) * (s.heavy ? A.spanHeavy : A.spanLight)
   const startEdge = p.swingAngle - s.sweep * half + swept * tail
   const a0 = s.sweep > 0 ? Math.max(startEdge, behind) : Math.min(startEdge, behind)
-  const blessed = hasBoon(world, 'cleave')
+  const dress = bladeDress(activeBoons(world), !!world.session.run?.primedBrand)
   return {
     a0, a1, outer: reach.radius, fade,
-    thick: (s.heavy ? A.heavyThick : A.lightThick) + (blessed ? tuning.boons.cleave.smearAdd : 0),
+    thick: (s.heavy ? A.heavyThick : A.lightThick) + (hasBoon(world, 'cleave') ? tuning.boons.cleave.smearAdd : 0),
     x: lerp(p.px, p.x, alpha), y: lerp(p.py, p.y, alpha),
-    heavy: s.heavy, blessed, hole: A.hole,
+    heavy: s.heavy, dress, hole: A.hole,
   }
 }
 
@@ -748,23 +751,24 @@ export function drawSwingArc(g: Graphics, p: Player, alpha: number, world: World
   const arc = swingArc(p, alpha, world)
   if (!arc) return
   const A = tuning.juice.arc
-  const { a0, a1, outer, thick, fade, x, y, heavy, blessed, hole } = arc
-  const steel = heavy ? 0xfff6d0 : 0xeaf4ff
-  const fire = heavy ? 0xffc050 : 0xffc060
+  const { a0, a1, outer, thick, fade, x, y, heavy, dress, hole } = arc
+  const C = BLADE_SMEAR[dress]
+  const body = heavy ? C.heavy : C.light
   // The directional keel already names a vertical cut. Ease the broad white crescent slightly in
   // that view so the rear/front fighter remains a readable actor inside the contact composition.
   const verticalClarity = Math.abs(Math.sin(p.swingAngle)) >= A.axisMinVertical ? 0.84 : 1
   smear(g, x, y, a0, a1, outer + 2, thick + 5, A.rimColor, A.rimAlpha * fade, 1.0, hole)
-  if (heavy) smear(g, x, y, a0, a1, outer + 1, thick + 3, blessed ? 0xff9020 : 0xff9a28, A.ghostAlpha * fade, 1.2, hole)
-  smear(g, x, y, a0, a1, outer, thick, blessed ? fire : steel, (heavy ? A.heavyAlpha : A.lightAlpha) * fade * verticalClarity, 0.8, hole)
-  smear(g, x, y, a0 + (a1 - a0) * 0.5, a1, outer - thick * 0.2, thick * 0.65, blessed ? 0xfff0c0 : 0xffffff, fade * verticalClarity, 0.7, hole)
+  if (heavy) smear(g, x, y, a0, a1, outer + 1, thick + 3, C.ghost, A.ghostAlpha * fade, 1.2, hole)
+  smear(g, x, y, a0, a1, outer, thick, body, (heavy ? A.heavyAlpha : A.lightAlpha) * fade * verticalClarity, 0.8, hole)
+  smear(g, x, y, a0 + (a1 - a0) * 0.5, a1, outer - thick * 0.2, thick * 0.65, C.tip, fade * verticalClarity, 0.7, hole)
 }
 
 // The blade itself: a short hot wedge on the leading edge, drawn in air over the fighters.
 export function drawSwingTip(g: Graphics, p: Player, alpha: number, world: World): void {
   const arc = swingArc(p, alpha, world)
   if (!arc) return
-  const { a1, outer, thick, fade, x, y, heavy, blessed, hole } = arc
+  const { a1, outer, thick, fade, x, y, heavy, dress, hole } = arc
+  const C = BLADE_SMEAR[dress]
   const tip = outer + (heavy ? 2.5 : 1.5)
   const hilt = Math.max(hole, outer - thick * 0.55)
   const c1 = Math.cos(a1), s1 = Math.sin(a1) * 0.9
@@ -773,7 +777,7 @@ export function drawSwingTip(g: Graphics, p: Player, alpha: number, world: World
     x + c1 * hilt + nx, y + s1 * hilt + ny,
     x + c1 * tip, y + s1 * tip,
     x + c1 * hilt - nx, y + s1 * hilt - ny,
-  ]).fill({ color: blessed ? 0xfff0c0 : 0xffffff, alpha: fade })
+  ]).fill({ color: C.tip, alpha: fade })
 
   // On a vertical cut the tangent of a truthful circular arc is horizontal, so a freeze-frame can
   // misread the action as lateral even though the target lies north/south. After the swept sector
@@ -796,14 +800,14 @@ export function drawSwingTip(g: Graphics, p: Player, alpha: number, world: World
       x + ca * root + px * width, y + sa * root + py * width,
       x + ca * end, y + sa * end,
       x + ca * root - px * width, y + sa * root - py * width,
-    ]).fill({ color: blessed ? 0xfff0c0 : 0xffffff, alpha: A.axisAlpha * fade })
+    ]).fill({ color: C.tip, alpha: A.axisAlpha * fade })
   }
   if (heavy) {
     g.poly([
       x + c1 * (hilt + 2), y + s1 * (hilt + 2),
       x + c1 * tip, y + s1 * tip,
       x + c1 * (hilt + 2) - nx * 0.4, y + s1 * (hilt + 2) - ny * 0.4,
-    ]).fill({ color: 0xffd060, alpha: fade * 0.85 })
+    ]).fill({ color: C.heavy, alpha: fade * 0.85 })
   }
 }
 

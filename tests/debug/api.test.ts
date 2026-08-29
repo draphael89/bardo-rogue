@@ -20,6 +20,8 @@ function makeHost() {
     setOverride: () => {},
     setBot: () => {},
     pause: (p?: boolean) => { loop.paused = p ?? !loop.paused; return loop.paused },
+    shellPause: (p?: boolean) => { loop.paused = p ?? !loop.paused; return loop.paused },
+    abandon: () => false,
     loop,
     presenter: null,
     get metrics() { return metrics },
@@ -30,6 +32,7 @@ function makeHost() {
     stopRecord: (): Replay => ({ v: 1, seed: 1, scenario: 'empty', frames: [] }),
     download: () => {},
     replay: () => {},
+    inspectSave: () => ({ checkpoint: null }),
   }
 }
 

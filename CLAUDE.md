@@ -1,9 +1,9 @@
 # Bardo Rogue
 
-Browser action-roguelike vertical slice: one arena, three waves, one sword. PixiJS v8 + Vite + TypeScript strict, pnpm.
-Design rationale and the full plan: `/Users/davidraphael/.claude/plans/web-roguelike-action-rpg-glimmering-pnueli.md`.
+Browser action-roguelike vertical slice: a deterministic hub -> Greek-gate run loop (rooms, boons, rites, boss, return). PixiJS v8 + Vite + TypeScript strict, pnpm.
+Plan of record: `VERTICAL_SLICE_PLAN.md` — its STATUS block is the live truth. Design ancestor: `/Users/davidraphael/.claude/plans/web-roguelike-action-rpg-glimmering-pnueli.md`.
 Agent harness (URL params, `window.__game`, shot/pose/headless tools, replays): `HARNESS.md`.
-Standing directive for agents working here: `GAUNTLET.md` (build/critic loop, commit after every passed piece, keep `public/progress/data.json` current).
+Standing directive: the PR loop — plan -> build -> multi-agent adversarial review -> fix -> merge. Commit after every passed piece; keep `public/progress/data.json` current. `GAUNTLET.md` is retired as the directive; its blind-critique protocol (`.claude/skills/bardo-critic`) survives only as the realm-art acceptance gate (three exhibits).
 
 ## Rules that keep the game tunable
 - `src/sim/` is pure TypeScript: no DOM, no pixi, no `Math.random`, no `Date`. It is deterministic given (seed, scenario, inputs) and runs headless in Vitest and `tools/headless.ts`.
@@ -15,7 +15,7 @@ Standing directive for agents working here: `GAUNTLET.md` (build/critic loop, co
 ## Verify before claiming done
 - `pnpm typecheck` and `pnpm test` must be green.
 - Visual changes: `pnpm poses` (pose sheet of ~30 key frames) and/or `pnpm shot -- --scenario wave1 --bot naive-melee --ticks 500`, then Read the PNG.
-- Balance changes: `pnpm sim -- --scenario full --bot kite --seeds 1-8` and compare against the targets in the plan (skilled clear 60–120 s, idle dies in wave 1).
+- Balance changes: `pnpm matrix -- --seeds 1-100` — the hard gate is "no seed strands a player"; the reported band is slice-kite win 0.6–1.0, slice-naive 0.0–0.2. (The old "skilled clear 60–120 s" target was measured unpassable and replaced by variance gates; never assert a threshold without measuring it first.)
 - The dev server is usually already running on :5173; check before starting another.
 - Platform changes (`src/platform/`, `desktop/`): `pnpm desktop:build && pnpm smoke:desktop` — 23 hosting checks including replay-hash parity between the packaged app and `pnpm sim`. Never needed for a gameplay change.
 - Any change to what `stepWorld` or `createWorld` can reach (most of `src/sim/`, and `src/tuning.ts`) breaks the pinned hashes in `tests/sim/replay.test.ts`. If intended: `pnpm record-bots`, paste the printed hashes into the test. Never hand-edit a hash, and never run `record-bots` to make a failure go away — it would launder real drift into the fixtures. `src/sim/save.ts` and `src/sim/storage.ts` are pure document code that the sim never calls (`tests/sim/boundary.test.ts` asserts it), so editing them must NOT change a hash.

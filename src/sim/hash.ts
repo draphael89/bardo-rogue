@@ -1,7 +1,7 @@
 import type { World, PlayerState, EnemyState, ProjectileKind } from './world'
 import type { EnemyKind } from './events'
 import type { WaveState } from './world'
-import type { RoomPhase } from './session'
+import type { MysteryChoice, RoomPhase, ShopGood } from './session'
 import type { RiteId } from './rites'
 import { ARM } from './weapons'
 import { BOON } from './boons'
@@ -17,6 +17,8 @@ const WAVE_STATE: Record<WaveState, number> = { idle: 0, pending: 1, active: 2, 
 const ROOM_PHASE: Record<RoomPhase, number> = { town: 0, entering: 1, fighting: 2, reward: 3, exits: 4, transitioning: 5, resolved: 6 }
 const PROJECTILE_KIND: Record<ProjectileKind, number> = { bolt: 0, arrow: 1, mirror: 2, echo: 3 }
 const RITE: Record<RiteId, number> = { toll: 0 }
+const SHOP: Record<ShopGood, number> = { heal: 0, vessel: 1, vow: 2 }
+const MYSTERY: Record<MysteryChoice, number> = { coin: 0, memory: 1, leave: 2 }
 
 // FNV-1a over a canonical snapshot of everything the sim's outcome depends on.
 // Deliberately NOT hashed: world.visualRng (cosmetic-only stream) and the arena's DECORATION, so
@@ -55,7 +57,9 @@ export function hashWorld(world: World): number {
 
   if (world.scenario === 'loop') {
     const session = world.session
-    int(session.meta.attempts); int(session.meta.victories)
+    int(session.meta.attempts); int(session.meta.victories); int(session.meta.remembrances)
+    flag(session.meta.rerollUnlocked)
+    flag(session.meta.vesselUnlocked)
     byte(session.preparedWeapon ? ARM[session.preparedWeapon] + 1 : 0)
     const run = session.run
     flag(!!run)
@@ -65,16 +69,35 @@ export function hashWorld(world: World): number {
       for (const visit of run.roomHistory) { str(visit.id); int(visit.enteredTick) }
       // A flag-then-body block is the one legal shape for optional data: the flag discriminates, so
       // the body's bytes can never be mistaken for a neighbour's.
+      int(run.obols)
       flag(!!run.pendingReward)
       if (run.pendingReward) {
         byte(run.pendingReward.family === 'blade' ? 0 : 1); byte(run.pendingReward.focus); flag(run.pendingReward.fromRite)
         for (const id of run.pendingReward.options) int(BOON[id])
       }
+      flag(!!run.pendingShop)
+      if (run.pendingShop) {
+        byte(run.pendingShop.focus)
+        for (const good of run.pendingShop.goods) byte(SHOP[good])
+      }
+      flag(!!run.pendingMystery)
+      if (run.pendingMystery) {
+        byte(run.pendingMystery.focus)
+        for (const choice of run.pendingMystery.choices) byte(MYSTERY[choice])
+      }
+      flag(run.mysteryHunt)
       byte(run.killedBy === 'none' ? 0 : ENEMY_KIND[run.killedBy] + 1); flag(run.killedRanged)
       flag(!!run.pendingRite)
       if (run.pendingRite) { byte(RITE[run.pendingRite.id]); byte(run.pendingRite.focus) }
       byte(run.riteAnswer === 'paid' ? 1 : run.riteAnswer === 'refused' ? 2 : 0)
       flag(run.riteBoonOwed); flag(run.riteDebt)
+      // Always written when a run exists: length 0 covers `map === null`. Ids only.
+      const nodes = run.map?.nodes ?? []
+      int(nodes.length)
+      for (const node of nodes) str(node.id)
+      str(run.map?.template ?? '')
+      int(run.boundaryRng)
+      int(run.rerolls)
     }
   }
 
@@ -108,6 +131,7 @@ export function hashWorld(world: World): number {
     byte(e.burn); int(e.burnTicks); int(e.burnAcc); int(e.burnActionId)
     // poseTick is a cosmetic clock, like visualRng above: deterministic presentation state, but it
     // cannot affect an outcome and therefore is deliberately outside the gameplay hash contract.
+    // hunt and debt are the same class: they name the body on the strip and the death card. The fight does not change.
     flag(e.knockbackHeavy); int(e.knockbackActionId)
   }
 

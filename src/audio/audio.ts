@@ -9,6 +9,9 @@
 // Presentation only. Nothing in src/sim/ imports this file, and nothing here reads sim state
 // except through the values sfxMap hands us after a tick.
 
+import { bedToneFor } from './bedTone'
+import type { LayoutId } from '@/sim/layouts'
+
 export type BusName = 'music' | 'ambience' | 'sfx' | 'ui'
 
 export interface PlayOpts {
@@ -130,6 +133,9 @@ export const MIX = {
   // band free instead of making every wind-up fight for it. A permanent hole in one band the bed
   // does not need costs the bed far less than a duck deep enough to be heard through it.
   bedNotch: { hz: 2828, q: 1.4, db: -10 },
+  // The room's air. A lowshelf on the ducked legs only — never the tell notch, never SFX.
+  // playbackRate lives on the voices; this is the weight under it.
+  layoutShelf: { hz: 180, q: 0.7 },
   // At most `max` starts of one sound group inside `window` seconds; the rest are dropped.
   voiceCap: { window: 0.07, max: 4 },
   // Space. Every sim event already carries (x, y); this is what turns it into a stereo image.
@@ -229,6 +235,8 @@ export class AudioSystem {
   crowd: GainNode | null = null
   /** The static 2-4 kHz cut that reserves the tell band, one per ducked bus. */
   bedNotch: Partial<Record<BusName, BiquadFilterNode>> = {}
+  /** Per-layout lowshelf on the same legs. The Hall is heavier than the Gate. */
+  layoutShelf: Partial<Record<BusName, BiquadFilterNode>> = {}
   /** Offline rendering only: added to ctx.currentTime so a whole fight can be scheduled ahead. */
   timeOffset = 0
 
@@ -252,6 +260,7 @@ export class AudioSystem {
   private driveApplied = false
   private combatOn = false
   private lastCombat: [number, number] = [0, 1]
+  private layout: LayoutId = 'bardo'
 
   private _muted = false
   get muted(): boolean { return this._muted }
@@ -352,7 +361,10 @@ export class AudioSystem {
     })
   }
 
-  private masterLevel(): number { return dbToGain(MIX.masterDb) * this.slider.master }
+  // sliderToGain, not a raw multiply: the pause card shows three identical sliders, and the master
+  // answering linearly while the buses answer on the -60 dB curve made equal positions sound wildly
+  // different (master 0.5 was -6 dB where music 0.5 was -30 dB).
+  private masterLevel(): number { return dbToGain(MIX.masterDb) * sliderToGain(this.slider.master) }
   private now(): number { return (this.ctx?.currentTime ?? 0) + this.timeOffset }
 
   /**
@@ -404,10 +416,12 @@ export class AudioSystem {
     this.outTrim = ctx.createGain()
     this.outTrim.gain.value = dbToGain(MIX.outTrimDb)
     this.master.connect(this.limiter); this.limiter.connect(this.outTrim); this.outTrim.connect(ctx.destination)
-    this.duckStage = {}; this.bedNotch = {}
+    this.duckStage = {}; this.bedNotch = {}; this.layoutShelf = {}
     const mk = (b: BusName) => {
       const g = ctx.createGain()
-      this.busLevel[b] = dbToGain(MIX.busDb[b])
+      // The slider may have been set before the context existed (settings load at boot, the graph
+      // at the first gesture); a bus that ignored it here would discard the player's saved volume.
+      this.busLevel[b] = dbToGain(MIX.busDb[b]) * sliderToGain(this.slider[b])
       g.gain.value = this.busLevel[b]
       g.connect(this.master!)
       if (MIX.ducked.includes(b)) {
@@ -418,11 +432,17 @@ export class AudioSystem {
         notch.frequency.value = MIX.bedNotch.hz
         notch.Q.value = MIX.bedNotch.q
         notch.gain.value = MIX.bedNotch.db
-        // bed -> duck -> tell-band notch -> fader -> Master; stingers join at the fader,
-        // so they are neither ducked nor notched.
-        d.connect(notch); notch.connect(g)
+        const shelf = ctx.createBiquadFilter()
+        shelf.type = 'lowshelf'
+        shelf.frequency.value = MIX.layoutShelf.hz
+        shelf.Q.value = MIX.layoutShelf.q
+        shelf.gain.value = 0
+        // bed -> duck -> tell-band notch -> room shelf -> fader -> Master. Stingers join
+        // at the fader, so they are neither ducked, notched, nor retuned by the floor.
+        d.connect(notch); notch.connect(shelf); shelf.connect(g)
         this.duckStage[b] = d
         this.bedNotch[b] = notch
+        this.layoutShelf[b] = shelf
       }
       return g
     }
@@ -492,9 +512,15 @@ export class AudioSystem {
       },
       bedNotch: {
         ...MIX.bedNotch,
-        stage: 'peaking biquad between the duck stage and the bus fader: it shapes the bed and the ambience only, never a stinger and never an SFX',
+        stage: 'peaking biquad between the duck stage and the room shelf: it shapes the bed and the ambience only, never a stinger and never an SFX',
         reserves: 'the danger tells (enemyWindup, spawnTelegraph) and the dodge sweep live in this band',
         response: [500, 1000, 1500, 2000, 2828, 4000, 6000, 9000].map(hz => ({ hz, db: +peakingDb(hz, MIX.bedNotch, 48000).toFixed(2) })),
+      },
+      layoutShelf: {
+        ...MIX.layoutShelf,
+        layout: this.layout,
+        tone: bedToneFor(this.layout),
+        stage: 'lowshelf after the tell notch, before the fader. playbackRate on the voices. The tell band does not move.',
       },
       bed: MIX.bed,
       space: {
@@ -788,6 +814,29 @@ export class AudioSystem {
       this.fadeVoice(this.bedVoices.drive, driveWanted ? 0 : -Infinity, driveWanted ? B.fadeIn * 0.8 : B.fadeOut)
     }
   }
+
+  /** Retune the one bed to the floor. Same loops; the Hall is heavier than the Gate. */
+  setLayout(layout: LayoutId): void {
+    if (layout === this.layout) return
+    this.layout = layout
+    this.applyLayoutTone(false)
+  }
+
+  private applyLayoutTone(immediate: boolean): void {
+    if (!this.ctx) return
+    const tone = bedToneFor(this.layout)
+    const t = this.now()
+    for (const v of Object.values(this.bedVoices)) {
+      if (!v) continue
+      if (immediate) v.src.playbackRate.value = tone.rate
+      else v.src.playbackRate.setTargetAtTime(tone.rate, t, 0.35)
+    }
+    for (const shelf of Object.values(this.layoutShelf)) {
+      if (!shelf) continue
+      if (immediate) shelf.gain.value = tone.shelfDb
+      else shelf.gain.setTargetAtTime(tone.shelfDb, t, 0.35)
+    }
+  }
   /** The running bed voices, for a mix debug view or an offline level check. Read only. */
   get layers(): Readonly<{ ambience?: Voice; bed?: Voice; drive?: Voice }> { return this.bedVoices }
 
@@ -820,6 +869,7 @@ export class AudioSystem {
     this.bedVoices.bed = this.start(this.bedBuffers.bed, { gain: dbToGain(B.bedDb), bus: 'music', loop: true, delay: at, startSilent: true, ducked: true })
     this.bedVoices.drive = this.start(this.bedBuffers.drive, { gain: dbToGain(B.driveDb), bus: 'music', loop: true, delay: at, startSilent: true, ducked: true })
     this.combatOn = false; this.driveOn = false; this.driveApplied = false
+    this.applyLayoutTone(true)
   }
 
   /**

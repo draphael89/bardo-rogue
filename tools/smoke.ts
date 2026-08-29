@@ -158,7 +158,7 @@ async function play(page: Page, spec: PathSpec): Promise<void> {
     const paid = spec.toll === 'paid'
     check(paid ? outcome.maxHpAfterToll < 5 : outcome.maxHpAfterToll === 5,
       `paying costs a vessel and refusing does not (maxHp ${outcome.maxHpAfterToll})`)
-    if (paid && spec.expect === 'won') check(outcome.boons.length >= 4, `the ferryman pays out a fourth vow (${outcome.boons.length} vows)`)
+    if (paid && spec.expect === 'won') check(outcome.boons.length >= 3, `the ferryman still pays out after the stall (${outcome.boons.length} vows)`)
   }
   check(outcome.boons.length > 0, `builds a run: ${outcome.boons.join(', ') || 'none'}`)
   if (spec.expect === 'lost') check(outcome.killedBy !== 'none' && !!outcome.killedBy, `death names its killer (${String(outcome.killedBy)})`)

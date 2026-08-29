@@ -1,6 +1,6 @@
 import { tuning, type SwingDef } from '@/tuning'
 import type { Enemy, World } from './world'
-import type { RewardFamily } from './session'
+import type { BoonStack, RewardFamily } from './session'
 import { damageEnemy, type DamageResult } from './combat'
 import { applyBrand, applyBurn } from './status'
 import { hasLineOfSight } from './collision'
@@ -72,47 +72,47 @@ export interface BoonDef {
 export const BOONS: Record<BoonId, BoonDef> = {
   cleave: {
     id: 'cleave', name: 'CLEAVING GRACE', deity: 'fury', family: 'blade', vow: 'Claim the room.',
-    detail: 'Light swings carve a wider, longer arc.',
+    detail: 'The blade takes more of the room with it.',
   },
   ashenEdge: {
     id: 'ashenEdge', name: 'ASHEN EDGE', deity: 'fury', family: 'blade', vow: 'Write their ending.',
-    detail: 'Light weapon hits Brand foes, up to 3.',
+    detail: 'Every light writes a mark. Three is a sentence.',
   },
   finalJudgment: {
     id: 'finalJudgment', name: 'FINAL JUDGMENT', deity: 'fury', family: 'blade', vow: 'Commit. Then collect.',
-    detail: 'Heavy hits consume Brand in a damaging burst.',
+    detail: 'The committed blow spends every mark in a burst.',
   },
   emberKiss: {
     id: 'emberKiss', name: "PHLEGETHON'S KISS", deity: 'fury', family: 'blade', vow: 'Let the river taste them.',
-    detail: 'Heavy hits set foes burning.',
+    detail: 'The committed blow leaves them burning.',
   },
   bloodDebt: {
     id: 'bloodDebt', name: 'THE DEBT PASSES', deity: 'fury', family: 'blade', vow: 'It is never settled.',
-    detail: 'A dying foe throws its Brand to the nearest.',
+    detail: 'When one falls, the mark finds the next.',
   },
   unanswered: {
     id: 'unanswered', name: 'UNANSWERED', deity: 'fury', family: 'blade', vow: 'Do not let them finish.',
-    detail: 'Heavies that interrupt a wind-up hit far harder.',
+    detail: 'Catch them mid-word and the blow is twice as cruel.',
   },
   betweenStep: {
     id: 'betweenStep', name: 'BETWEEN-STEP', deity: 'hecate', family: 'veil', vow: 'Pass through fear.',
-    detail: 'A perfect dodge primes your next hit for 3 Brand.',
+    detail: 'Pass through them and the next blow writes the whole sentence.',
   },
   mirrorSteel: {
     id: 'mirrorSteel', name: 'MIRROR STEEL', deity: 'hecate', family: 'veil', vow: 'Return what was sent.',
-    detail: 'Cut hostile bolts to reflect them through enemies.',
+    detail: 'Cut what they send. Send it back through them.',
   },
   afterimage: {
     id: 'afterimage', name: 'AFTERIMAGE', deity: 'hecate', family: 'veil', vow: 'Leave an edge behind.',
-    detail: 'A perfect dodge releases a short weapon echo.',
+    detail: 'The step through leaves a blade where you were.',
   },
   torchlight: {
     id: 'torchlight', name: 'TORCHLIGHT', deity: 'hecate', family: 'veil', vow: 'Show them the way down.',
-    detail: 'A perfect dodge sets the nearest foe alight.',
+    detail: 'The step through lights whoever stands nearest.',
   },
   crossroads: {
     id: 'crossroads', name: 'CROSSROADS', deity: 'hecate', family: 'veil', vow: 'Arrive from everywhere.',
-    detail: 'A swing out of a roll cuts a full circle.',
+    detail: 'Come out of the roll swinging, and you cut every side.',
   },
   // The duo, and the only place the two powers agree: she marks the debt, and the river collects it
   // from everyone standing near. It needs Final Judgment plus ANY vow of Hecate's — naming two
@@ -121,7 +121,7 @@ export const BOONS: Record<BoonId, BoonDef> = {
   // collect it, then this; both powers are represented, which is the whole point of a pact.
   pyre: {
     id: 'pyre', name: 'PYRE', deity: 'fury', family: 'blade', vow: 'Let the whole room answer.',
-    detail: 'Judgment bursts set all they touch alight.',
+    detail: 'The collection sets everyone it touches on fire.',
     requires: ['finalJudgment'],
   },
 }
@@ -293,4 +293,13 @@ export function triggerPerfectDodge(world: World): void {
     afterimageActionId(world.tick),
     'echo',
   )
+}
+
+// ---------------------------------------------------------------------------------------------
+// Presentation vocabulary. The sim never reads a boon's NAME, so these are safe for any renderer
+// to import — they exist so the HUD strip, the death card and the victory card cannot drift into
+// three different spellings of the same build.
+export const UNMARKED_BUILD = 'UNMARKED BLADE'
+export function boonNames(boons: readonly BoonStack[]): string[] {
+  return boons.map(b => BOONS[b.id].name)
 }

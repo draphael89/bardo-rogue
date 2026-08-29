@@ -3,6 +3,8 @@ import type { Atlas } from './atlas'
 import { fxRng } from './fxRng'
 import { decalAlphaForFrame } from './feedback'
 import { authoredFxFrame, FX_UNIT, quantizeFxRotation } from './fxUnits'
+import { LAMPAD } from './lampadInk'
+import { SPAWN } from './spawnInk'
 
 interface P { s: Sprite; frames: readonly Texture[] | null; spin: number; vx: number; vy: number; life: number; maxLife: number; drag: number; grav: number; scale0: number; scale1: number; rot: number; alpha0: number; alpha1: number; ground: number | null; tint0: number; tint1: number | null; sgn: number; unit: number }
 
@@ -118,8 +120,8 @@ export class Particles {
     this.spawn(this.atlas.particle('circle_02'), x, y, { maxLife: 0.2, scale0: 6, scale1: 22, tint, blend: 'add', alpha0: 0.8, alpha1: 0 })
   }
 
-  boltTrail(x: number, y: number) {
-    this.spawn(this.atlas.particle('circle_01'), x + fxRng.particles.signed(2), y + fxRng.particles.signed(2), { maxLife: 0.25, scale0: 5, scale1: 1, tint: 0xb060ff, blend: 'add', alpha0: 0.7, alpha1: 0 })
+  boltTrail(x: number, y: number, tint = LAMPAD.glow) {
+    this.spawn(this.atlas.particle('circle_01'), x + fxRng.particles.signed(2), y + fxRng.particles.signed(2), { maxLife: 0.25, scale0: 5, scale1: 1, tint, blend: 'add', alpha0: 0.7, alpha1: 0 })
   }
 
   arrowTrail(x: number, y: number) {
@@ -169,21 +171,21 @@ export class Particles {
   // alpha-ramped bloom covers both silhouettes and says nothing about direction, so the contact shape
   // is now authored out of whole pixels in presenter.drawContact instead.
 
-  spawnBurst(x: number, y: number) {
-    this.spawn(this.atlas.particle('circle_03'), x, y, { maxLife: 0.3, scale0: 4, scale1: 30, tint: 0xfff0c0, blend: 'add', alpha0: 0.9, alpha1: 0 })
+  spawnBurst(x: number, y: number, tint = SPAWN.burst, spark = SPAWN.burstSpark) {
+    this.spawn(this.atlas.particle('circle_03'), x, y, { maxLife: 0.3, scale0: 4, scale1: 30, tint, blend: 'add', alpha0: 0.9, alpha1: 0 })
     for (let i = 0; i < 10; i++) {
       const a = fxRng.particles.next() * 6.28, sp = fxRng.particles.range(30, 80)
-      this.spawn(this.atlas.particle('spark_01'), x, y, { vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 20, maxLife: 0.4, drag: 0.9, scale0: 5, scale1: 1, tint: 0xffe0a0, blend: 'add' })
+      this.spawn(this.atlas.particle('spark_01'), x, y, { vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 20, maxLife: 0.4, drag: 0.9, scale0: 5, scale1: 1, tint: spark, blend: 'add' })
     }
   }
 
   // One brazier flame tongue (flame_05/06 are the solid shapes; 01-04 are wisps that vanish at this size).
   // Normal blend on purpose: additive over the grey wall would bleach to white; the lightmap supplies the glow.
-  flame(x: number, y: number) {
+  flame(x: number, y: number, tint = 0xfff0a0, tint1 = 0xff5a14) {
     const big = fxRng.particles.next() < 0.3
     const f = this.spawn(this.atlas.particle(fxRng.particles.next() < 0.5 ? 'flame_05' : 'flame_06'), x + fxRng.particles.signed(5), y + fxRng.particles.signed(2), {
       vx: fxRng.particles.signed(6), vy: -16 - fxRng.particles.next() * 14, maxLife: (big ? 0.5 : 0.3) + fxRng.particles.next() * 0.15, drag: 0.94,
-      scale0: big ? 22 : fxRng.particles.range(14, 18), scale1: 5, rot: fxRng.particles.signed(2), tint: 0xfff0a0, tint1: 0xff5a14, alpha0: 1, alpha1: 0.55,
+      scale0: big ? 22 : fxRng.particles.range(14, 18), scale1: 5, rot: fxRng.particles.signed(2), tint, tint1, alpha0: 1, alpha1: 0.55,
     })
     // A flame must point up, with a little lean. Feeding a continuous +/-0.4 rad through quantRot
     // collapsed it: the 22.5-degree step has a +/-11.25-degree capture zone, so half the draws snapped

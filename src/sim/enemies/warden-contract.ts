@@ -28,7 +28,9 @@ export interface WardenProjectileContract {
 export function wardenProjectileContract(pattern: WardenProjectilePattern, phase: number): WardenProjectileContract {
   const W = tuning.warden
   const p2 = phase > 0
-  const speed = pattern === 'ring' ? (p2 ? W.boltSpeed2 : W.boltSpeed) : (p2 ? W.fanSpeed2 : W.fanSpeed)
+  // Phase two recombines slam/ring/fan. Density stays the taught sentence; faster/fatter
+  // volleys were acceleration, not a new decision.
+  const speed = pattern === 'ring' ? W.boltSpeed : W.fanSpeed
   const lifeTicks = pattern === 'ring' ? W.boltLife : W.fanLife
   const spawnOffset = W.radius + 4
   const combinedHurtRadius = W.boltRadius + tuning.player.radius
@@ -36,8 +38,8 @@ export function wardenProjectileContract(pattern: WardenProjectilePattern, phase
   return {
     pattern,
     phase: p2 ? 1 : 0,
-    count: pattern === 'ring' ? (p2 ? W.boltCount2 : W.boltCount) : (p2 ? W.fanCount2 : W.fanCount),
-    volleys: pattern === 'fan' && p2 ? W.fanVolleys2 : 1,
+    count: pattern === 'ring' ? W.boltCount : W.fanCount,
+    volleys: 1,
     spawnOffset,
     speed,
     lifeTicks,

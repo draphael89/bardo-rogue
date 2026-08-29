@@ -13,6 +13,7 @@ export interface InputFrame {
   restart: boolean
   choiceDelta?: -1 | 0 | 1        // reward focus, edge-triggered
   confirm?: boolean               // common modal/summary confirmation edge
+  reroll?: boolean                // offer only: reforge the three cards, once per run
 }
 
 export function emptyInput(): InputFrame {

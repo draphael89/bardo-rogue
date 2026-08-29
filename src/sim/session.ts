@@ -6,11 +6,15 @@ import type { RiteId } from './rites'
 import { SLOW_FULL, type World } from './world'
 import { ARM, grantArm } from './weapons'
 import { Rng, STREAM, streamSeed } from './rng'
+import { buildSliceRooms, installRoute, templateForSeed, type RunMap } from './route'
 import { tuning } from '@/tuning'
 
 export type RoomPhase = 'town' | 'entering' | 'fighting' | 'reward' | 'exits' | 'transitioning' | 'resolved'
 export type RunResult = 'active' | 'won' | 'lost'
 export type RewardFamily = 'blade' | 'veil'
+export type RoomReward = RewardFamily | 'shop' | 'mystery'
+export type ShopGood = 'heal' | 'vessel' | 'vow'
+export type MysteryChoice = 'coin' | 'memory' | 'leave'
 
 export interface BoonStack {
   id: BoonId
@@ -36,6 +40,16 @@ export interface RiteOffer {
   focus: 0 | 1
 }
 
+export interface ShopOffer {
+  goods: [ShopGood, ShopGood, ShopGood]
+  focus: 0 | 1 | 2
+}
+
+export interface MysteryOffer {
+  choices: [MysteryChoice, MysteryChoice, MysteryChoice]
+  focus: 0 | 1 | 2
+}
+
 /** How the run answered the realm's one rite. `null` until it has been asked and answered. */
 export type RiteAnswer = null | 'paid' | 'refused'
 
@@ -50,6 +64,11 @@ export interface RunState {
   roomId: string
   roomHistory: RoomVisit[]
   pendingReward: RewardOffer | null
+  pendingShop: ShopOffer | null
+  pendingMystery: MysteryOffer | null
+  obols: number
+  /** The Unburied, left on the bank, follows into the next room. */
+  mysteryHunt: boolean
   // The toll, in its three states: being asked, paid (and owed a vow at this room's end), or
   // refused. A refusal outlives the room it was made in — that is the whole point of it.
   pendingRite: RiteOffer | null
@@ -63,12 +82,21 @@ export interface RunState {
   primedBrand: boolean
   killedBy: DeathKind          // 'none' until something lands the killing blow
   killedRanged: boolean
+  /** Installed at startRun. Null in town and in every non-loop scenario. */
+  map: RunMap | null
+  /** Gameplay rng as this node was entered. Resume re-enters from this, not from mid-fight. */
+  boundaryRng: number
+  /** One reforging of a boon offer, earned from the Smith. */
+  rerolls: number
 }
 
 export interface MetaStateV1 {
   version: 1
   attempts: number
   victories: number
+  remembrances: number
+  rerollUnlocked: boolean
+  vesselUnlocked: boolean
   unlockedWeapons: ArmId[]
 }
 
@@ -76,10 +104,32 @@ export interface GameSessionState {
   meta: MetaStateV1
   preparedWeapon: ArmId | null
   run: RunState | null
+  /** Remembrances banked by the last finished attempt. Town reads this on the way home. */
+  lastBanked: number
+  /** What you told the Unburied, if you met him. Town reads this once. */
+  lastMystery: MysteryChoice | null
 }
 
 export function defaultMetaState(): MetaStateV1 {
-  return { version: 1, attempts: 0, victories: 0, unlockedWeapons: ['blade'] }
+  return { version: 1, attempts: 0, victories: 0, remembrances: 0, rerollUnlocked: false, vesselUnlocked: false, unlockedWeapons: ['blade'] }
+}
+
+/** Town and every fresh descent wear the banked cup. The shop cup dies with the attempt. */
+export function townMaxHp(meta: MetaStateV1): number {
+  return tuning.player.hp + (meta.vesselUnlocked ? tuning.economy.smith.vesselAmount : 0)
+}
+
+export function applyTownHealth(world: World): void {
+  const max = townMaxHp(world.session.meta)
+  world.player.maxHp = max
+  world.player.hp = max
+}
+
+export function smithWaiting(meta: MetaStateV1): boolean {
+  const s = tuning.economy.smith
+  if (!meta.rerollUnlocked) return meta.remembrances >= s.rerollCost
+  if (!meta.vesselUnlocked) return meta.remembrances >= s.vesselCost
+  return false
 }
 
 export function makeSessionState(meta: MetaStateV1 = defaultMetaState()): GameSessionState {
@@ -88,10 +138,15 @@ export function makeSessionState(meta: MetaStateV1 = defaultMetaState()): GameSe
       version: 1,
       attempts: Math.max(0, Math.floor(meta.attempts)),
       victories: Math.max(0, Math.floor(meta.victories)),
+      remembrances: Math.max(0, Math.floor(meta.remembrances ?? 0)),
+      rerollUnlocked: !!meta.rerollUnlocked,
+      vesselUnlocked: !!meta.vesselUnlocked,
       unlockedWeapons: meta.unlockedWeapons.includes('blade') ? [...meta.unlockedWeapons] : ['blade', ...meta.unlockedWeapons],
     },
     preparedWeapon: null,
     run: null,
+    lastBanked: 0,
+    lastMystery: null,
   }
 }
 
@@ -111,7 +166,9 @@ export function startRun(world: World, firstRoomId: string): boolean {
   // (replay.ts), so a recorded attempt still reproduces exactly.
   const runSeed = streamSeed(world.seed, STREAM.gameplay ^ Math.imul(attempt, 0x45d9f3b))
   world.session.meta.attempts = attempt
-  world.player.hp = world.player.maxHp = tuning.player.hp
+  world.session.lastBanked = 0
+  world.session.lastMystery = null
+  world.player.hp = world.player.maxHp = townMaxHp(world.session.meta)
   world.session.run = {
     seed: runSeed,
     weapon,
@@ -123,6 +180,10 @@ export function startRun(world: World, firstRoomId: string): boolean {
     roomId: firstRoomId,
     roomHistory: [],
     pendingReward: null,
+    pendingShop: null,
+    pendingMystery: null,
+    obols: 0,
+    mysteryHunt: false,
     pendingRite: null,
     riteAnswer: null,
     riteBoonOwed: false,
@@ -132,12 +193,21 @@ export function startRun(world: World, firstRoomId: string): boolean {
     primedBrand: false,
     killedBy: 'none',
     killedRanged: false,
+    map: null,
+    boundaryRng: 0,
+    rerolls: world.session.meta.rerollUnlocked ? 1 : 0,
   }
   world.rng = new Rng(runSeed)
   world.boonBits = 0
   world.attemptStart = world.tick
   world.player.armed = true
   grantArm(world, weapon)
+  if (world.scenario === 'loop') {
+    const template = templateForSeed(runSeed)
+    installRoute(world, buildSliceRooms(template, world.rng), template)
+    const first = template.nodes[0]?.id
+    if (first) world.session.run.roomId = first
+  }
   world.emit({ type: 'runStarted', weapon })
   return true
 }
@@ -172,8 +242,13 @@ export function finishRun(world: World, result: Exclude<RunResult, 'active'>): v
   if (!run || run.result !== 'active') return
   run.result = result
   if (result === 'won') world.session.meta.victories++
+  const gained = run.depth * tuning.economy.remembrancePerDepth
+    + (result === 'won' ? tuning.economy.remembranceOnVictory : 0)
+  world.session.meta.remembrances += gained
+  world.session.lastBanked = gained
   world.roomPhase = 'resolved'
   world.phaseTick = world.tick
+  world.emit({ type: 'remembrancesBanked', amount: gained, total: world.session.meta.remembrances })
   world.emit({
     type: result === 'won' ? 'runWon' : 'runLost',
     depth: run.depth,

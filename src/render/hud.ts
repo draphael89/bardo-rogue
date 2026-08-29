@@ -1,9 +1,12 @@
 import { Container, Graphics, Text } from 'pixi.js'
 import { crispText } from './textCrisp'
 import type { Atlas } from './atlas'
-import type { EnemyKind } from '@/sim/events'
+import type { EnemyKind, WardenAttackPattern } from '@/sim/events'
 import type { World } from '@/sim/world'
-import { hasBoon } from '@/sim/boons'
+import { hideWaveTally, remainingLabel, takenBy } from './shadeNames'
+import { minosLifeInk } from './minosInk'
+import { deathCarriedLine, deathClose, deathReachedLine, deathSentLine, deathTakenLine, hideFightChrome, hidePlaceCaption } from './titleMenu'
+import { BOONS, hasBoon } from '@/sim/boons'
 import { HUB_ID } from '@/sim/rooms'
 import { tuning } from '@/tuning'
 
@@ -90,30 +93,22 @@ const CT = { hold: 4, dim: 12, stele: 12, steleOpen: 8, sky: 20, title: 22, cros
 // Settled is 0 — a dim WAVE box and an empty heart plate at 0.4 were still the second-brightest objects
 // beside the card's gold. The place name stays; it is the named floor (§8.2.3), not a survival readout.
 const CHROME_OUT = 6
+function meetingHud(world: World, overlay = false): boolean {
+  return hideFightChrome({
+    town: world.roomPhase === 'town',
+    reward: world.roomPhase === 'reward',
+    entering: world.roomPhase === 'entering',
+    won: world.session.run?.result === 'won',
+    overlay,
+  })
+}
+
 function fightChrome(cardAge: number): number {
   if (cardAge < CT.stele) return 1
   if (cardAge < CT.stele + CHROME_OUT) return 0.7
   return 0
 }
 
-// The shades of this realm, by name. A death card's first job is to teach, and the silhouette
-// already teaches which body it was - so the name gets to do the other job, which is to make the
-// place feel like somewhere with its own dead in it rather than enemy types 1 through 3.
-function takenBy(kind: EnemyKind | 'none'): string {
-  switch (kind) {
-    case 'brute': return 'A FALLEN HOPLITE'
-    case 'oathbound': return 'AN OATH-BOUND HOPLITE'
-    case 'caster': return 'A LAMPAD'
-    case 'charger': return 'AN EMPUSA'
-    case 'warden': return 'MINOS'
-    case 'dummy': return 'A BLOW'
-    case 'none': return 'A BLOW'
-    default: {
-      const _n: never = kind
-      return _n
-    }
-  }
-}
 
 
 // The veil: five nested ellipses centred on the corpse, each contributing one hard step. Composited they reach
@@ -233,6 +228,9 @@ export class Hud {
   // which was wrong exactly where it mattered most: a bolt is deactivated the instant it lands and a
   // charger has usually dashed past, so a ranged or drive-by death named a bystander — or 'A BLOW'.
   private deathKiller: EnemyKind | 'none' | null = null
+  private deathSentence: WardenAttackPattern | undefined
+  private deathHunt = false
+  private deathDebt = false
   waveText: Text
   banner: Text
   sub: Text
@@ -342,7 +340,12 @@ export class Hud {
   clearBanner() { this.bannerTicks = 0; this.hideBanner() }
 
   /** The sim named the killer; the card states it. Called from the playerDeath event. */
-  setKiller(kind: EnemyKind | 'none'): void { this.deathKiller = kind }
+  setKiller(kind: EnemyKind | 'none', sentence?: WardenAttackPattern, hunt = false, debt = false): void {
+    this.deathKiller = kind
+    this.deathSentence = sentence
+    this.deathHunt = hunt
+    this.deathDebt = debt
+  }
 
   update(world: World, _dtSec: number) {
     const p = world.player
@@ -469,7 +472,7 @@ export class Hud {
   private updateCrown(world: World, p: World['player'], at: { x: number; y: number } | null, hurtAge: number) {
     const g = this.crownG
     g.clear()
-    if (!at || p.state === 'dead') { g.visible = false; return }
+    if (!at || p.state === 'dead' || meetingHud(world, this.hushFight)) { g.visible = false; return }
     for (const e of world.enemies) if (e.active && e.kind === 'warden') { g.visible = false; return }
     if (world.rooms[world.roomIndex]?.id === HUB_ID) { g.visible = false; return }
     g.visible = true
@@ -566,7 +569,7 @@ export class Hud {
 
   private updateLife(world: World, now: number, hurtAge: number) {
     const p = world.player
-    if (world.roomPhase === 'town') {
+    if (meetingHud(world, this.hushFight)) {
       this.plateG.visible = false
       this.rig.visible = false
       return
@@ -707,34 +710,44 @@ export class Hud {
     let e: World['enemies'][number] | null = null
     for (const x of world.enemies) if (x.active && x.kind === 'warden') { e = x; break }
     const g = this.bossG
-    if (!e) { g.visible = false; this.bossName.visible = false; return }
+    if (!e || meetingHud(world, this.hushFight)) { g.visible = false; this.bossName.visible = false; return }
     const dp = world.player
     const cardAge = dp.state === 'dead' && dp.deathTick >= 0 ? world.tick - dp.deathTick : -1
     const back = fightChrome(cardAge)
     const bw = 168, bh = 16
     const bx = Math.round((V.width - bw) / 2), by = 2
     const cracked = e.phase > 0
-    const edge = cracked ? C.ember : C.goldDim
+    const ink = minosLifeInk(cracked)
     g.visible = back > 0
     g.alpha = back
     g.clear()
-    plate(g, bx, by, bw, bh, edge)
-    const inner = bw - 10
+    plate(g, bx, by, bw, bh, ink.edge)
+    const inner = bw - 8
     const fill = Math.max(0, Math.round(inner * (e.hp / e.maxHp)))
-    g.rect(bx + 5, by + 11, inner, 3).fill(C.mortar)
+    // The life is the plate. A 3px hairline under the name read as an empty bar on a full judge.
+    // Wine, not the crossing — gold stays on the scale in the room.
+    const barY = by + 4
+    const barH = 8
+    g.rect(bx + 4, barY, inner, barH).fill(C.mortar)
     if (fill > 0) {
-      g.rect(bx + 5, by + 11, fill, 3).fill(cracked ? C.ember : C.gold)
-      g.rect(bx + 5, by + 11, fill, 1).fill(cracked ? C.emberHi : C.goldHot)
+      g.rect(bx + 4, barY, fill, barH).fill(ink.fill)
+      g.rect(bx + 4, barY, fill, 2).fill(ink.hot)
     }
-    const mid = bx + 5 + Math.round(inner * 0.5)
-    g.rect(mid, by + 10, 1, 5).fill(C.void)
+    // The veil is a notch on the lip, not a cut that empties the right half of a full judge.
+    const mid = bx + 4 + Math.round(inner * 0.5)
+    g.rect(mid, barY, 1, 2).fill(C.void)
     this.bossName.visible = back > 0
     this.bossName.alpha = back
-    this.bossName.tint = cracked ? C.emberHi : C.bone
-    this.bossName.position.set(Math.round(V.width / 2), by + 3)
+    this.bossName.tint = ink.name
+    this.bossName.position.set(Math.round(V.width / 2), by + 5)
   }
 
   private updateWave(world: World) {
+    if (meetingHud(world, this.hushFight)) {
+      this.waveText.visible = false
+      this.waveG.visible = false
+      return
+    }
     const w = world.wave
     const live = w.state === 'active' || w.state === 'pending'
     const dp = world.player
@@ -749,17 +762,33 @@ export class Hud {
     const g = this.waveG
     g.clear()
     if (!live || back <= 0) return
-    // one mark per body still owed to you. The number is the language (w2r1: unlabeled ticks lost).
+    for (const e of world.enemies) {
+      if (e.active && e.kind === 'warden') {
+        this.waveText.visible = false
+        this.waveG.visible = false
+        return
+      }
+    }
+    // one mark per body still owed to you. The name is the language (w2r1: unlabeled ticks lost).
     let alive = 0
     for (const e of world.enemies) if (e.active && e.state !== 'dead') alive++
     const pending = world.spawnQueue.length
     const owed = alive + pending
-    this.waveText.text = `LEFT ${owed}`
+    if (owed === 0) {
+      this.waveText.visible = false
+      this.waveG.visible = false
+      return
+    }
+    this.waveText.text = remainingLabel(world)
     const total = Math.min(owed, 16)
-    const tw = Math.max(58, Math.round(this.waveText.width))
+    const nameOnly = hideWaveTally(alive, owed)
+    const tw = Math.max(nameOnly ? 1 : 58, Math.round(this.waveText.width))
     const px = V.width - 8 - tw - 4, pw = tw + 8
-    plate(g, px, 2, pw, 26, C.goldDim)
-    g.rect(px + 4, 19, pw - 8, 1).fill(C.goldDim)   // rule between the count and the pips
+    // One name is the count. A tall empty rail under OATH-BOUND read as a dead boss bar.
+    // Ghosts on the floor do not get a second tally — that rail was four dots under 2 HOPLITES.
+    plate(g, px, 2, pw, nameOnly ? 16 : 26, C.goldDim)
+    if (nameOnly) return
+    g.rect(px + 4, 19, pw - 8, 1).fill(C.goldDim)
     diamond(g, px + 2, 19, C.goldDim); diamond(g, px + pw - 3, 19, C.goldDim)
 
     // tally strokes: a solid bone stroke per living enemy, a broken gold stroke per spawn already telegraphed
@@ -791,7 +820,9 @@ export class Hud {
     // offer was a vow.
     if (world.session.run?.pendingReward || world.session.run?.pendingRite) { this.hideBanner(); return }
     let text = '', sub = '', tone: Tone = 'wave', age = 0, ttl = Infinity
-    if (w.state === 'done' && world.roomClearTick >= 0) {
+    // The production loop's exits strip is the instruction. A second slab saying ROOM CLEARED /
+    // WALK NORTH is developer text sitting on the plan.
+    if (w.state === 'done' && world.roomClearTick >= 0 && world.scenario !== 'loop') {
       text = 'ROOM CLEARED'
       sub = world.hasNextRoom()
         ? ((world.rooms[world.roomIndex].exits?.length ?? 0) > 1 ? 'CHOOSE A DOOR' : 'WALK NORTH')
@@ -863,7 +894,7 @@ export class Hud {
   // --- the death card -------------------------------------------------------------------------------------------
   private hideDeathCard() {
     if (this.cardKeyStr === '') return
-    this.cardKeyStr = ''; this.veilKey = ''; this.deathAt = null; this.deathKiller = null
+    this.cardKeyStr = ''; this.veilKey = ''; this.deathAt = null; this.deathKiller = null; this.deathSentence = undefined; this.deathHunt = false; this.deathDebt = false
     this.scrimG.clear(); this.cardG.clear()
     this.cardTitle.visible = this.cardSub.visible = this.cardKey.visible = this.cardAct.visible = false
     for (const r of this.cardRows) r.label.visible = r.value.visible = false
@@ -917,22 +948,24 @@ export class Hud {
     let standing = 0
     for (const e of world.enemies) if (e.active) standing++
     const felled = Math.max(0, world.nextEnemyId - 1 - standing)
-    const secs = Math.max(0, Math.floor((p.deathTick - world.attemptStart) / 60))
-    const hub = world.rooms.some(r => r.id === HUB_ID)
-    const pulls = hub ? 'THE BARDO PULLS YOU BACK' : 'THE THRESHOLD PULLS YOU BACK'
-    if (this.cardSub.text !== pulls) this.cardSub.text = pulls
-    const act = hub ? 'RETURN' : 'BEGIN AGAIN'
-    if (this.cardAct.text !== act) this.cardAct.text = act
-    const rows: [string, string][] = [
-      ['TAKEN BY', takenBy(this.deathKiller ?? 'none')],
-      world.session.run ? ['REACHED', `${world.session.run.depth} CHAMBERS`] : ['SENT ONWARD', `${felled}`],
-      ['HELD', `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`],
+    const close = deathClose(world.scenario, world.rooms.some(r => r.id === HUB_ID))
+    if (this.cardSub.text !== close.pulls) this.cardSub.text = close.pulls
+    if (this.cardAct.text !== close.act) this.cardAct.text = close.act
+    const run = world.session.run
+    const names = run ? run.boons.map(b => BOONS[b.id].name) : []
+    const lines = [
+      deathTakenLine(takenBy(this.deathKiller ?? 'none', this.deathSentence, { hunt: this.deathHunt, debt: this.deathDebt })),
+      deathCarriedLine(names),
+      run ? deathReachedLine(run.depth, world.session.lastBanked) : deathSentLine(felled),
     ]
-    for (let i = 0; i < rows.length; i++) {
+    for (let i = 0; i < lines.length; i++) {
       const r = this.cardRows[i]
-      if (r.label.text !== rows[i][0]) r.label.text = rows[i][0]
-      if (r.value.text !== rows[i][1]) r.value.text = rows[i][1]
-      r.label.visible = r.value.visible = age >= CT.rows[i]
+      if (r.label.text !== '') r.label.text = ''
+      if (r.value.text !== lines[i]) r.value.text = lines[i]
+      r.label.visible = false
+      r.value.visible = age >= CT.rows[i]
+      r.value.anchor.set(0, 0)
+      r.value.position.set(CARD_X + 26, CARD.top + 128 + i * 10)
       // the value lands hard: one tick bleached to bone-white, then it settles into bone
       r.value.tint = age === CT.rows[i] ? C.wickWhite : C.bone
     }
@@ -944,16 +977,17 @@ export class Hud {
     this.cardSub.visible = age >= CT.sub
     const keyWord = this.padMode ? 'START' : 'R'
     if (this.cardKey.text !== keyWord) this.cardKey.text = keyWord
-    const capW = Math.round(this.cardKey.width) + 9
-    const actW = capW + 5 + Math.round(this.cardAct.width)
+    const capW = close.showKey ? Math.round(this.cardKey.width) + 9 : 0
+    const actW = (close.showKey ? capW + 5 : 0) + Math.round(this.cardAct.width)
     const ax = CARD_CX - Math.round(actW / 2)
     const ay = CARD.top + 166
     this.cardKey.position.set(ax + Math.round(capW / 2), ay + 2)
-    this.cardAct.position.set(ax + capW + 5, ay + 2)
-    this.cardKey.visible = this.cardAct.visible = age >= CT.act
+    this.cardAct.position.set(close.showKey ? ax + capW + 5 : ax, ay + 2)
+    this.cardAct.visible = age >= CT.act
+    this.cardKey.visible = age >= CT.act && close.showKey
 
     // 3. The art. Redrawn only when the pose changes: every staging tick, then once per twinkle step.
-    const pose = age <= CT.act + 4 ? `a${age}` : `s${Math.floor(now / 11)}`
+    const pose = `${close.showKey ? 'k' : 'n'}${age <= CT.act + 4 ? `a${age}` : `s${Math.floor(now / 11)}`}`
     if (pose === this.cardKeyStr) return
     this.cardKeyStr = pose
     const g = this.cardG
@@ -997,36 +1031,32 @@ export class Hud {
       diamond(g, CARD_CX + cw + 1, CARD.top + 74, C.gold)
     }
 
-    // The summary sits under its own hairline, so the fiction and the tally never read as one paragraph.
+    // The summary sits under its own hairline, so the title and the sentences never read as one paragraph.
     if (age >= CT.rows[0]) {
       g.rect(CARD_X + 26, CARD.top + 120, CARD.w - 52, 1).fill({ color: C.iron })
       diamond(g, CARD_X + 23, CARD.top + 120, C.goldDim, 0.9)
       diamond(g, CARD_X + CARD.w - 24, CARD.top + 120, C.goldDim, 0.9)
     }
-    // leader dots between each label and its number: the row reads as a line, not two floating words
-    for (let i = 0; i < rows.length; i++) {
-      if (age < CT.rows[i]) continue
-      const r = this.cardRows[i]
-      const y = CARD.top + 133 + i * 10
-      const x0 = CARD_X + 27 + Math.round(r.label.width), x1 = CARD_X + CARD.w - 28 - Math.round(r.value.width)
-      for (let x = x0 + 2; x < x1 - 1; x += 4) g.rect(x, y, 1, 1).fill({ color: C.boneLo, alpha: 0.7 })
-    }
 
-    // The way back. A key cap in the hint row's grammar, on its own inset shelf, and the ONLY thing on this card
-    // that moves once the card has settled — so the eye finds the affordance without a word of instruction.
+    // The way back. Stock scenarios keep a key cap so R / START still teach. The loop already taught
+    // confirm on every other card — RETURN sits on the same blinking gold rule as RISE.
     if (age >= CT.act) {
       const lit = Math.floor(now / 24) % 2 === 0
       g.rect(ax - 8, ay - 3, actW + 16, 1).fill({ color: C.void, alpha: 0.6 })
       g.rect(ax - 8, ay + 14, actW + 16, 1).fill({ color: C.void, alpha: 0.4 })
-      const cx = ax, cy = ay
-      g.rect(cx + 1, cy + 12, capW - 2, 1).fill({ color: C.void, alpha: 0.9 })
-      g.rect(cx + 1, cy, capW - 2, 12).fill(C.iron)
-      g.rect(cx, cy + 1, capW, 10).fill(C.iron)
-      const edge = lit ? C.gold : C.goldDim
-      g.rect(cx + 1, cy, capW - 2, 1).fill(edge)
-      g.rect(cx + 1, cy + 11, capW - 2, 1).fill({ color: C.goldDim, alpha: 0.9 })
-      g.rect(cx, cy + 1, 1, 10).fill(edge)
-      g.rect(cx + capW - 1, cy + 1, 1, 10).fill({ color: C.goldDim, alpha: 0.9 })
+      if (close.showKey) {
+        const cx = ax, cy = ay
+        g.rect(cx + 1, cy + 12, capW - 2, 1).fill({ color: C.void, alpha: 0.9 })
+        g.rect(cx + 1, cy, capW - 2, 12).fill(C.iron)
+        g.rect(cx, cy + 1, capW, 10).fill(C.iron)
+        const edge = lit ? C.gold : C.goldDim
+        g.rect(cx + 1, cy, capW - 2, 1).fill(edge)
+        g.rect(cx + 1, cy + 11, capW - 2, 1).fill({ color: C.goldDim, alpha: 0.9 })
+        g.rect(cx, cy + 1, 1, 10).fill(edge)
+        g.rect(cx + capW - 1, cy + 1, 1, 10).fill({ color: C.goldDim, alpha: 0.9 })
+      } else {
+        g.rect(ax, ay + 11, actW, 1).fill({ color: lit ? C.gold : C.goldDim, alpha: 0.7 })
+      }
     }
   }
 
@@ -1236,10 +1266,21 @@ export class Hud {
     this.chromeHidden = hidden
     if (hidden) { this.place.alpha = 0; this.footG.clear(); this.hintRow.alpha = 0 }
   }
+  /** Pause (and any other fighting-phase overlay) hushes survival readouts. The named floor stays. */
+  setHushFight(hush: boolean): void { this.hushFight = hush }
   private chromeHidden = false
+  private hushFight = false
 
   private updateFooter(world: World, now: number) {
     if (this.chromeHidden) { this.place.alpha = 0; this.footG.clear(); return }
+    const run = world.session.run
+    if (hidePlaceCaption({
+      offer: !!run?.pendingReward,
+      shop: !!run?.pendingShop,
+      mystery: !!run?.pendingMystery,
+      rite: !!run?.pendingRite,
+      won: run?.result === 'won',
+    })) { this.place.alpha = 0; this.footG.clear(); return }
     const p = world.player
     const dead = p.state === 'dead'
     const intro = this.bannerTicks > 0 && this.bannerStart >= 0 && now - this.bannerStart < this.bannerTicks && this.bannerTone === 'wave'
@@ -1261,7 +1302,8 @@ export class Hud {
 
     const age = now - this.hintStart
     const alpha = age < this.hintTicks - 80 ? 0.8 : Math.max(0, (this.hintTicks - age) / 80) * 0.8
-    this.hintRow.alpha = this.chromeHidden || dead || world.roomPhase === 'town' || world.roomPhase === 'reward' || world.roomPhase === 'entering' ? 0 : alpha
+    // The loop teaches with the sword, not a keycap plate. Wave/dummy scenarios keep the legend.
+    this.hintRow.alpha = this.chromeHidden || dead || world.scenario === 'loop' || world.roomPhase === 'town' || world.roomPhase === 'reward' || world.roomPhase === 'entering' ? 0 : alpha
     this.hintRow.visible = this.hintRow.alpha > 0.02
   }
 

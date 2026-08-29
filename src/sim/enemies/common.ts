@@ -99,7 +99,7 @@ export function enemyRadialAttack(world: World, e: Enemy, radius: number, damage
   const d = Math.hypot(p.x - e.x, p.y - e.y)
   const clear = hasLineOfSight(world.arena, e.x, e.y, p.x, p.y)
   if (clear && d <= radius + p.radius) {
-    hurtPlayer(world, Math.atan2(p.y - e.y, p.x - e.x), damage, e.kind)
+    hurtPlayer(world, Math.atan2(p.y - e.y, p.x - e.x), damage, e.kind, false, e.kind === 'warden' ? 'slam' : undefined, { hunt: e.hunt, debt: e.debt })
     return true
   }
   if (clear && d <= radius + p.radius + tuning.bullet.grazePx) {
@@ -113,7 +113,7 @@ export function enemyArcAttack(world: World, e: Enemy, radius: number, arcDeg: n
   const p = world.player
   const clear = hasLineOfSight(world.arena, e.x, e.y, p.x, p.y)
   if (clear && arcHits(e.x, e.y, e.aimAngle, radius, arcDeg, p.x, p.y, p.radius)) {
-    hurtPlayer(world, e.aimAngle, damage, e.kind)
+    hurtPlayer(world, e.aimAngle, damage, e.kind, false, undefined, { hunt: e.hunt, debt: e.debt })
     return true
   }
   if (clear && arcHits(e.x, e.y, e.aimAngle, radius, arcDeg, p.x, p.y, p.radius + tuning.bullet.grazePx)) {

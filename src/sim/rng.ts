@@ -12,6 +12,13 @@ export class Rng {
   int(a: number, b: number): number { return a + Math.floor(this.next() * (b - a + 1)) }
   pick<T>(arr: readonly T[]): T { return arr[Math.floor(this.next() * arr.length)] }
   get state(): number { return this.s }
+
+  /** Continue a stream from a captured `state`. Resume only — step never constructs this. */
+  static fromState(state: number): Rng {
+    const rng = new Rng(0)
+    rng.s = state >>> 0
+    return rng
+  }
 }
 
 // Named streams off one world seed. Cosmetic rolls live on their own stream so adding or

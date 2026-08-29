@@ -15,8 +15,13 @@ const PAD_DODGE = [0, 1, 4]       // A / B / LB
 // Start. Exported because main.ts's controller-pause poll listens to the same physical button:
 // one constant, or remapping it here would silently split "pause" and "restart" onto different keys.
 export const PAD_RESTART = [9]
-const PAD_CHOICE_LEFT = 14
-const PAD_CHOICE_RIGHT = 15
+export const PAD_CHOICE_LEFT = 14
+export const PAD_CHOICE_RIGHT = 15
+// D-pad vertical, standard mapping. Read by the shell's pause card (main.ts), which polls the pad
+// itself because the sim — and with it this system's sample() — is stopped while paused.
+export const PAD_MENU_UP = 12
+export const PAD_MENU_DOWN = 13
+export const PAD_MENU_CONFIRM = 0
 const PAD_EDGE = new Set([...PAD_ATTACK, ...PAD_HEAVY, ...PAD_DODGE, ...PAD_RESTART, PAD_CHOICE_LEFT, PAD_CHOICE_RIGHT])
 
 function modalInput(world: World): boolean {
@@ -255,14 +260,47 @@ export class InputSystem {
     f.attack = attack; f.attackHeld = attackHeld; f.heavy = heavy; f.dodge = dodge; f.restart = restart
     // Both modal screens take the same two keys and swallow everything else, so the sword can never
     // be swung at a menu. `entering` is the rite; `reward` is the offer.
+    // One definition of "the confirm was pressed", shared by the two modal branches below — a
+    // confirm source added to one and not the other would answer menus but fail to answer a return.
+    // One definition of "the confirm was pressed", shared by the two modal branches below — a
+    // confirm source added to one and not the other would answer menus but fail to answer a return.
+    // Heavy is deliberately NOT folded in: on a reward screen it is the Smith's reroll instead, so
+    // each branch adds it on its own terms.
+    const confirmBase = this.pressed.has('Enter') || this.pressed.has('Space') || this.pressed.has('KeyJ') || this.pressed.has('KeyZ') || this.mousePressed || padAttackEdge || dodge
     if (world.roomPhase === 'reward' || world.roomPhase === 'entering') {
       const left = this.pressed.has('ArrowLeft') || this.pressed.has('KeyA')
       const right = this.pressed.has('ArrowRight') || this.pressed.has('KeyD')
       f.choiceDelta = left === right ? padChoiceDelta : left ? -1 : 1
-      f.confirm = this.pressed.has('Enter') || this.pressed.has('Space') || this.pressed.has('KeyJ') || this.pressed.has('KeyZ') || this.mousePressed || padAttackEdge || dodge || heavy
+      // A heavy on a live offer is the reroll, not the claim; anywhere else it still confirms.
+      const reforging = world.roomPhase === 'reward' && heavy && !!world.session.run?.pendingReward
+      f.confirm = confirmBase || (!reforging && heavy)
+      f.reroll = reforging
       f.moveX = 0; f.moveY = 0; f.attack = false; f.attackHeld = false; f.heavy = false; f.dodge = false
     } else if (world.player.state === 'dead' || (world.roomPhase === 'resolved' && world.session.run?.result !== 'active')) {
-      f.confirm = this.pressed.has('Enter') || this.pressed.has('Space') || this.pressed.has('KeyJ') || this.pressed.has('KeyZ') || this.mousePressed || padAttackEdge || dodge || heavy
+      // The reveal owns its opening beats: canReturn() is true on the killing tick itself, so a
+      // press already streaming in (a mash, a fresh pad edge) would skip the whole staged card.
+      // Gated here, after every device is normalized, so keyboard, mouse and pad wait alike — and
+      // ONLY here: bots, replays and the debug override hand their frames to the sim directly
+      // (src/main.ts), so recorded fixtures never see this gate.
+      // Every death stages a card, run or not — a run-less one counts the felled instead of the
+      // chambers (hud.ts) — so both wait. What never gates is the OTHER arm: a stock scenario idling
+      // in 'resolved' with no run has nothing being revealed, and its R must still restart at once.
+      const dead = world.player.state === 'dead'
+      const revealStart = dead ? world.player.deathTick
+        : world.session.run && world.session.run.result !== 'active' ? world.phaseTick : -1
+      if (revealStart >= 0 && world.tick - revealStart < (dead ? tuning.reveal.deathMinTicks : tuning.reveal.victoryMinTicks)) {
+        f.restart = false   // restart returns too (src/sim/step.ts:22), so it waits with confirm
+      } else {
+        f.confirm = confirmBase || heavy
+      }
+      // A victory leaves the player ALIVE in a resolved room, and stepWorld does not stop for the
+      // summary — so mashing to dismiss it was starting swings and rolls behind the card. The
+      // reward and rite modals already blank these; a reveal is a modal too.
+      // Only when a card is actually up: a stock scenario idles in 'resolved' with no run and no
+      // card, and blanking there would freeze the player in every wave/dummy scenario.
+      if (revealStart >= 0) {
+        f.moveX = 0; f.moveY = 0; f.attack = false; f.attackHeld = false; f.heavy = false; f.dodge = false
+      }
     }
     this.pressed.clear(); this.mousePressed = false; this.mouseHeavyPressed = false
     return f
@@ -271,5 +309,25 @@ export class InputSystem {
   // Presentation may read the live hold-to-lock target, but cannot write it or leak it into the
   // deterministic world. A null target means Q is up or the retained target is no longer valid.
   get hardLockTargetId(): number | null { return this.lockedTargetId }
+
+  /**
+   * Drop latched combat intent when the player-facing pause opens or closes. WASD on the pause
+   * card must not walk the first unpaused tick, and a held confirm (A / J) must not dodge or swing.
+   * Pad edges stay armed against the buttons that are still down so a held A does not fire as a new press.
+   */
+  releaseHeldIntent(): void {
+    this.down.clear()
+    this.pressed.clear()
+    this.mousePressed = false
+    this.mouseHeld = false
+    this.mouseHeavyPressed = false
+    this.mouseOwnsAim = false
+    this.lockedTargetId = null
+    this.retainedExplicitAim.clear()
+    this.controllerRearm.disarmAll()
+    const pads = typeof navigator !== 'undefined' && navigator.getGamepads ? navigator.getGamepads() : []
+    const pad = pads && pads[0]
+    this.padPrev = pad ? Array.from({ length: 16 }, (_, i) => !!pad.buttons[i]?.pressed) : []
+  }
 
 }

@@ -546,6 +546,94 @@
       "luminance": 0.5263,
       "family": "feedback",
       "role": "Player-damage shockwave, second ring."
+    },
+    "riverShadow": {
+      "hex": "#0A1016",
+      "rgb": [10, 16, 22],
+      "band": "B0",
+      "luminance": 0.0594,
+      "family": "shadow",
+      "role": "First Gate river shadow. ART_DIRECTION §9.0."
+    },
+    "riverBody": {
+      "hex": "#121C28",
+      "rgb": [18, 28, 40],
+      "band": "B1",
+      "luminance": 0.1049,
+      "family": "stone",
+      "role": "First Gate river body."
+    },
+    "riverLit": {
+      "hex": "#1C2E3C",
+      "rgb": [28, 46, 60],
+      "band": "B1",
+      "luminance": 0.1693,
+      "family": "stone",
+      "role": "First Gate river, lit face."
+    },
+    "reed": {
+      "hex": "#2A3A2C",
+      "rgb": [42, 58, 44],
+      "band": "B2",
+      "luminance": 0.2101,
+      "family": "stone",
+      "role": "Acheron reed beds."
+    },
+    "ashField": {
+      "hex": "#2C2824",
+      "rgb": [44, 40, 36],
+      "band": "B1",
+      "luminance": 0.1591,
+      "family": "stone",
+      "role": "Asphodel ash-field body."
+    },
+    "ashFieldLit": {
+      "hex": "#3A342C",
+      "rgb": [58, 52, 44],
+      "band": "B2",
+      "luminance": 0.2067,
+      "family": "stone",
+      "role": "Asphodel ash-field, lit."
+    },
+    "poppy": {
+      "hex": "#5A2030",
+      "rgb": [90, 32, 48],
+      "band": "B1",
+      "luminance": 0.1784,
+      "family": "supernatural",
+      "role": "Asphodel / Minos poppy. Rare. Never a bouquet."
+    },
+    "poppyHot": {
+      "hex": "#8A3040",
+      "rgb": [138, 48, 64],
+      "band": "B2",
+      "luminance": 0.2678,
+      "family": "supernatural",
+      "role": "Poppy highlight. 1 px."
+    },
+    "coinBrass": {
+      "hex": "#8A6A38",
+      "rgb": [138, 106, 56],
+      "band": "B3",
+      "luminance": 0.4282,
+      "family": "metal",
+      "role": "Dull Charon coin. 2×2 px, never a sparkle."
+    },
+    "wineDark": {
+      "hex": "#3A1428",
+      "rgb": [58, 20, 40],
+      "band": "B1",
+      "luminance": 0.1158,
+      "family": "supernatural",
+      "role": "First Gate reserved hostile hue. §9.0."
+    },
+    "wineDarkHot": {
+      "hex": "#6A2038",
+      "rgb": [106, 32, 56],
+      "band": "B1",
+      "luminance": 0.1939,
+      "family": "supernatural",
+      "role": "Wine-dark telegraph hot."
     }
   },
   "notes": [

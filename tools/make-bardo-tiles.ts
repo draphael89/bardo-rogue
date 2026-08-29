@@ -58,6 +58,16 @@ const P = {
   well: [4, 3, 10] as C,
   wellHi: [12, 8, 22] as C,
   sill: [255, 186, 96] as C,
+  // ART_DIRECTION §9.0 First Gate. Extends canon; does not replace it.
+  riverShadow: [10, 16, 22] as C,
+  riverBody: [18, 28, 40] as C,
+  riverLit: [28, 46, 60] as C,
+  reed: [42, 58, 44] as C,
+  ashField: [44, 40, 36] as C,
+  ashFieldLit: [58, 52, 44] as C,
+  poppy: [90, 32, 48] as C,
+  poppyHot: [138, 48, 64] as C,
+  coinBrass: [138, 106, 56] as C,
 }
 
 function hash(x: number, y: number, s: number): number {
@@ -429,6 +439,85 @@ function pitTile(): Uint8Array {
   return t.d
 }
 
+// §9.0 overlays. Full alpha. Horizontal water-line language, never a mosaic or a meander.
+function siltTile(): Uint8Array {
+  const t = makeTile()
+  t.fill(P.void, 0)
+  for (let y = 9; y < 16; y++) for (let x = 0; x < SIZE; x++) {
+    const col: C = y === 9 ? P.ashFieldLit : y > 13 ? P.riverShadow : chance(x, y, 71, 28) ? P.ashField : P.riverBody
+    t.set(x, y, col)
+  }
+  return t.d
+}
+
+function waterTile(): Uint8Array {
+  const t = makeTile()
+  t.fill(P.riverShadow)
+  for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++) {
+    if (chance(x, y, 73, 18)) t.set(x, y, P.riverBody)
+    if (y % 5 === 2 && chance(x, y, 74, 40)) t.set(x, y, P.riverLit)
+  }
+  for (let x = 2; x < 14; x++) if (x % 3 !== 1) t.set(x, 4, P.riverLit)
+  return t.d
+}
+
+function grateTile(): Uint8Array {
+  const t = makeTile()
+  // Overlay cells replace, they do not composite — the water has to live in this tile.
+  t.fill(P.riverShadow)
+  for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++) {
+    if (chance(x, y, 73, 14)) t.set(x, y, P.riverBody)
+  }
+  for (let x = 1; x < 15; x++) { t.set(x, 3, P.iron); t.set(x, 11, P.iron) }
+  for (let y = 2; y < 14; y++) { t.set(4, y, P.iron); t.set(11, y, P.iron) }
+  t.set(4, 3, P.ironHi); t.set(11, 3, P.ironHi)
+  t.set(1, 11, P.mortar); t.set(14, 11, P.mortar)
+  return t.d
+}
+
+function reedTile(): Uint8Array {
+  const t = makeTile()
+  t.fill(P.void, 0)
+  for (const [x, y0] of [[4, 4], [8, 2], [11, 5]] as const) {
+    for (let y = y0; y < 15; y++) t.set(x, y, y < y0 + 3 ? P.ashFieldLit : P.reed)
+    t.set(x + 1, y0, P.reed)
+  }
+  t.set(8, 2, P.ashFieldLit)
+  return t.d
+}
+
+function poppyTile(): Uint8Array {
+  const t = makeTile()
+  t.fill(P.void, 0)
+  t.set(7, 14, P.reed); t.set(7, 13, P.reed); t.set(7, 12, P.reed)
+  t.set(7, 10, P.poppy); t.set(6, 11, P.poppy); t.set(8, 11, P.poppy)
+  t.set(7, 11, P.poppyHot)
+  return t.d
+}
+
+function coinTile(): Uint8Array {
+  const t = makeTile()
+  t.fill(P.void, 0)
+  t.set(6, 12, P.coinBrass); t.set(7, 12, P.goldDim)
+  t.set(6, 13, P.woodLo); t.set(7, 13, P.coinBrass)
+  t.set(10, 10, P.coinBrass); t.set(11, 10, P.goldDim)
+  t.set(10, 11, P.woodLo); t.set(11, 11, P.coinBrass)
+  return t.d
+}
+
+function beamTile(): Uint8Array {
+  const t = makeTile()
+  t.fill(P.void, 0)
+  for (let x = 0; x < SIZE; x++) {
+    t.set(x, 6, P.slate2)
+    t.set(x, 7, P.slate1)
+    t.set(x, 8, P.slate0)
+    t.set(x, 9, P.grout)
+    if (x % 5 === 0) t.set(x, 6, P.goldDim)
+  }
+  return t.d
+}
+
 function voidTile(): Uint8Array {
   const t = makeTile()
   t.fill(P.void)
@@ -454,6 +543,8 @@ tiles.push(
   /* 71 */ door(false), /* 72 */ door(true), /* 73 */ windowHalf('l'), /* 74 */ windowHalf('r'), /* 75 */ relief(),
   /* 76 */ pillar(true), /* 77 */ pillar(false),
   /* 78 */ crackTile(0), /* 79 */ crackTile(1), /* 80 */ pitTile(),
+  /* 81 */ siltTile(), /* 82 */ waterTile(), /* 83 */ grateTile(),
+  /* 84 */ reedTile(), /* 85 */ poppyTile(), /* 86 */ coinTile(), /* 87 */ beamTile(),
 )
 
 const ROWS = Math.ceil(tiles.length / COLS)
@@ -755,9 +846,76 @@ function pew32(): Uint8Array {
   return d
 }
 
+function reed32(): Uint8Array {
+  const { d, set } = make32()
+  for (let x = 4; x < 22; x++) set(x, 31, P.grout)
+  for (const [x, y0, h] of [[8, 6, 24], [13, 3, 27], [18, 8, 22]] as const) {
+    for (let y = y0; y < y0 + h; y++) {
+      const lean = Math.round((y - y0) * 0.08)
+      set(x + lean, y, y < y0 + 4 ? P.ashFieldLit : P.reed)
+    }
+    set(x + 1, y0, P.reed)
+  }
+  return d
+}
+
+function prow32(): Uint8Array {
+  const { d, set } = make32()
+  // Point north, into the room; the south edge is the crop against the wall.
+  for (let y = 4; y < 32; y++) {
+    const t = (y - 4) / 27
+    const x0 = Math.round(15 - 2 - t * 10)
+    const x1 = Math.round(16 + 2 + t * 11)
+    for (let x = x0; x <= x1; x++) {
+      let col: C = P.wood
+      if (x === x0 || x === x0 + 1) col = P.woodHi
+      else if (x >= x1 - 2) col = P.woodLo
+      if (y > 27) col = P.mortar
+      set(x, y, col)
+    }
+  }
+  for (let x = 12; x < 20; x++) set(x, 8, P.iron)
+  set(15, 5, P.goldDim)
+  set(15, 4, P.woodHi)
+  return d
+}
+
+function pole32(): Uint8Array {
+  const { d, set } = make32()
+  for (let y = 2; y < 31; y++) {
+    set(14, y, P.woodHi)
+    set(15, y, P.wood)
+    set(16, y, P.woodLo)
+  }
+  for (let y = 4; y < 10; y++) for (let x = 11; x < 21; x++) {
+    const dx = (x - 15.5) / 4.6, dy = (y - 6.5) / 2.8
+    if (dx * dx + dy * dy > 1) continue
+    set(x, y, chance(x, y, 81, 30) ? P.gold : P.goldDim)
+  }
+  set(15, 6, P.goldHot)
+  set(14, 31, P.grout); set(16, 31, P.grout)
+  return d
+}
+
+function pan32(): Uint8Array {
+  const { d, set } = make32()
+  for (let x = 6; x < 26; x++) set(x, 28, P.grout)
+  for (let y = 16; y < 24; y++) for (let x = 6; x < 26; x++) {
+    const dx = (x - 15.5) / 9.2, dy = (y - 19) / 3.4
+    if (dx * dx + dy * dy > 1) continue
+    set(x, y, x < 9 ? P.slate2 : x > 22 ? P.slate0 : P.slate1)
+  }
+  for (let x = 8; x < 24; x++) { set(x, 16, P.slate2); set(x, 23, P.grout) }
+  return d
+}
+
 const bellCells = bell64()
 // Index order is the contract with src/sim/arena.ts (the `PROP` map). Append, never reorder.
-const props32 = [bellCells[0], bellCells[1], bellCells[2], bellCells[3], brazier32(), ossuary32(), shard32(), pew32()]
+const props32 = [
+  bellCells[0], bellCells[1], bellCells[2], bellCells[3],
+  brazier32(), ossuary32(), shard32(), pew32(),
+  reed32(), prow32(), pole32(), pan32(),
+]
 const pRows = Math.ceil(props32.length / PCOLS)
 const pSheet = Buffer.alloc(PCOLS * P32 * pRows * P32 * 4)
 for (let i = 0; i < props32.length; i++) {

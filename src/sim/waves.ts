@@ -1,119 +1,26 @@
 import { tuning } from '@/tuning'
 import type { World } from './world'
-import type { EnemyKind } from './events'
 import { TILE, setDoorWalkable } from './arena'
 import { clearBulletTime } from './combat'
 import { overlapsSolid } from './collision'
+import { grantClearObols, offerShop } from './economy'
+import { offerMystery } from './mystery'
 import { offerReward } from './rewards'
 import { finishRun } from './session'
+import type { SpawnDef, WaveDef, WaveGroup } from './content/waves'
 
-export interface SpawnDef { kind: EnemyKind; x: number; y: number } // in tiles
-export interface WaveGroup { delay: number; spawns: SpawnDef[]; whenRemainingAtMost?: number; mirrorX?: boolean }
-export interface WaveDef { groups: WaveGroup[] }
-
-// The reference fight is a curriculum, not a pile of health: read one body, choose across a firing
-// line, route a dash, then combine the verbs under pressure. Whole formations may mirror per seed;
-// relative spacing never changes, so variation asks for a new first decision without changing fairness.
-export const ROOM_WAVES: WaveDef[] = [
-  { groups: [{ delay: 0, mirrorX: true, spawns: [{ kind: 'brute', x: 8, y: 4.5 }] }] },
-  { groups: [{ delay: 0, mirrorX: true, spawns: [
-    { kind: 'brute', x: 16, y: 5.5 },
-    { kind: 'caster', x: 3, y: 3.5 },
-  ] }, { delay: 30, whenRemainingAtMost: 1, mirrorX: true, spawns: [
-    { kind: 'caster', x: 22, y: 9.5 },
-  ] }] },
-  { groups: [
-    { delay: 0, mirrorX: true, spawns: [{ kind: 'charger', x: 4, y: 10.5 }, { kind: 'caster', x: 21.5, y: 3.5 }] },
-    { delay: 45, whenRemainingAtMost: 1, mirrorX: true, spawns: [{ kind: 'brute', x: 7, y: 4.5 }] },
-  ] },
-  {
-    groups: [
-      { delay: 0, mirrorX: true, spawns: [{ kind: 'brute', x: 9, y: 4.5 }, { kind: 'brute', x: 16, y: 4.5 }, { kind: 'caster', x: 2.5, y: 3 }, { kind: 'caster', x: 23.5, y: 3 }] },
-      { delay: 30, whenRemainingAtMost: 2, mirrorX: true, spawns: [{ kind: 'charger', x: 2.5, y: 8 }, { kind: 'charger', x: 23.5, y: 8 }, { kind: 'charger', x: 7, y: 3 }, { kind: 'charger', x: 19, y: 3 }] },
-      { delay: 0, whenRemainingAtMost: 2, mirrorX: true, spawns: [{ kind: 'charger', x: 12.5, y: 3 }, { kind: 'charger', x: 12.5, y: 12.5 }] },
-    ],
-  },
-  { groups: [
-    { delay: 0, mirrorX: true, spawns: [
-      { kind: 'caster', x: 3, y: 3.5 },
-      { kind: 'brute', x: 13, y: 5 },
-      { kind: 'charger', x: 5, y: 11 },
-    ] },
-    { delay: 20, whenRemainingAtMost: 2, mirrorX: true, spawns: [
-      { kind: 'caster', x: 22, y: 3.5 }, { kind: 'charger', x: 21, y: 11 },
-    ] },
-    { delay: 20, whenRemainingAtMost: 1, mirrorX: true, spawns: [
-      { kind: 'brute', x: 18, y: 5 }, { kind: 'charger', x: 4, y: 7.5 },
-    ] },
-  ] },
-  // Coda: three clean two-body phrases. The density falls but the verbs alternate, letting a good
-  // player finish in rhythm instead of surviving the hardest pile and then mopping up leftovers.
-  { groups: [
-    { delay: 0, mirrorX: true, spawns: [{ kind: 'brute', x: 8, y: 5 }, { kind: 'caster', x: 21, y: 4 }] },
-    { delay: 24, whenRemainingAtMost: 0, mirrorX: true, spawns: [{ kind: 'charger', x: 5, y: 10 }, { kind: 'charger', x: 21, y: 10 }] },
-    { delay: 24, whenRemainingAtMost: 0, mirrorX: true, spawns: [{ kind: 'caster', x: 4, y: 4 }, { kind: 'brute', x: 18, y: 5.5 }] },
-  ] },
-]
-
-// Two-room run: Threshold teaches the brute, Crossing answers with range + dash. Positions stay off furniture.
-export const THRESHOLD_RUN_WAVES: WaveDef[] = [ROOM_WAVES[0]]
-export const CROSSING_RUN_WAVES: WaveDef[] = [
-  { groups: [{ delay: 20, spawns: [
-    { kind: 'caster', x: 4, y: 3.5 },
-    { kind: 'charger', x: 22, y: 4 },
-    { kind: 'charger', x: 3, y: 11 },
-  ] }] },
-]
-
-// The production slice is authored as four distinct questions, not four escalating piles.
-// Room 1 teaches commitment; the branches test movement or priority; Room 3 asks the player to
-// combine those lessons before the Warden. Delays are short enough to preserve momentum but long
-// enough for each arrival tell to register.
-export const SLICE_ROOM_1: WaveDef[] = [{ groups: [{ delay: 0, spawns: [
-  { kind: 'brute', x: 8, y: 5 },
-  { kind: 'brute', x: 19, y: 6 },
-] }] }]
-
-export const SLICE_ROOM_2_VEIL: WaveDef[] = [{ groups: [
-  { delay: 0, spawns: [{ kind: 'caster', x: 13, y: 4 }] },
-  { delay: 55, spawns: [{ kind: 'charger', x: 4, y: 9 }] },
-  { delay: 32, spawns: [{ kind: 'charger', x: 22, y: 10 }] },
-] }]
-
-export const SLICE_ROOM_2_BLADE: WaveDef[] = [{ groups: [
-  { delay: 0, spawns: [
-    { kind: 'brute', x: 13, y: 5 },
-    { kind: 'caster', x: 4, y: 4 },
-    { kind: 'caster', x: 22, y: 4 },
-  ] },
-] }]
-
-// Charon's Landing is where the Oath-Bound is introduced, and it is introduced ALONE: the shield is
-// a rule to be read, and a rule taught inside a crowd is a rule learned by accident. The pressure
-// arrives afterwards, once the answer is known.
-export const SLICE_ROOM_3: WaveDef[] = [{ groups: [
-  { delay: 0, spawns: [
-    { kind: 'oathbound', x: 13, y: 5 },
-  ] },
-  { delay: 40, whenRemainingAtMost: 0, spawns: [
-    { kind: 'caster', x: 21, y: 4 },
-    { kind: 'charger', x: 4, y: 10 },
-  ] },
-  { delay: 40, whenRemainingAtMost: 1, spawns: [
-    { kind: 'brute', x: 8, y: 5 },
-  ] },
-] }]
-
-export const SLICE_WARDEN: WaveDef[] = [{ groups: [{ delay: 20, spawns: [
-  { kind: 'warden', x: 13, y: 5 },
-] }] }]
+export type { SpawnDef, WaveGroup, WaveDef } from './content/waves'
+export {
+  ROOM_WAVES, THRESHOLD_RUN_WAVES, CROSSING_RUN_WAVES,
+  SLICE_ROOM_1, SLICE_ROOM_2_VEIL, SLICE_ROOM_2_BLADE, SLICE_ROOM_3, SLICE_WARDEN,
+} from './content/waves'
 
 /**
  * `opts.ticks` overrides the telegraph length and `opts.debt` marks the arrival as the refused
  * toll's. Only the toll uses either: that body is not part of a wave's phrasing, it has to arrive
  * after the room's own opening rather than inside it, and it announces itself when it lands.
  */
-export function queueSpawn(world: World, s: SpawnDef, opts: { ticks?: number; debt?: boolean } = {}): void {
+export function queueSpawn(world: World, s: SpawnDef, opts: { ticks?: number; debt?: boolean; hunt?: boolean } = {}): void {
   const ticks = opts.ticks ?? tuning.spawnTelegraphTicks
   let x = s.x * TILE, y = s.y * TILE
   const radius = s.kind === 'dummy' ? 6 : tuning[s.kind].radius
@@ -130,7 +37,11 @@ export function queueSpawn(world: World, s: SpawnDef, opts: { ticks?: number; de
     }
     x = bestX; y = bestY
   }
-  world.spawnQueue.push({ kind: s.kind, x, y, ticksLeft: ticks, total: ticks, ...(opts.debt ? { debt: true } : {}) })
+      world.spawnQueue.push({
+        kind: s.kind, x, y, ticksLeft: ticks, total: ticks,
+        ...(opts.debt ? { debt: true } : {}),
+        ...(opts.hunt ? { hunt: true } : {}),
+      })
   world.emit({ type: 'spawnTelegraph', x, y, kind: s.kind })
 }
 
@@ -139,18 +50,55 @@ export function updateSpawnQueue(world: World): void {
     const s = world.spawnQueue[i]
     s.ticksLeft--
     // a full pool emits poolOverflow and returns null; keep the entry and retry next tick
-    if (s.ticksLeft <= 0 && world.spawnEnemy(s.kind, s.x, s.y)) {
+    if (s.ticksLeft <= 0) {
+      const spawned = world.spawnEnemy(s.kind, s.x, s.y)
+      if (!spawned) continue
       // The account is read out when the body is standing in the room, not when its mark went down
       // two and a half seconds earlier under a room-name banner nobody could see past.
-      if (s.debt) world.emit({ type: 'riteDebtCalled' })
+      if (s.debt) {
+        spawned.debt = true
+        world.emit({ type: 'riteDebtCalled', id: spawned.id, x: spawned.x, y: spawned.y })
+      }
+      if (s.hunt) {
+        spawned.hunt = true
+        world.emit({ type: 'mysteryHuntCalled', id: spawned.id, x: spawned.x, y: spawned.y })
+      }
       world.spawnQueue.splice(i, 1)
     }
   }
 }
 
+function enqueueGroup(world: World, g: WaveGroup): void {
+  const mirror = !!g.mirrorX && world.rng.next() < 0.5
+  for (const s of g.spawns) queueSpawn(world, mirror ? { ...s, x: world.arena.cols - s.x } : s)
+}
+
+/**
+ * The loop's door flash is the hold (`loopLeadTicks` === `transitionTicks`). Waiting that
+ * again after `enterRoom` leaves an empty floor — Acheron with no pads — for the first
+ * thing a player sees. Stock arenas still use the pending lead so pinned hashes stay put.
+ */
+function openFirstWave(world: World): void {
+  const w = world.wave
+  const defs = world.waveDefs
+  if (!defs?.length) return
+  w.index = 0
+  w.groupIndex = 0
+  w.timer = 0
+  w.state = 'active'
+  world.emit({ type: 'waveStart', wave: 1, total: w.total })
+  const g = defs[0].groups[0]
+  if (!g || g.delay > 0 || g.whenRemainingAtMost !== undefined) return
+  enqueueGroup(world, g)
+  w.groupIndex = 1
+}
+
 export function startWaves(world: World, waves: WaveDef[]): void {
-  world.wave = { index: -1, state: 'pending', groupIndex: 0, timer: 30, total: waves.length }
+  const loop = world.scenario === 'loop'
+  const lead = loop ? tuning.loopLeadTicks : tuning.waveLeadTicks
+  world.wave = { index: -1, state: 'pending', groupIndex: 0, timer: lead, total: waves.length }
   world.waveDefs = waves
+  if (loop) openFirstWave(world)
 }
 
 export function updateWaves(world: World): void {
@@ -174,8 +122,7 @@ export function updateWaves(world: World): void {
     const g = def.groups[w.groupIndex]
     if (g.whenRemainingAtMost !== undefined && remaining > g.whenRemainingAtMost) return
     if (w.timer < g.delay) { w.timer++; return }
-    const mirror = !!g.mirrorX && world.rng.next() < 0.5
-    for (const s of g.spawns) queueSpawn(world, mirror ? { ...s, x: world.arena.cols - s.x } : s)
+    enqueueGroup(world, g)
     w.groupIndex++
     w.timer = 0
     return
@@ -204,8 +151,18 @@ export function updateWaves(world: World): void {
         world.emit({ type: 'boltHitWall', x: b.x, y: b.y })
       }
       if (world.doorOpen) setDoorWalkable(world.arena, true)
-      world.emit({ type: 'roomClear', hasNext: world.hasNextRoom(), reward: !!reward, victory })
+      world.emit({
+        type: 'roomClear',
+        hasNext: world.hasNextRoom(),
+        reward: !!reward && reward !== 'shop' && reward !== 'mystery',
+        shop: reward === 'shop',
+        mystery: reward === 'mystery',
+        victory,
+      })
+      grantClearObols(world)
       if (victory) finishRun(world, 'won')
+      else if (reward === 'shop') offerShop(world)
+      else if (reward === 'mystery') offerMystery(world)
       else if (reward) offerReward(world, reward)
       else {
         world.roomPhase = world.hasNextRoom() ? 'exits' : 'resolved'

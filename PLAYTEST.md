@@ -27,6 +27,9 @@ explain mid-playtest. The build stays pinned until the last tester finishes.
   the URL between runs starts a fresh recording: **every run's file must be collected**, and a
   later one cannot stand in for a missing earlier one. The tester sends every bundle to the organizer. Rename each to
   `T<n>-run<r>-<condition>.json` before sending.
+- **Checking a bundle.** `pnpm sim -- --replay <bundle>.json` replays it and prints the condition it
+  applied. The bundle carries its own condition, so the organizer does not have to remember which
+  run was which — but do check that the printed `playtest` field matches the file's name.
 - **Ending a run.** Runs end by dying or by beating Minos — there is no giving up. The pause card's
   abandon row is deliberately hidden during a playtest session, because abandoning would break the
   bundle's promise to replay exactly what the tester played. F2 and F3 are locked out for the same
@@ -42,7 +45,7 @@ Three URL conditions:
 |---|---|---|
 | baseline | `?playtest=baseline` | All verbs available. |
 | no-heavy | `?playtest=no-heavy` | The independent heavy input is off. The heavy exists only as the chain's third swing. |
-| no-dash | `?playtest=no-dash` | The dodge-to-attack cancel window is closed. |
+| no-dash | `?playtest=no-dash` | The dodge-to-attack cancel window is closed, so a swing lands after the roll instead of out of it. |
 
 **Run 1 is always baseline, for everyone.** It is the comparable onboarding sample; do not vary it.
 Runs 2–3 follow this table. Recruit testers in order T1, T2, … — the table keeps every condition at

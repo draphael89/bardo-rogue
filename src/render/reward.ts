@@ -5,10 +5,9 @@ import { drawPortrait, MASK_W, type PortraitId } from './views/deity'
 import type { World } from '@/sim/world'
 import { obolsLabel, SHOP_COPY, shopCost } from '@/sim/economy'
 import { MYSTERY_COPY, canAffordMystery } from '@/sim/mystery'
-import { canAbandon } from '@/sim/return'
 import type { MysteryOffer, RewardOffer, ShopOffer } from '@/sim/session'
 import { tuning } from '@/tuning'
-import { backPause, duoFooter, meetingVeil, offerAct, offerSpoken, pauseFooter, pauseNudge, resolvePause, shopAct, shopSpoken, showBuildStrip, townTally, victoryKeptLine, wrapPauseFocus, type PauseAct, type PausePage, type TitleNudge } from './titleMenu'
+import { backPause, duoFooter, meetingVeil, offerAct, offerSpoken, pauseFooter, pauseNudge, pauseRows, resolvePause, shopAct, shopSpoken, showBuildStrip, townTally, victoryKeptLine, wrapPauseFocus, type PauseAct, type PausePage, type TitleNudge } from './titleMenu'
 import { label, placeCentered, placeLeft, placeRight, wrappedCentered, P } from './ui'
 import { clamp01 } from './anim'
 
@@ -53,6 +52,12 @@ export class RewardOverlay {
   private master = 1
   private pauseFocus = 0
   private abandonArmed = false
+  // Whether the abandon row exists AT ALL, decided by the shell and nothing else. The overlay used
+  // to answer this itself by calling canAbandon(world), which is a strictly weaker question than
+  // the one the shell asks: a playtest session and a live recording both forbid abandoning while
+  // canAbandon stays true. The card then drew a row that navigation had no index for, and choosing
+  // "GIVE THE DESCENT BACK" opened SETTINGS instead. One source, set every frame.
+  private leaving = false
   private suppressed = false
   private reducedEffects = false
   private music = 1
@@ -112,6 +117,20 @@ export class RewardOverlay {
     return true
   }
 
+  /**
+   * The shell decides whether this run can be given back; the card never asks the sim itself.
+   * Set every frame, so a recording armed while the card is already open shrinks it at once — and
+   * the focus is clamped with it, or the highlight would sit on a row that no longer exists.
+   */
+  setLeaving(leaving: boolean): void {
+    if (this.leaving === leaving) return
+    this.leaving = leaving
+    const rows = pauseRows(this.pausePage, leaving)
+    if (this.pauseFocus >= rows) this.pauseFocus = rows - 1
+    this.abandonArmed = false
+    this.key = ''
+  }
+
   nudgePause(): TitleNudge {
     return this.paused ? pauseNudge(this.pausePage, this.pauseFocus) : 'none'
   }
@@ -146,7 +165,7 @@ export class RewardOverlay {
     this.updateBuild(world)
     if (!this.root.visible) return
     const nextKey = this.paused
-      ? `pause|${this.pausePage}|${this.reducedEffects ? 1 : 0}|${canAbandon(world) ? 1 : 0}|${this.pauseFocus}|${this.abandonArmed ? 1 : 0}|${this.master}|${this.music}|${this.sfx}|${tuning.view.width}`
+      ? `pause|${this.pausePage}|${this.reducedEffects ? 1 : 0}|${this.leaving ? 1 : 0}|${this.pauseFocus}|${this.abandonArmed ? 1 : 0}|${this.master}|${this.music}|${this.sfx}|${tuning.view.width}`
       : rite
       ? `rite|${rite.id}|${rite.focus}|${tuning.view.width}`
       : shop
@@ -169,7 +188,7 @@ export class RewardOverlay {
       else if (mystery) this.paintMystery(mystery, world)
       else if (offer) this.paintOffer(offer, world.session.run?.rerolls ?? 0)
       else if (victory) this.paintVictory(world)
-      else this.paintPause(canAbandon(world))
+      else this.paintPause(this.leaving)
     }
     this.reveal(world)
   }

@@ -26,6 +26,7 @@ import { detectPlatform, PROFILE_ID } from '@/platform'
 import { loadSave, saveFilename } from '@/platform/saveFile'
 import { titleNudge, townTally } from '@/render/titleMenu'
 import { nudgeSlider } from '@/sim/storage'
+import { applyPlaytestCondition, asPlaytestCondition, conditionOfBundle, PLAYTEST_CONDITIONS } from '@/playtest'
 
 async function boot() {
   const q = new URLSearchParams(location.search)
@@ -39,11 +40,8 @@ async function boot() {
   // the named verb condition filters LIVE input only (bots and replays bypass it, and the filtered
   // frames are what gets recorded, so an exported bundle replays exactly as the tester played), and
   // F4 downloads the session bundle. Conditions and protocol: PLAYTEST.md.
-  const PLAYTEST_CONDITIONS = ['baseline', 'no-heavy', 'no-dash'] as const
-  type PlaytestCondition = typeof PLAYTEST_CONDITIONS[number]
   const playtestRaw = q.get('playtest')
-  const playtest: PlaytestCondition | null =
-    playtestRaw && (PLAYTEST_CONDITIONS as readonly string[]).includes(playtestRaw) ? playtestRaw as PlaytestCondition : null
+  const playtest = asPlaytestCondition(playtestRaw)
   if (playtestRaw && !playtest) console.log(`[playtest] unknown condition "${playtestRaw}"; expected ${PLAYTEST_CONDITIONS.join(' | ')}`)
 
   // Widen the render target to the window's aspect before anything reads it, so the room is not
@@ -320,6 +318,15 @@ async function boot() {
     return r
   }
   const replay = (r: Replay | EncodedReplay) => {
+    // A playtest bundle is an encoded replay plus its condition, and no-dash lives in the tuning
+    // rather than in the frames — so replaying one without re-applying it measures a baseline run.
+    // Sticky for the rest of the session on purpose: `pnpm shot --replay bundle.json` is one shot,
+    // and a live session that has installed a no-dash replay is no longer a baseline session.
+    const bundled = conditionOfBundle(r)
+    if (bundled) {
+      applyPlaytestCondition(bundled)
+      console.log(`[replay] playtest bundle: condition "${bundled}" applied`)
+    }
     const rep = isEncodedReplay(r) ? decodeReplay(r) : r
     reset(rep.seed, rep.scenario, {
       god: rep.god,
@@ -407,6 +414,10 @@ async function boot() {
       }
       returnOpenThisFrame = false
       presenter.reward.setPaused(userPaused)
+      // The card must be told, not left to ask the sim: canAbandon(world) is true in a playtest
+      // session where giving the descent back is forbidden, and the card would draw a row that
+      // navigation has no index for.
+      presenter.reward.setLeaving(canGiveBack())
       presenter.routeMap.setPaused(userPaused)
       presenter.render(alpha, dt)
       overlay.update(world, loop)
@@ -550,15 +561,11 @@ async function boot() {
   // Arm the playtest session: record from tick zero (the world is fresh here, so no reset is
   // needed), and keep the meta snapshot the recorder was handed — the exported bundle must carry
   // the exact counters the run seed was derived from, not the ones the session has mutated since.
-  // no-dash closes the cancel WINDOW rather than filtering presses. Starving the sim of input
-  // cannot work here: a dodge and an attack pressed on the same free tick both pass (the body is
-  // not rolling yet), and an attack buffered just before the roll is already queued — either one
-  // still reaches the cancel at travel tick 9 and launches the dash attack, quietly contaminating
-  // the condition it was supposed to remove. Lifting the gate past the roll's own travel removes
-  // the mechanism instead, so a queued swing simply lands after the roll like any other.
-  if (playtest === 'no-dash' && !botName) {
-    tuning.player.dodge.attackCancelFrom = tuning.player.dodge.travel + 99
-    console.log('[playtest] no-dash: the dodge-to-attack cancel is disabled for this session')
+  // Conditions a recording cannot carry are re-applied here and, identically, by every replay path
+  // (src/playtest.ts explains which is which). no-heavy rides in the frames; no-dash does not.
+  if (playtest && !botName) {
+    applyPlaytestCondition(playtest)
+    if (playtest === 'no-dash') console.log('[playtest] no-dash: the dodge-to-attack cancel is disabled for this session')
   }
   if (playtest && !botName) {
     // The recorder takes its own defensive copy of meta and holds it for the whole session, so the
@@ -721,7 +728,7 @@ async function boot() {
     }
     if ((e.code === 'Escape' || e.code === 'KeyP') && !e.repeat) {
       e.preventDefault()
-      if (e.code === 'Escape' && userPaused && presenter.reward.backPause(canAbandon(world))) return
+      if (e.code === 'Escape' && userPaused && presenter.reward.backPause(canGiveBack())) return
       setPaused(!userPaused)
       return
     }

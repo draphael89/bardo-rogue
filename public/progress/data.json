@@ -1,10 +1,14 @@
 {
   "title": "Bardo Rogue",
   "subtitle": "First Gate: rooms-as-data, a generated route, a town that remembers",
-  "updated": "2026-08-29T08:42:00-04:00",
+  "updated": "2026-08-29T11:20:00-04:00",
   "now": "hall-plate-wine",
   "round": 3,
   "timeline": [
+    {
+      "t": "11:20",
+      "text": "The pause card hides GIVE THE DESCENT BACK during a playtest, as the protocol always said it did. A no-dash bundle now replays as a no-dash run."
+    },
     {
       "t": "08:42",
       "text": "The Hall names THE HALL OF MINOS. The judge's plate samples wine, not the door. Acheron is 2 HOPLITES; the Antechamber is OATH-BOUND."

@@ -113,6 +113,31 @@ What the merge itself had to settle, recorded here because a future reader will 
 
 The live ledger below is PR #13's, kept as written.
 
+### Revision 5 (2026-08-29) — the review round on the merge itself
+
+Three defects in the merge's own work, each found by reading the wiring rather than by a failing
+test, each now covered by a test that goes red without its fix.
+
+- **One authority for the abandon row.** The pause card asked the sim (`canAbandon(world)`) when it
+  drew and asked the shell (`canGiveBack()`) when it navigated. The two disagree exactly where it
+  matters: a playtest session forbids abandoning while a run is plainly live. So the card painted a
+  "GIVE THE DESCENT BACK" row that navigation had no index for, and choosing it opened SETTINGS —
+  and PLAYTEST.md's promise that the row is hidden was simply false. The overlay no longer reaches
+  into the sim; the shell sets `setLeaving()` every frame, and `canAbandon` has one caller.
+- **The Escape key had drifted onto the same wrong answer**, returning a focus index off the end of
+  the shorter card.
+- **A no-dash bundle did not replay as a no-dash run.** `no-heavy` is a frame filter and rides in the
+  recording; `no-dash` closes a cancel WINDOW, and a window is not in the frames. Nothing on the
+  replay side re-applied it, so every no-dash bundle replayed as a baseline run and diverged at the
+  tester's first dodge-into-attack — which would have quietly falsified the condition the fun gate
+  exists to measure. The condition now lives in `src/playtest.ts`, rides in the bundle, and is
+  re-applied by `pnpm sim`, by `pnpm shot`, and by `__game.replay()`. Measured on identical frames:
+  hash 3380115452 baseline against 272518353 no-dash, and `--playtest baseline` reproduces the
+  baseline hash exactly from the no-dash bundle.
+
+Gates after the round: 799 tests / 62 files, matrix 100/100 (kite 88%, naive 0%, unchanged from
+before the round), build ok, smoke both endings, pinned replay hashes untouched.
+
 ### Open after the merge (audited 2026-08-29, eleven agents over PR #13)
 
 Fixed in the merge: the double schema-3 collision, the duplicate latch release, the missing master

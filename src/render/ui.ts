@@ -98,3 +98,17 @@ export function wrappedCentered(
     return t
   })
 }
+
+/**
+ * How tall `wrappedCentered` will come out, without building a single Text.
+ *
+ * A card that carries a footer has to know how many lines its prose took BEFORE it decides where its
+ * own bottom edge is, and the only honest answer comes from the same metrics the wrap will use.
+ */
+export function wrappedExtent(text: string, tier: TypeTier, wrapWidth: number): { lines: number; step: number } {
+  const style = styleFor(tier, 0xffffff)
+  style.wordWrap = true
+  style.wordWrapWidth = wrapWidth
+  const metrics = CanvasTextMetrics.measureText(text, style)
+  return { lines: metrics.lines.length, step: Math.round(metrics.lineHeight) }
+}

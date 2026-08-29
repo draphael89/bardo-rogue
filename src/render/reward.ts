@@ -7,8 +7,8 @@ import { obolsLabel, SHOP_COPY, shopCost } from '@/sim/economy'
 import { MYSTERY_COPY, canAffordMystery } from '@/sim/mystery'
 import type { MysteryOffer, RewardOffer, ShopOffer } from '@/sim/session'
 import { tuning } from '@/tuning'
-import { backPause, clampPauseFocus, duoFooter, meetingVeil, offerAct, offerSpoken, pauseFooter, pauseNudge, resolvePause, shopAct, shopSpoken, showBuildStrip, townTally, victoryKeptLine, wrapPauseFocus, type PauseAct, type PausePage, type TitleNudge } from './titleMenu'
-import { label, placeCentered, placeLeft, placeRight, wrappedCentered, P } from './ui'
+import { backPause, clampPauseFocus, duoFooter, meetingVeil, offerAct, offerCardHeight, offerSpoken, pauseFooter, pauseNudge, resolvePause, shopAct, shopSpoken, showBuildStrip, townTally, victoryKeptLine, wrapPauseFocus, type PauseAct, type PausePage, type TitleNudge } from './titleMenu'
+import { label, placeCentered, placeLeft, placeRight, wrappedCentered, wrappedExtent, P } from './ui'
 import { clamp01 } from './anim'
 
 /**
@@ -26,6 +26,20 @@ function fadeToBlack(t: number): number {
   return (v << 16) | (v << 8) | v
 }
 
+/**
+ * Where the TYPE is when the plate under it is at `t`.
+ *
+ * The two fade by different means and therefore at different apparent rates: a plate at 30% alpha
+ * over a near-black room is still invisible, while type multiplied to 30% grey is already legible
+ * against it. Run flat, the words arrive before the thing they are written on and the card reads as
+ * text floating over the room. Holding the type back for the first third of the plate's own fade
+ * puts them in the order the eye expects — surface, then writing.
+ */
+const TYPE_LAG = 0.35
+function behind(t: number): number {
+  return clamp01((t - TYPE_LAG) / (1 - TYPE_LAG))
+}
+
 export class RewardOverlay {
   root = new Container()
   // The veil is its own layer so it can thicken over the room while the cards are still arriving.
@@ -35,8 +49,9 @@ export class RewardOverlay {
   private g = new Graphics()
   private texts: Text[] = []
   // One container per card, so each can land on its own beat. They used to be drawn straight into
-  // `this.g` with everything else, which is why the whole screen could only pop at once.
-  private cards: Container[] = []
+  // `this.g` with everything else, which is why the whole screen could only pop at once. The plate
+  // is held alongside the box because the two halves of a card fade by different means — see reveal.
+  private cards: { box: Container; plate: Graphics }[] = []
   private act: Text | null = null
   private armed = false
   private animates = false
@@ -204,22 +219,30 @@ export class RewardOverlay {
   private reveal(world: World): void {
     const R = tuning.juice.modalReveal
     if (!this.animates || this.reducedEffects) {
-      this.scrim.alpha = 1; this.body.tint = 0xffffff
-      for (const c of this.cards) { c.tint = 0xffffff; c.y = 0 }
+      this.scrim.alpha = 1; this.body.tint = 0xffffff; this.g.alpha = 1
+      for (const c of this.cards) { c.box.tint = 0xffffff; c.box.y = 0; c.plate.alpha = 1 }
       this.setArmed(true)
       return
     }
     const age = world.tick - world.phaseTick
-    // The room you just cleared stays legible under the veil for the first beat, so the kill lands
-    // on the room rather than on a scrim that was already there.
-    this.scrim.alpha = clamp01(age / R.scrimTicks)
-    this.body.tint = fadeToBlack(clamp01(age / R.scrimTicks))
-    this.cards.forEach((card, i) => {
+    // The room you just walked up to stays legible under the veil for the first beat, so the arrival
+    // lands on the room rather than on a scrim that was already there.
+    const t0 = clamp01(age / R.scrimTicks)
+    this.scrim.alpha = t0
+    this.body.tint = fadeToBlack(behind(t0))
+    // Tint alone was never a fade for a PLATE. A Graphics multiplied to black is a black rectangle at
+    // full opacity, so the old reveal punched three solid holes in the room on frame zero — 29% of a
+    // 480x270 frame gone instantly — and then coloured them in. Coverage has to be alpha, and alpha is
+    // safe here precisely because a Graphics carries no `crispText` filter to threshold: only the
+    // TYPE has to keep fading by tint.
+    this.g.alpha = t0
+    this.cards.forEach(({ box, plate }, i) => {
       const t = clamp01((age - R.scrimTicks - i * R.cardStagger) / R.cardTicks)
-      card.tint = fadeToBlack(t)
+      box.tint = fadeToBlack(behind(t))
+      plate.alpha = t
       // Whole pixels only: a card easing through a fraction of a row drags every glyph on it
       // off the grid, which is the whole reason the type in here reads at all.
-      card.y = Math.round((1 - t) * R.cardRise)
+      box.y = Math.round((1 - t) * R.cardRise)
     })
     this.setArmed(age >= tuning.run.modalArmTicks)
   }
@@ -259,7 +282,7 @@ export class RewardOverlay {
     this.g.destroy()
     this.scrim.destroy()
     for (const t of this.texts) t.destroy()
-    for (const c of this.cards) c.destroy({ children: true })
+    for (const c of this.cards) c.box.destroy({ children: true })
     this.texts = []
     this.cards = []
     this.act = null
@@ -277,7 +300,7 @@ export class RewardOverlay {
     const box = new Container()
     const g = new Graphics()
     box.addChild(g)
-    this.cards.push(box)
+    this.cards.push({ box, plate: g })
     this.root.addChild(box)
     return { box, g, add: (t: Text) => { this.texts.push(t); box.addChild(t) } }
   }
@@ -452,7 +475,17 @@ export class RewardOverlay {
     // --- the terms ---------------------------------------------------------------------------
     const gap = 8
     const cardW = Math.min(142, Math.floor((W - 32 - gap * 2) / 3))
-    const cardH = 88
+    // The card is as tall as the WIDEST of its three, never taller. Two vows wrap to three lines at
+    // this width (BETWEEN-STEP and CROSSROADS) and both are Hecate's, so both can turn up as the
+    // cross-crossroads card in a Fury offer — where an attribution footer is drawn as well. Pinned
+    // at 88 that third line came within 2px of the footer where a two-line card gets 8, and the
+    // comment above claiming the footer was safe was simply measuring the two-line case. Three
+    // cards in a row must stay the same height, so the row grows together or not at all.
+    const detailTop = 51
+    // Only the renderer knows what the glyphs actually came to, so it measures; `offerCardHeight`
+    // owns the arithmetic and is tested in node beside the death card's own row ladder.
+    const extent = options.map(id => wrappedExtent(BOONS[id].detail, 'body', cardW - 24))
+    const cardH = offerCardHeight(detailTop, Math.max(...extent.map(e => e.lines * e.step)))
     const total = cardW * 3 + gap * 2
     const x0 = Math.floor((W - total) / 2)
     options.forEach((id, i) => {
@@ -475,7 +508,7 @@ export class RewardOverlay {
       placeCentered(vow, x + cardW / 2, y + 37); add(vow)
       // Anchored to its TOP, not its middle: a three-line detail and a one-line detail must both
       // leave the card's footer alone, and a centred block grows into it.
-      for (const line of wrappedCentered(def.detail, 'body', selected ? P.bone : P.dim, cardW - 24, x + cardW / 2, y + 51)) add(line)
+      for (const line of wrappedCentered(def.detail, 'body', selected ? P.bone : P.dim, cardW - 24, x + cardW / 2, y + detailTop)) add(line)
       // One footer line, never two. A duo is itself the most interesting thing that can be said
       // about a card, so it speaks instead of the attribution rather than under it.
       if (def.requires?.length) {

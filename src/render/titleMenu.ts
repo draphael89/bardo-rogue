@@ -291,3 +291,19 @@ export function townTally(attempts: number, victories: number, remembrances = 0)
   if (remembrances <= 0) return `${descents}  ·  ${named}`
   return `${descents}  ·  ${named}  ·  ${keptLabel(remembrances)}`
 }
+
+/**
+ * How tall the three offer cards have to be to hold the tallest of their three detail blocks.
+ *
+ * The height was pinned at 88, which fits a two-line detail and its attribution footer with 11px
+ * between them. Two vows wrap to three lines at the card's width and both are Hecate's, so both can
+ * appear as the cross-crossroads card in a Fury offer — where the footer IS drawn — and that third
+ * line came within 2px of it. The footer sits at `cardH - 10`, so keeping the same 11px gap is
+ * `detailTop + block + 11 + 10`, and a two-line block still lands on exactly 88.
+ *
+ * Three cards in a row must stay the same height, so the caller passes the tallest block and every
+ * card grows together or not at all.
+ */
+export function offerCardHeight(detailTop: number, tallestBlockPx: number): number {
+  return Math.max(88, detailTop + tallestBlockPx + 21)
+}

@@ -375,6 +375,16 @@ function updateWardenTell(v: EntityView, e: Enemy, x: number, y: number, tk: num
     return
   }
 
+  drawSlamTell(g, hi, e, cx, cy, tk, arena, foot, x, y, scorching)
+  if (!scorching) drawCompanionTell(g, hi, e, cx, cy, tk, arena, foot, x, y)
+}
+
+function drawSlamTell(
+  g: Graphics, hi: Graphics | null, e: Enemy, cx: number, cy: number, tk: number,
+  arena: Arena, foot: number, originX: number, originY: number, scorching: boolean,
+): void {
+  const W = tuning.warden
+  const s = e.state
   const q = tellProgress(e, tk)
   const past = s === 'attack' ? tk : 0
   const bloom = s === 'windup' ? clamp01((tk + 1) / 3) : past > 0 ? clamp01(1 - (past - 1) / 4) : 1
@@ -391,28 +401,27 @@ function updateWardenTell(v: EntityView, e: Enemy, x: number, y: number, tk: num
 
   // The body is the clock. The floor is only the PLACE the slam will land — a dark plate that grows.
   // Wine rim only after the aim locks. Gold is the scale, not the smash.
-  dangerDisk(g, cx, cy, front - 1, plateCol, plateA, arena, x, y, foot, tuning.player.radius)
-  octagon(g, cx, cy, front, dark, 0.55 * bloom * fade, false, arena, x, y, foot, tuning.player.radius)
+  dangerDisk(g, cx, cy, front - 1, plateCol, plateA, arena, originX, originY, foot, tuning.player.radius)
+  octagon(g, cx, cy, front, dark, 0.55 * bloom * fade, false, arena, originX, originY, foot, tuning.player.radius)
   if (committed && !scorching) {
-    octagon(g, cx, cy, front, rimCol, 0.95 * bloom, false, arena, x, y, foot, tuning.player.radius)
+    octagon(g, cx, cy, front, rimCol, 0.95 * bloom, false, arena, originX, originY, foot, tuning.player.radius)
     if (hi) {
-      octagon(hi, cx, cy, front, dark, 0.8, false, arena, x, y, foot, tuning.player.radius)
-      octagon(hi, cx, cy, front, rimCol, 1, false, arena, x, y, foot, tuning.player.radius)
+      octagon(hi, cx, cy, front, dark, 0.8, false, arena, originX, originY, foot, tuning.player.radius)
+      octagon(hi, cx, cy, front, rimCol, 1, false, arena, originX, originY, foot, tuning.player.radius)
     }
   } else {
     // A broken wine edge names danger from the first readable body lift. The closed white rim
     // is reserved for the lock. Gold stays on the scale.
     octagon(g, cx, cy, front, e.phase ? MINOS.circleHot : MINOS.circle,
       (0.38 + q * 0.22) * Math.max(0.7, bloom), true,
-      arena, x, y, foot, tuning.player.radius)
+      arena, originX, originY, foot, tuning.player.radius)
     // Above the light. The Hall's river dark ate the windup plate and the slam arrived untelegraphed.
     if (hi) {
       octagon(hi, cx, cy, front, e.phase ? MINOS.circleHot : MINOS.circle,
         (0.32 + q * 0.2) * Math.max(0.7, bloom), true,
-        arena, x, y, foot, tuning.player.radius)
+        arena, originX, originY, foot, tuning.player.radius)
     }
   }
-  if (!scorching) drawCompanionTell(g, hi, e, cx, cy, tk, arena, foot, x, y)
 }
 
 function drawCompanionTell(
@@ -429,14 +438,14 @@ function drawCompanionTell(
     drawFanTell(g, hi, e, cx, cy, tk, arena, foot)
     return
   }
-  const W = tuning.warden
-  const q = tellProgress(e, tk)
-  const R = Math.max(4, Math.round((W.slamRadius + tuning.player.radius) * q))
-  octagon(g, cx, cy, R, MINOS.dark, 0.45, false, arena, originX, originY, foot, tuning.player.radius)
-  octagon(g, cx, cy, R, e.phase ? MINOS.circleHot : MINOS.circle, 0.55, true, arena, originX, originY, foot, tuning.player.radius)
-  if (hi) {
-    octagon(hi, cx, cy, R, e.phase ? MINOS.circleHot : MINOS.circle, 0.5, true, arena, originX, originY, foot, tuning.player.radius)
+  if (companion === WARDEN_PATTERN.slam) {
+    // Fan plants the circle. Same plate, broken wine edge, and lock rim as the taught slam —
+    // a dashed outline alone read as décor once the lanes already owned the floor.
+    drawSlamTell(g, hi, e, cx, cy, tk, arena, foot, originX, originY, false)
+    return
   }
+  const _never: never = companion
+  void _never
 }
 
 // The near field is the commitment the player must solve now. The complete remaining path stays
@@ -493,11 +502,31 @@ function threatLane(g: Graphics, hi: Graphics | null, arena: Arena, e: Enemy,
       }
       hi.fill({ color: secondary ? MINOS.veilHot : MINOS.commit, alpha: secondary ? 0.72 : 0.96 })
     } else {
-      for (let d = from; d <= proximalShown; d += nearStep * 2) {
+      // Above the light. A 1px / 10px / 0.34 stack was a shadow in the Hall, not a spoke.
+      const hiStep = secondary ? 4 : 2
+      const hiW = secondary ? 1 : 2
+      for (let d = from; d <= proximalShown; d += hiStep) {
         const px = Math.round(x + ca * d), py = Math.round(y + sa * d)
-        if (isDangerPointVisible(arena, e.x, e.y, px, py - foot)) hi.rect(px, py, 1, 1)
+        if (isDangerPointVisible(arena, e.x, e.y, px, py - foot)) hi.rect(px, py, hiW, 1)
       }
-      hi.fill({ color, alpha: alpha * 0.55 })
+      hi.fill({ color, alpha: alpha * (secondary ? 0.42 : 0.85) })
+    }
+    if (!committed && q > 0.18 && reach > proximalEnd + 1) {
+      let d = proximalEnd + 4
+      let dash = 3
+      while (d < reach) {
+        const t = (d - proximalEnd) / Math.max(1, reach - proximalEnd)
+        dash = t < 0.42 ? 3 : t < 0.76 ? 2 : 1
+        const end = Math.min(reach, d + dash)
+        for (let at = d; at <= end; at++) {
+          const px = Math.round(x + ca * at), py = Math.round(y + sa * at)
+          if (isDangerPointVisible(arena, e.x, e.y, px, py - foot)) hi.rect(px, py, 1, 1)
+        }
+        d += dash + 6 + Math.floor(t * 5)
+      }
+      const ex = Math.round(x + ca * reach), ey = Math.round(y + sa * reach)
+      if (isDangerPointVisible(arena, e.x, e.y, ex, ey - foot)) hi.rect(ex, ey, 1, 1)
+      hi.fill({ color, alpha: alpha * (secondary ? 0.28 : 0.55) * clamp01((q - 0.18) / 0.42) })
     }
   }
 }

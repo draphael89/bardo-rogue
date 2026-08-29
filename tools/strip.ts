@@ -40,8 +40,8 @@ function parseHold(s: string): Record<string, unknown> {
   catch { throw new Error(`--hold must be JSON, e.g. --hold '{"attack":true,"aimX":1}' (got: ${s})`) }
 }
 
-// crop in 480x270 internal-resolution coords: "x,y,w,h", or "player" / "player,w,h" (a FIXED box on the player at frame 0)
-const VIEW_W = 480, VIEW_H = 270
+// crop in 640x360 internal-resolution coords: "x,y,w,h", or "player" / "player,w,h" (a FIXED box on the player at frame 0)
+const VIEW_W = 640, VIEW_H = 360
 const cropArg = args.crop ?? ''
 let cropMode: 'fixed' | 'player' = 'fixed'
 let crop = { x: 0, y: 0, w: VIEW_W, h: VIEW_H }
@@ -51,7 +51,7 @@ if (cropArg.startsWith('player')) {
   crop = { x: 0, y: 0, w: p[0] || 160, h: p[1] || 120 }
 } else if (cropArg) {
   const p = cropArg.split(',').map(Number)
-  if (p.length !== 4 || p.some((n: number) => !Number.isFinite(n))) throw new Error('--crop takes x,y,w,h in 480x270 view coords (or "player" / "player,w,h")')
+  if (p.length !== 4 || p.some((n: number) => !Number.isFinite(n))) throw new Error('--crop takes x,y,w,h in 640x360 view coords (or "player" / "player,w,h")')
   crop = { x: p[0], y: p[1], w: p[2], h: p[3] }
 }
 
@@ -135,8 +135,10 @@ const clip = await page.evaluate(({ crop, cropMode, VIEW_W, VIEW_H }) => {
   const s = ra.scale
   let { x, y, w, h } = crop
   if (cropMode === 'player') {
-    x = ra.arenaOffset.x + g.world.player.x - w / 2
-    y = ra.arenaOffset.y + g.world.player.y - h / 2
+    // The camera owns the world transform; ask the container where the player landed (target px).
+    const pt = ra.world.toGlobal({ x: g.world.player.x, y: g.world.player.y })
+    x = pt.x - w / 2
+    y = pt.y - h / 2
   }
   w = Math.min(w, VIEW_W); h = Math.min(h, VIEW_H)
   x = Math.max(0, Math.min(VIEW_W - w, Math.round(x))); y = Math.max(0, Math.min(VIEW_H - h, Math.round(y)))

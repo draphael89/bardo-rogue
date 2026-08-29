@@ -31,13 +31,24 @@ export class Particles {
   private dustFrames: readonly Texture[]
   readonly max = 1500
 
+  // World px past the room edge a stamp may still land on (knockback splatter against a wall).
+  private decalPad = 32
+
   constructor(private atlas: Atlas, private fx: Container, decals: Container, _floor: Container) {
     this.dustFrames = [1, 2, 3, 4].map(i => atlas.particle(`smoke_0${i}`))
-    this.decalRt = RenderTexture.create({ width: 480, height: 300, scaleMode: 'nearest' })
-    this.decalSprite = new Sprite(this.decalRt); this.decalSprite.position.set(-32, -15)
+    // Sized by bindArena to the room, not the viewport: decals live in world space and a camera
+    // larger room must not scroll its floor scars out of the texture.
+    this.decalRt = RenderTexture.create({ width: 16, height: 16, scaleMode: 'nearest' })
+    this.decalSprite = new Sprite(this.decalRt); this.decalSprite.position.set(-this.decalPad, -this.decalPad)
     decals.addChild(this.decalSprite)
     this.decalContainer.addChild(this.stamp)
     this.stamp.anchor.set(0.5)
+  }
+
+  /** Room entry (and first mount): size the decal target to the room. Resizing clears it. */
+  bindArena(arena: { cols: number; rows: number }): void {
+    const w = arena.cols * 16 + this.decalPad * 2, h = arena.rows * 16 + this.decalPad * 2
+    if (this.decalRt.width !== w || this.decalRt.height !== h) this.decalRt.resize(w, h)
   }
   private renderer: import('pixi.js').Renderer | null = null
   attachRenderer(r: import('pixi.js').Renderer) { this.renderer = r }
@@ -256,7 +267,7 @@ export class Particles {
       this.stamp.rotation = fxRng.particles.next() * 6.28
       const sc = fxRng.particles.range(12, 24) / 32
       this.stamp.scale.set(sc)
-      this.stamp.position.set(x + 32 + Math.cos(angle) * d + fxRng.particles.signed(6), y + 15 + 4 + Math.sin(angle) * d * 0.6 + fxRng.particles.signed(4))
+      this.stamp.position.set(x + this.decalPad + Math.cos(angle) * d + fxRng.particles.signed(6), y + this.decalPad + 4 + Math.sin(angle) * d * 0.6 + fxRng.particles.signed(4))
       this.renderer.render({ container: this.decalContainer, target: this.decalRt, clear: false })
     }
   }
@@ -273,7 +284,7 @@ export class Particles {
       this.stamp.rotation = angle + (i === 0 ? 0.2 : -0.35)
       const sc = (i === 0 ? 14 : 10) / 32
       this.stamp.scale.set(sc, sc * 0.7)
-      this.stamp.position.set(x + 32 + Math.cos(angle) * d, y + 19 + Math.sin(angle) * d * 0.6)
+      this.stamp.position.set(x + this.decalPad + Math.cos(angle) * d, y + this.decalPad + 4 + Math.sin(angle) * d * 0.6)
       this.renderer.render({ container: this.decalContainer, target: this.decalRt, clear: false })
     }
   }

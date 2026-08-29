@@ -1,13 +1,14 @@
 import { Container, Sprite, RenderTexture, Graphics, type DestroyOptions, type Renderer } from 'pixi.js'
 import { TILE, T, type Arena, type ArenaDoor, type DoorMark, type ArenaOffering, type ArenaRack, doorOpens } from '@/sim/arena'
 import type { Atlas } from './atlas'
-import { tuning } from '@/tuning'
 import { OATH } from './oathMetal'
 
 // Static floor/walls baked into one texture; door clusters (sprites + marks) change with open state.
 // `door` is a Container so every exit rides with presenter addChild / destroy. destroy() always
 // takes children — presenter does not pass { children: true }.
-export interface TilemapView { sprite: Sprite; door: Container; setDoorOpen(open: boolean): void; voidLayer: Sprite }
+// The starfield void is no longer baked here: it lives in the screen-space underlay layer
+// (src/render/starfield.ts), where a moving camera cannot scroll it out of frame.
+export interface TilemapView { sprite: Sprite; door: Container; setDoorOpen(open: boolean): void }
 
 const MARK = {
   combat: 0xff6a18, combatCore: 0xffcc56, combatEdge: 0x3a1008,
@@ -448,33 +449,12 @@ function bakeGrit(g: Graphics, arena: Arena): void {
   void C.slate1; void C.slate2; void C.naveWarm
 }
 
-function bakeVoid(arena: Arena, arenaOffset: { x: number; y: number }): Container {
-  const { width, height } = tuning.view
-  const root = new Container()
-  const g = new Graphics()
-  g.rect(0, 0, width, height)
-  g.fill({ color: 0x08070e, alpha: 1 })
-  // §2.8 the void is never a solid black rectangle: 1 px stars at ≤1 % density, two in three
-  // cold, one in three warm. Integer pixels, full alpha — no soft additive dots.
-  const arenaW = arena.cols * TILE, arenaH = arena.rows * TILE
-  for (let i = 0; i < 260; i++) {
-    const sx = (i * 73 + 11) % width
-    const sy = (i * 47 + 7) % height
-    const ax = sx - arenaOffset.x, ay = sy - arenaOffset.y
-    if (ax > -3 && ay > -3 && ax < arenaW + 3 && ay < arenaH + 3) continue
-    g.rect(sx, sy, 1, 1)
-    g.fill({ color: i % 3 === 0 ? 0xffe2a0 : 0xb0c4ff, alpha: 1 })
-  }
-  root.addChild(g)
-  return root
-}
-
 /**
  * `floorTint` multiplies the baked stone, and nothing else. It is a parameter rather than something
  * the caller sets afterwards because there are two build sites (first mount and every room entry),
  * and a tint applied at one of them would give the realm a floor on arrival and lose it on rebuild.
  */
-export function buildTilemap(renderer: Renderer, atlas: Atlas, arena: Arena, arenaOffset: { x: number; y: number }, floorTint = 0xffffff): TilemapView {
+export function buildTilemap(renderer: Renderer, atlas: Atlas, arena: Arena, floorTint = 0xffffff): TilemapView {
   const c = new Container()
   for (let r = 0; r < arena.rows; r++) for (let col = 0; col < arena.cols; col++) {
     const i = r * arena.cols + col
@@ -496,8 +476,8 @@ export function buildTilemap(renderer: Renderer, atlas: Atlas, arena: Arena, are
   renderer.render({ container: c, target: rt, clear: true })
   c.destroy({ children: true })
   const sprite = new Sprite(rt)
-  // The stone only. voidLayer (the starfield) and the door cluster are separate sprites below, so
-  // the void stays void and the open door stays gold.
+  // The stone only. The starfield underlay and the door cluster are separate surfaces, so the void
+  // stays void and the open door stays gold.
   sprite.tint = floorTint
 
   const door = new Container()
@@ -513,16 +493,8 @@ export function buildTilemap(renderer: Renderer, atlas: Atlas, arena: Arena, are
     nativeDestroy(typeof options === 'boolean' ? { children: true } : { children: true, ...options })
   }
 
-  const { width, height } = tuning.view
-  const voidScene = bakeVoid(arena, arenaOffset)
-  const vrt = RenderTexture.create({ width, height, scaleMode: 'nearest' })
-  renderer.render({ container: voidScene, target: vrt, clear: true })
-  voidScene.destroy({ children: true })
-  const voidLayer = new Sprite(vrt)
-  voidLayer.position.set(-arenaOffset.x, -arenaOffset.y)
-
   return {
-    sprite, door, voidLayer,
+    sprite, door,
     setDoorOpen(open) {
       for (const c of clusters) c.setOpen(open)
       gift?.sync(!!arena.offeringTaken)

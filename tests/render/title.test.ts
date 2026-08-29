@@ -136,16 +136,16 @@ describe('title menu', () => {
     expect(showBuildStrip({ hasRun: true, inTown: false, overlayOpen: true, dead: false, vows: 1 })).toBe(false)
   })
 
-  it('is three verbs on the gate, five on settings, one on credits', () => {
+  it('is three verbs on the gate, six on settings, one on credits', () => {
     expect(titleRows('menu')).toBe(3)
-    expect(titleRows('settings')).toBe(5)
+    expect(titleRows('settings')).toBe(6)
     expect(titleRows('credits')).toBe(1)
   })
 
   it('wraps focus so a pad player cannot walk off the card', () => {
     expect(wrapTitleFocus('menu', 0, -1)).toBe(2)
     expect(wrapTitleFocus('menu', 2, 1)).toBe(0)
-    expect(wrapTitleFocus('settings', 0, -1)).toBe(4)
+    expect(wrapTitleFocus('settings', 0, -1)).toBe(5)
     expect(wrapTitleFocus('credits', 0, 1)).toBe(0)
   })
 
@@ -160,7 +160,8 @@ describe('title menu', () => {
     expect(confirmTitle('settings', 1)).toEqual({ page: 'settings', focus: 1, act: 'none' })
     expect(confirmTitle('settings', 2)).toEqual({ page: 'settings', focus: 2, act: 'none' })
     expect(confirmTitle('settings', 3)).toEqual({ page: 'settings', focus: 3, act: 'none' })
-    expect(confirmTitle('settings', 4)).toEqual({ page: 'menu', focus: 1, act: 'none' })
+    expect(confirmTitle('settings', 4)).toEqual({ page: 'settings', focus: 4, act: 'fullscreen' })
+    expect(confirmTitle('settings', 5)).toEqual({ page: 'menu', focus: 1, act: 'none' })
     expect(confirmTitle('credits', 0)).toEqual({ page: 'menu', focus: 2, act: 'none' })
   })
 

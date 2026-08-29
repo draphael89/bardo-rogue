@@ -35,7 +35,7 @@ const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=sw
 const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } })
 const errors: string[] = []
 page.on('pageerror', e => errors.push('pageerror: ' + e.message))
-await page.goto(`${url}/?scenario=loop&seed=${seed}&mute=1&save=off&view=480`)
+await page.goto(`${url}/?scenario=loop&seed=${seed}&mute=1&save=off&view=640`)
 await page.waitForFunction(() => !!(window as unknown as { __game?: unknown }).__game, null, { timeout: 15000 })
 await page.waitForTimeout(400)
 

@@ -22,7 +22,18 @@ export interface SwingDef {
 }
 
 export const tuning = {
-  view: { width: 480, height: 270 },
+  // The internal render target (ADR 0002): 640x360, integer-upscaled to the window; width is
+  // adaptive (app.ts fitViewWidth). `worldScale` is the world-render scale: sim space (16px tiles)
+  // draws onto the target at 1.5x, so tile art carries 24px per tile while every sim distance and
+  // speed stays in sim px. Render-side only — the sim never reads this block.
+  view: {
+    width: 640, height: 360, worldScale: 1.5,
+    // The follow camera (ADR 0001). followLerp is per 60Hz frame (dt-corrected in presenter);
+    // clampMargin is world px the view may rest beyond the room bounds. A room that fits the
+    // viewport collapses the clamp range and is centred exactly, which is what keeps today's
+    // rooms static under the same code path.
+    camera: { followLerp: 0.12, clampMargin: 0 },
+  },
 
   player: {
     radius: 5,
@@ -326,7 +337,7 @@ export const tuning = {
                             // featureless white blob for most of the hit-stop.
     lookahead: 4, lookaheadLerp: 0.08,
     aberrationTicks: 3,
-    aberrationStrength: 2,  // screen px of red/blue split at the pulse peak
+    aberrationStrength: 2,  // TARGET px of red/blue split at the pulse peak, quantised to whole target pixels (§6.8)
     // Screen flash on an ordinary kill. It has to sit UNDER heavy contact (0.20) and under getting
     // hurt (0.25), or the most routine event in the fight is also the loudest and the next telegraph
     // is washed out by the last thing you killed. The shatter and the punch-zoom carry the release.

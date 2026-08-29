@@ -188,12 +188,12 @@ export class TitleOverlay {
 
   private paintSettings(W: number, H: number): void {
     const still = this.reducedEffects ? 'THE ROOM IS STILL' : 'STILL THE ROOM'
-    // Five rows now, so the block starts higher: RISE used to sit on the footer rule.
     this.paintRow(W / 2, 140, still, this.focus === 0)
     this.paintMeter(W / 2, 158, 'MASTER', this.master, this.focus === 1)
     this.paintMeter(W / 2, 176, 'MUSIC', this.music, this.focus === 2)
     this.paintMeter(W / 2, 194, 'SOUND', this.sfx, this.focus === 3)
-    this.paintRow(W / 2, 212, 'RISE', this.focus === 4)
+    this.paintRow(W / 2, 212, 'FULLSCREEN', this.focus === 4)
+    this.paintRow(W / 2, 230, 'RISE', this.focus === 5)
     const foot = label('THE ROOM LISTENS', 'meta', P.dim)
     placeCentered(foot, W / 2, H - 38); this.add(foot)
   }

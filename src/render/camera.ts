@@ -1,6 +1,17 @@
 import { tuning } from '@/tuning'
 
-// Trauma-based shake (shake = trauma^2), noise-driven, with an optional directional kick.
+// World-bounds clamp for the follow focus, one axis at a time. `span` is the room's world extent,
+// `visSpan` how much world the viewport shows. When the span (plus margin) fits inside the view the
+// range collapses and the room is centred exactly — which is how today's screen-sized rooms stay
+// static under the same code path an oversized room scrolls through (ADR 0001).
+export function clampFocus(focus: number, span: number, visSpan: number, margin: number): number {
+  const half = visSpan / 2
+  const lo = half - margin, hi = span - half + margin
+  return lo >= hi ? span / 2 : Math.max(lo, Math.min(hi, focus))
+}
+
+// Trauma-based shake (shake = trauma^2), noise-driven, with an optional directional kick, plus the
+// smoothed follow focus the presenter clamps to the room (ADR 0001).
 export class Camera {
   trauma = 0
   kickX = 0; kickY = 0
@@ -10,6 +21,8 @@ export class Camera {
   private t = 0
   offsetX = 0; offsetY = 0; rotation = 0
   zoom = 1                 // punch scale about the player, eases back to 1
+  followX = 0; followY = 0 // smoothed follow focus, world px (pre-clamp)
+  private followFresh = true
   private reducedEffects = false
 
   setReducedEffects(reduced: boolean) {
@@ -43,6 +56,15 @@ export class Camera {
     }
   }
   punchZoom(z: number) { this.zoom = Math.max(this.zoom, 1 + (z - 1) * (this.reducedEffects ? 0.15 : 1)) }
+  // A new room must be framed, never scrolled into: the next follow() lands instantly.
+  snapFollow() { this.followFresh = true }
+  follow(tx: number, ty: number, dtSec: number) {
+    if (this.followFresh) { this.followX = tx; this.followY = ty; this.followFresh = false; return }
+    // followLerp is tuned per 60 Hz frame; rescale by dt so high-Hz displays don't snap harder
+    const k = 1 - Math.pow(1 - tuning.view.camera.followLerp, dtSec * 60)
+    this.followX += (tx - this.followX) * k
+    this.followY += (ty - this.followY) * k
+  }
   // Anticipation, not impact: eases in while it is fed and eases back out the moment it stops.
   lean(angle: number, strength: number) { this.leanTX = Math.cos(angle) * strength; this.leanTY = Math.sin(angle) * strength }
 

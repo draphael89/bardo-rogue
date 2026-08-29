@@ -134,7 +134,9 @@ const CROWN_UP = 32                                  // authored 32px hero: keep
 // The judge's plate, in view pixels. One definition, because the crown has to step out of exactly
 // this rectangle and nothing else — updateBoss draws it and updateCrown avoids it.
 const BOSS_BAR = { w: 168, h: 16, y: 2 }
-const BOSS_BAR_X = Math.round((V.width - BOSS_BAR.w) / 2)
+// A function, not a module const: V.width is adaptive (app.ts) and a value baked at import time
+// would strand the plate off-centre after a fullscreen re-fit.
+const bossBarX = () => Math.round((V.width - BOSS_BAR.w) / 2)
 const HEART_X = 8, HEART_Y = 6, STEP = 9            // flame pitch in unscaled px; the rig is drawn at 2x
 const HURT_SHAKE = [1, -1, 1, 0, -1, 1, 0, 0]       // authored 8-tick rig shake, never a random jitter
 
@@ -477,7 +479,7 @@ export class Hud {
     const top = baseY - 2, bottom = baseY + 6
     const left = x0 - 1, right = x0 + w + 1
     return top <= BOSS_BAR.y + BOSS_BAR.h && bottom >= BOSS_BAR.y
-      && left <= BOSS_BAR_X + BOSS_BAR.w && right >= BOSS_BAR_X
+      && left <= bossBarX() + BOSS_BAR.w && right >= bossBarX()
   }
 
   // --- the life crown: the health read, on the body -------------------------------------------------------------
@@ -744,7 +746,7 @@ export class Hud {
     const cardAge = dp.state === 'dead' && dp.deathTick >= 0 ? world.tick - dp.deathTick : -1
     const back = fightChrome(cardAge)
     const bw = BOSS_BAR.w, bh = BOSS_BAR.h
-    const bx = BOSS_BAR_X, by = BOSS_BAR.y
+    const bx = bossBarX(), by = BOSS_BAR.y
     const cracked = e.phase > 0
     const ink = minosLifeInk(cracked)
     g.visible = back > 0

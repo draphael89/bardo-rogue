@@ -91,9 +91,13 @@ for (const pose of POSES) {
       if (focus === 'bolt') { const b = w.projectiles.find((b: any) => b.active); if (b) { fx = b.x; fy = b.y } }
       const ra = g.presenter.ra
       const s = ra.scale
-      const vx = ra.arenaOffset.x + fx, vy = ra.arenaOffset.y + fy
-      const x = Math.max(0, Math.round((vx - CROP / 2) * s + ra.screen.x)), y = Math.max(0, Math.round((vy - CROP / 2) * s + ra.screen.y))
-      return { x, y, width: CROP * s, height: CROP * s, state: `${w.player.state}:${w.player.stateTick}` }
+      // CROP is WORLD px of context; the world renders at view.worldScale onto the target, and the
+      // camera owns the world transform, so ask the container where the focus actually landed.
+      const S = g.tuning.view.worldScale
+      const pt = ra.world.toGlobal({ x: fx, y: fy })
+      const half = (CROP * S) / 2
+      const x = Math.max(0, Math.round((pt.x - half) * s + ra.screen.x)), y = Math.max(0, Math.round((pt.y - half) * s + ra.screen.y))
+      return { x, y, width: CROP * S * s, height: CROP * S * s, state: `${w.player.state}:${w.player.stateTick}` }
     }, { scenario: pose.scenario, seed, god: pose.god, run: pose.run, focus, CROP, PRELUDE })
     // frameTimes is a 240-sample ring, so waiting for length >= 242 deadlocks late in a full sheet.
     // Await two actual browser frames instead; the paused loop still renders on every rAF.

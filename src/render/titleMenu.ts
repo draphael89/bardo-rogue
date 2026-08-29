@@ -7,13 +7,13 @@
 const METER_AT: Record<number, 'master' | 'music' | 'sfx' | undefined> = { 1: 'master', 2: 'music', 3: 'sfx' }
 
 export type TitlePage = 'menu' | 'settings' | 'credits'
-export type TitleAct = 'none' | 'descend' | 'toggle-still'
+export type TitleAct = 'none' | 'descend' | 'toggle-still' | 'fullscreen'
 export type TitleNudge = 'none' | 'master' | 'music' | 'sfx'
 
 export function titleRows(page: TitlePage): number {
   switch (page) {
     case 'menu': return 3
-    case 'settings': return 5   // still, master, music, sound, back
+    case 'settings': return 6   // still, master, music, sound, fullscreen, back
     case 'credits': return 1
     default: { const _: never = page; return _ }
   }
@@ -37,6 +37,8 @@ export function confirmTitle(page: TitlePage, focus: number): { page: TitlePage;
     case 'settings':
       if (focus === 0) return { page, focus, act: 'toggle-still' }
       if (METER_AT[focus]) return { page, focus, act: 'none' }
+      // The verb lives here, not in the sim: fullscreen is the host's job (platform.fullscreen).
+      if (focus === 4) return { page, focus, act: 'fullscreen' }
       return { page: 'menu', focus: 1, act: 'none' }
     case 'credits':
       return { page: 'menu', focus: 2, act: 'none' }

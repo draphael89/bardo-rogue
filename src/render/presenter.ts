@@ -11,7 +11,9 @@ import { updatePlayerRim } from './views/player'
 import { promiseFrame } from './clipSelect'
 import { ARM, armOf } from '@/sim/weapons'
 import { buildTilemap, type TilemapView } from './tilemap'
-import { Camera } from './camera'
+import { Camera, clampFocus } from './camera'
+import { drawVoidUnderlay } from './starfield'
+import { TILE } from '@/sim/arena'
 import { Hud } from './hud'
 import { Particles } from './particles'
 import { lerp } from './anim'
@@ -104,11 +106,17 @@ export class Presenter {
   // Last valid floor-space pose lets target loss release outward instead of popping with no cause.
   private hardLockLast = { x: 0, y: 0, radius: 0 }
 
+  // The starfield void, screen space behind the world (starfield.ts). Presenter owns it because
+  // only the presenter knows the current room's resting rect.
+  private voidG = new Graphics()
+
   constructor(public ra: RenderApp, public atlas: Atlas, public world: World) {
     seedFx(world.seed)
     const L = ra.layers
-    this.tilemap = buildTilemap(ra.app.renderer, atlas, world.arena, ra.arenaOffset, floorTintFor(world))
-    L.floor.addChild(this.tilemap.voidLayer, this.tilemap.sprite, this.tilemap.door)
+    L.underlay.addChild(this.voidG)
+    this.rebuildVoid()
+    this.tilemap = buildTilemap(ra.app.renderer, atlas, world.arena, floorTintFor(world))
+    L.floor.addChild(this.tilemap.sprite, this.tilemap.door)
     for (const p of world.arena.props) {
       const s = makePropSprite(atlas, p)
       this.propSprites.push(s)
@@ -116,6 +124,7 @@ export class Presenter {
     }
     this.playerView = createPlayerView(atlas, L)
     this.particles = new Particles(atlas, L.fx, L.decals, L.floor)
+    this.particles.bindArena(world.arena)
     this.atmosphere = new Atmosphere(atlas, L.fx, world.arena, world.rooms[world.roomIndex]?.layout ?? 'threshold')
     L.fx.addChild(this.fxGraphics)
     L.shadows.addChild(this.groundFx)
@@ -1005,19 +1014,31 @@ export class Presenter {
     const L = this.ra.layers
     this.tilemap.sprite.destroy()
     this.tilemap.door.destroy()
-    this.tilemap.voidLayer.destroy()
     for (const s of this.propSprites) s.destroy()
     this.propSprites = []
-    this.tilemap = buildTilemap(this.ra.app.renderer, this.atlas, this.world.arena, this.ra.arenaOffset, floorTintFor(this.world))
-    L.floor.addChild(this.tilemap.voidLayer, this.tilemap.sprite, this.tilemap.door)
+    this.rebuildVoid()
+    this.tilemap = buildTilemap(this.ra.app.renderer, this.atlas, this.world.arena, floorTintFor(this.world))
+    L.floor.addChild(this.tilemap.sprite, this.tilemap.door)
     for (const p of this.world.arena.props) {
       const s = makePropSprite(this.atlas, p)
       this.propSprites.push(s)
       L.entities.addChild(s)
     }
+    this.particles.bindArena(this.world.arena)
     this.lighting.rebind(this.world.arena)
     this.atmosphere.rebind(this.world.arena, this.world.rooms[this.world.roomIndex]?.layout ?? 'threshold')
     this.tilemap.setDoorOpen(this.world.doorOpen)
+    // A new room is framed, never scrolled into.
+    this.camera.snapFollow()
+  }
+
+  // The room's resting rect in target px (camera at rest). Feeds the underlay's star skip so a room
+  // that fits the frame keeps a starless interior, exactly as the old bake did.
+  private rebuildVoid(): void {
+    const V = tuning.view, S = V.worldScale
+    const a = this.world.arena
+    const w = a.cols * TILE * S, h = a.rows * TILE * S
+    drawVoidUnderlay(this.voidG, { x: Math.round((V.width - w) / 2), y: Math.round((V.height - h) / 2), w, h })
   }
 
   private flashAlpha = 0
@@ -1166,15 +1187,26 @@ export class Presenter {
     this.damageNumbers.update(dtSec)
     this.postfx.update(dtSec)
 
-    // camera: shake + zoom punch, both about the player so the player pixel never moves
+    // camera: smoothed follow clamped to the room (ADR 0001), the world drawn at the world-render
+    // scale (ADR 0002), shake + zoom punch still about the player so the player pixel never moves.
+    // Rounding happens in TARGET pixels: the pivot is quantised to the target grid (round(v*S)/S)
+    // and the translation rounded whole, so integer world positions land on whole target pixels.
     const aimX = Math.cos(p.aimAngle), aimY = Math.sin(p.aimAngle)
     this.camera.update(dtSec, aimX, aimY)
-    const off = this.ra.arenaOffset
-    const pxr = Math.round(lerp(p.px, p.x, alpha)), pyr = Math.round(lerp(p.py, p.y, alpha))
-    this.ra.world.pivot.set(pxr, pyr)
-    this.ra.world.scale.set(this.camera.zoom)
-    this.ra.world.position.set(Math.round(off.x + pxr + this.camera.offsetX), Math.round(off.y + pyr + this.camera.offsetY))
+    const V = tuning.view, S = V.worldScale
+    const pxi = lerp(p.px, p.x, alpha), pyi = lerp(p.py, p.y, alpha)
+    this.camera.follow(pxi, pyi, dtSec)
+    const fx = clampFocus(this.camera.followX, w.arena.cols * TILE, V.width / S, V.camera.clampMargin)
+    const fy = clampFocus(this.camera.followY, w.arena.rows * TILE, V.height / S, V.camera.clampMargin)
+    const tx = Math.round(V.width / 2 - fx * S), ty = Math.round(V.height / 2 - fy * S)
+    const pxq = Math.round(pxi * S) / S, pyq = Math.round(pyi * S) / S
+    this.ra.world.pivot.set(pxq, pyq)
+    this.ra.world.scale.set(S * this.camera.zoom)
     this.ra.world.rotation = this.camera.rotation
+    this.ra.world.position.set(
+      Math.round(pxq * S + tx + this.camera.offsetX * S),
+      Math.round(pyq * S + ty + this.camera.offsetY * S),
+    )
 
     if (this.flashAlpha > 0) {
       // The target's width is adaptive (app.ts fits 480..768 in 16px steps), so a size taken once at

@@ -104,9 +104,11 @@ async function boot() {
   let reducedEffects = q.has('reduced') ? q.get('reduced') !== '0' : storedReducedEffects
   let world: World = createWorld(seed, scenario, { god, ...(scenario === 'loop' ? { meta: savedSave.meta } : {}) })
   const resumed = scenario === 'loop' && !!savedSave.checkpoint && restoreCheckpoint(world, savedSave.checkpoint)
-  if (scenario === 'loop' && savedSave.checkpoint && !resumed) {
+  if (scenario === 'loop' && savedSave.checkpoint) {
+    // Consumed either way. A resumed checkpoint must not outlive its own load, or the same room can
+    // be retried from its entry HP without limit; a refused one must not be retried every boot.
     savedSave = { ...savedSave, checkpoint: null }
-    console.log('[save] checkpoint could not be restored; starting in the Bardo')
+    if (!resumed) console.log('[save] checkpoint could not be restored; starting in the Bardo')
   }
   // Spatial audio starts with the player's actual spawn, before the first enemy tell can arrive.
   audio.setListener(world.player.x, world.player.y)
@@ -236,10 +238,15 @@ async function boot() {
     )) {
       // An explicit copy: reset() builds a NEW meta object, so holding the live one would leave this
       // pointing at a dead object and persist stale counters.
+      // The checkpoint is a NODE-BOUNDARY save, so only a room arrival may write one. Every other
+      // event here still persists meta (Remembrances are banked as they are earned) but leaves the
+      // checkpoint alone: a snapshot taken after a room's reward banked would, on resume, re-enter
+      // that room and grant the reward a second time — once per reload, forever.
+      const atBoundary = world.events.some(ev => ev.type === 'runStarted' || ev.type === 'roomEnter')
       savedSave = {
         ...savedSave,
         meta: { ...world.session.meta, unlockedWeapons: [...world.session.meta.unlockedWeapons] },
-        checkpoint: captureCheckpoint(world),
+        ...(atBoundary ? { checkpoint: captureCheckpoint(world) } : {}),
       }
       void persist()
       platform.setRunActive(world.session.run !== null)   // so a desktop quit can ask before binning a run

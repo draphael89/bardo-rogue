@@ -219,10 +219,15 @@ export function restoreCheckpoint(world: World, snap: RunCheckpoint): boolean {
       edges: n.edges.map(e => ({ dir: e.dir, to: e.to, mark: e.mark })),
     })),
   }
+  // Ask the installed route whether this node exists BEFORE entering it. The old guard compared
+  // run.roomId against snap.roomId, but run.roomId was assigned from the snapshot forty lines above,
+  // so it could never be false — a checkpoint naming a room this build's route does not contain
+  // reported success and stranded the player in the hub with a live run, every reload.
+  if (!world.rooms.some(r => r.id === snap.roomId)) return false
   enterRoomById(world, snap.roomId, 'resume')
   // enterRoom rebuilds the node; keep the door shut if this snapshot was a modal.
   if (snap.pendingReward || snap.pendingRite || snap.pendingShop || snap.pendingMystery) setDoorWalkable(world.arena, false)
-  return world.session.run.roomId === snap.roomId
+  return world.rooms[world.roomIndex]?.id === snap.roomId
 }
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)

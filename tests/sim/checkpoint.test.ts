@@ -79,3 +79,35 @@ describe('node-boundary checkpoint', () => {
     expect(parseCheckpoint({ version: 1, roomId: 'threshold' })).toBeNull()
   })
 })
+
+describe('restoreCheckpoint refuses a node this build does not have', () => {
+  // The guard used to compare run.roomId against snap.roomId — but it assigned run.roomId FROM the
+  // snapshot first, so it could never return false. A checkpoint naming an unknown room therefore
+  // reported success and left the player in the hub holding a live run, on every reload.
+  it('returns false instead of stranding the player with a live run', () => {
+    const world = beginFirstCombat()
+    const snap = captureCheckpoint(world)!
+    expect(snap).not.toBeNull()
+
+    const fresh = createWorld(11, 'loop')
+    const ok = restoreCheckpoint(fresh, { ...snap, roomId: 'a-room-no-route-contains' })
+    expect(ok).toBe(false)
+  })
+
+  it('still restores a node the route does contain', () => {
+    const world = beginFirstCombat()
+    const snap = captureCheckpoint(world)!
+    const fresh = createWorld(11, 'loop')
+    expect(restoreCheckpoint(fresh, snap)).toBe(true)
+    expect(fresh.rooms[fresh.roomIndex]?.id).toBe(snap.roomId)
+  })
+})
+
+describe('a checkpoint only ever describes a node entry', () => {
+  // Capturing after a room banked its reward meant resume re-entered that room and granted it
+  // again — once per reload, without limit.
+  it('is null in town, so coming home cannot be resumed into', () => {
+    const world = createWorld(11, 'loop')
+    expect(captureCheckpoint(world)).toBeNull()
+  })
+})

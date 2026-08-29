@@ -131,6 +131,10 @@ const VEIL_BAND = 5                                  // row quantum: the veil's 
 const STARS = 34                                    // ~2 % of the opening's area: a deep sky, not a starfield poster
 const FEET = 6                                       // player.radius + 1: the row the sprite's feet stand on
 const CROWN_UP = 32                                  // authored 32px hero: keep the life crown clear of crest and raised blade
+// The judge's plate, in view pixels. One definition, because the crown has to step out of exactly
+// this rectangle and nothing else — updateBoss draws it and updateCrown avoids it.
+const BOSS_BAR = { w: 168, h: 16, y: 2 }
+const BOSS_BAR_X = Math.round((V.width - BOSS_BAR.w) / 2)
 const HEART_X = 8, HEART_Y = 6, STEP = 9            // flame pitch in unscaled px; the rig is drawn at 2x
 const HURT_SHAKE = [1, -1, 1, 0, -1, 1, 0, 0]       // authored 8-tick rig shake, never a random jitter
 
@@ -314,9 +318,14 @@ export class Hud {
     this.cardAct = new Text({ text: 'BEGIN AGAIN', style: { fontFamily: 'Kenney Mini', fontSize: 8, fill: C.bone, letterSpacing: 1 }, resolution: 1 })
     this.cardAct.anchor.set(0, 0)
 
-    layer.addChild(this.markG, this.crownG, this.hurtG, this.bandG, this.banner, this.sub,
+    // Order is z. `markG` is under everything by design (it is floor paint under the sprite's feet).
+    // `crownG` is deliberately near the END: it is the primary survival read and the corner plate is
+    // documented as its redundant copy, so a crown that loses z to that copy — and to the wave box
+    // and the judge's plate — is the readout being hidden by the thing it replaces. It still sits
+    // below the scrim and the death card, which are allowed to cover the whole frame.
+    layer.addChild(this.markG, this.hurtG, this.bandG, this.banner, this.sub,
       this.plateG, this.rig, this.waveG, this.waveText, this.bossG, this.bossName,
-      this.footG, this.place, this.hintRow,
+      this.footG, this.place, this.hintRow, this.crownG,
       this.scrimG, this.cardG, this.cardTitle, this.cardSub, this.cardKey, this.cardAct)
     for (const r of this.cardRows) layer.addChild(r.label, r.value)
     this.hideDeathCard()
@@ -458,6 +467,19 @@ export class Hud {
     g.rect(cx - 6, cy + 4, 13, 1).fill({ color: C.void, alpha: 0.9 })
   }
 
+  /** Does the crown's own box land on the judge's plate? Only asked while a judge is alive — with no
+   *  boss bar on screen there is nothing to yield to, and the count stays on the body. */
+  private crownMeetsBossPlate(world: World, x0: number, w: number, baseY: number): boolean {
+    let boss = false
+    for (const e of world.enemies) if (e.active && e.kind === 'warden') { boss = true; break }
+    if (!boss) return false
+    // the cup bed is drawn from y-1 with height 6, and the arc lifts a cup by one row either way
+    const top = baseY - 2, bottom = baseY + 6
+    const left = x0 - 1, right = x0 + w + 1
+    return top <= BOSS_BAR.y + BOSS_BAR.h && bottom >= BOSS_BAR.y
+      && left <= BOSS_BAR_X + BOSS_BAR.w && right >= BOSS_BAR_X
+  }
+
   // --- the life crown: the health read, on the body -------------------------------------------------------------
   // A survival readout in the far corner of the screen is a readout you never look at: during a fight your eyes
   // are locked on your own body and on the thing about to hit it, 268 px away from the corner panel. So the
@@ -475,13 +497,18 @@ export class Hud {
     const g = this.crownG
     g.clear()
     if (!at || p.state === 'dead' || meetingHud(world, this.hushFight)) { g.visible = false; return }
-    for (const e of world.enemies) if (e.active && e.kind === 'warden') { g.visible = false; return }
     if (world.rooms[world.roomIndex]?.id === HUB_ID) { g.visible = false; return }
-    g.visible = true
     const n = p.maxHp
     const PITCH = 4, ARC = [1, 0, -1, 0, 1, 0, 1, 0]
     const x0 = at.x - Math.round((n * PITCH - 1) / 2)
     const baseY = at.y - CROWN_UP
+    // The judge's plate owns the top band while he lives, and a crown drawn into it stops reading as
+    // the player's and starts reading as part of his bar. Step aside for the plate — NOT for the
+    // fight. Hiding the on-body count for the whole Minos encounter sent the survival read back to
+    // the far corner during the one fight where the eyes never leave the middle of the screen, which
+    // is the exact failure this crown exists to fix.
+    if (this.crownMeetsBossPlate(world, x0, n * PITCH, baseY)) { g.visible = false; return }
+    g.visible = true
     const slot = (i: number) => ({ x: x0 + i * PITCH, y: baseY + (ARC[i] ?? 0) })
 
     // Pass 1, the bed: a void plate per cup. The wicks need their own dark to burn against, and separate beds
@@ -716,8 +743,8 @@ export class Hud {
     const dp = world.player
     const cardAge = dp.state === 'dead' && dp.deathTick >= 0 ? world.tick - dp.deathTick : -1
     const back = fightChrome(cardAge)
-    const bw = 168, bh = 16
-    const bx = Math.round((V.width - bw) / 2), by = 2
+    const bw = BOSS_BAR.w, bh = BOSS_BAR.h
+    const bx = BOSS_BAR_X, by = BOSS_BAR.y
     const cracked = e.phase > 0
     const ink = minosLifeInk(cracked)
     g.visible = back > 0

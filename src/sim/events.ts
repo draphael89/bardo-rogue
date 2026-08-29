@@ -86,7 +86,9 @@ export type SimEvent =
   | { type: 'footstep'; x: number; y: number }
   | EnemyWindupEvent
   | EnemyAttackEvent
-  | { type: 'enemyStagger'; id: number; x: number; y: number }
+  // `interrupted`: the stagger took a committed action away (a windup, an aim, a charger's freeze).
+  // `heavyOnly`: this body's poise does not yield to a light at all, so the break is news by itself.
+  | { type: 'enemyStagger'; id: number; x: number; y: number; interrupted: boolean; heavyOnly: boolean }
   | { type: 'enemyWallSlam'; id: number; kind: EnemyKind; x: number; y: number; angle: number; actionId: number }
   | { type: 'enemyPhase'; id: number; kind: EnemyKind; x: number; y: number; phase: number }
   | { type: 'boltFired'; x: number; y: number; angle: number }

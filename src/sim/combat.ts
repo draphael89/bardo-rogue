@@ -184,7 +184,11 @@ export function damageEnemy(
   world.emit(hit)
 
   // poise: brutes only stagger from the heavy; the warden only from a heavy while not committed;
-  // dummies never; everyone else staggers on any hit
+  // dummies never; everyone else staggers on any hit.
+  // The event carries whether the stagger TOOK SOMETHING AWAY — a windup, an aim, a charger's freeze
+  // — because "he was about to and now he isn't" and "he flinched" are different news and the low-
+  // poise bodies (caster, charger, oath-bound) produce the second one on every ordinary light.
+  const brokeCommitment = priorState === 'windup' || priorState === 'aim' || priorState === 'freeze'
   if (kind === 'warden') {
     // The veil break is also a committed authored beat. Damage still lands, but a heavy cannot erase
     // the only non-damaging announcement of phase two.
@@ -193,14 +197,20 @@ export function damageEnemy(
       e.state = 'stagger'
       e.stateTick = 0
       e.hitDone = false
-      world.emit({ type: 'enemyStagger', id: e.id, x: e.x, y: e.y })
+      world.emit({ type: 'enemyStagger', id: e.id, x: e.x, y: e.y, interrupted: brokeCommitment, heavyOnly: true })
     }
-  } else if (kind === 'brute') {
+  } else if (kind === 'brute' || kind === 'oathbound') {
+    // The elite is the line shade PLUS ONE RULE, so it inherits the line shade's poise. It used to
+    // fall through to the everyone-else arm and stagger on any landed hit, which deleted the rule it
+    // exists for: `guardUp` is false while staggered, staggerTicks is 26, and a light chains every
+    // ~21 — so one flank hit put the shield down and MEASURED at 0% guard uptime for the rest of the
+    // fight. Two of the three advertised answers (COMMIT, FLANK, BURN) collapsed into "flank once,
+    // then mash". Now a light off the flank hurts it and nudges it; only the heavy takes the guard.
     if (heavy) {
       e.state = 'stagger'
       e.stateTick = 0
       e.hitDone = false
-      world.emit({ type: 'enemyStagger', id: e.id, x: e.x, y: e.y })
+      world.emit({ type: 'enemyStagger', id: e.id, x: e.x, y: e.y, interrupted: brokeCommitment, heavyOnly: true })
     } else {
       e.kbx += Math.cos(angle) * tuning.brute.lightNudge * 10
       e.kby += Math.sin(angle) * tuning.brute.lightNudge * 10
@@ -209,10 +219,9 @@ export function damageEnemy(
     e.state = 'stagger'
     e.stateTick = 0
     e.hitDone = false
-    world.emit({ type: 'enemyStagger', id: e.id, x: e.x, y: e.y })
+    world.emit({ type: 'enemyStagger', id: e.id, x: e.x, y: e.y, interrupted: brokeCommitment, heavyOnly: false })
   }
-  const interrupted = (priorState === 'windup' || priorState === 'aim' || priorState === 'freeze')
-    && e.state === 'stagger'
+  const interrupted = brokeCommitment && e.state === 'stagger'
   return { outcome: 'landed', landed: true, killed: false, guarded, interrupted, resolvedDamage: damage }
 }
 

@@ -1,13 +1,25 @@
 {
   "title": "Bardo Rogue",
   "subtitle": "First Gate: rooms-as-data, a generated route, a town that remembers",
-  "updated": "2026-08-29T13:30:00-04:00",
+  "updated": "2026-08-29T16:20:00-04:00",
   "now": "hall-plate-wine",
   "round": 3,
   "timeline": [
     {
+      "t": "16:20",
+      "text": "Review round on PR 20: three P2s, all real. The Oath-Bound and the Warden had their heavy poise breaks suppressed by a rule that only knew the brute — the sim now says which bodies do not yield to a light. The plant latch resets where swing ids restart, and one shared promiseFrame() keeps the drawing on the same frame as the dust."
+    },
+    {
+      "t": "15:25",
+      "text": "The elite keeps its shield. A flank light used to stagger the Oath-Bound, and staggerTicks outran the light chain, so one hit put the guard down and MEASURED 0% uptime for the rest of the fight. It now inherits the line shade's poise: 85%. COMMIT, FLANK and BURN are three answers again."
+    },
+    {
       "t": "13:30",
       "text": "A refused toll still meets you in the Hall after a reload. The Unburied waits for the judge instead of the next fight. The death stele holds its own build line."
+    },
+    {
+      "t": "12:00",
+      "text": "Two standing audits re-checked against HEAD: 51 claims, none false, 7 stale. The clip sampler can now play more than three drawings, the heavy's plant lands on the tick the dodge stops working, and the life crown stays on the body during Minos."
     },
     {
       "t": "11:20",

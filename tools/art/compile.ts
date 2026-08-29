@@ -74,6 +74,13 @@ export function validateClipRefs(def: SheetDef, where: string): void {
       if (contact === resolve(clip.frames[0])) {
         throw new Error(`sheet ${where}: clip "${name}" asserts its startup frame "${clip.sim.contact}" as the contact — the frame shown while the hit is live cannot be the wind-up pose`)
       }
+      // ...and it cannot be the LAST frame either. clipSelect spreads whatever follows the contact
+      // across recovery; with nothing after it the contact drawing is held for the entire recovery,
+      // so the swing never visibly ends. This only became reachable when clips grew past three
+      // frames — at three the contact is structurally in the middle and there is nothing to get wrong.
+      if (clip.frames.length > 1 && contact === resolve(clip.frames[clip.frames.length - 1])) {
+        throw new Error(`sheet ${where}: clip "${name}" asserts its last frame "${clip.sim.contact}" as the contact — recovery would hold the impact pose and the swing would never visibly end`)
+      }
     }
   }
 }

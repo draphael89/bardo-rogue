@@ -71,7 +71,7 @@ export function updateEnemyView(v: EntityView, e: Enemy, world: World, alpha: nu
   b.zIndex = feetY
   // The Brute owns an authored recoil frame; a full white replacement would delete that pose on
   // precisely the contact ticks it was drawn for. Puppet enemies retain their silhouette flash.
-  if (e.kind !== 'warden') v.setFlash(e.flash > 0 && e.kind !== 'dummy' && e.kind !== 'brute' && e.kind !== 'oathbound')
+  if (e.kind !== 'warden') v.setFlash(e.flash > 0 && e.kind !== 'dummy' && !EntityView.authoredHitReaction(e.kind))
   if (e.kind === 'warden') v.setShadow(x, feetY - 1, 32 - hop * 0.35, 11 - hop * 0.15, 0.48 - hop * 0.02)
   else if (e.kind === 'brute' || e.kind === 'oathbound') v.setShadow(x, feetY - 1, 25, 8, 0.43)
   else v.setShadow(x, feetY - 1, 14 - hop * 0.5, 6 - hop * 0.2, 0.35 - hop * 0.02)

@@ -56,12 +56,16 @@ export const tuning = {
     },
     attack: {
       buffer: 12,
-      heavyCommitTick: 4,   // before this the heavy can be abandoned; after it, the visible plant is a promise
+      // Before this the heavy can be abandoned; from here the visible plant is a promise. It is also
+      // the ONE number the heavy's whole telegraph derives from: presenter.heavyPromiseFrame() turns
+      // it into the render frame that carries the glow, the plant dust and the shake. There used to
+      // be a second number (heavyChargeTicks) lighting the glow two ticks earlier, which meant the
+      // ramp began before the promise and nothing at all marked the promise.
+      heavyCommitTick: 4,
       steerRateDeg: 16,     // max deg/tick the swing angle may still be steered, during steerTicks only
                             // note the press tick cannot steer (the state is entered after the steer block),
                             // so a light's usable correction is (steerTicks - 1) * steerRateDeg — 48°,
                             // enough for an 8-way tap to finish a cardinal-to-diagonal redirect
-      heavyChargeTicks: 2,  // startup ticks before the heavy's blade-glow telegraph lights up (presentation)
       swings: [
         { startup: 4, active: 4, recovery: 13, damage: 2, radius: 25, arcDeg: 130, lunge: 13, windup: 2, hitstop: 3, knockback: 90, chainFrom: 2, dodgeCancelFrom: 0, whiffPenalty: 7, moveCommit: 0.45, moveRecover: 0.7, steerTicks: 4, sweep: 1, heavy: false },
         { startup: 4, active: 4, recovery: 13, damage: 2, radius: 25, arcDeg: 150, lunge: 15, windup: 2, hitstop: 3, knockback: 95, chainFrom: 2, dodgeCancelFrom: 0, whiffPenalty: 7, moveCommit: 0.45, moveRecover: 0.7, steerTicks: 4, sweep: -1, heavy: false },
@@ -263,7 +267,14 @@ export const tuning = {
   },
   caster: {
     hp: 3, radius: 5, retreatRange: 70, prefMin: 90, prefMax: 130, speed: 40, strafeSpeed: 30,
-    aimTicks: 24, cooldown: 70, boltSpeed: 110, boltRadius: 3, boltLifeTicks: 180, damage: 1, staggerTicks: 10, knockbackScale: 1,
+    // boltSpeed is the WHOLE speed. It used to be 110 here and a private 1.8x scale in caster.ts, so
+    // the one number a tuner would reach for was not the number the bolt flew at. MEASURED, and the
+    // reason it is 198: at 110 px/s the bolt advances 1.83 px per tick — less than one pixel of the
+    // 2x strip the piece is judged on, and the head's centroid moved +0.2 px over six ticks while
+    // the sim moved it 11. Travel that small cannot read as travel at any art quality. 198 puts the
+    // head at 3.3 px/tick, unmissable frame to frame, and still leaves ~30 ticks of flight from the
+    // preferred 90–130 px band: half a second to see it, step aside, or cut it.
+    aimTicks: 24, cooldown: 70, boltSpeed: 198, boltRadius: 3, boltLifeTicks: 180, damage: 1, staggerTicks: 10, knockbackScale: 1,
   },
   charger: {
     hp: 2, radius: 4, hoverMin: 50, hoverMax: 70, hoverSpeed: 60, orbitSpeed: 1.6,
@@ -440,7 +451,13 @@ export const tuning = {
     stagger: { trauma: 0.10, bruteTrauma: 0.26, bruteZoom: 1.02, bruteFlash: 0.10 },
     // the greatsword's own feedback chain: the wind-up pulls the camera back, contact shoves it through
     swing: {
-      heavyWindTrauma: 0.16, heavyWindKick: 2.4,   // camera drifts opposite the swing while the blade is up
+      heavyWindKick: 2.4,     // px the camera DRIFTS opposite the swing while the blade is up (a lean, eased)
+      // ...and one whole-pixel drop on the tick the promise is made. It replaces a 0.16 trauma that
+      // was measurably invisible: shake is trauma^2 * shakeMax, so 0.16 moved the camera at most
+      // 0.10 px into a Math.round, inside a 2.4 px lean that was already there. Straight down, so it
+      // cannot be read as more of the horizontal drift, and well under the 5.2 px contact kick so it
+      // cannot be mistaken for the blow itself.
+      heavyPlantKick: 1.6,
       heavyEmberRate: 160,                          // embers/s drawn into the blade during the heavy wind-up
       heavyPlantDust: 11,                          // dust puffed at the feet when the heavy plants
       waveParticles: 12,                           // ground wave thrown along a heavy contact

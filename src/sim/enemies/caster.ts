@@ -16,13 +16,6 @@ const STRAFE_FLIP_TICKS = 54  // how often it may reverse its strafe
 const SETTLE_TICKS = 10       // beat of stillness before the staff comes up, so the aim reads
 const SETTLE_SCALE = 0.35
 const RETREAT_SKEW = 0.55     // radians of sideways lean in the backpedal; keeps it off corners
-// MEASURED: at tuning's 110 px/s the bolt advances 1.83 px per tick — less than one pixel of the 2x
-// strip the piece is judged on, and a fraction of its own effect's length, so the head's centroid
-// moved +0.2 px over six ticks while the sim moved it 11. Travel that small cannot read as travel at
-// any art quality. 1.8x puts the head at 3.3 px/tick, which is unmissable frame to frame and still
-// leaves ~30 ticks of flight from the caster's preferred 90–130 px band — half a second to see it,
-// step aside, or cut it. A SCALE and not a literal so tuning.caster.boltSpeed stays the live knob.
-const BOLT_SPEED_SCALE = 1.8
 const CUT = {
   damage: 1,          // the sever runs back down the line
   pull: 230,          // px/s of knockback dragging the caster toward the cut point (i.e. toward you)
@@ -120,7 +113,7 @@ export function updateCaster(world: World, e: Enemy): void {
       }
       if (e.stateTick >= C.aimTicks) {
         const ox = e.x + Math.cos(e.aimAngle) * (e.radius + 4), oy = e.y + Math.sin(e.aimAngle) * (e.radius + 4)
-        const bolt = world.fireProjectile(ox, oy, e.aimAngle, C.boltSpeed * BOLT_SPEED_SCALE, C.boltRadius, C.boltLifeTicks, 0, 1, 0, 'bolt', 'caster')
+        const bolt = world.fireProjectile(ox, oy, e.aimAngle, C.boltSpeed, C.boltRadius, C.boltLifeTicks, 0, 1, 0, 'bolt', 'caster')
         e.targetX = bolt ? bolt.id : 0
         if (bolt) world.emit({ type: 'boltFired', x: ox, y: oy, angle: e.aimAngle })
         world.emit({ type: 'enemyAttack', id: e.id, kind: 'caster', x: e.x, y: e.y, angle: e.aimAngle })

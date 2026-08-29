@@ -33,7 +33,7 @@ per tick: `stepWorld(world, inputFrame)`.
 | `pnpm desktop:build` | `pnpm build` (payload gate included) then compiles `desktop/*.cts` to `desktop/out/*.cjs` |
 | `pnpm desktop:start` | Runs the PACKAGED code path (`app://bardo/`) against the local `dist/`, without packaging anything |
 | `pnpm smoke:desktop` | Tier-3: drives the real Electron app under Playwright and checks hosting, incl. replay-hash parity with `pnpm sim` |
-| `pnpm site:build` | PlayBardo.com landing page: `site/src` + `site/art-src` -> static `site/dist` (responsive AVIF/WebP, hashed assets; `tools/build-site.ts`). Separate from the game build. |
+| `pnpm site:build` | Everything PlayBardo.com serves: the landing page (`site/src` + `site/art-src` -> `site/dist`, responsive AVIF/WebP, hashed assets) AND the playable game rebuilt under the `/play/` base into `site/dist/play` (`tools/build-site.ts`). It writes the game straight there, never through the repo's own `dist/`, which stays at base `/` for the desktop host. |
 | `pnpm desktop:dist:signed-local` | Build a Developer ID-signed arm64 app, dmg, and zip without contacting Apple's notarization service. |
 | `pnpm desktop:verify` | Verify the local app signature, identity, Hardened Runtime, entitlements, icon, arm64 executable, dmg, and zip. |
 | `APPLE_KEYCHAIN_PROFILE=bardo-notary pnpm desktop:dist` | Build, sign, notarize, and staple the release artifacts on macOS. |

@@ -177,7 +177,6 @@ h1, h2 { text-wrap: balance; font-weight: 400; }
   align-items: center;
   justify-content: center;
   min-height: 60px;
-  margin-top: 2.4rem;
   padding: 0 38px;
   background: var(--gold);
   clip-path: var(--clip-steps);
@@ -191,6 +190,34 @@ h1, h2 { text-wrap: balance; font-weight: 400; }
   transition: transform var(--dur-fast) var(--ease-out), background-color var(--dur-base) ease;
 }
 .cta span { position: relative; }
+
+/* Two doors. The gold slab is still the one thing meant to be pressed; the Mac download is the
+   same shape hollowed out, so it reads as the alternative rather than a second primary.
+   Stacked, not side by side: display tracking makes both labels wide, and neither copy column is
+   wide enough to hold them on one line without wrapping ragged at some viewport. */
+.cta-row {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  margin-top: 2.4rem;
+  max-width: 24rem;
+}
+/* The hollow slab is drawn as two clipped boxes, not as a border or an inset shadow: clip-path cuts
+   both of those into four disconnected strokes at the corner steps. Outer box = the outline colour,
+   ::before inset 2px = the dark interior, each clipped to the same stepped silhouette. */
+.cta--ghost {
+  background: var(--gold-dim);
+  color: var(--gold);
+}
+.cta--ghost::before {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  background: rgba(8, 7, 14, 0.72);
+  clip-path: var(--clip-steps);
+  transition: background-color var(--dur-base) ease;
+}
 .cta--large {
   min-height: 68px;
   padding: 0 46px;
@@ -198,9 +225,13 @@ h1, h2 { text-wrap: balance; font-weight: 400; }
 }
 @media (hover: hover) and (pointer: fine) {
   .cta:hover { background: var(--gold-hot); }
+  .cta--ghost:hover { background: var(--gold); color: var(--gold-hot); }
+  .cta--ghost:hover::before { background: rgba(212, 176, 96, 0.16); }
 }
 .cta:active { transform: scale(0.96); }
 .cta:focus-visible { background: var(--gold-hot); }
+.cta--ghost:focus-visible { background: var(--gold); color: var(--gold-hot); }
+.cta--ghost:focus-visible::before { background: rgba(212, 176, 96, 0.16); }
 
 /* the fine print under the slab: platform facts, deliberately quiet */
 .cta-note {
@@ -211,6 +242,14 @@ h1, h2 { text-wrap: balance; font-weight: 400; }
   color: var(--bone-dim);
   text-shadow: 0 1px 3px rgba(8, 7, 14, 0.9);
 }
+
+/* the Mac facts sit a step quieter than the browser line above them */
+.cta-note--sub { margin-top: 0.3rem; color: var(--gold-dim); }
+
+/* No touch controls exist yet, so a phone visitor is told before they tap into a game they cannot
+   move. Pure CSS: (pointer: coarse) is the same signal the hover rules above already trust. */
+.cta-note--touch { display: none; text-transform: none; letter-spacing: 0.02em; color: var(--gold-dim); }
+@media (pointer: coarse) { .cta-note--touch { display: block; } }
 
 /* ---- hero ---- */
 .hero {

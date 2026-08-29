@@ -13,3 +13,11 @@
 
 /index.html
   Cache-Control: public, max-age=600
+
+# The playable build under /play/. Its JS/CSS carry Vite content hashes, but the sprite and audio
+# payload copied beside them does not, so an hour is the ceiling: long enough that a return visit
+# is cheap, short enough that a new build reaches players the same day.
+/play/assets/*
+  Cache-Control: public, max-age=3600
+/play/index.html
+  Cache-Control: public, max-age=0, must-revalidate

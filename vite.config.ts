@@ -25,7 +25,14 @@ function runtimeAssets(): Plugin {
   }
 }
 
+// Where the built game will be served from. Default '/' covers the dev server, `pnpm preview` and
+// the desktop host; `pnpm site:build` sets '/play/' for the copy that ships inside site/dist. Vite
+// exposes this to the app as import.meta.env.BASE_URL, which src/assetBase.ts turns into the one
+// runtime asset root (see that file -- root-relative '/assets/' would 404 under a subpath).
+const BASE = process.env.BARDO_BASE ?? '/'
+
 export default defineConfig(({ command }) => ({
+  base: BASE,
   resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
   publicDir: command === 'build' ? false : 'public',
   server: { host: true },

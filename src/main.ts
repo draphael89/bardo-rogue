@@ -1,3 +1,4 @@
+import { ASSET_BASE } from '@/assetBase'
 import { createRenderApp, fitViewWidth } from '@/render/app'
 import { loadAtlas, loadFonts } from '@/render/atlas'
 import { Presenter } from '@/render/presenter'
@@ -56,7 +57,7 @@ async function boot() {
   const viewOverride = +(q.get('view') ?? 0)
   tuning.view.width = fitViewWidth(viewOverride)
 
-  const manifest = await (await fetch('/assets/manifest.json')).json() as Record<string, string[]>
+  const manifest = await (await fetch(`${ASSET_BASE}manifest.json`)).json() as Record<string, string[]>
   await loadFonts()
   const ra = await createRenderApp(document.getElementById('app')!, { w: ARENA_COLS * TILE, h: ARENA_ROWS * TILE })
   const atlas = await loadAtlas(manifest)

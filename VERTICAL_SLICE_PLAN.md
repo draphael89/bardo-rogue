@@ -201,6 +201,25 @@ the vocabulary is in `CONTEXT.md`. Decisions of record:
    one replay-hash rebaseline (`pnpm record-bots`) when the new Bardo arena lands. Acceptance is
    the blind-critic protocol with the nine concepts registered in `art/reference/concepts/`.
 
+### Revision 7 (2026-08-30) — the hero becomes a system before it becomes a picture
+
+Revision 6's decision 4 produced a first identity round: eight screened 64×64 candidates
+(`.art-cache/candidates/hero-identity-v2/`). The user rejected the framing before choosing —
+every candidate is a costume whose identity lives in removable equipment — and issued a
+foundational brief, canonized as `CHARACTER_FOUNDATION.md`, the standing spec for the player
+character. Consequences of record:
+
+1. **No identity master exists.** The candidate round is shelved as reference; `pnpm art approve`
+   stays untouched. Identity art resumes only after the user locks a mannequin, a hard-constraints
+   spec, and a production pipeline (the document's exploration phase).
+2. **Revision 6's "tripled frame budget" is revised:** strong poses first (anticipation → commit →
+   impact → follow-through → recovery); frames serve poses.
+3. **The character production pipeline is an open architecture question** — single source of truth,
+   Dead Cells principle (cheap iteration), options to be investigated and costed before locking.
+4. Tracks are unaffected where independent: the engine track (ADR 0001/0002) proceeds; set-piece
+   and district art proceeds under the bible; the PixelLab cycle now most likely lapses for hero
+   work (as decision 2 originally planned) and spends, if at all, on non-hero assets.
+
 ### Open after the merge (audited 2026-08-29, eleven agents over PR #13)
 
 Fixed in the merge: the double schema-3 collision, the duplicate latch release, the missing master

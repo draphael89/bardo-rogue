@@ -124,9 +124,17 @@ export function hidePlaceCaption(s: { offer: boolean; shop: boolean; mystery: bo
   return s.offer || s.shop || s.mystery || s.rite || s.won
 }
 
-/** The fight strip is a survival readout. Death already names the blade on the stone. */
-export function showBuildStrip(s: { hasRun: boolean; inTown: boolean; overlayOpen: boolean; dead: boolean }): boolean {
-  return s.hasRun && !s.inTown && !s.overlayOpen && !s.dead
+/** The fight strip names what you carry. An empty first fight does not wear UNMARKED BLADE. */
+export function showBuildStrip(s: {
+  hasRun: boolean
+  inTown: boolean
+  overlayOpen: boolean
+  dead: boolean
+  vows?: number
+  purse?: number
+}): boolean {
+  if (!s.hasRun || s.inTown || s.overlayOpen || s.dead) return false
+  return (s.vows ?? 0) > 0 || (s.purse ?? 0) > 0
 }
 
 /** The footer already names the floor. A second title on arrival is developer text. */

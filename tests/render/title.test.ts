@@ -86,11 +86,13 @@ describe('title menu', () => {
     expect(hidePlaceCaption({ offer: false, shop: false, mystery: false, rite: false, won: false })).toBe(false)
   })
 
-  it('does not leave the fight strip on the death stone', () => {
-    expect(showBuildStrip({ hasRun: true, inTown: false, overlayOpen: false, dead: false })).toBe(true)
-    expect(showBuildStrip({ hasRun: true, inTown: false, overlayOpen: false, dead: true })).toBe(false)
-    expect(showBuildStrip({ hasRun: true, inTown: true, overlayOpen: false, dead: false })).toBe(false)
-    expect(showBuildStrip({ hasRun: true, inTown: false, overlayOpen: true, dead: false })).toBe(false)
+  it('does not leave the fight strip on the death stone, or on an unmarked first fight', () => {
+    expect(showBuildStrip({ hasRun: true, inTown: false, overlayOpen: false, dead: false, vows: 1 })).toBe(true)
+    expect(showBuildStrip({ hasRun: true, inTown: false, overlayOpen: false, dead: false, purse: 2 })).toBe(true)
+    expect(showBuildStrip({ hasRun: true, inTown: false, overlayOpen: false, dead: false })).toBe(false)
+    expect(showBuildStrip({ hasRun: true, inTown: false, overlayOpen: false, dead: true, vows: 1 })).toBe(false)
+    expect(showBuildStrip({ hasRun: true, inTown: true, overlayOpen: false, dead: false, vows: 1 })).toBe(false)
+    expect(showBuildStrip({ hasRun: true, inTown: false, overlayOpen: true, dead: false, vows: 1 })).toBe(false)
   })
 
   it('is three verbs on the gate, four on settings, one on credits', () => {

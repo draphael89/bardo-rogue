@@ -1,10 +1,14 @@
 {
   "title": "Bardo Rogue",
   "subtitle": "First Gate: rooms-as-data, a generated route, a town that remembers",
-  "updated": "2026-08-29T08:02:00-04:00",
-  "now": "first-gate-bot-refresh",
+  "updated": "2026-08-29T08:14:00-04:00",
+  "now": "first-fight-quiet-strip",
   "round": 3,
   "timeline": [
+    {
+      "t": "08:14",
+      "text": "The first fight no longer wears UNMARKED BLADE. The strip arrives when a vow or a coin does. Title and meeting still read after the type ramp."
+    },
     {
       "t": "08:02",
       "text": "After the door-flash lead, kite is 7/8 and naive is 0/8. Coming home is still unarmed. Do not retune the loss."

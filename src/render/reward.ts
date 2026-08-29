@@ -137,6 +137,8 @@ export class RewardOverlay {
       inTown: world.roomPhase === 'town',
       overlayOpen: this.root.visible,
       dead: world.player.state === 'dead',
+      vows: world.session.run?.boons.length ?? 0,
+      purse: world.session.run?.obols ?? 0,
     })
     this.updateMeta(world)
     this.updateBuild(world)
@@ -225,12 +227,12 @@ export class RewardOverlay {
     if (!this.build.visible) return
     const ids = world.session.run?.boons.map(b => b.id) ?? []
     const purse = world.session.run?.obols ?? 0
-    const vows = ids.length ? ids.map(id => BOONS[id].name).join('  ·  ') : 'UNMARKED BLADE'
-    this.buildText.text = `${vows}   ·   ${obolsLabel(purse)}`
+    const vows = ids.map(id => BOONS[id].name).join('  ·  ')
+    this.buildText.text = vows ? `${vows}   ·   ${obolsLabel(purse)}` : obolsLabel(purse)
     placeLeft(this.buildText, 13, 39)
     const w = Math.min(tuning.view.width - 26, this.buildText.width + 14)
     this.buildG.clear().roundRect(8, 30, w, 18, 2).fill({ color: P.void, alpha: 0.84 })
-    this.buildG.rect(8, 30, 2, 18).fill({ color: ids.length ? P.gold : 0x4c4c56 })
+    this.buildG.rect(8, 30, 2, 18).fill({ color: ids.length || purse ? P.gold : 0x4c4c56 })
   }
 
   private clear(): void {

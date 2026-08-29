@@ -1,5 +1,6 @@
 import { Assets, Texture, Rectangle, TextureSource } from 'pixi.js'
 import { bindSheet, validateSheetDef, type Sheet, type SheetDef } from './sheet'
+import { ASSET_BASE } from '@/assetBase'
 
 // All pixel art is sampled nearest-neighbor. Set once, before any texture loads.
 TextureSource.defaultOptions.scaleMode = 'nearest'
@@ -37,7 +38,7 @@ export async function loadAtlas(manifest: Record<string, string[]>): Promise<Atl
   // the host turns into 'assets' and the load dies cross-origin. Pinning rootPath to this document's
   // own root is a no-op on http(s) and correct on any scheme.
   Assets.resolver.rootPath = new URL('/', location.href).href
-  const base = '/assets/'
+  const base = ASSET_BASE
   const tiny = await Assets.load<Texture>(base + 'sprites/tiny_dungeon.png')
   const room = await Assets.load<Texture>(base + 'sprites/bardo_room.png')
   const props = await Assets.load<Texture>(base + 'sprites/bardo_props.png')
@@ -112,7 +113,7 @@ export async function loadFonts(): Promise<void> {
     ['Kenney Mini', 'kenney_mini-webfont.woff2'],
   ]
   await Promise.all(fonts.map(async ([name, file]) => {
-    const face = new FontFace(name, `url(/assets/fonts/${file})`)
+    const face = new FontFace(name, `url(${ASSET_BASE}fonts/${file})`)
     await face.load()
     document.fonts.add(face)
   }))

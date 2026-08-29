@@ -12,6 +12,7 @@
  * The build fails if any un-rewritten art/font/asset reference survives into dist.
  */
 import { createHash } from 'node:crypto'
+import { execFileSync } from 'node:child_process'
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import sharp from 'sharp'
@@ -188,12 +189,37 @@ writeFileSync(path.join(DIST, 'index.html'), html)
 
 cpSync(path.join(SRC, '_headers'), path.join(DIST, '_headers'))
 
+// ---- the playable game ------------------------------------------------------
+// "Play in browser" on the landing page is this: the same bundle the desktop host ships, rebuilt
+// under the /play/ base (src/assetBase.ts turns that into the runtime asset root) and written
+// straight into site/dist/play. It deliberately does NOT go through the repo's own dist/, which
+// the desktop host loads at base '/' -- a /play/-based build sitting there would break
+// `pnpm desktop:start` silently. Same payload gate as `pnpm build`, pointed at the copy that ships.
+const bin = (name: string) => path.join(ROOT, 'node_modules/.bin', name)
+const run = (cmd: string, args: string[], env?: NodeJS.ProcessEnv) =>
+  execFileSync(cmd, args, { cwd: ROOT, stdio: 'inherit', env: { ...process.env, ...env } })
+
+run(bin('tsc'), ['--noEmit'])
+run(bin('vite'), ['build', '--outDir', 'site/dist/play', '--emptyOutDir'], { BARDO_BASE: '/play/' })
+run(bin('tsx'), ['tools/check-build.ts', 'site/dist/play'])
+
+// The gate above proves the payload; this proves the base actually took. A bundle still asking for
+// root-relative /assets/ would pass every size and inventory check and then 404 on playbardo.com.
+const playHtml = readFileSync(path.join(DIST, 'play/index.html'), 'utf8')
+if (!/src="\/play\/assets\//.test(playHtml)) throw new Error('site/dist/play/index.html does not load its bundle from /play/assets/')
+const playJs = readdirSync(path.join(DIST, 'play/assets')).filter((f) => f.endsWith('.js'))
+const asksForRoot = playJs.filter((f) => /["\`]\/assets\//.test(readFileSync(path.join(DIST, 'play/assets', f), 'utf8')))
+if (asksForRoot.length) throw new Error(`/play/ bundle still fetches root-relative /assets/: ${asksForRoot.join(', ')}`)
+
 // ---- gates ------------------------------------------------------------------
 const leftovers = [...html.matchAll(/(?:art\/|@art|@artpreload|assets\/styles\.css|assets\/main\.js)/g)]
 if (leftovers.length) throw new Error(`unrewritten references in index.html: ${leftovers.map((m) => m[0]).join(', ')}`)
 if (/fonts\/(?:cinzel|inter)-latin-\d+-normal\.woff2/.test(css)) throw new Error('unrewritten font reference in styles.css')
 if (css.includes('/*@panel-aspect*/')) throw new Error('unrewritten panel-aspect token in styles.css')
 if (/CAPTURE PENDING|GALLERY_SLOT/.test(html)) throw new Error('placeholder gallery markup is still present')
+// A /play/ build nobody links to is a build nobody plays. Both CTA rows must offer the door.
+const playLinks = [...html.matchAll(/href="\/play\/"/g)].length
+if (playLinks < 2) throw new Error(`index.html links /play/ ${playLinks} time(s); both CTA rows should`)
 
 let total = 0
 const walk = (dir: string): void =>

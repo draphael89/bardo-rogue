@@ -9,6 +9,7 @@
 // Presentation only. Nothing in src/sim/ imports this file, and nothing here reads sim state
 // except through the values sfxMap hands us after a tick.
 
+import { ASSET_BASE } from '@/assetBase'
 import { bedToneFor } from './bedTone'
 import type { LayoutId } from '@/sim/layouts'
 
@@ -371,7 +372,7 @@ export class AudioSystem {
    * Decode every file and build the graph. `ctx` is only passed by the offline mix renderer;
    * the game leaves it out and gets a real AudioContext plus the gesture unlock.
    */
-  async load(files: string[], base = '/assets/audio/', ctx?: BaseAudioContext): Promise<void> {
+  async load(files: string[], base = `${ASSET_BASE}audio/`, ctx?: BaseAudioContext): Promise<void> {
     if (!ctx && typeof AudioContext === 'undefined') return
     this.ctx = ctx ?? new AudioContext()
     // Only a context we created is ours to pause. OfflineAudioContext also declares suspend(), but

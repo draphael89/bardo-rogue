@@ -2,10 +2,14 @@
 // shipped something it must not (gauntlet evidence, an audit video, a comparison capture) or grew
 // past budget. Standalone: `pnpm check:build` re-runs the gate against an existing dist/.
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
-import { join, relative, sep } from 'node:path'
+import { join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const DIST = fileURLToPath(new URL('../dist', import.meta.url))
+// Defaults to dist/, the game's own build. `pnpm site:build` passes site/dist/play, the same
+// bundle rebuilt under the /play/ base, so the hosted-on-PlayBardo copy clears the same gate.
+const DIST = process.argv[2]
+  ? resolve(process.cwd(), process.argv[2])
+  : fileURLToPath(new URL('../dist', import.meta.url))
 const ALLOWED_TOP = new Set(['index.html', 'assets'])                // everything dist/ may contain
 const FORBIDDEN = /(^|\/)(progress|audit|evidence|gauntlet)(\/|$)/i  // path SEGMENTS: public/assets/audio ships round_1.ogg
 const VIDEO = /\.(mp4|mov|webm|mkv|avi)$/i
@@ -47,7 +51,7 @@ function walk(dir: string): void {
 }
 
 if (!existsSync(DIST)) {
-  console.error('check-build: no dist/ - run `vite build` first')
+  console.error(`check-build: no ${DIST} - run \`vite build\` first`)
   process.exit(1)
 }
 walk(DIST)
@@ -129,7 +133,7 @@ if (problems.size) {
     const eg = paths.filter(Boolean).slice(0, 3)
     console.error(`FAIL ${reason}${eg.length ? `: ${paths.length} file(s), e.g. ${eg.join(', ')}` : ''}`)
   }
-  console.error('check-build: dist/ is not shippable')
+  console.error(`check-build: ${DIST} is not shippable`)
   process.exit(1)
 }
 console.log(`check-build: ok (${files.length} files)`)

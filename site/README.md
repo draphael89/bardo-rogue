@@ -16,6 +16,8 @@ One-page marketing site for Bardo. Fully static, separate from the game build.
 - `site/dist/` — build output (gitignored). `pnpm site:build` produces AVIF + WebP at
   4 widths, hashed filenames, hashed fonts (from `@fontsource`), OG card, and favicons.
   Colors and the favicon cite `art/palette/canon.json` names.
+- `site/dist/play/` — the playable game, built by the same command. This is what
+  "Play in browser" opens. See **The playable build** below.
 
 ## Build & preview
 
@@ -24,16 +26,40 @@ pnpm site:build
 python3 -m http.server 8899 -d site/dist
 ```
 
+## The playable build
+
+`playbardo.com/play/` is the same web bundle the desktop host ships, rebuilt under a `/play/`
+base and written into `site/dist/play`. `pnpm site:build` does it: typecheck, `vite build` with
+`BARDO_BASE=/play/`, then the release payload gate (`tools/check-build.ts`) pointed at that copy.
+
+Two things make the subpath work, and both are load-bearing:
+
+- **`BARDO_BASE`** (read in `vite.config.ts`) sets Vite's `base`, which it bakes into
+  `import.meta.env.BASE_URL`. `src/assetBase.ts` turns that into `ASSET_BASE`, the single root every
+  runtime fetch uses — the manifest, the atlas, the fonts, the audio. Root-relative `/assets/`
+  anywhere in `src/` would 404 under `/play/`, so the site build greps the emitted bundle for it and
+  fails if it comes back.
+- **It never goes through the repo's own `dist/`.** That copy stays at base `/`, which is what
+  `pnpm desktop:start` and the packaged Mac app load. A `/play/`-based build sitting in `dist/`
+  would break the desktop host silently.
+
+The game needs a keyboard or gamepad; there are no touch controls yet. The CTA fine print says so,
+and `.cta-note--touch` (CSS `pointer: coarse`) says it louder on a phone.
+
 ## Deploy (Cloudflare Pages)
 
 - Build command: `pnpm site:build`
 - Output directory: `site/dist`
-- `_headers` ships immutable caching for hashed `/img`, `/fonts`, `/assets`.
+- `_headers` ships immutable caching for hashed `/img`, `/fonts`, `/assets`, and an hour for
+  `/play/assets` — the game's JS is content-hashed but the sprite and audio payload beside it is not.
 - Connect the playbardo.com domain in the Cloudflare dashboard.
+- `/.nvmrc` pins Node 22, which Pages reads. The build now runs Vite, and Vite 8 refuses to
+  start on Node 18 — the image default on older Pages projects.
 
 ## Download CTA
 
-Both CTAs point at the GitHub release asset for the notarized macOS build:
+Each of the two CTA rows offers **Play in browser** (`/play/`) and **Download for Mac**.
+Both download buttons point at the GitHub release asset for the notarized macOS build:
 
 ```
 https://github.com/draphael89/bardo-rogue/releases/download/v0.1.0-mac-alpha.1/Bardo-Rogue-0.1.0-mac-arm64.dmg

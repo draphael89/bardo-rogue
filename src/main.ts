@@ -237,6 +237,9 @@ async function boot() {
     // Do not leave the first-impression title intercepting F/V/E/I while the replay owns input.
     presenter.title.setSoundGate(false)
     presenter.title.setShown(false)
+    // Recompute the hold after hiding the title: the initial title is what paused a fresh boot, but
+    // an explicit player pause remains authoritative if a replay is installed later.
+    setPaused(userPaused)
     replayFrames = rep.frames.length ? rep.frames : null
     replayIdx = 0
   }

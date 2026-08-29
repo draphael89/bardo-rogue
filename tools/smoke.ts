@@ -198,10 +198,47 @@ async function bootTitle(page: Page): Promise<void> {
   const f0 = await page.evaluate(() => (window as any).__game.loop.frameTimes.length)
   await page.waitForFunction((n) => (window as any).__game.loop.frameTimes.length >= n + 2, f0, { timeout: 15000 })
   check(true, 'renders frames under the title')
+
+  // Installing a replay through the live API is a measurement path just like booting with ?bot=.
+  // It must release the initial title's pause hold or the replay remains forever at tick zero.
+  await page.evaluate(() => {
+    const g = (window as any).__game
+    g.replay({
+      v: 1, seed: 7, scenario: 'empty',
+      frames: Array.from({ length: 30 }, () => ({
+        moveX: 0, moveY: 0, aimX: 1, aimY: 0, aimSoft: false,
+        attack: false, attackHeld: false, heavy: false, dodge: false, restart: false,
+      })),
+    })
+  })
+  await page.waitForFunction(() => (window as any).__game.world.tick > 0, null, { timeout: 5000 })
+  const replayStarted = await page.evaluate(() => {
+    const g = (window as any).__game
+    return { title: !!g.presenter.title.visible, paused: !!g.loop.paused, tick: g.world.tick }
+  })
+  check(!replayStarted.title && !replayStarted.paused && replayStarted.tick > 0,
+    `API replay releases the title hold and advances (tick ${replayStarted.tick})`)
+
+  // Reboot for the real-key path, then prove the replay path does not mistake a user's pause for
+  // the title hold. title(true) recreates the exact combined state after P has set userPaused.
+  await page.goto(`${url}/?scenario=loop&seed=${seed}&mute=1&save=off`)
+  await page.waitForFunction(() => !!(window as unknown as { __game?: unknown }).__game, null, { timeout: 30000 })
   await page.keyboard.press('Enter')
   await page.waitForFunction(() => !(window as any).__game.presenter.title.visible, null, { timeout: 5000 })
   const after = await page.evaluate(() => ({ paused: !!(window as any).__game.loop.paused }))
   check(!after.paused, 'Enter dismisses the title and the game runs — not the pause card')
+  await page.keyboard.press('KeyP')
+  await page.evaluate(() => {
+    const g = (window as any).__game
+    g.title(true)
+    g.replay({ v: 1, seed: 8, scenario: 'empty', frames: [] })
+  })
+  const replayPreservedPause = await page.evaluate(() => {
+    const g = (window as any).__game
+    return { title: !!g.presenter.title.visible, paused: !!g.loop.paused, tick: g.world.tick }
+  })
+  check(!replayPreservedPause.title && replayPreservedPause.paused && replayPreservedPause.tick === 0,
+    'API replay hides the title without clearing an explicit player pause')
   check(errors.length === 0, `no console errors on boot${errors.length ? `: ${errors.slice(0, 3).join(' | ')}` : ''}`)
   page.off('console', onConsole)
   page.off('pageerror', onError)

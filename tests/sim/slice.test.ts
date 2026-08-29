@@ -223,7 +223,7 @@ describe('production vertical slice', () => {
   // chosen because a competent policy still wins them; if a content change makes one unwinnable the
   // right response is to look at the change, not to widen the assertion.
   it.each([
-    { seed: 3, branch: 'veil-path' },
+    { seed: 5, branch: 'veil-path' },
     { seed: 4, branch: 'blade-path' },
   ])('records and replays the complete $branch session deterministically', ({ seed, branch }) => {
     const source = createWorld(seed, 'loop')

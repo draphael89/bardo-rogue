@@ -124,7 +124,7 @@ export function damageEnemy(
   // The Warden's lesson is punish timing, not raw health. His veil halves (and integer-clamps)
   // damage while composed; recover and stagger are the authored full-damage openings. The hit event
   // carries the resolved value, so every feedback channel tells the same truth as the health bar.
-  const guarded = !silent && kind === 'warden' && e.state !== 'recover' && e.state !== 'stagger'
+  const guarded = kind === 'warden' && e.state !== 'recover' && e.state !== 'stagger'
   if (guarded) {
     damage = Math.max(1, Math.floor(damage * tuning.warden.guardDamageScale))
   }
@@ -177,7 +177,7 @@ export function damageEnemy(
     e.active = false
     return { outcome: 'landed', landed: true, killed: true, guarded, interrupted: false, resolvedDamage: damage }
   }
-  if (silent) return { outcome: 'landed', landed: true, killed: false, guarded: false, interrupted: false, resolvedDamage: damage }
+  if (silent) return { outcome: 'landed', landed: true, killed: false, guarded, interrupted: false, resolvedDamage: damage }
   addFreeze(world, resolvedHitstop)
   world.emit(hit)
 

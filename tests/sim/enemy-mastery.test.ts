@@ -36,6 +36,23 @@ describe('Warden timing truth and mastery', () => {
     })
   })
 
+  it('keeps authored veil mitigation on silent status damage without adding presentation or poise', () => {
+    const { world, e } = warden()
+    e.state = 'chase'
+    const hp = e.hp
+
+    const result = damageEnemyForTest(world, e, 4, 0, 100, true, 8, 41, { silent: true })
+
+    expect(result).toMatchObject({ guarded: true, resolvedDamage: 2 })
+    expect(e.hp).toBe(hp - 2)
+    expect(e.state).toBe('chase')
+    expect(e.flash).toBe(0)
+    expect(e.kbx).toBe(0)
+    expect(world.freeze).toBe(0)
+    expect(world.slowTicks).toBe(0)
+    expect(world.events.some(event => event.type === 'hit' || event.type === 'enemyStagger')).toBe(false)
+  })
+
   it('punctuates the veil as a short refusal, not a heavy-hit opening', () => {
     const guarded = warden()
     guarded.e.state = 'chase'

@@ -85,6 +85,8 @@ interface CellStats {
   meanLum: number
   /** Colour histogram as hex -> count, for inter-frame identity. */
   hist: Map<string, number>
+  /** Per-pixel opacity, for checks that must know where the DRAWING is, not just its bbox. */
+  mask: Uint8Array
   /** Centroid of opaque mass, in cell pixels. */
   cx: number
   cy: number
@@ -146,7 +148,7 @@ function cellStats(ctx: GateContext, name: string, index: number): CellStats {
     name, index, opaque,
     bbox: x1 < x0 ? null : { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 },
     meanLum: opaque ? lumSum / opaque : 0,
-    hist, cx: opaque ? sx / opaque : 0, cy: opaque ? sy / opaque : 0,
+    hist, mask, cx: opaque ? sx / opaque : 0, cy: opaque ? sy / opaque : 0,
     components, hash,
   }
 }
@@ -342,9 +344,18 @@ export function runGates(ctx: GateContext): GateResult[] {
 
     // Sockets must sit on the drawing (±2px): a socket in empty space is a point that detached from
     // the art it annotates, and everything hung on it (the brute's charge glow) floats.
+    // Measured against OPAQUE PIXELS, not the bounding rectangle: a pose with an extended weapon
+    // has a bbox full of empty space, and a socket parked in the gap between body and blade passed
+    // the rectangle test while everything hung on it still floated.
     for (const [sn, [sx, sy]] of Object.entries(def.frames[s.name]?.sockets ?? {})) {
-      const on = sx >= s.bbox.x - 2 && sx <= s.bbox.x + s.bbox.w + 1 && sy >= s.bbox.y - 2 && sy <= s.bbox.y + s.bbox.h + 1
-      add(`frame:${s.name}:socket:${sn}`, on, `socket [${sx},${sy}] vs bbox ${JSON.stringify(s.bbox)}`, 'fail')
+      let near = false
+      for (let dy = -2; dy <= 2 && !near; dy++) for (let dx = -2; dx <= 2; dx++) {
+        const px = sx + dx, py = sy + dy
+        if (px < 0 || px >= def.cell || py < 0 || py >= def.cell) continue
+        if (s.mask[py * def.cell + px]) { near = true; break }
+      }
+      add(`frame:${s.name}:socket:${sn}`, near,
+        `socket [${sx},${sy}] has no opaque pixel within 2px — it has detached from the drawing`, 'fail')
     }
   }
 

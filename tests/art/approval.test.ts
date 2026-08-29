@@ -69,6 +69,12 @@ describe('receipts', () => {
       rmSync(receiptPathFor(master), { force: true })
     }
   })
+  it('refuses a non-PNG target, whose receipt path would be the file itself', () => {
+    expect(() => receiptPathFor('art/approved/README.md')).toThrow(/not a \.png/)
+    expect(() => writeReceipt('art/approved/README.md', 'x', 'vitest')).toThrow(/not a \.png/)
+    expect(readFileSync('art/approved/README.md', 'utf8')).toMatch(/^# Approved masters/)
+  })
+
   it('refuses to receipt a file outside art/approved', () => {
     expect(() => writeReceipt(srcPng, 'x', 'vitest')).toThrow(/not under art\/approved/)
   })

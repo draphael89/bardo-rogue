@@ -31,6 +31,27 @@ const freeDirection = new WeakMap<EntityView, HeroDirection>()
 // Clip names in play order: swings[i] maps to SWING_CLIPS[i] in every hero sidecar.
 const SWING_CLIPS = ['light1', 'light2', 'heavy'] as const
 
+/**
+ * Fail at load, not mid-combat.
+ *
+ * Frame selection reads these clips by name, so a sidecar missing one loads clean, passes the
+ * generic gates, and then throws the first time the player moves, dodges or swings. The vocabulary
+ * a hero sheet must carry is a real contract; assert it once where the sheets are bound.
+ */
+function requireHeroClips(sheet: Sheet): Sheet {
+  for (const name of ['run', 'dodge', ...SWING_CLIPS]) {
+    if (!sheet.def.clips?.[name]) throw new Error(`sheet ${sheet.def.id}: a hero sheet must declare the "${name}" clip — the renderer selects frames by that name`)
+  }
+  return sheet
+}
+
+function requireRollClip(sheet: Sheet): Sheet {
+  const roll = sheet.def.clips?.roll
+  if (!roll) throw new Error(`sheet ${sheet.def.id}: a roll sheet must declare the "roll" clip`)
+  if (roll.frames.length < 4) throw new Error(`sheet ${sheet.def.id}: the "roll" clip needs four airborne phases, not ${roll.frames.length}`)
+  return sheet
+}
+
 export function heroFrameName(sheet: Sheet, p: Player, world: World, time: number): string {
   const clips = sheet.def.clips!
   if (p.state === 'dead') return 'dead'
@@ -85,9 +106,9 @@ export function createPlayerView(atlas: Atlas, layers: { entities: Container; sh
   const art: PlayerArt = {
     stock: atlas.tile(SPRITE.player), stockWhite: atlas.white(SPRITE.player),
     hero: {
-      side: { sheet: atlas.sheet('bardo_hero') },
-      north: { sheet: atlas.sheet('bardo_hero_north'), roll: atlas.sheet('bardo_hero_north_roll') },
-      south: { sheet: atlas.sheet('bardo_hero_south'), roll: atlas.sheet('bardo_hero_south_roll') },
+      side: { sheet: requireHeroClips(atlas.sheet('bardo_hero')) },
+      north: { sheet: requireHeroClips(atlas.sheet('bardo_hero_north')), roll: requireRollClip(atlas.sheet('bardo_hero_north_roll')) },
+      south: { sheet: requireHeroClips(atlas.sheet('bardo_hero_south')), roll: requireRollClip(atlas.sheet('bardo_hero_south_roll')) },
     },
   }
   playerArt.set(v, art)

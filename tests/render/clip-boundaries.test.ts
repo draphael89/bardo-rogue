@@ -77,6 +77,17 @@ describe('dodge and run', () => {
 })
 
 describe('a wrong-but-existing contact fails the build', () => {
+  it('a contact asserted against a window with no live phase is rejected', () => {
+    // player.dodge resolves fine and has travel/total but no `active`: nothing is damaging while
+    // that frame shows, so a contact assertion there is an assertion about nothing.
+    const bad = structuredClone(hero)
+    bad.clips!.dodge.sim!.contact = 'dodgeContact'
+    bad.clips!.dodge.frames = ['dodgeStart', 'dodgeContact', 'dodgeLand']
+    bad.frames.dodgeContact = { i: 15, pivot: [16, 30] }
+    delete (bad.frames as Record<string, unknown>).dead
+    expect(() => validateClipRefs(bad, 't')).toThrow(/no live phase/)
+  })
+
   it('a contact name that does not read as a contact key is rejected', () => {
     const bad = structuredClone(hero)
     bad.clips!.light1.sim!.contact = 'light1Start'

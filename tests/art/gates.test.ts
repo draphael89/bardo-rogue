@@ -70,12 +70,24 @@ describe('objective gates', () => {
     expect(dup.ok).toBe(false)
     expect(dup.severity).toBe('fail')
   })
-  it('a socket off the drawing hard-fails', async () => {
+  it('a socket off the drawing hard-fails, including one inside the bbox but on empty pixels', async () => {
     const c = await ctx([body()])
     c.def.frames.f0.sockets = { tip: [2, 2] }                  // empty corner, far from the body
     expect(gate(runGates(c), 'frame:f0:socket:tip').ok).toBe(false)
     c.def.frames.f0.sockets = { tip: [16, 16] }                // on the body
     expect(gate(runGates(c), 'frame:f0:socket:tip').ok).toBe(true)
+
+    // A body plus a detached blade tip: the bbox spans the gap between them, so a socket parked in
+    // that gap passes a rectangle test while floating in mid-air. It must fail.
+    const gapped = await ctx([(x: number, y: number) => {
+      if (x >= 4 && x <= 12 && y >= 8 && y <= 28) return (x + y) % 5 === 0 ? null : 'slateHi'
+      if (x >= 26 && x <= 28 && y >= 8 && y <= 12) return 'cope'      // the far tip
+      return null
+    }])
+    gapped.def.frames.f0.sockets = { hand: [19, 18] }          // inside the bbox, on nothing
+    expect(gate(runGates(gapped), 'frame:f0:socket:hand').ok).toBe(false)
+    gapped.def.frames.f0.sockets = { hand: [27, 10] }          // on the tip
+    expect(gate(runGates(gapped), 'frame:f0:socket:hand').ok).toBe(true)
   })
 })
 

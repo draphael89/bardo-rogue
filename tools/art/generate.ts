@@ -18,7 +18,7 @@
 // unauthenticated probe (create-image-* answers 401 auth-required; generate-image-* answers 404).
 import { createHash } from 'node:crypto'
 import { mkdirSync, writeFileSync, readFileSync, existsSync, statSync, readdirSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { dirname, join, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
 import { canon, subset } from './palette'
@@ -154,8 +154,12 @@ export function resolveReferences(refs: readonly string[] | undefined, max = REF
     } else if (/\.png$/i.test(r)) files.push(r)
     else throw new Error(`generate: reference "${r}" is not a PNG`)
   }
-  files.sort()
-  return files.slice(-max).map(file => {
+  // Deduplicate before ordering, slicing or counting: naming a master twice — or naming it AND the
+  // directory that contains it — otherwise burned a Retro Diffusion reference slot on a repeat and
+  // made bitforge reject a spec that resolves to exactly one deliberate master.
+  const unique = [...new Set(files.map(f => f.split(sep).join('/')))]
+  unique.sort()
+  return unique.slice(-max).map(file => {
     const buf = readFileSync(file)
     return { file, hash: sha256(buf), b64: buf.toString('base64') }
   })
@@ -290,8 +294,14 @@ export async function generate(provider: ProviderName, spec: GenerateSpec, outDi
   let seed: number | undefined = spec.seed
 
   const writeManifest = (): string => {
+    // Content-hash the batch so a manifest is named for what it contains — but a rerun with fixed
+    // seeds returns the SAME candidates, so that name collides and the second paid batch would
+    // overwrite the first one's timestamp, usage and job id. Allocate a suffix instead: every paid
+    // run keeps its own record, which is the entire point of writing one.
     const runHash = sha256(candidates.map(c => c.sha256).join(',')).slice(0, 12)
-    const manifest = join(outDir, `${provider}-${hash}-${runHash}.manifest.json`)
+    const base = join(outDir, `${provider}-${hash}-${runHash}`)
+    let manifest = `${base}.manifest.json`
+    for (let n = 2; existsSync(manifest); n++) manifest = `${base}-${n}.manifest.json`
     writeFileSync(manifest, JSON.stringify({
       provider,
       promptHash: hash,
@@ -325,7 +335,14 @@ export async function generate(provider: ProviderName, spec: GenerateSpec, outDi
       const body = (await res.text()).slice(0, 400)
       throw new Error(`generate: ${provider} returned ${res.status} ${res.statusText}: ${body}${savedNote()}`)
     }
-    const json = await res.json() as Record<string, unknown>
+    let json: Record<string, unknown>
+    try {
+      json = await res.json() as Record<string, unknown>
+    } catch (e) {
+      // A 200 carrying malformed JSON rejected straight out of generate(), past the survivor note,
+      // leaving earlier paid candidates on disk with no manifest and no instruction to inspect them.
+      throw new Error(`generate: ${provider} returned a 200 whose body is not JSON: ${e instanceof Error ? e.message : e}${savedNote()}`)
+    }
     const batch = decodeImages(json)
     if (!batch.length) throw new Error(`generate: ${provider} returned no images: ${JSON.stringify(json).slice(0, 400)}${savedNote()}`)
     for (const b64 of batch) {

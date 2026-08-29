@@ -30,8 +30,13 @@ export interface ApprovalReceipt {
 
 const fileSha = (p: string): string => createHash('sha256').update(readFileSync(p)).digest('hex')
 
-export const receiptPathFor = (masterPath: string): string =>
-  masterPath.replace(/\.png$/i, '.approval.json')
+export const receiptPathFor = (masterPath: string): string => {
+  // Guarded, not best-effort: a path with no .png suffix came back UNCHANGED, so approving a
+  // non-PNG under art/approved/ (a mis-tabbed README.md, say) overwrote that file with its own
+  // receipt JSON. A master is a PNG; anything else is a mistake worth naming.
+  if (!/\.png$/i.test(masterPath)) throw new Error(`approve: ${masterPath} is not a .png — a master is an image, and a receipt path derived from it must not collide with the file itself`)
+  return masterPath.replace(/\.png$/i, '.approval.json')
+}
 
 /** Record a human approval decision. The caller is responsible for having one. */
 export function writeReceipt(masterPath: string, id: string, approvedBy: string, note?: string): ApprovalReceipt {

@@ -61,6 +61,15 @@ describe('resolveReferences', () => {
     // Capped: the lexicographically LAST files win — the newest versions under the -vN convention.
     expect(resolveReferences([pool], 1).map(r => r.file)).toEqual([join(pool, 'hero-v2.png')])
   })
+  it('deduplicates a path named twice, and one named both directly and via its directory', () => {
+    const pool = join(dir, 'dedupe'); mkdirSync(pool, { recursive: true })
+    const one = join(pool, 'hero-v1.png')
+    writeFileSync(one, refPng)
+    expect(resolveReferences([one, one]).map(r => r.file)).toEqual([one])
+    // Named directly AND through the directory that holds it: bitforge must still see exactly one.
+    expect(resolveReferences([one, pool]).map(r => r.file)).toEqual([one])
+  })
+
   it('hashes the file content', () => {
     const [r] = resolveReferences([join(dir, 'ref-b.png')])
     expect(r.hash).toMatch(/^[0-9a-f]{64}$/)
@@ -216,6 +225,34 @@ describe('generate (mocked fetch)', () => {
     const files = readdirSync(out)
     expect(files.some(f => f.endsWith('.png'))).toBe(true)
     expect(files.some(f => f.endsWith('.manifest.json')), 'the surviving candidate must keep its run record').toBe(true)
+  })
+
+  it('routes a malformed JSON body through the survivor note', async () => {
+    vi.stubEnv('PIXELLAB_SECRET', 'test-token')
+    let call = 0
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      call++
+      return call === 1
+        ? new Response(JSON.stringify({ image: { type: 'base64', base64: refPng.toString('base64') } }), { status: 200 })
+        : new Response('{ not json', { status: 200, headers: { 'Content-Type': 'application/json' } })
+    }))
+    const out = join(dir, 'badjson')
+    await expect(generate('pixellab', spec({ count: 2 }), out)).rejects.toThrow(/saved 1 candidate/)
+    expect(readdirSync(out).some(f => f.endsWith('.manifest.json'))).toBe(true)
+  })
+
+  it('a rerun returning identical candidates keeps both runs\' manifests', async () => {
+    // Fixed seeds return the same images, so the content-hash manifest name collides; the second
+    // paid batch must not overwrite the first one's usage, job id and timestamp.
+    vi.stubEnv('PIXELLAB_SECRET', 'test-token')
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      image: { type: 'base64', base64: refPng.toString('base64') }, usage: { type: 'usd', usd: 0.01 },
+    }), { status: 200 })))
+    const out = join(dir, 'rerun')
+    const a = await generate('pixellab', spec({ count: 1, seed: 5 }), out)
+    const b = await generate('pixellab', spec({ count: 1, seed: 5 }), out)
+    expect(b.manifest).not.toBe(a.manifest)
+    expect(readdirSync(out).filter(f => f.endsWith('.manifest.json'))).toHaveLength(2)
   })
 
   it('surfaces a non-2xx as an error without retrying', async () => {

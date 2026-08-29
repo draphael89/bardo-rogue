@@ -57,9 +57,14 @@ export function validateClipRefs(def: SheetDef, where: string): void {
     // The runtime consumes the assertion (clipSelect), so beyond these, a wrong contact is a wrong
     // frame ON SCREEN during the damage window — which the boundary tests and motion strips show.
     if (clip.sim.contact) {
+      // A contact frame is "the drawing shown while damage is live", so the window it names must
+      // HAVE a live phase. Absent counts as absent: player.dodge resolves fine and has no `active`,
+      // and a contact asserted against it is an assertion about nothing. (Scoped to contact-present
+      // on purpose — applying it to every sim clip would reject the dodge and roll clips, which
+      // legitimately name windows with no damage phase and assert no contact.)
       const active = (node as Record<string, unknown>).active
-      if (typeof active === 'number' && active < 1) {
-        throw new Error(`sheet ${where}: clip "${name}" asserts a contact but "${clip.sim.ref}" has no live phase (active ${active})`)
+      if (typeof active !== 'number' || active < 1) {
+        throw new Error(`sheet ${where}: clip "${name}" asserts contact "${clip.sim.contact}" against "${clip.sim.ref}", which has no live phase (active ${JSON.stringify(active)}) — nothing is damaging while that frame shows`)
       }
       if (!/(contact|hit|strike|impact)/i.test(clip.sim.contact)) {
         throw new Error(`sheet ${where}: clip "${name}" contact frame "${clip.sim.contact}" is not a contact/hit/strike/impact key`)

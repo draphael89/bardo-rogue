@@ -383,6 +383,14 @@ describe('gates', () => {
     } satisfies CompileReport
     const gates = runGates({ def, report, pixels, width, height, groundLuminance: 0.13 })
     expect(gates.some(g => g.gate === 'duplicate-frames')).toBe(false)
+
+    for (let y = 0; y < cell; y++) for (let x = 0; x < cell; x++) {
+      const a = (y * width + x) * 4, b = (y * width + cell + x) * 4
+      pixels.set(pixels.subarray(a, a + 4), b)
+    }
+    pixels[cell * 4] = 255 // hidden RGB in a fully transparent pixel is not visible frame identity
+    const hiddenRgb = runGates({ def, report, pixels, width, height, groundLuminance: 0.13 })
+    expect(hiddenRgb.some(g => g.gate === 'duplicate-frames' && !g.ok)).toBe(true)
   })
 })
 

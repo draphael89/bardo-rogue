@@ -88,11 +88,12 @@ function cellStats(ctx: GateContext, name: string, index: number): CellStats {
   for (let y = 0; y < cell; y++) {
     for (let x = 0; x < cell; x++) {
       const i = ((oy + y) * width + ox + x) * 4
-      // Duplicate detection is exact image identity, not red-channel identity. Canon contains
-      // distinct colours with the same red byte (slateHi and purple2), so retain every RGBA byte.
+      // Duplicate detection is exact visible image identity, not red-channel identity. Canon contains
+      // distinct colours with the same red byte (slateHi and purple2), while RGB hidden behind alpha
+      // zero is not visible identity and must not make otherwise identical frames distinct.
+      if (pixels[i + 3] === 0) { hash += '.'; continue }
       hash += [pixels[i], pixels[i + 1], pixels[i + 2], pixels[i + 3]]
         .map(v => v.toString(16).padStart(2, '0')).join('')
-      if (pixels[i + 3] === 0) continue
       const c: RGB = [pixels[i], pixels[i + 1], pixels[i + 2]]
       const l = luminance(c)
       mask[y * cell + x] = 1

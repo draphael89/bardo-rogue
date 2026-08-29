@@ -328,8 +328,8 @@ async function boot() {
     if (e.code === 'F3') { e.preventDefault(); if (recorder.recording) stopRecord(); recorder.download() }
     if (e.code === 'KeyF' && !e.repeat) { e.preventDefault(); void platform.fullscreen() }
     // Save management is reachable only from the pause screen, so it can never fire mid-fight.
-    if (userPaused && e.code === 'KeyE' && !e.repeat) { e.preventDefault(); void exportSave() }
-    if (userPaused && e.code === 'KeyI' && !e.repeat) { e.preventDefault(); void importSave() }
+    if (userPaused && !importing && e.code === 'KeyE' && !e.repeat) { e.preventDefault(); void exportSave() }
+    if (userPaused && !importing && e.code === 'KeyI' && !e.repeat) { e.preventDefault(); void importSave() }
   })
   if (!noSave) {
     platform.watchForeignWrites?.(() => {

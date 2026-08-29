@@ -497,7 +497,7 @@ export class RewardOverlay {
     const W = tuning.view.width
     this.scrim.rect(0, 0, W, tuning.view.height).fill({ color: P.void, alpha: 0.76 })
     const settings = this.pausePage === 'settings'
-    const rows = settings ? 4 : leaving ? 3 : 2
+    const rows = settings ? 5 : leaving ? 3 : 2   // still, master, music, sound, rise
     const foot = pauseFooter()
     const cardH = 56 + rows * 22 + (foot ? 28 : 16)
     const cardY = Math.round((tuning.view.height - cardH) / 2)

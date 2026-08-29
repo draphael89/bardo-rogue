@@ -104,6 +104,10 @@ async function boot() {
   const resumed = scenario === 'loop' && !!savedSave.checkpoint && restoreCheckpoint(world, savedSave.checkpoint)
   // Set only for the roomEnter that the resume itself emits; cleared by the first arrival.
   let resumeEntryPending = resumed
+  // Raised by a mid-run debit of PERMANENT currency, lowered by the next write that also stores a
+  // checkpoint. See flushEvents: the debit and the checkpoint carrying what it bought must land
+  // together, or the player pays and a reload takes the purchase back.
+  let metaDebtPending = false
   if (scenario === 'loop' && savedSave.checkpoint) {
     // Consumed either way. A resumed checkpoint must not outlive its own load, or the same room can
     // be retried from its entry HP without limit; a refused one must not be retried every boot.
@@ -249,12 +253,21 @@ async function boot() {
       // written straight back on the first tick, and the fight can be reloaded from entry HP forever.
       const fromResume = arrived && resumeEntryPending
       if (arrived) resumeEntryPending = false
+      const writesCheckpoint = terminal || (arrived && !fromResume)
       const checkpointWrite = terminal ? { checkpoint: null }
         : arrived && !fromResume ? { checkpoint: captureCheckpoint(world) }
         : {}
+      // The Unburied's memory option is the game's only mid-run change to permanent meta: it spends
+      // Remembrances for max HP that lives in the RUN. The checkpoint beside it was captured at this
+      // room's entry and knows nothing about the purchase, so persisting the debit on its own
+      // charged the player for a vessel that the next reload handed straight back. Hold the debit
+      // until a write that also stores a checkpoint, and the two halves move together: reload
+      // before then and both roll back; die or win and the terminal write banks it as spent.
+      if (!terminal && world.events.some(ev => ev.type === 'mysteryChosen')) metaDebtPending = true
+      if (writesCheckpoint) metaDebtPending = false
       savedSave = {
         ...savedSave,
-        meta: { ...world.session.meta, unlockedWeapons: [...world.session.meta.unlockedWeapons] },
+        ...(metaDebtPending ? {} : { meta: { ...world.session.meta, unlockedWeapons: [...world.session.meta.unlockedWeapons] } }),
         ...checkpointWrite,
       }
       void persist()
@@ -553,8 +566,27 @@ async function boot() {
       // reset() rebuilds the world with the imported meta and rebinds the presenter. Deliberately not a
       // reload: that would drop ?bot=/?seed=, destroy window.__game mid-evaluate and break an attached
       // Playwright page.
-      if (world.scenario === 'loop') reset(cur.seed, cur.scenario, { god: cur.god, meta: savedSave.meta })
-      presenter.hud.showBanner('SAVE IMPORTED', townTally(savedSave.meta.attempts, savedSave.meta.victories, savedSave.meta.remembrances), 2.2)
+      let resumedImport = false
+      if (world.scenario === 'loop') {
+        reset(cur.seed, cur.scenario, { god: cur.god, meta: savedSave.meta })
+        // An imported document can carry a live descent. Without this the run existed only on disk:
+        // the player stood in the Bardo with no sign of it, and the first room of their NEXT descent
+        // overwrote the checkpoint, so the imported run was gone before they could reload into it.
+        if (savedSave.checkpoint) {
+          resumedImport = restoreCheckpoint(world, savedSave.checkpoint)
+          resumeEntryPending = resumedImport
+          // Consumed either way, exactly as at boot: a restored checkpoint must not outlive its own
+          // load, or the room can be retried from entry HP forever; a refused one must not be
+          // retried on every later import.
+          savedSave = { ...savedSave, checkpoint: null }
+          void persist()
+        }
+      }
+      presenter.hud.showBanner(
+        resumedImport ? 'DESCENT RESUMED' : 'SAVE IMPORTED',
+        resumedImport ? 'the imported run continues here' : townTally(savedSave.meta.attempts, savedSave.meta.victories, savedSave.meta.remembrances),
+        2.2,
+      )
     } finally { importing = false }
   }
 

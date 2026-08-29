@@ -111,3 +111,74 @@ describe('a checkpoint only ever describes a node entry', () => {
     expect(captureCheckpoint(world)).toBeNull()
   })
 })
+
+describe('a checkpoint carries the obligations the room has already queued', () => {
+  // enterRoom runs beginRoomFight -- which clears riteDebt/mysteryHunt and turns each into a
+  // 150-tick delayed spawn -- BEFORE it emits the roomEnter the checkpoint rides on. Reading the
+  // flag alone therefore captured `false` with the shade still in a queue no checkpoint stores, so
+  // reloading in the Hall deleted the entire consequence of refusing the toll.
+  it('treats a queued debt shade as still owed', () => {
+    const world = beginFirstCombat()
+    const run = world.session.run!
+    run.riteDebt = false
+    world.spawnQueue.push({ kind: 'charger', x: 10, y: 6, ticksLeft: 150, total: 150, debt: true })
+    expect(captureCheckpoint(world)!.riteDebt).toBe(true)
+  })
+
+  it('treats a queued hunt the same way', () => {
+    const world = beginFirstCombat()
+    const run = world.session.run!
+    run.mysteryHunt = false
+    world.spawnQueue.push({ kind: 'charger', x: 10, y: 6, ticksLeft: 150, total: 150, hunt: true })
+    expect(captureCheckpoint(world)!.mysteryHunt).toBe(true)
+  })
+
+  it('does not invent one when nothing is owed', () => {
+    const world = beginFirstCombat()
+    world.session.run!.riteDebt = false
+    world.session.run!.mysteryHunt = false
+    const snap = captureCheckpoint(world)!
+    expect(snap.riteDebt).toBe(false)
+    expect(snap.mysteryHunt).toBe(false)
+  })
+
+  it('survives the round trip in one form or the other', () => {
+    const world = beginFirstCombat()
+    world.session.run!.riteDebt = false
+    world.spawnQueue.push({ kind: 'charger', x: 10, y: 6, ticksLeft: 150, total: 150, debt: true })
+    const snap = captureCheckpoint(world)!
+    const fresh = createWorld(11, 'loop')
+    expect(restoreCheckpoint(fresh, snap)).toBe(true)
+    // Either still flagged, or already re-collected into the queue by the re-entry. Both are the
+    // obligation surviving; neither is it silently gone.
+    expect(fresh.session.run!.riteDebt || fresh.spawnQueue.some(s => s.debt)).toBe(true)
+  })
+})
+
+describe('a resumed attempt keeps its own clock', () => {
+  // The world restarts at tick 0 on a reload. startedTick used to restart with it, so the eventual
+  // runWon/runLost reported only the time since the resume: a nine-minute descent that was reloaded
+  // once read as ninety seconds.
+  it('records how long the attempt had already run', () => {
+    const world = beginFirstCombat()
+    world.tick = world.session.run!.startedTick + 4321
+    expect(captureCheckpoint(world)!.elapsed).toBe(4321)
+  })
+
+  it('backdates startedTick so the duration continues across the reload', () => {
+    const world = beginFirstCombat()
+    world.tick = world.session.run!.startedTick + 4321
+    const snap = captureCheckpoint(world)!
+    const fresh = createWorld(11, 'loop')
+    expect(restoreCheckpoint(fresh, snap)).toBe(true)
+    expect(fresh.tick - fresh.session.run!.startedTick).toBe(4321)
+  })
+
+  it('reads a document written before the field existed as zero elapsed', () => {
+    const world = beginFirstCombat()
+    world.tick = world.session.run!.startedTick + 500
+    const snap = captureCheckpoint(world)!
+    const { elapsed: _dropped, ...older } = snap
+    expect(parseCheckpoint(older)!.elapsed).toBe(0)
+  })
+})

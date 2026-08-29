@@ -72,6 +72,8 @@ export interface RunCheckpoint {
   hp: number
   maxHp: number
   depth: number
+  /** Ticks this attempt had already run when the snapshot was taken. See restoreCheckpoint. */
+  elapsed: number
   boonBits: number
   boons: CheckpointBoon[]
   history: CheckpointVisit[]
@@ -147,12 +149,22 @@ export function captureCheckpoint(world: World): RunCheckpoint | null {
     hp: run.hp,
     maxHp: run.maxHp,
     depth: run.depth,
+    // A resumed attempt is one attempt, so its clock has to cross the reload. Without this the
+    // world restarts at tick 0, startedTick with it, and the eventual runWon/runLost reports only
+    // the time since the resume -- a 9-minute descent that was reloaded once reads as 90 seconds.
+    elapsed: Math.max(0, world.tick - run.startedTick),
     boonBits: run.boonBits,
     boons: run.boons.map(b => ({ id: b.id, stacks: b.stacks })),
     history: cloneHistory(run.roomHistory),
     riteAnswer: run.riteAnswer,
     riteBoonOwed: run.riteBoonOwed,
-    riteDebt: run.riteDebt,
+    // Still OWED, not merely still flagged. enterRoom runs beginRoomFight -- which clears these two
+    // and converts them into a delayed spawn -- BEFORE it emits the roomEnter this snapshot rides
+    // on (rooms.ts). So at capture time the flag is already false and the shade is 150 ticks deep
+    // in spawnQueue, which no checkpoint carries. Reading the flag alone therefore threw away the
+    // whole consequence of refusing the toll: reload in the Hall and Minos came alone, forever.
+    // Restoring the flag re-collects it on re-entry, and re-entry rebuilds the room anyway.
+    riteDebt: run.riteDebt || world.spawnQueue.some(s => s.debt),
     primedBrand: run.primedBrand,
     boundaryRng: run.boundaryRng,
     phase: world.roomPhase,
@@ -161,7 +173,7 @@ export function captureCheckpoint(world: World): RunCheckpoint | null {
     pendingRite: cloneRite(run.pendingRite),
     pendingShop: cloneShop(run.pendingShop),
     pendingMystery: cloneMystery(run.pendingMystery),
-    mysteryHunt: run.mysteryHunt,
+    mysteryHunt: run.mysteryHunt || world.spawnQueue.some(s => s.hunt),
     obols: run.obols,
     rerolls: run.rerolls,
   }
@@ -202,7 +214,9 @@ export function restoreCheckpoint(world: World, snap: RunCheckpoint): boolean {
     riteBoonOwed: snap.riteBoonOwed,
     riteDebt: snap.riteDebt,
     result: 'active',
-    startedTick: 0,
+    // Backdated so the attempt's clock continues rather than restarting. world.tick is 0 at boot
+    // and non-zero when a save is imported mid-session, so the offset is computed, not assumed.
+    startedTick: world.tick - snap.elapsed,
     primedBrand: snap.primedBrand,
     killedBy: 'none',
     killedRanged: false,
@@ -402,6 +416,8 @@ export function parseCheckpoint(input: unknown): RunCheckpoint | null {
   if (obols === null || obols < 0) return null
   const rerolls = input.rerolls === undefined ? 0 : int(input.rerolls)
   if (rerolls === null || rerolls < 0) return null
+  const elapsed = input.elapsed === undefined ? 0 : int(input.elapsed)
+  if (elapsed === null || elapsed < 0) return null
   return normalizeCheckpoint({
     version: 1,
     seed,
@@ -410,6 +426,7 @@ export function parseCheckpoint(input: unknown): RunCheckpoint | null {
     hp,
     maxHp,
     depth,
+    elapsed,
     boonBits,
     boons,
     history,
@@ -440,6 +457,7 @@ export function normalizeCheckpoint(cp: RunCheckpoint): RunCheckpoint {
     hp: cp.hp,
     maxHp: cp.maxHp,
     depth: cp.depth,
+    elapsed: cp.elapsed,
     boonBits: cp.boonBits,
     boons: cp.boons.map(b => ({ id: b.id, stacks: b.stacks })),
     history: cloneHistory(cp.history),

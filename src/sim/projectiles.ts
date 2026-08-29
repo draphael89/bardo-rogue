@@ -44,8 +44,13 @@ export function updateProjectiles(world: World): void {
       continue
     }
     if (p.state === 'dead') continue
-    const d = Math.hypot(p.x - b.x, p.y - b.y)
+    const dx = p.x - b.x, dy = p.y - b.y
     const hitR = b.radius + p.radius
+    const grazeR = hitR + tuning.bullet.grazePx
+    // A projectile outside the graze square cannot hit or graze the player. Keep hypot for every
+    // possible contact and for non-finite coordinates, whose comparisons historically fall through.
+    if (dx === dx && dy === dy && (dx > grazeR || dx < -grazeR || dy > grazeR || dy < -grazeR)) continue
+    const d = Math.hypot(dx, dy)
     if (d <= hitR) {
       const src = b.srcKind === 'player' ? 'none' : b.srcKind
       if (isPlayerDodgeInvulnerable(world)) {
@@ -54,7 +59,7 @@ export function updateProjectiles(world: World): void {
       }
       hurtPlayer(world, b.angle, b.damage, src, true, b.sentence)
       b.active = false
-    } else if (d <= hitR + tuning.bullet.grazePx) {
+    } else if (d <= grazeR) {
       noteNearMiss(world, b.angle, b.x, b.y, 'projectile')
     }
   }

@@ -254,6 +254,27 @@ describe('enemy cadence and projectile authority', () => {
     expect(world.events.some(x => x.type === 'playerHurt' && x.hp === tuning.player.hp - 3)).toBe(true)
   })
 
+  it('keeps hostile projectile graze bounds exact without consuming non-finite shots', () => {
+    const tangent = createWorld(1, 'empty')
+    const p = tangent.player
+    p.dodgeTick = tuning.player.dodge.iStart
+    const grazeR = p.radius + 3 + tuning.bullet.grazePx
+    tangent.fireProjectile(p.x + grazeR, p.y, 0, 0, 3, 20)
+    updateProjectiles(tangent)
+    expect(tangent.events.some(event => event.type === 'graze')).toBe(true)
+
+    const far = createWorld(1, 'empty')
+    const farShot = far.fireProjectile(far.player.x + grazeR + 0.001, far.player.y, 0, 0, 3, 20)!
+    updateProjectiles(far)
+    expect(farShot.active).toBe(true)
+    expect(far.events.some(event => event.type === 'graze' || event.type === 'playerHurt')).toBe(false)
+
+    const nonFinite = createWorld(1, 'empty')
+    const nonFiniteShot = nonFinite.fireProjectile(Number.NaN, nonFinite.player.y, 0, 0, 3, 20)!
+    updateProjectiles(nonFinite)
+    expect(nonFiniteShot.active).toBe(true)
+  })
+
   it('spends a tangent friendly shot on the first live enemy in pool order', () => {
     const world = createWorld(1, 'empty')
     world.arena.solid.fill(0)

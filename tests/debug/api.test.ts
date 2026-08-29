@@ -12,13 +12,15 @@ beforeAll(() => { (globalThis as unknown as { window: Record<string, unknown> })
 function makeHost() {
   let world = createWorld(1, 'empty')
   let metrics = new Metrics()
+  const loop = { paused: false, stats: () => ({ frames: 0 }) } as unknown as Loop
   return {
     getWorld: () => world,
     reset: (seed = 1, scenario = 'empty') => { world = createWorld(seed, scenario); metrics = new Metrics() },
     tick: () => {},
     setOverride: () => {},
     setBot: () => {},
-    loop: { paused: false, stats: () => ({ frames: 0 }) } as unknown as Loop,
+    pause: (p?: boolean) => { loop.paused = p ?? !loop.paused; return loop.paused },
+    loop,
     presenter: null,
     get metrics() { return metrics },
     mute: () => false,

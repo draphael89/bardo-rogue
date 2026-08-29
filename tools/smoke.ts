@@ -219,6 +219,24 @@ async function bootTitle(page: Page): Promise<void> {
   check(!replayStarted.title && !replayStarted.paused && replayStarted.tick > 0,
     `API replay releases the title hold and advances (tick ${replayStarted.tick})`)
 
+  // Deterministic capture tools pause first, install a replay second, and step by hand. Releasing
+  // the title hold must not release that independent API hold or rAF can advance behind the shot.
+  await page.evaluate(() => {
+    const g = (window as any).__game
+    g.pause(true)
+    g.replay({ v: 1, seed: 9, scenario: 'empty', frames: [] })
+  })
+  const debugHeld = await page.evaluate(() => {
+    const g = (window as any).__game
+    return { paused: !!g.loop.paused, tick: g.world.tick }
+  })
+  await page.waitForTimeout(120)
+  const debugStillHeld = await page.evaluate(() => (window as any).__game.world.tick)
+  check(debugHeld.paused && debugHeld.tick === 0 && debugStillHeld === 0,
+    'API replay preserves the deterministic capture pause')
+  await page.evaluate(() => { (window as any).__game.pause(false) })
+  await page.waitForFunction(() => (window as any).__game.world.tick > 0, null, { timeout: 5000 })
+
   // Reboot for the real-key path, then prove the replay path does not mistake a user's pause for
   // the title hold. title(true) recreates the exact combined state after P has set userPaused.
   await page.goto(`${url}/?scenario=loop&seed=${seed}&mute=1&save=off`)

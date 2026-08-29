@@ -41,6 +41,7 @@ export function installApi(host: {
   tick(): void
   setOverride(f: InputFrame | null): void
   setBot(b: ((w: World) => InputFrame) | null): void
+  pause(p?: boolean): boolean
   loop: Loop
   presenter: unknown
   metrics: Metrics
@@ -63,7 +64,7 @@ export function installApi(host: {
     step: (n = 1) => { for (let i = 0; i < n; i++) host.tick() },
     setInput: f => host.setOverride(f ? { moveX: 0, moveY: 0, aimX: 1, aimY: 0, aimSoft: false, attack: false, attackHeld: false, heavy: false, dodge: false, restart: false, ...f } : null),
     bot: name => host.setBot(name ? makeBot(name) : null),
-    pause: p => { host.loop.paused = p ?? !host.loop.paused; return host.loop.paused },
+    pause: p => host.pause(p),
     hash: () => hashWorld(host.getWorld()),
     state: () => {
       const w = host.getWorld()

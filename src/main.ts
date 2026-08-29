@@ -91,6 +91,7 @@ async function boot() {
   audio.setListener(world.player.x, world.player.y)
   platform.setRunActive(world.session.run !== null)
   let userPaused = false
+  let debugPaused = false
   let metrics = new Metrics()
   const presenter = new Presenter(ra, atlas, world)
   presenter.setReducedEffects(reducedEffects)
@@ -306,6 +307,11 @@ async function boot() {
     reset, tick,
     setOverride: f => { input.override = f },
     setBot: b => { bot = b },
+    pause: p => {
+      debugPaused = p ?? !debugPaused
+      loop.paused = debugPaused || userPaused || presenter.title.visible
+      return loop.paused
+    },
     loop,
     presenter,
     get metrics() { return metrics },
@@ -386,10 +392,12 @@ async function boot() {
   // disagree. Pausing used to stop only the simulation: the bed kept playing behind the overlay and
   // a backgrounded tab kept a synthesiser running indefinitely.
   const setPaused = (p: boolean) => {
-    const held = p || presenter.title.visible
+    const playerHeld = p || presenter.title.visible
     userPaused = p
-    loop.paused = held
-    audio.setSuspended(held)
+    loop.paused = playerHeld || debugPaused
+    // The debug hold freezes deterministic captures but deliberately leaves the rendered/audio
+    // surface live, matching the API's original contract. Player/title pause owns the audio clock.
+    audio.setSuspended(playerHeld)
   }
 
   // A gamepad button is not browser user activation. It may ask the browser to resume audio, but it

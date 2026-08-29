@@ -1,13 +1,18 @@
 import { describe, it, expect, beforeAll, afterEach, vi } from 'vitest'
-import { readFileSync, existsSync, mkdtempSync, readdirSync } from 'node:fs'
+import { readFileSync, existsSync, mkdtempSync, readdirSync, writeFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import sharp from 'sharp'
 import { validateSheetDef, type SheetDef } from '../../src/render/sheet'
-import { compileSheet, validateClipRefs } from '../../tools/art/compile'
+import { compileSheet, validateClipRefs, validateProvenance, type CompileReport, type CompileSpec } from '../../tools/art/compile'
 import { makeContext, runGates, summarise } from '../../tools/art/gates'
 import { canon, rgbToHex, type RGB } from '../../tools/art/palette'
 import { generate, requests } from '../../tools/art/generate'
+import { authoredFxFrame, quantizeFxAlpha, quantizeFxRotation } from '../../src/render/fxUnits'
+import { heroFrameName } from '../../src/render/views/player'
+import { createWorld } from '../../src/sim/scenarios'
+import { ARM } from '../../src/sim/weapons'
 
 const SHEETS = [
   'bardo_hero',
@@ -256,9 +261,50 @@ describe('gates', () => {
       expect(distinct.size, n).toBeLessThanOrEqual(def.maxColors)
     }
   })
+
+  it('blocks promotion on identity, duplicate, jump, loop, and grounded-foot failures', () => {
+    const cell = 32, width = cell * 3, height = cell
+    const pixels = new Uint8Array(width * height * 4)
+    const paint = (frame: number, x0: number, rgb: [number, number, number]) => {
+      for (let y = 12; y < 20; y++) for (let x = x0; x < x0 + 8; x++) {
+        const i = (y * width + frame * cell + x) * 4
+        pixels[i] = rgb[0]; pixels[i + 1] = rgb[1]; pixels[i + 2] = rgb[2]; pixels[i + 3] = 255
+      }
+    }
+    paint(0, 2, [80, 40, 100])
+    paint(1, 2, [80, 40, 100])                 // exact duplicate
+    paint(2, 22, [220, 190, 80])               // disjoint identity and a 20px jump
+    const def = {
+      id: 'test.bad-animation', version: 1, kind: 'character' as const, cell, cols: 3, rows: 1,
+      palette: 'test', maxColors: 16,
+      frames: { a: { i: 0, pivot: [4, 30] as [number, number] }, b: { i: 1, pivot: [4, 30] as [number, number] }, c: { i: 2, pivot: [26, 2] as [number, number] } },
+      clips: { bad: { frames: ['a', 'b', 'c'], timing: 'ticks' as const, ticks: [1, 1, 1], loop: true } },
+    }
+    const report = {
+      spec: '', input: '', output: '', sidecar: '', source: { width, height, hash: '' },
+      atlas: { cell, cols: 3, rows: 1, width, height, colors: 2, partialAlpha: 0, indexed: false, liftGamma: 1, despeckled: 0, strays: 0 },
+      palette: [], offPalette: [], frames: [],
+    } satisfies CompileReport
+    const gates = runGates({ def, report, pixels, width, height, groundLuminance: 0.13 })
+    const hard = new Set(gates.filter(g => !g.ok && g.severity === 'fail').map(g => g.gate))
+    expect(hard.has('duplicate-frames')).toBe(true)
+    expect([...hard].some(g => g.startsWith('identity:'))).toBe(true)
+    expect([...hard].some(g => g.includes(':centroid:'))).toBe(true)
+    expect(hard.has('clip:bad:loop-closure')).toBe(true)
+    expect(hard.has('clip:bad:planted-feet')).toBe(true)
+    expect(summarise(gates).pass, 'the CLI must not promote a candidate with any of these failures').toBe(false)
+  })
 })
 
 describe('authored effect sprites', () => {
+  it('selects discrete authored dust keys and quantized fog presentation values', () => {
+    expect([0, 0.24, 0.25, 0.5, 0.99, 1].map(u => authoredFxFrame(u, 4))).toEqual([0, 0, 1, 2, 3, 3])
+    const alphas = new Set(Array.from({ length: 101 }, (_, i) => quantizeFxAlpha(i / 100)))
+    expect(alphas.size).toBe(4)
+    const step = Math.PI / 8
+    expect(quantizeFxRotation(step * 1.49)).toBeCloseTo(step)
+    expect(quantizeFxRotation(step * 1.51)).toBeCloseTo(step * 2)
+  })
   it('are hard-edged: no partial alpha except the glows and haze that §6.6 permits', async () => {
     const manifest = JSON.parse(readFileSync('public/assets/manifest.json', 'utf8')) as Record<string, string[]>
     const stepped = new Set(['circle_03.png', 'circle_05.png', 'fog_01.png', 'fog_02.png', 'fog_03.png', 'fog_04.png', 'fog_05.png'])
@@ -355,6 +401,24 @@ describe('review findings', () => {
     expect(() => validateClipRefs(withRef('player.nonesuch'), 'x')).toThrow(/does not resolve/)
     // Resolves to a real object, but one with no timing window in it.
     expect(() => validateClipRefs(withRef('view'), 'x')).toThrow(/no timing window/)
+
+    const wrongContact = {
+      ...base,
+      clips: { c: { frames: ['windup', 'contact', 'recover'], timing: 'sim', sim: { ref: 'player.attack.swings.0', contact: 'windup' } } },
+    } as unknown as SheetDef
+    expect(() => validateClipRefs(wrongContact, 'x')).toThrow(/not a contact\/hit\/strike\/impact key/)
+  })
+
+  it('verifies prompt-record hashes and distinguishes approved sources from admitted references', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'bardo-provenance-'))
+    const source = join(dir, 'source.png'), promptFile = join(dir, 'prompt.txt')
+    writeFileSync(source, 'source')
+    writeFileSync(promptFile, 'exact retained prompt')
+    const promptHash = createHash('sha256').update(readFileSync(promptFile)).digest('hex')
+    const base = { id: 'x', kind: 'character', input: source, output: join(dir, 'out.png'), cell: 32, cols: 1, rows: 1, frames: [] } as CompileSpec
+    expect(() => validateProvenance({ ...base, provenance: { provider: 'test', approvedSource: source, promptFile, promptHash } }, 'x')).not.toThrow()
+    expect(() => validateProvenance({ ...base, provenance: { provider: 'test', approvedSource: source, promptFile, promptHash: '0'.repeat(64) } }, 'x')).toThrow(/does not match/)
+    expect(() => validateProvenance({ ...base, provenance: { provider: 'test', approvedReference: source } }, 'x')).toThrow(/under art\/approved/)
   })
 
   it('every shipped sidecar names a tuning window that still exists', () => {
@@ -362,6 +426,18 @@ describe('review findings', () => {
       const def = JSON.parse(readFileSync(sidecarPath(n), 'utf8')) as SheetDef
       expect(() => validateClipRefs(def, n), n).not.toThrow()
     }
+  })
+
+  it('renders the south second-swing contact through the sidecar contact key', () => {
+    const world = createWorld(1, 'empty')
+    world.player.arm = ARM.blade
+    world.player.state = 'attack'
+    world.player.swingIndex = 1
+    world.player.stateTick = 4
+    const runtimeKey = heroFrameName(world.player, world, 0)
+    const south = JSON.parse(readFileSync('public/assets/sprites/bardo_hero_south.json', 'utf8')) as SheetDef
+    expect(runtimeKey).toBe(south.clips!.light2.sim!.contact)
+    expect(south.frames[runtimeKey].i).toBe(9)
   })
 
   it('pose fit preserves aspect instead of stretching a cropped silhouette', async () => {
@@ -388,5 +464,31 @@ describe('review findings', () => {
     const b = report.frames[0].bounds!
     expect(b.w / b.h).toBeLessThan(0.5)      // still clearly tall and narrow
     expect(b.w / b.h).toBeGreaterThan(0.05)
+  })
+
+  it('pose fit uses one shared sheet scale instead of enlarging every frame independently', async () => {
+    const W = 240, H = 120
+    const buf = Buffer.alloc(W * H * 4)
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const i = (y * W + x) * 4
+      const tall = x > 40 && x < 60 && y > 10 && y < 110
+      const short = x > 165 && x < 185 && y > 60 && y < 110
+      if (tall || short) { buf[i] = 110; buf[i + 1] = 44; buf[i + 2] = 70; buf[i + 3] = 255 }
+      else { buf[i] = 0; buf[i + 1] = 255; buf[i + 2] = 0; buf[i + 3] = 255 }
+    }
+    const dir = mkdtempSync(join(tmpdir(), 'bardo-pose-scale-'))
+    const src = join(dir, 'src.png')
+    await sharp(buf, { raw: { width: W, height: H, channels: 4 } }).png().toFile(src)
+    const { report } = await compileSheet({
+      id: 'test.pose-scale', kind: 'character', input: src, output: join(dir, 'out.png'),
+      cell: 32, cols: 2, rows: 1, fit: 'pose', minIsland: 0, despeckle: false,
+      palette: ['mortar', 'purple1', 'purple2'],
+      frames: [{ name: 'tall', i: 0 }, { name: 'short', i: 1 }],
+    }, 'test')
+    const [tall, short] = report.frames.map(f => f.bounds!)
+    expect(tall.h).toBeGreaterThan(28)
+    expect(short.h).toBeGreaterThan(10)
+    expect(short.h).toBeLessThan(20)
+    expect(tall.h / short.h).toBeGreaterThan(1.7)
   })
 })

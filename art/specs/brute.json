@@ -151,7 +151,8 @@
   "provenance": {
     "provider": "openai",
     "model": "gpt-image (built-in tool)",
-    "approvedReference": "art/source/bardo_brute_alpha_v1.png",
-    "promptHash": "see art/bardo-combat-sprites.md"
+    "approvedSource": "art/source/bardo_brute_alpha_v1.png",
+    "promptFile": "art/bardo-combat-sprites.md",
+    "promptHash": "9630ffaa43cc52d756502023f515b6b26e5c5bd5a3acea271e79e9752b908141"
   }
 }

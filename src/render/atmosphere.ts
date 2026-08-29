@@ -3,7 +3,7 @@ import type { Atlas } from './atlas'
 import type { World } from '@/sim/world'
 import { TILE } from '@/sim/arena'
 import { tuning } from '@/tuning'
-import { FX_UNIT, FOG_UNIT } from './fxUnits'
+import { FX_UNIT, FOG_UNIT, quantizeFxAlpha, quantizeFxRotation } from './fxUnits'
 
 interface Mote {
   s: Sprite
@@ -156,10 +156,10 @@ export class Atmosphere {
     for (let i = 0; i < this.fog.length; i++) {
       const f = this.fog[i]
       const u = (this.t * (4 + i * 0.7) + i * 50) % (spanX + 90)
-      f.position.set(inner.x0 - 40 + u, inner.y0 + 18 + ((i * 41) % Math.max(8, spanY - 28)))
+      f.position.set(Math.round(inner.x0 - 40 + u), Math.round(inner.y0 + 18 + ((i * 41) % Math.max(8, spanY - 28))))
       f.scale.set((70 + i * 14) / FOG_UNIT)
-      f.alpha = A.fogAlpha * fade * (0.65 + Math.sin(this.t * 0.45 + i) * 0.35)
-      f.rotation = this.t * 0.04 * (i % 2 === 0 ? 1 : -1)
+      f.alpha = A.fogAlpha * quantizeFxAlpha(fade * (0.65 + Math.sin(this.t * 0.45 + i) * 0.35))
+      f.rotation = quantizeFxRotation(this.t * 0.04 * (i % 2 === 0 ? 1 : -1))
     }
 
     for (const m of this.motes) {

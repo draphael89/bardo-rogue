@@ -2,9 +2,9 @@ import { Container, Sprite, Texture, RenderTexture, Rectangle } from 'pixi.js'
 import type { Atlas } from './atlas'
 import { fxRng } from './fxRng'
 import { decalAlphaForFrame } from './feedback'
-import { FX_UNIT } from './fxUnits'
+import { authoredFxFrame, FX_UNIT, quantizeFxRotation } from './fxUnits'
 
-interface P { s: Sprite; spin: number; vx: number; vy: number; life: number; maxLife: number; drag: number; grav: number; scale0: number; scale1: number; rot: number; alpha0: number; alpha1: number; ground: number | null; tint0: number; tint1: number | null; sgn: number; unit: number }
+interface P { s: Sprite; frames: readonly Texture[] | null; spin: number; vx: number; vy: number; life: number; maxLife: number; drag: number; grav: number; scale0: number; scale1: number; rot: number; alpha0: number; alpha1: number; ground: number | null; tint0: number; tint1: number | null; sgn: number; unit: number }
 
 // Authored FX sprites are 16x16 (tools/make-bardo-fx.ts). `scale0`/`scale1` stay in screen pixels, so
 // the sprite scale is size/unit. shatter() passes BODY_UNIT because it scales a body texture, not an
@@ -14,9 +14,7 @@ const BODY_UNIT = 64
 
 // §6.1: rotation quantises to 16 steps. A freely rotating sprite over a 480x270 target resamples its
 // own pixels every frame, which is the loudest "not pixel art" tell there is.
-const ROT_STEPS = 16
-const QUANT = (Math.PI * 2) / ROT_STEPS
-const quantRot = (a: number): number => Math.round(a / QUANT) * QUANT
+const QUANT = (Math.PI * 2) / 16
 
 // Pooled sprite particles. Everything is drawn into the low-res target so soft shapes pixelate on their own.
 export class Particles {
@@ -28,9 +26,11 @@ export class Particles {
   private stamp = new Sprite()
   private decalContainer = new Container()
   private hostileFloorThreat = false
+  private dustFrames: readonly Texture[]
   readonly max = 1500
 
   constructor(private atlas: Atlas, private fx: Container, decals: Container, _floor: Container) {
+    this.dustFrames = [1, 2, 3, 4].map(i => atlas.particle(`smoke_0${i}`))
     this.decalRt = RenderTexture.create({ width: 480, height: 300, scaleMode: 'nearest' })
     this.decalSprite = new Sprite(this.decalRt); this.decalSprite.position.set(-32, -15)
     decals.addChild(this.decalSprite)
@@ -53,8 +53,9 @@ export class Particles {
   private spawn(tex: Texture, x: number, y: number, o: Partial<P> & { tint?: number; tint1?: number; blend?: 'add' | 'normal' } = {}): P | null {
     if (this.live.length >= this.max) return null
     let p = this.pool.pop()
-    if (!p) { const s = new Sprite(); s.anchor.set(0.5); s.roundPixels = true; this.fx.addChild(s); p = { s, spin: 0, vx: 0, vy: 0, life: 0, maxLife: 1, drag: 1, grav: 0, scale0: 1, scale1: 1, rot: 0, alpha0: 1, alpha1: 0, ground: null, tint0: 0xffffff, tint1: null, sgn: 1, unit: FX } }
+    if (!p) { const s = new Sprite(); s.anchor.set(0.5); s.roundPixels = true; this.fx.addChild(s); p = { s, frames: null, spin: 0, vx: 0, vy: 0, life: 0, maxLife: 1, drag: 1, grav: 0, scale0: 1, scale1: 1, rot: 0, alpha0: 1, alpha1: 0, ground: null, tint0: 0xffffff, tint1: null, sgn: 1, unit: FX } }
     p.s.texture = tex; p.s.visible = true; p.s.position.set(x, y)
+    p.frames = o.frames ?? null
     p.vx = o.vx ?? 0; p.vy = o.vy ?? 0; p.life = p.maxLife = o.maxLife ?? 0.4; p.drag = o.drag ?? 1; p.grav = o.grav ?? 0
     p.scale0 = o.scale0 ?? 1; p.scale1 = o.scale1 ?? p.scale0; p.rot = o.rot ?? 0; p.alpha0 = o.alpha0 ?? 1; p.alpha1 = o.alpha1 ?? 0; p.ground = o.ground ?? null
     p.tint0 = o.tint ?? 0xffffff; p.tint1 = o.tint1 ?? null; p.sgn = o.sgn ?? 1; p.unit = o.unit ?? FX
@@ -62,7 +63,7 @@ export class Particles {
     // `spin` is the true angle; the sprite only ever shows it quantised. Accumulating on the sprite
     // itself discards the remainder every frame, and a slow spin never advances a step at all.
     p.spin = fxRng.particles.next() * 6.28
-    p.s.rotation = quantRot(p.spin)
+    p.s.rotation = quantizeFxRotation(p.spin)
     p.s.scale.set(p.scale0 / p.unit * p.sgn, p.scale0 / p.unit)
     this.live.push(p)
     return p
@@ -79,7 +80,8 @@ export class Particles {
       p.vx *= Math.pow(p.drag, dt * 60); p.vy *= Math.pow(p.drag, dt * 60)
       p.s.x += p.vx * dt; p.s.y += p.vy * dt
       if (p.ground !== null && p.s.y > p.ground) { p.s.y = p.ground; p.vy = -Math.abs(p.vy) * 0.3; p.vx *= 0.6 }
-      if (p.rot !== 0) { p.spin += p.rot * dt; p.s.rotation = quantRot(p.spin) }
+      if (p.rot !== 0) { p.spin += p.rot * dt; p.s.rotation = quantizeFxRotation(p.spin) }
+      if (p.frames) p.s.texture = p.frames[authoredFxFrame(u, p.frames.length)]
       const sc = p.scale0 + (p.scale1 - p.scale0) * u
       p.s.scale.set(sc / p.unit * p.sgn, sc / p.unit)
       p.s.alpha = p.alpha0 + (p.alpha1 - p.alpha0) * u
@@ -100,7 +102,8 @@ export class Particles {
     for (let i = 0; i < n; i++) {
       const a = angle + fxRng.particles.signed(1.2)
       const sp = fxRng.particles.range(10, 40)
-      this.spawn(this.atlas.particle('smoke_0' + fxRng.particles.int(1, 5)), x + fxRng.particles.signed(4), y, { vx: Math.cos(a) * sp, vy: Math.sin(a) * sp * 0.4 - 6, maxLife: fxRng.particles.range(0.35, 0.6), drag: 0.9, scale0: fxRng.particles.range(5, 9), scale1: 12, tint: 0xd8b088, alpha0: 0.5, alpha1: 0 })
+      const size = fxRng.particles.range(8, 12)
+      this.spawn(this.dustFrames[0], x + fxRng.particles.signed(4), y, { frames: this.dustFrames, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp * 0.4 - 6, maxLife: fxRng.particles.range(0.35, 0.6), drag: 0.9, scale0: size, scale1: size, tint: 0xd8b088, alpha0: 0.5, alpha1: 0 })
     }
   }
 

@@ -28,8 +28,8 @@
     { "name": "light1Contact", "i": 5, "pivot": [16, 26] },
     { "name": "light1Recover", "i": 6, "pivot": [16, 32] },
     { "name": "light2Start", "i": 7, "pivot": [16, 26] },
-    { "name": "light2Contact", "i": 8, "pivot": [16, 25] },
-    { "name": "light2Recover", "i": 9, "pivot": [16, 25] },
+    { "name": "light2Recover", "i": 8, "pivot": [16, 25] },
+    { "name": "light2Contact", "i": 9, "pivot": [16, 25] },
     { "name": "heavyStart", "i": 10, "pivot": [16, 25] },
     { "name": "heavyContact", "i": 11, "pivot": [16, 25] },
     { "name": "dodgeStart", "i": 12, "pivot": [16, 21] },
@@ -48,7 +48,8 @@
   "provenance": {
     "provider": "openai",
     "model": "gpt-image (built-in tool)",
-    "approvedReference": "art/source/bardo_hero_south_alpha_v4.png",
-    "promptHash": "see art/bardo-combat-sprites.md"
+    "approvedSource": "art/source/bardo_hero_south_alpha_v4.png",
+    "promptFile": "art/bardo-combat-sprites.md",
+    "promptHash": "9630ffaa43cc52d756502023f515b6b26e5c5bd5a3acea271e79e9752b908141"
   }
 }

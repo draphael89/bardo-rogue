@@ -243,7 +243,7 @@ export function runGates(ctx: GateContext): GateResult[] {
   for (let i = 1; i < stats.length; i++) {
     const d = histDistance(stats[i - 1].hist, stats[i].hist)
     add(`identity:${stats[i - 1].name}->${stats[i].name}`, d <= 0.45,
-      `palette-histogram distance ${d.toFixed(3)} (want <= 0.45)`, 'warn')
+      `palette-histogram distance ${d.toFixed(3)} (want <= 0.45)`)
   }
   const dupes = new Map<string, string[]>()
   for (const s of stats) {
@@ -252,7 +252,7 @@ export function runGates(ctx: GateContext): GateResult[] {
     dupes.set(s.hash, list)
   }
   for (const [, names] of dupes) {
-    if (names.length > 1) add(`duplicate-frames`, false, `identical frames: ${names.join(', ')}`, 'warn')
+    if (names.length > 1) add(`duplicate-frames`, false, `identical frames: ${names.join(', ')}`)
   }
 
   // --- clips ---------------------------------------------------------------------------------------
@@ -265,19 +265,21 @@ export function runGates(ctx: GateContext): GateResult[] {
     for (let i = 1; i < seq.length; i++) {
       const jump = Math.hypot(seq[i].cx - seq[i - 1].cx, seq[i].cy - seq[i - 1].cy)
       add(`clip:${clipName}:centroid:${seq[i - 1].name}->${seq[i].name}`, jump <= def.cell * 0.45,
-        `centroid moved ${jump.toFixed(1)}px (cap ${(def.cell * 0.45).toFixed(1)})`, 'warn')
+        `centroid moved ${jump.toFixed(1)}px (cap ${(def.cell * 0.45).toFixed(1)})`)
     }
     // A loop that does not close pops on repeat.
     if (clip.loop && seq.length > 1) {
       const close = Math.hypot(seq[0].cx - seq[seq.length - 1].cx, seq[0].cy - seq[seq.length - 1].cy)
-      add(`clip:${clipName}:loop-closure`, close <= def.cell * 0.5, `first/last centroid gap ${close.toFixed(1)}px`, 'warn')
+      add(`clip:${clipName}:loop-closure`, close <= def.cell * 0.5, `first/last centroid gap ${close.toFixed(1)}px`)
     }
     // Planted feet: the pivot is the contract's promise that the sprite meets the floor in the same
     // place all clip long. Drift here is the foot-sliding the stride formula exists to prevent.
-    const pivots = clip.frames.map(n => def.frames[resolve(n)].pivot[1])
-    const spread = Math.max(...pivots) - Math.min(...pivots)
-    add(`clip:${clipName}:planted-feet`, spread <= def.cell * 0.35,
-      `foot pivot spread ${spread}px across the clip`, 'warn')
+    if (clip.grounded !== false) {
+      const pivots = clip.frames.map(n => def.frames[resolve(n)].pivot[1])
+      const spread = Math.max(...pivots) - Math.min(...pivots)
+      add(`clip:${clipName}:planted-feet`, spread <= def.cell * 0.35,
+        `foot pivot spread ${spread}px across the clip`)
+    }
   }
 
   return out

@@ -66,14 +66,14 @@
         26
       ]
     },
-    "light2Contact": {
+    "light2Recover": {
       "i": 8,
       "pivot": [
         16,
         25
       ]
     },
-    "light2Recover": {
+    "light2Contact": {
       "i": 9,
       "pivot": [
         16,
@@ -190,8 +190,9 @@
   "source": {
     "provider": "openai",
     "model": "gpt-image (built-in tool)",
-    "approvedReference": "art/source/bardo_hero_south_alpha_v4.png",
-    "promptHash": "see art/bardo-combat-sprites.md",
+    "approvedSource": "art/source/bardo_hero_south_alpha_v4.png",
+    "promptFile": "art/bardo-combat-sprites.md",
+    "promptHash": "9630ffaa43cc52d756502023f515b6b26e5c5bd5a3acea271e79e9752b908141",
     "compiler": "bardo-art/1",
     "sourceFile": "art/source/bardo_hero_south_alpha_v4.png",
     "sourceHash": "03d55971e4da870e"

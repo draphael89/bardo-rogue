@@ -39,6 +39,8 @@ export interface SheetClip {
   /** Required when timing === 'sim': which tuning window governs, and which frame must be contact. */
   sim?: { ref: string; contact?: string }
   loop?: boolean
+  /** Defaults true. Set false for tumbling/airborne clips whose pivot intentionally travels. */
+  grounded?: boolean
 }
 
 export interface SheetProvenance {
@@ -47,9 +49,14 @@ export interface SheetProvenance {
   modelVersion?: string
   jobId?: string
   seed?: number
+  /** SHA-256 (or a 16+ digit prefix) of promptFile, verified by the compiler. */
   promptHash?: string
+  promptFile?: string
   referenceHashes?: string[]
+  /** A style/reference input admitted through the explicit art/approved human checkpoint. */
   approvedReference?: string
+  /** A deliberately approved editable source that is itself the compile input. */
+  approvedSource?: string
   /** Compiler identity + the exact source it was built from. Lineage, not decoration. */
   compiler?: string
   sourceFile?: string

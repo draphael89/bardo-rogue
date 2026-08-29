@@ -28,7 +28,7 @@ type ClipSelection = { key: string; direction: HeroDirection; stateTick: number 
 const clipSelection = new WeakMap<EntityView, ClipSelection>()
 const freeDirection = new WeakMap<EntityView, HeroDirection>()
 
-function heroFrame(p: Player, world: World, time: number): string {
+export function heroFrameName(p: Player, world: World, time: number): string {
   if (p.state === 'dead') return 'dead'
   if (p.state === 'hurt' || p.flash > 0) return 'hurt'
   if (p.state === 'free') return Math.hypot(p.vx, p.vy) > 10 ? (Math.floor(time * 9) & 1 ? 'runA' : 'runB') : 'idle'
@@ -44,15 +44,6 @@ function heroFrame(p: Player, world: World, time: number): string {
   // `heavyStart`): contact releases into the same heavy-specific stance rather than borrowing the
   // second light attack's recovery.
   return 'heavy' + phase
-}
-
-function directionalHeroFrame(direction: HeroDirection, frame: string): string {
-  // The south sheet's second cut resolves downward in cell 9 and recoils overhead in cell 8. Its
-  // generated semantic pair is intentionally reversed to keep both the contact axis and recovery
-  // silhouette truthful; simulation timing and the public 16-frame contract stay unchanged.
-  if (direction === 'south' && frame === 'light2Contact') return 'light2Recover'
-  if (direction === 'south' && frame === 'light2Recover') return 'light2Contact'
-  return frame
 }
 
 function authoredDirectionFor(v: EntityView, p: Player, bladeEquipped: boolean): HeroDirection | null {
@@ -471,7 +462,7 @@ export function updatePlayerView(v: EntityView, p: Player, world: World, alpha: 
 
   b.tint = 0xffffff
   if (art && heroDirection) {
-    const frameName = directionalHeroFrame(heroDirection, heroFrame(p, world, time))
+    const frameName = heroFrameName(p, world, time)
     const hero = art.hero[heroDirection]
     verticalRollFrame = verticalDodgeFrame(heroDirection, p.stateTick, P.dodge.travel)
     if (p.state === 'dodge' && verticalRollFrame >= 0 && hero.roll) {

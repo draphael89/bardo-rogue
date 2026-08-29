@@ -9,9 +9,9 @@
 // Pipeline per cell:
 //   despill chroma -> binary alpha by coverage -> map every source pixel to canon -> vote per output
 //   pixel -> salience rescue -> optional pose fit -> pivot detection -> emit.
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
-import { dirname, relative } from 'node:path'
+import { dirname, normalize, relative } from 'node:path'
 import sharp from 'sharp'
 import type { SheetDef, SheetFrame, SheetClip, SheetProvenance } from '../../src/render/sheet'
 import { validateSheetDef } from '../../src/render/sheet'
@@ -46,6 +46,44 @@ export function validateClipRefs(def: SheetDef, where: string): void {
     if (!WINDOW_KEYS.some(k => keys.includes(k))) {
       throw new Error(`sheet ${where}: clip "${name}" resolves "${clip.sim.ref}" to an object with no timing window (has: ${keys.slice(0, 8).join(', ')})`)
     }
+    if (clip.sim.contact) {
+      const active = (node as Record<string, unknown>).active
+      if (typeof active !== 'number' || active < 1) {
+        throw new Error(`sheet ${where}: clip "${name}" claims contact against "${clip.sim.ref}", which has no positive active window`)
+      }
+      // Membership alone lets a spec label its anticipation drawing as the contact frame. Frame names
+      // are the semantic API consumed by the renderer, so require the asserted key to say what it is.
+      // This deliberately stays narrower than reimplementing each renderer's phase selection here.
+      if (!/(contact|hit|strike|impact)/i.test(clip.sim.contact)) {
+        throw new Error(`sheet ${where}: clip "${name}" contact frame "${clip.sim.contact}" is not a contact/hit/strike/impact key`)
+      }
+    }
+  }
+}
+
+/** Filesystem-backed provenance checks run at compile time, where lineage can actually be proved. */
+export function validateProvenance(spec: CompileSpec, where: string): void {
+  const p = spec.provenance
+  if (!p) return
+  if (p.approvedReference) {
+    const ref = normalize(p.approvedReference)
+    if (!ref.startsWith(`art/approved/`) || !existsSync(ref)) {
+      throw new Error(`sheet ${where}: approvedReference must be a retained file under art/approved`)
+    }
+  }
+  if (p.approvedSource) {
+    const source = normalize(p.approvedSource)
+    if (source !== normalize(spec.input) || !existsSync(source)) {
+      throw new Error(`sheet ${where}: approvedSource must name the retained compile input`)
+    }
+  }
+  if (p.promptFile && !p.promptHash) throw new Error(`sheet ${where}: promptFile requires promptHash`)
+  if (p.promptHash) {
+    if (!/^[0-9a-f]{16,64}$/.test(p.promptHash) || !p.promptFile || !existsSync(p.promptFile)) {
+      throw new Error(`sheet ${where}: promptHash requires an existing promptFile and a 16-64 digit lowercase SHA-256 prefix`)
+    }
+    const actual = createHash('sha256').update(readFileSync(p.promptFile)).digest('hex').slice(0, p.promptHash.length)
+    if (actual !== p.promptHash) throw new Error(`sheet ${where}: promptHash does not match ${p.promptFile}`)
   }
 }
 
@@ -244,8 +282,8 @@ interface Cell { data: Uint8Array; w: number; h: number }
  * distortion `fit: "pose"` exists to prevent. Centre horizontally, anchor south — the sprite stands
  * on the bottom of its cell, which is where the foot pivot is measured from.
  */
-function padToSquare(c: Cell): Cell {
-  const side = Math.max(c.w, c.h)
+function padToSquare(c: Cell, side = Math.max(c.w, c.h)): Cell {
+  if (side < c.w || side < c.h) throw new Error(`compile: pose ${c.w}x${c.h} does not fit shared ${side}px scale box`)
   if (side === c.w && side === c.h) return c
   const out = new Uint8Array(side * side * 4)
   const ox = Math.floor((side - c.w) / 2)
@@ -355,6 +393,8 @@ export async function compileSheet(spec: CompileSpec, specPath = '<inline>'): Pr
   const pal = subset(spec.palette)
   const maxColors = spec.maxColors ?? canon().budgets[spec.kind === 'character' ? 'character' : spec.kind === 'prop' ? 'prop' : 'effect'] ?? 16
 
+  validateProvenance(spec, specPath)
+
   const raw = readFileSync(spec.input)
   const sourceHash = createHash('sha256').update(raw).digest('hex').slice(0, 16)
   const img = sharp(raw).ensureAlpha()
@@ -391,6 +431,22 @@ export async function compileSheet(spec: CompileSpec, specPath = '<inline>'): Pr
   const frames: FrameReport[] = []
   const usedColors = new Set<string>()
 
+  // `fit: pose` removes the generator's excess matte, but it must not normalize every silhouette to
+  // full height independently. One shared source-space square preserves actor scale across the whole
+  // sheet; each pose still gets its own crop, south placement, declared pivot, and sockets.
+  let poseSide = 0
+  if (fit === 'pose') {
+    for (const [index, fs] of byIndex) {
+      const col = index % spec.cols, row = Math.floor(index / spec.cols)
+      const left = Math.round(col * meta.width / spec.cols), right = Math.round((col + 1) * meta.width / spec.cols)
+      const top = Math.round(row * meta.height / spec.rows), bottom = Math.round((row + 1) * meta.height / spec.rows)
+      const region = extractCell(src, meta.width, left, top, right - left, bottom - top)
+      const b = silhouetteBounds(region, chromaKey)
+      if (!b) throw new Error(`compile: cell ${index} ("${fs.name}") has no opaque pose`)
+      poseSide = Math.max(poseSide, b.x1 - b.x0 + 1, b.y1 - b.y0 + 1)
+    }
+  }
+
   for (let row = 0; row < spec.rows; row++) {
     for (let col = 0; col < spec.cols; col++) {
       const index = row * spec.cols + col
@@ -407,7 +463,7 @@ export async function compileSheet(spec: CompileSpec, specPath = '<inline>'): Pr
       if (fit === 'pose') {
         const b = silhouetteBounds(region, chromaKey)
         if (!b) throw new Error(`compile: cell ${index} ("${fs.name}") has no opaque pose`)
-        region = padToSquare(extractCell(region.data as Uint8Array, region.w, b.x0, b.y0, b.x1 - b.x0 + 1, b.y1 - b.y0 + 1))
+        region = padToSquare(extractCell(region.data as Uint8Array, region.w, b.x0, b.y0, b.x1 - b.x0 + 1, b.y1 - b.y0 + 1), poseSide)
       }
 
       const available = cell - margin * 2

@@ -113,6 +113,53 @@ What the merge itself had to settle, recorded here because a future reader will 
 
 The live ledger below is PR #13's, kept as written.
 
+### Open after the merge (audited 2026-08-29, eleven agents over PR #13)
+
+Fixed in the merge: the double schema-3 collision, the duplicate latch release, the missing master
+bus, and PR #13's three checkpoint holes (reward re-farm on reload, unlimited room retry, and a
+restore guard that could never return false). What the audit found and the merge did NOT close,
+ranked by what a sitting player would notice first. Each is evidenced; none is a hunch.
+
+1. **The realm dress does not change the room.** Seven rooms the ledger describes as river / ash /
+   ice / iron / bronze / wine-fire / wine-hall render as the same blue-grey masonry — measured mean
+   RGB across the play area differs by under 4/255 between Acheron and the Hall. `fogAlpha` 0.10 and
+   `rayAlpha` 0.06 (`tuning.ts:473-474`) are too low for the presets in
+   `render/atmospherePresets.ts:20-105` to register. This is the single biggest gap between what the
+   ledger claims and what renders.
+2. **The map beat does not produce a plan.** Every spine has exactly one fork, at one depth, and both
+   branches rejoin one node later — so `routeTail` returns the same chain for either door
+   (`route.ts:496-504`), and the overlay shows an identical future whichever you pick. §G.1 wanted
+   width 2-3 and choices at three depths. The overlay also never draws the route *so far*:
+   `roomHistory` is read only to build a cache key (`render/map.ts:57-60`).
+3. **One run in six has nowhere to spend.** ASH_MARCH carries no utility node at all — no shop, no
+   Unburied, no toll — so its obols are unspendable (`route.ts:312-354`; 16.8% of seeds). Obols have
+   no scarcity anywhere: a full clear earns 34-51 and the single purchase costs 6-12, so the purse
+   counts up and never bites.
+4. **The Smith spends on proximity.** Walking within 18px buys, with no confirmation and no undo, and
+   the purchase banner is destroyed in the same frame by the next one (`smith.ts:62-76`).
+5. **MetaStateV2 never landed.** The new persistent fields were bolted onto `MetaStateV1` with
+   `version: 1` unchanged (`session.ts:93-101`), so the next meta change has no discriminator to
+   migrate from. The settings payload got its bump in this merge; meta still needs one.
+6. **Determinism seams.** `arena.smithNear` is per-tick state outside `hashWorld` that gates a
+   purchase whose effects ARE hashed; `roomsFor` now returns module-global mutable arrays by
+   reference rather than fresh ones. And no pinned replay fixture covers the `loop` scenario at all,
+   so every line of new hashed state sits outside the fixture net — the "hashes must not move" rule
+   is currently satisfied vacuously.
+7. **Minos fires stacked lanes.** In phase two the veil sentence looses the ring and its fan
+   companion from one origin on one tick, putting two bolts on an identical path — one is invisible.
+   Eleven phase-two warden constants in `tuning.ts` are now dead but still read as authoritative.
+8. **Shell edges.** The death stone's rows are left-anchored with no wrap or mask, so a two-vow death
+   spills off the card; Settings and Credits still paint centred over the hero body that the menu
+   page was moved to avoid; and a mouse cannot operate the shell — clicking SETTINGS starts a run.
+9. **Evidence hygiene.** Every committed Minos and Empusa progress shot was written by the first
+   commit, and the last four commits then rewrote exactly those pixels amber to wine. The progress
+   page shows a renderer that no longer exists.
+10. **Two props fail this PR's own gate.** `ART_DIRECTION.md` §11.1 sets the Mirror test at ≤60%;
+    the committed prow measures 71% and the pan 92%.
+
+The human fun gate remains the one thing bots cannot close, and it is still at zero sessions.
+
+
 ### Remaining toward 90+ (live, 2026-08-29)
 
 The sentence in §E is playable. What still reads as unfinished when you sit down:

@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "id": "actor.brute.identity.v1",
+  "file": "bardo_brute_alpha_v1.png",
+  "sha256": "9239a86d6136629e234fc1ee31fdcb8dff78c324a89bf3a57f1a60bcbd72d53c",
+  "approvedAt": "2026-08-29T11:35:40.281Z",
+  "approvedBy": "purecromulence@gmail.com",
+  "note": "Approved in chat 2026-08-29 during the lane reconciliation: the shipped master from the merged PR #7 line, reviewed in pose sheets and gameplay captures."
+}

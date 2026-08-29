@@ -39,7 +39,11 @@ export interface SheetClip {
   /** Required when timing === 'sim': which tuning window governs, and which frame must be contact. */
   sim?: { ref: string; contact?: string }
   loop?: boolean
-  /** Defaults true. Set false for tumbling/airborne clips whose pivot intentionally travels. */
+  /**
+   * Defaults true. Set false for tumbling/airborne clips (the vertical dodge rolls) whose pivot
+   * INTENTIONALLY travels — there the pivot spread is the lift, and the planted-feet gate must not
+   * read it as foot-sliding.
+   */
   grounded?: boolean
 }
 
@@ -49,9 +53,9 @@ export interface SheetProvenance {
   modelVersion?: string
   jobId?: string
   seed?: number
-  /** SHA-256 (or a 16+ digit prefix) of the source-specific immutable promptFile. */
-  promptHash?: string
+  /** Checked-in prompt file this asset was generated from. Its hash is computed, never typed. */
   promptFile?: string
+  promptHash?: string
   referenceHashes?: string[]
   /** A style/reference input admitted through the explicit art/approved human checkpoint. */
   approvedReference?: string
@@ -72,6 +76,12 @@ export interface SheetDef {
   cols: number
   rows: number
   palette: string
+  /**
+   * The exact canon colour NAMES this asset was compiled against. The standalone gate enforces this
+   * selected ramp, not merely "somewhere in canon" — a sprite that wanders into another asset's ramp
+   * is palette drift even when every colour is individually canonical.
+   */
+  ramp?: string[]
   maxColors: number
   /** The direction the art is drawn facing. `mirror` says the opposite side is served by flipping. */
   facing?: 'east' | 'south' | 'north' | 'none'
@@ -84,6 +94,12 @@ export interface SheetDef {
    */
   aliases?: Record<string, string>
   clips?: Record<string, SheetClip>
+  /**
+   * Judged gate findings a human chose to carry, by EXACT gate id with a reason. Only heuristic
+   * ('judge') findings are waivable, only while they actually fire; the gate runner validates both,
+   * so a stale waiver is a build failure rather than dormant armour.
+   */
+  waivers?: Array<{ gate: string; reason: string }>
   source?: SheetProvenance
 }
 
@@ -115,11 +131,21 @@ const EMPTY_SOCKETS: Record<string, readonly [number, number]> = Object.freeze({
 export function validateSheetDef(def: SheetDef, where: string): void {
   const fail = (m: string): never => { throw new Error(`sheet ${where}: ${m}`) }
   if (!def.id) fail('missing id')
+  // The version names the CONTRACT shape, so a sidecar written by a future compiler fails loudly here
+  // instead of half-loading with fields this renderer does not know it is ignoring.
+  if (def.version !== 1) fail(`unsupported contract version ${def.version} (this build reads version 1)`)
+  if (!['character', 'prop', 'effect', 'tile'].includes(def.kind)) fail(`unknown kind "${def.kind}"`)
+  if (!def.palette || typeof def.palette !== 'string') fail('missing palette name')
+  if (!Number.isInteger(def.maxColors) || def.maxColors < 2) fail('maxColors must be an integer >= 2')
   if (!Number.isInteger(def.cell) || def.cell < 8) fail('cell must be an integer >= 8')
   if (!Number.isInteger(def.cols) || def.cols < 1) fail('cols must be a positive integer')
   if (!Number.isInteger(def.rows) || def.rows < 1) fail('rows must be a positive integer')
+  if (def.facing !== undefined && !['east', 'south', 'north', 'none'].includes(def.facing)) fail(`unknown facing "${def.facing}"`)
+  // Mirroring serves the opposite side by flipping east-drawn art; flipping a south/north/facing-less
+  // sheet is a meaningless combination that hides a spec mistake.
+  if (def.mirror && def.facing !== 'east') fail(`mirror requires facing "east", not "${def.facing}"`)
+  if (!def.frames || Object.keys(def.frames).length === 0) fail('frames is empty')
   const cells = def.cols * def.rows
-  if (!def.frames || Object.keys(def.frames).length === 0) fail('must declare at least one frame')
   const seen = new Set<number>()
   for (const [name, f] of Object.entries(def.frames)) {
     if (!Number.isInteger(f.i) || f.i < 0 || f.i >= cells) fail(`frame "${name}" index ${f.i} outside 0..${cells - 1}`)
@@ -128,6 +154,11 @@ export function validateSheetDef(def: SheetDef, where: string): void {
     const [px, py] = f.pivot ?? []
     if (!Number.isFinite(px) || !Number.isFinite(py)) fail(`frame "${name}" has no pivot`)
     if (px < 0 || px > def.cell || py < 0 || py > def.cell) fail(`frame "${name}" pivot [${px},${py}] outside the cell`)
+    for (const [sn, sv] of Object.entries(f.sockets ?? {})) {
+      if (!Array.isArray(sv) || sv.length !== 2 || !sv.every(Number.isFinite) || sv[0] < 0 || sv[0] > def.cell || sv[1] < 0 || sv[1] > def.cell) {
+        fail(`frame "${name}" socket "${sn}" is not a finite coordinate inside the cell`)
+      }
+    }
   }
   for (const [alias, target] of Object.entries(def.aliases ?? {})) {
     if (def.frames[alias]) fail(`alias "${alias}" collides with a real frame name`)

@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "id": "actor.hero.south.v4",
+  "file": "bardo_hero_south_alpha_v4.png",
+  "sha256": "03d55971e4da870ec1c6f5b8348ef3d4a5308971f7e840ec83f3e8ba0e83349b",
+  "approvedAt": "2026-08-29T11:35:43.599Z",
+  "approvedBy": "purecromulence@gmail.com",
+  "note": "Approved in chat 2026-08-29 during the lane reconciliation: the shipped master from the merged PR #7 line, reviewed in pose sheets and gameplay captures."
+}

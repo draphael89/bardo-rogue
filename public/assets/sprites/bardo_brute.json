@@ -2,10 +2,28 @@
   "id": "actor.brute",
   "version": 1,
   "kind": "character",
-  "cell": 48,
+  "cell": 64,
   "cols": 4,
   "rows": 2,
   "palette": "bardo.canon",
+  "ramp": [
+    "mortar",
+    "slate0",
+    "iron",
+    "ironHi",
+    "slate3",
+    "slateHi",
+    "brick",
+    "purple0",
+    "purple1",
+    "purple2",
+    "purple3",
+    "boneLo",
+    "boneDim",
+    "bone",
+    "ember",
+    "wood"
+  ],
   "maxColors": 16,
   "facing": "east",
   "mirror": true,
@@ -13,81 +31,81 @@
     "idle": {
       "i": 0,
       "pivot": [
-        18,
-        46
+        32,
+        60
       ]
     },
     "chase": {
       "i": 1,
       "pivot": [
-        28,
-        46
+        32,
+        60
       ]
     },
     "windupEarly": {
       "i": 2,
       "pivot": [
-        23,
-        46
+        32,
+        60
       ],
       "sockets": {
         "maulHead": [
-          15,
-          8
+          23,
+          15
         ]
       }
     },
     "windupCommit": {
       "i": 3,
       "pivot": [
-        25,
-        46
+        32,
+        60
       ],
       "sockets": {
         "maulHead": [
-          19,
-          7
+          23,
+          9
         ]
       }
     },
     "release": {
       "i": 4,
       "pivot": [
-        18,
-        46
+        32,
+        60
       ],
       "sockets": {
         "maulHead": [
-          43,
-          40
+          56,
+          54
         ]
       }
     },
     "contact": {
       "i": 5,
       "pivot": [
-        19,
-        46
+        32,
+        60
       ],
       "sockets": {
         "maulHead": [
-          43,
-          42
+          57,
+          56
         ]
       }
     },
     "recover": {
       "i": 6,
       "pivot": [
-        18,
-        46
+        32,
+        60
       ]
     },
     "hurt": {
       "i": 7,
       "pivot": [
-        18,
-        46
+        32,
+        60
       ]
     }
   },
@@ -107,12 +125,29 @@
       }
     }
   },
+  "waivers": [
+    {
+      "gate": "frame:windupCommit:height",
+      "reason": "The raised maul apex IS the tell: at one shared scale the committed wind-up reads taller than the idle by design. The body is ~36px, well under the cap; the overage is weapon."
+    },
+    {
+      "gate": "frame:idle:light-direction",
+      "reason": "Score 0.38 vs cap 0.35: the amber mask slit and apron trim sit low on the approved silhouette by design; shoulder iron and helm are north-lit. Human-judged on the approved master."
+    },
+    {
+      "gate": "frame:contact:light-direction",
+      "reason": "The contact frame is brightest at the impact point at the ground line - the SS6.7 STRIKE beat - so its vertical gradient reads bright-south. That is the hit, not pillow shading."
+    }
+  ],
   "source": {
     "provider": "openai",
     "model": "gpt-image (built-in tool)",
     "approvedSource": "art/approved/bardo_brute_alpha_v1.png",
     "promptFile": "art/prompts/bardo_brute_alpha_v1.txt",
     "promptHash": "40421fc7fa6117eb11644a94681f8497e39c369db128ee278a083c18e651b749",
+    "referenceHashes": [
+      "9239a86d6136629e234fc1ee31fdcb8dff78c324a89bf3a57f1a60bcbd72d53c"
+    ],
     "compiler": "bardo-art/1",
     "sourceFile": "art/approved/bardo_brute_alpha_v1.png",
     "sourceHash": "9239a86d6136629e"

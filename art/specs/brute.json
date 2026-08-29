@@ -4,7 +4,7 @@
   "input": "art/approved/bardo_brute_alpha_v1.png",
   "output": "public/assets/sprites/bardo_brute.png",
   "sidecar": "public/assets/sprites/bardo_brute.json",
-  "cell": 48,
+  "cell": 64,
   "cols": 4,
   "rows": 2,
   "maxColors": 16,
@@ -29,7 +29,7 @@
   "paletteNote": "Sixteen canon colours. First pass put emberLo in this ramp and the wine apron drifted to fire-red: a lifted dark wine lands nearer a strong red than a dark purple, so the Brute read as burning rather than aproned. Wine now owns a full four-step ramp (purple0..3) and ember is kept as a single slot for the mask slit - the only heat he owns, and SS6.7 reserves it for the committed attack. No gold: gold marks a threshold (SS8.2.2) and he is not one.",
   "facing": "east",
   "mirror": true,
-  "fit": "pose",
+  "fit": "shared",
   "margin": 2,
   "chromaKey": true,
   "coverage": 0.5,
@@ -41,95 +41,71 @@
     "minShare": 0.22,
     "minDelta": 0.16
   },
-  "note": "The generated sheet is square regardless of its 4x2 grid, so cells are twice as tall as wide; 'pose' fit crops each silhouette before fitting so the Brute is not vertically compressed. Pivots locate the planted foot under the simulation body \u2014 generated cells preserve the drawing, not a uniform registration point. maulHead sockets are where the tell hangs its emissive charge and falling motes; without them the glow floats off the weapon.",
+  "note": "fit 'shared': one source-to-output scale for the whole sheet, so the Brute's body is the same size in every frame - per-frame 'pose' fitting compiled the compact idle 19% larger than the wide contact smash, with the swing exactly at the moment the player stares at him. The cell moves from 48 to 64 because the measured motion envelope cannot hold both a 38px body and a maul raised overhead in 48px at one scale: at 64 the committed wind-up is genuinely TALLER than the idle (58px vs 37px), which is what a tell should read as. anchorX is the judged planted-foot position as a fraction of each silhouette - carried over from the hand-placed 48px registration, not re-guessed. maulHead sockets are bbox fractions for the same reason: they follow the drawing through any recompile scale.",
   "frames": [
     {
       "name": "idle",
       "i": 0,
-      "pivot": [
-        18,
-        46
-      ]
+      "anchorX": 0.372
     },
     {
       "name": "chase",
       "i": 1,
-      "pivot": [
-        28,
-        46
-      ]
+      "anchorX": 0.605
     },
     {
       "name": "windupEarly",
       "i": 2,
-      "pivot": [
-        23,
-        46
-      ],
       "sockets": {
         "maulHead": [
-          15,
-          8
+          0.214,
+          0.14
         ]
-      }
+      },
+      "anchorX": 0.5
     },
     {
       "name": "windupCommit",
       "i": 3,
-      "pivot": [
-        25,
-        46
-      ],
       "sockets": {
         "maulHead": [
-          19,
-          7
+          0.304,
+          0.116
         ]
-      }
+      },
+      "anchorX": 0.565
     },
     {
       "name": "release",
       "i": 4,
-      "pivot": [
-        18,
-        46
-      ],
       "sockets": {
         "maulHead": [
-          43,
-          40
+          0.953,
+          0.848
         ]
-      }
+      },
+      "anchorX": 0.372
     },
     {
       "name": "contact",
       "i": 5,
-      "pivot": [
-        19,
-        46
-      ],
       "sockets": {
         "maulHead": [
-          43,
-          42
+          0.952,
+          0.893
         ]
-      }
+      },
+      "anchorX": 0.381
     },
     {
       "name": "recover",
       "i": 6,
-      "pivot": [
-        18,
-        46
-      ]
+      "anchorX": 0.372
     },
     {
       "name": "hurt",
       "i": 7,
-      "pivot": [
-        18,
-        46
-      ]
+      "anchorX": 0.372
     }
   ],
   "clips": {
@@ -152,7 +128,24 @@
     "provider": "openai",
     "model": "gpt-image (built-in tool)",
     "approvedSource": "art/approved/bardo_brute_alpha_v1.png",
-    "promptFile": "art/prompts/bardo_brute_alpha_v1.txt",
-    "promptHash": "40421fc7fa6117eb11644a94681f8497e39c369db128ee278a083c18e651b749"
-  }
+    "promptFile": "art/prompts/bardo_brute_alpha_v1.txt"
+  },
+  "register": [
+    32,
+    60
+  ],
+  "waivers": [
+    {
+      "gate": "frame:windupCommit:height",
+      "reason": "The raised maul apex IS the tell: at one shared scale the committed wind-up reads taller than the idle by design. The body is ~36px, well under the cap; the overage is weapon."
+    },
+    {
+      "gate": "frame:idle:light-direction",
+      "reason": "Score 0.38 vs cap 0.35: the amber mask slit and apron trim sit low on the approved silhouette by design; shoulder iron and helm are north-lit. Human-judged on the approved master."
+    },
+    {
+      "gate": "frame:contact:light-direction",
+      "reason": "The contact frame is brightest at the impact point at the ground line - the SS6.7 STRIKE beat - so its vertical gradient reads bright-south. That is the hit, not pillow shading."
+    }
+  ]
 }

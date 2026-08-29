@@ -10,6 +10,12 @@
 // while a prompt derived from §1 (palette), §2 (materials), §4 (silhouette, canvas) and §10 (the
 // forbidden list) is the same instruction every time, and its hash is recorded in the sheet's
 // provenance so a result can be traced back to the exact words that produced it.
+//
+// Endpoint names and parameter shapes are pinned by tests/art/generate.test.ts against the provider's
+// published OpenAPI schema, because the first version of this file shipped with plausible-looking
+// endpoints that 404ed: nothing here had a test, so the whole lane stayed green while being
+// uncallable. Verified 2026-08-28 against https://api.pixellab.ai/v2/openapi.json and an
+// unauthenticated probe (create-image-* answers 401 auth-required; generate-image-* answers 404).
 import { createHash } from 'node:crypto'
 import { mkdirSync, writeFileSync, readFileSync, existsSync, statSync, readdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -17,7 +23,14 @@ import { fileURLToPath } from 'node:url'
 import sharp from 'sharp'
 import { canon, subset } from './palette'
 
-export type ProviderName = 'retrodiffusion' | 'pixellab'
+export const PROVIDERS = ['retrodiffusion', 'pixellab'] as const
+export type ProviderName = (typeof PROVIDERS)[number]
+
+/** The only way a string becomes a ProviderName. A typoed --provider must not silently default. */
+export function parseProvider(s: string): ProviderName {
+  if ((PROVIDERS as readonly string[]).includes(s)) return s as ProviderName
+  throw new Error(`generate: unknown provider "${s}" — expected one of: ${PROVIDERS.join(', ')}`)
+}
 
 export interface GenerateSpec {
   /** What the asset IS, in the game's own words: "the hero: split helm crest, iron plate, greatsword". */
@@ -39,6 +52,7 @@ export interface GenerateResult {
   provider: ProviderName
   promptHash: string
   files: string[]
+  manifest: string
   jobId?: string
   seed?: number
 }
@@ -86,6 +100,7 @@ export function buildPrompt(spec: GenerateSpec): string {
 }
 
 export const promptHash = (prompt: string): string => createHash('sha256').update(prompt).digest('hex').slice(0, 16)
+export const sha256 = (buf: Buffer | string): string => createHash('sha256').update(buf).digest('hex')
 
 /**
  * The canon palette as a base64 PNG, which is what both providers take as a palette lock.
@@ -109,34 +124,41 @@ export async function palettePng(names?: string[]): Promise<string> {
   return png.toString('base64')
 }
 
+export interface ResolvedReference { file: string; hash: string; b64: string }
+
 /**
- * Resolve the spec's style references to base64 PNGs.
+ * Resolve the spec's style references to concrete files.
  *
  * `references` may name files or directories; `art/approved/` is a directory by design, because the
- * approved pool IS the style reference and it grows. Without this the field was inert and adding an
- * approved master conditioned nothing — the pipeline's advertised consistency mechanism was a
- * comment. Selection is path-sorted rather than timestamp-sorted, so copying or checking out the
- * same pool cannot change a paid request. Retro Diffusion accepts four references; PixelLab accepts
- * one style image, so both select from the same stable four-image prefix and PixelLab uses its first.
+ * approved pool IS the style reference and it grows. Rules, all of them about determinism and about
+ * never silently generating unconditioned when the spec asked for conditioning:
+ *  - a named file that does not exist is an error, not a skip;
+ *  - a named directory that resolves no PNGs is an error for the same reason;
+ *  - ordering is lexicographic by path — the pool versions itself by name (…-v1, …-v2), so "latest"
+ *    is a naming convention, not a checkout-dependent mtime;
+ *  - when capped, the lexicographically LAST `max` files win, which under that convention is the
+ *    newest versions.
  */
+/** Both providers take only a handful of references; four is the documented ceiling. */
 export const REFERENCE_IMAGE_LIMIT = 4
 
-export async function referenceImages(refs: readonly string[] | undefined, max = REFERENCE_IMAGE_LIMIT): Promise<string[]> {
+export function resolveReferences(refs: readonly string[] | undefined, max = REFERENCE_IMAGE_LIMIT): ResolvedReference[] {
   if (!refs?.length) return []
   const files: string[] = []
   for (const r of refs) {
-    if (!existsSync(r)) throw new Error(`generate: requested reference does not exist: ${r}`)
+    if (!existsSync(r)) throw new Error(`generate: reference "${r}" does not exist — the spec asked to condition on it`)
     if (statSync(r).isDirectory()) {
-      const pngs = readdirSync(r).filter(f => /\.png$/i.test(f))
-      if (!pngs.length) throw new Error(`generate: requested reference directory contains no PNG images: ${r}`)
-      for (const f of pngs) files.push(join(r, f))
-    } else {
-      if (!/\.png$/i.test(r)) throw new Error(`generate: requested reference is not a PNG image: ${r}`)
-      files.push(r)
-    }
+      const found = readdirSync(r).filter(f => /\.png$/i.test(f)).map(f => join(r, f))
+      if (!found.length) throw new Error(`generate: reference directory "${r}" contains no PNGs — approve a master first, or drop the reference`)
+      files.push(...found)
+    } else if (/\.png$/i.test(r)) files.push(r)
+    else throw new Error(`generate: reference "${r}" is not a PNG`)
   }
-  const stable = [...new Set(files)].sort((a, b) => a < b ? -1 : a > b ? 1 : 0)
-  return stable.slice(0, max).map(f => readFileSync(f).toString('base64'))
+  files.sort()
+  return files.slice(-max).map(file => {
+    const buf = readFileSync(file)
+    return { file, hash: sha256(buf), b64: buf.toString('base64') }
+  })
 }
 
 export interface ProviderRequest {
@@ -159,10 +181,10 @@ export interface ProviderRequest {
 export async function requests(provider: ProviderName, spec: GenerateSpec, token: string): Promise<ProviderRequest[]> {
   const prompt = buildPrompt(spec)
   const palette = await palettePng(spec.palette)
-  const refs = await referenceImages(spec.references)
   const count = Math.max(1, spec.count ?? 8)
 
   if (provider === 'retrodiffusion') {
+    const refs = resolveReferences(spec.references, 4)
     return [{
       url: 'https://api.retrodiffusion.ai/v1/inferences',
       method: 'POST',
@@ -176,14 +198,21 @@ export async function requests(provider: ProviderName, spec: GenerateSpec, token
         num_images: count,
         remove_bg: true,
         input_palette: palette,
-        ...(refs.length ? { reference_images: refs } : {}),
+        ...(refs.length ? { reference_images: refs.map(r => r.b64) } : {}),
         ...(spec.seed !== undefined ? { seed: spec.seed } : {}),
       },
     }]
   }
 
-  // PixelLab: bitforge is the endpoint that takes a style image, so the approved pool selects it;
-  // pixflux is the plain text-to-sprite path when there is nothing to condition on.
+  // PixelLab. Endpoints are /create-image-*, NOT /generate-image-* (the OpenAPI paths; the latter
+  // 404). Bitforge is the endpoint that takes a style image, so references select it; pixflux is the
+  // plain text-to-sprite path when there is nothing to condition on. Bitforge accepts exactly ONE
+  // style_image, so the spec must resolve exactly one — picking one silently from a pool would make
+  // the conditioning depend on directory contents nobody chose.
+  const refs = resolveReferences(spec.references, Infinity)
+  if (refs.length > 1) {
+    throw new Error(`generate: pixellab bitforge takes exactly one style reference; the spec resolved ${refs.length} (${refs.map(r => r.file).join(', ')}) — name the one deliberate master`)
+  }
   const url = refs.length
     ? 'https://api.pixellab.ai/v2/create-image-bitforge'
     : 'https://api.pixellab.ai/v2/create-image-pixflux'
@@ -200,7 +229,8 @@ export async function requests(provider: ProviderName, spec: GenerateSpec, token
       detail: 'medium detail',
       no_background: true,
       color_image: { type: 'base64', base64: palette },
-      ...(refs.length ? { style_image: { type: 'base64', base64: refs[0] }, style_strength: 50 } : {}),
+      // style_strength is an INTEGER percent 0-100 (default 0 = no transfer); 0.5 was a no-op.
+      ...(refs.length ? { style_image: { type: 'base64', base64: refs[0].b64 }, style_strength: 50 } : {}),
       // One call per candidate, so vary the seed or every candidate comes back identical.
       ...(spec.seed !== undefined ? { seed: spec.seed + i } : {}),
     },
@@ -216,52 +246,97 @@ export function tokenFor(provider: ProviderName): string | null {
   return process.env[TOKEN_ENV[provider]] ?? null
 }
 
+/** Pull the base64 image list out of a provider response, tolerating the documented shapes. */
+export function decodeImages(json: Record<string, unknown>): string[] {
+  if (Array.isArray(json.base64_images)) return json.base64_images as string[]
+  if (Array.isArray(json.images)) return json.images as string[]
+  if (json.image) {
+    const img = json.image as { base64?: string } | string
+    return [typeof img === 'string' ? img : img.base64 ?? '']
+  }
+  return []
+}
+
+/** A candidate must be an actual decodable PNG. A truncated or HTML-error body must not enter the pool. */
+export function isPng(buf: Buffer): boolean {
+  return buf.length > 8 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47
+}
+
 /**
  * Run a generation. Writes candidates into `.art-cache/candidates/` and returns their paths.
  * Never writes to public/assets: a candidate is not an asset until it has passed the gates and a
  * human has approved the identity it belongs to.
+ *
+ * Failed or ambiguous responses are never retried here: each POST is a paid call, and a retry on an
+ * ambiguous response can double-spend. The caller re-runs deliberately.
  */
 export async function generate(provider: ProviderName, spec: GenerateSpec, outDir = '.art-cache/candidates'): Promise<GenerateResult> {
   const token = tokenFor(provider)
   if (!token) throw new Error(`generate: ${TOKEN_ENV[provider]} is not set — export it, or use --dry-run to review the request`)
   const reqs = await requests(provider, spec, token)
+  const refs = resolveReferences(spec.references, provider === 'pixellab' ? Infinity : REFERENCE_IMAGE_LIMIT)
   const prompt = buildPrompt(spec)
   const hash = promptHash(prompt)
-  const requestHash = createHash('sha256')
-    .update(JSON.stringify(reqs.map(({ url, body }) => ({ url, body }))))
-    .digest('hex').slice(0, 12)
-  const runBase = `${provider}-${hash}-${requestHash}`
-  let runId = runBase
-  for (let attempt = 2; existsSync(join(outDir, `${runId}.prompt.txt`)); attempt++) runId = `${runBase}-${attempt}`
+  // The prompt record and the output directory exist BEFORE the first paid call, and every validated
+  // candidate is written to disk AS IT ARRIVES — a 429 on request three of eight must not discard the
+  // two images already paid for. (An earlier version buffered the batch in memory and lost exactly
+  // that; the error below names what survived so a retry is an informed decision.)
+  mkdirSync(outDir, { recursive: true })
+  writeFileSync(join(outDir, `${provider}-${hash}.prompt.txt`), prompt + '\n')
   const files: string[] = []
+  const candidates: Array<{ file: string; sha256: string }> = []
+  const usage: unknown[] = []
   let jobId: string | undefined
   let seed: number | undefined = spec.seed
 
-  mkdirSync(outDir, { recursive: true })
-  writeFileSync(join(outDir, `${runId}.prompt.txt`), prompt + '\n')
+  const writeManifest = (): string => {
+    const runHash = sha256(candidates.map(c => c.sha256).join(',')).slice(0, 12)
+    const manifest = join(outDir, `${provider}-${hash}-${runHash}.manifest.json`)
+    writeFileSync(manifest, JSON.stringify({
+      provider,
+      promptHash: hash,
+      requestHash: sha256(JSON.stringify(reqs.map(r => ({ url: r.url, body: r.body })))).slice(0, 16),
+      references: refs.map(r => ({ file: r.file, sha256: r.hash })),
+      candidates,
+      jobId: jobId ?? null,
+      seed: seed ?? null,
+      usage,
+      generatedAt: new Date().toISOString(),
+    }, null, 2) + '\n')
+    return manifest
+  }
 
   for (const req of reqs) {
-    const res = await fetch(req.url, { method: req.method, headers: req.headers, body: JSON.stringify(req.body) })
+    let res: Response
+    try {
+      res = await fetch(req.url, { method: req.method, headers: req.headers, body: JSON.stringify(req.body) })
+    } catch (e) {
+      const saved = files.length ? `; saved ${files.length} candidate(s) in ${outDir} (manifest ${writeManifest()}) — inspect them before retrying` : ''
+      throw new Error(`generate: ${provider} request failed: ${e instanceof Error ? e.message : e}${saved}`)
+    }
     if (!res.ok) {
-      const saved = files.length ? `; saved ${files.length} candidate(s) in ${outDir} — inspect them before retrying` : ''
-      throw new Error(`generate: ${provider} returned ${res.status} ${res.statusText}: ${(await res.text()).slice(0, 400)}${saved}`)
+      const body = (await res.text()).slice(0, 400)
+      const saved = files.length ? `; saved ${files.length} candidate(s) in ${outDir} (manifest ${writeManifest()}) — inspect them before retrying` : ''
+      throw new Error(`generate: ${provider} returned ${res.status} ${res.statusText}: ${body}${saved}`)
     }
     const json = await res.json() as Record<string, unknown>
-    // Both providers return base64; the key differs and has changed across versions, so accept any of
-    // the documented shapes rather than pinning one and breaking on the next release.
-    const batch: string[] =
-      (json.base64_images as string[]) ??
-      (json.images as string[]) ??
-      (json.image ? [(json.image as { base64?: string })?.base64 ?? json.image as string] : [])
-    if (!batch.length) throw new Error(`generate: ${provider} returned no images: ${JSON.stringify(json).slice(0, 400)}`)
+    const batch = decodeImages(json)
+    if (!batch.length) throw new Error(`generate: ${provider} returned no images: ${JSON.stringify(json).slice(0, 400)}${files.length ? ` (${files.length} earlier candidate(s) already saved in ${outDir})` : ''}`)
     for (const b64 of batch) {
-      const file = join(outDir, `${runId}-${files.length}.png`)
-      writeFileSync(file, Buffer.from(b64.replace(/^data:image\/\w+;base64,/, ''), 'base64'))
-      files.push(file)
+      const buf = Buffer.from(String(b64).replace(/^data:image\/\w+;base64,/, ''), 'base64')
+      if (!isPng(buf)) throw new Error(`generate: ${provider} returned a payload that is not a PNG (${buf.length} bytes) — not admitting it as a candidate`)
+      await sharp(buf).metadata() // throws if the PNG is truncated or undecodable
+      // Content-hash names: a rerun with different randomness cannot clobber an earlier paid batch,
+      // and identical content dedupes itself.
+      const contentHash = sha256(buf)
+      const file = join(outDir, `${provider}-${hash}-${contentHash.slice(0, 12)}.png`)
+      writeFileSync(file, buf)
+      if (!files.includes(file)) { files.push(file); candidates.push({ file, sha256: contentHash }) }
     }
+    if (json.usage) usage.push(json.usage)
     jobId ??= (json.job_id ?? json.id) as string | undefined
     seed ??= json.seed as number | undefined
   }
 
-  return { provider, promptHash: hash, files, jobId, seed }
+  return { provider, promptHash: hash, files, manifest: writeManifest(), jobId, seed }
 }

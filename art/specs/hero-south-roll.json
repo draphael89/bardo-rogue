@@ -9,8 +9,22 @@
   "rows": 2,
   "maxColors": 16,
   "palette": [
-    "mortar", "purple0", "purple1", "purple2", "purple3", "iron", "ironHi", "slate3",
-    "slateHi", "brick", "cope", "goldDim", "gold", "goldHot", "boneDim", "bone"
+    "mortar",
+    "purple0",
+    "purple1",
+    "purple2",
+    "purple3",
+    "iron",
+    "ironHi",
+    "slate3",
+    "slateHi",
+    "brick",
+    "cope",
+    "goldDim",
+    "gold",
+    "goldHot",
+    "boneDim",
+    "bone"
   ],
   "facing": "south",
   "mirror": false,
@@ -18,20 +32,72 @@
   "margin": 5,
   "chromaKey": true,
   "coverage": 0.5,
-  "valueLift": { "targetMean": 0.31 },
-  "salience": { "minShare": 0.22, "minDelta": 0.16 },
+  "valueLift": {
+    "targetMean": 0.31
+  },
+  "salience": {
+    "minShare": 0.22,
+    "minDelta": 0.16
+  },
   "frames": [
-    { "name": "dive", "i": 0, "pivot": [16, 28] },
-    { "name": "tuck", "i": 1, "pivot": [16, 16] },
-    { "name": "apex", "i": 2, "pivot": [16, 16] },
-    { "name": "extend", "i": 3, "pivot": [16, 28] }
+    {
+      "name": "dive",
+      "i": 0,
+      "pivot": [
+        16,
+        28
+      ]
+    },
+    {
+      "name": "tuck",
+      "i": 1,
+      "pivot": [
+        16,
+        16
+      ]
+    },
+    {
+      "name": "apex",
+      "i": 2,
+      "pivot": [
+        16,
+        16
+      ]
+    },
+    {
+      "name": "extend",
+      "i": 3,
+      "pivot": [
+        16,
+        28
+      ]
+    }
   ],
-  "clips": { "roll": { "frames": ["dive", "tuck", "apex", "extend"], "timing": "sim", "sim": { "ref": "player.dodge" }, "grounded": false } },
+  "clips": {
+    "roll": {
+      "frames": [
+        "dive",
+        "tuck",
+        "apex",
+        "extend"
+      ],
+      "timing": "sim",
+      "sim": {
+        "ref": "player.dodge"
+      },
+      "grounded": false
+    }
+  },
   "provenance": {
     "provider": "openai",
     "model": "gpt-image (built-in tool)",
     "approvedSource": "art/approved/bardo_hero_south_roll_alpha_v3.png",
-    "promptFile": "art/prompts/bardo_hero_south_roll_alpha_v3.txt",
-    "promptHash": "1fdca102ecd40da4cabcf5df8759a2434a091dc83fd29318463107cc95c8dbcf"
-  }
+    "promptFile": "art/prompts/bardo_hero_south_roll_alpha_v3.txt"
+  },
+  "waivers": [
+    {
+      "gate": "frame:apex:light-direction",
+      "reason": "The apex of the roll is the body INVERTED mid-somersault: helm and bright crest at the bottom, boots up top. Its north-lit form shading tumbles with the body, which a vertical form-gradient necessarily reads as bright-south. Physically correct for one airborne frame."
+    }
+  ]
 }

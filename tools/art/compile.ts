@@ -11,11 +11,12 @@
 //   pixel -> salience rescue -> optional pose fit -> pivot detection -> emit.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { createHash } from 'node:crypto'
-import { dirname, normalize, relative } from 'node:path'
+import { dirname, relative } from 'node:path'
 import sharp from 'sharp'
 import type { SheetDef, SheetFrame, SheetClip, SheetProvenance } from '../../src/render/sheet'
 import { validateSheetDef } from '../../src/render/sheet'
 import { canon, subset, nearestIndex, luminance, rgbToHex, liftLightness, solveLiftGamma, type PaletteSubset, type RGB } from './palette'
+import { isProductionPath, verifyApproval } from './approve'
 import { tuning } from '../../src/tuning'
 
 /** Timing fields that make a tuning node a window a clip can legitimately hang off. */
@@ -46,44 +47,34 @@ export function validateClipRefs(def: SheetDef, where: string): void {
     if (!WINDOW_KEYS.some(k => keys.includes(k))) {
       throw new Error(`sheet ${where}: clip "${name}" resolves "${clip.sim.ref}" to an object with no timing window (has: ${keys.slice(0, 8).join(', ')})`)
     }
+    // Three composed checks on a contact assertion, from both remediation lanes:
+    //  1. the governing tuning window must actually have a live phase (active >= 1) — a contact
+    //     frame for a window that never deals damage is an assertion about nothing;
+    //  2. the asserted frame's NAME must read as a contact key, so a sidecar stays legible;
+    //  3. structurally, the contact may not be the clip's startup frame (resolved through aliases,
+    //     so a deliberate bookend like heavyRecover -> heavyStart stays legal as RECOVERY while
+    //     "contact = the wind-up pose" stays an error).
+    // The runtime consumes the assertion (clipSelect), so beyond these, a wrong contact is a wrong
+    // frame ON SCREEN during the damage window — which the boundary tests and motion strips show.
     if (clip.sim.contact) {
+      // A contact frame is "the drawing shown while damage is live", so the window it names must
+      // HAVE a live phase. Absent counts as absent: player.dodge resolves fine and has no `active`,
+      // and a contact asserted against it is an assertion about nothing. (Scoped to contact-present
+      // on purpose — applying it to every sim clip would reject the dodge and roll clips, which
+      // legitimately name windows with no damage phase and assert no contact.)
       const active = (node as Record<string, unknown>).active
       if (typeof active !== 'number' || active < 1) {
-        throw new Error(`sheet ${where}: clip "${name}" claims contact against "${clip.sim.ref}", which has no positive active window`)
+        throw new Error(`sheet ${where}: clip "${name}" asserts contact "${clip.sim.contact}" against "${clip.sim.ref}", which has no live phase (active ${JSON.stringify(active)}) — nothing is damaging while that frame shows`)
       }
-      // Membership alone lets a spec label its anticipation drawing as the contact frame. Frame names
-      // are the semantic API consumed by the renderer, so require the asserted key to say what it is.
-      // This deliberately stays narrower than reimplementing each renderer's phase selection here.
       if (!/(contact|hit|strike|impact)/i.test(clip.sim.contact)) {
         throw new Error(`sheet ${where}: clip "${name}" contact frame "${clip.sim.contact}" is not a contact/hit/strike/impact key`)
       }
+      const resolve = (n: string): string => def.frames[n] ? n : def.aliases?.[n] ?? n
+      const contact = resolve(clip.sim.contact)
+      if (contact === resolve(clip.frames[0])) {
+        throw new Error(`sheet ${where}: clip "${name}" asserts its startup frame "${clip.sim.contact}" as the contact — the frame shown while the hit is live cannot be the wind-up pose`)
+      }
     }
-  }
-}
-
-/** Filesystem-backed provenance checks run at compile time, where lineage can actually be proved. */
-export function validateProvenance(spec: CompileSpec, where: string): void {
-  const p = spec.provenance
-  if (!p) return
-  if (p.approvedReference) {
-    const ref = normalize(p.approvedReference)
-    if (!ref.startsWith(`art/approved/`) || !existsSync(ref)) {
-      throw new Error(`sheet ${where}: approvedReference must be a retained file under art/approved`)
-    }
-  }
-  if (p.approvedSource) {
-    const source = normalize(p.approvedSource)
-    if (!source.startsWith(`art/approved/`) || source !== normalize(spec.input) || !existsSync(source)) {
-      throw new Error(`sheet ${where}: approvedSource must name the retained compile input under art/approved`)
-    }
-  }
-  if (p.promptFile && !p.promptHash) throw new Error(`sheet ${where}: promptFile requires promptHash`)
-  if (p.promptHash) {
-    if (!/^[0-9a-f]{16,64}$/.test(p.promptHash) || !p.promptFile || !existsSync(p.promptFile)) {
-      throw new Error(`sheet ${where}: promptHash requires an existing promptFile and a 16-64 digit lowercase SHA-256 prefix`)
-    }
-    const actual = createHash('sha256').update(readFileSync(p.promptFile)).digest('hex').slice(0, p.promptHash.length)
-    if (actual !== p.promptHash) throw new Error(`sheet ${where}: promptHash does not match ${p.promptFile}`)
   }
 }
 
@@ -92,9 +83,26 @@ export const COMPILER_VERSION = 'bardo-art/1'
 export interface FrameSpec {
   name: string
   i: number
-  /** Omit or 'auto' to detect the feet anchor from the silhouette. */
+  /** Omit or 'auto' to detect the feet anchor from the silhouette. Forbidden under fit "shared". */
   pivot?: [number, number] | 'auto'
+  /**
+   * Under fit "grid": cell-pixel coordinates. Under fit "shared": FRACTIONS of the frame's silhouette
+   * bbox (0..1 each axis), because output coordinates depend on a scale the spec author does not set —
+   * a socket typed in pixels would silently detach from the drawing on the next recompile.
+   */
   sockets?: Record<string, [number, number]>
+  /**
+   * fit "shared" only: where the frame's ground anchor sits across its silhouette width, as a 0..1
+   * fraction. This is a judged value — a swing that reaches east keeps its planted foot west of the
+   * mass centre — carried over from hand-placed registration rather than re-guessed per compile.
+   */
+  anchorX?: number
+  /**
+   * fit "grid" + register only: a deliberate 1px-scale placement concession, e.g. pulling a sword tip
+   * off the cell seam. Declared here so the concession is visible in review instead of buried in a
+   * translation formula.
+   */
+  nudge?: [number, number]
 }
 
 export interface CompileSpec {
@@ -112,12 +120,32 @@ export interface CompileSpec {
   frames: FrameSpec[]
   aliases?: Record<string, string>
   clips?: Record<string, SheetClip>
+  /** Judged gate findings to carry, by exact gate id, each with its reason. See SheetDef.waivers. */
+  waivers?: Array<{ gate: string; reason: string }>
   /** Restrict the target palette to a named ramp. Default: all of canon. */
   palette?: string[]
   /** Drop pixels that are decisively green (generators are asked for a #00ff00 matte). */
   chromaKey?: boolean
-  /** 'grid' samples the cell as-is; 'pose' crops each silhouette first, preserving aspect. */
-  fit?: 'grid' | 'pose'
+  /**
+   * 'grid'   samples the cell as-is; with `register`, content and pivot translate together onto the
+   *          canonical anchor (screen placement unchanged, cell registration uniform).
+   * 'pose'   crops each silhouette and pads it into ONE shared source-space square (the sheet's
+   *          largest bbox side), centred, south-anchored — body scale is constant, declared pivots
+   *          stay judged per frame. The mode for sheets whose pivot variation is information
+   *          (airborne rolls).
+   * 'shared' crops each silhouette and reduces with ONE scale placed against the canonical anchor:
+   *          registration is structural, pivots are stamped to `register`, sockets are bbox
+   *          fractions. The mode for grounded multi-pose sheets. Requires `register`.
+   */
+  fit?: 'grid' | 'pose' | 'shared'
+  /**
+   * Canonical anchor [x, y] in cell pixels. Every frame's pivot BECOMES this point: under 'grid' the
+   * declared pivot is translated onto it (on-screen placement is unchanged, because content and pivot
+   * move together — the compiler fails if that translation would clip a pixel); under 'shared' frames
+   * are placed against it directly. One anchor per sheet is what makes registration structural
+   * instead of sixteen hand-judged numbers that drift.
+   */
+  register?: [number, number]
   margin?: number
   /** Thin bright features (a blade) lose a plain majority vote. See `salienceRescue`. */
   salience?: { minShare: number; minDelta: number } | false
@@ -140,6 +168,86 @@ export interface CompileSpec {
   provenance?: Partial<SheetProvenance>
 }
 
+/**
+ * Reject a malformed spec before any pixel work, with the path to the fault.
+ *
+ * A spec arrives as `JSON.parse(...) as CompileSpec` — a cast, not a check. The concrete failure this
+ * exists for: two frames declaring the same `i` used to last-win silently through a Map, so a typoed
+ * index deleted a frame from the sheet and nothing said so.
+ */
+export function validateCompileSpec(spec: CompileSpec, where: string): void {
+  const fail = (m: string): never => { throw new Error(`spec ${where}: ${m}`) }
+  const isInt = (v: unknown): v is number => Number.isInteger(v)
+  if (!spec.id || typeof spec.id !== 'string') fail('missing id')
+  if (!['character', 'prop', 'effect', 'tile'].includes(spec.kind)) fail(`unknown kind "${spec.kind}"`)
+  if (!spec.input || typeof spec.input !== 'string') fail('missing input')
+  if (!spec.output || !/\.png$/.test(spec.output)) fail('output must be a .png path')
+  if (!isInt(spec.cell) || spec.cell < 8) fail('cell must be an integer >= 8')
+  if (!isInt(spec.cols) || spec.cols < 1 || !isInt(spec.rows) || spec.rows < 1) fail('cols/rows must be positive integers')
+  if (spec.maxColors !== undefined && (!isInt(spec.maxColors) || spec.maxColors < 2)) fail('maxColors must be an integer >= 2')
+  const margin = spec.margin ?? 0
+  if (!isInt(margin) || margin < 0 || margin * 2 >= spec.cell) fail(`margin ${margin} must be a non-negative integer smaller than half the cell`)
+  if (spec.coverage !== undefined && !(spec.coverage > 0 && spec.coverage <= 1)) fail(`coverage ${spec.coverage} outside (0, 1]`)
+  if (spec.fit !== undefined && !['grid', 'pose', 'shared'].includes(spec.fit)) fail(`unknown fit mode "${spec.fit}"`)
+  if (spec.fit === 'shared' && !spec.register) fail('fit "shared" requires "register"')
+  if (spec.register) {
+    const [ax, ay] = spec.register
+    if (!isInt(ax) || !isInt(ay) || ax < 0 || ax > spec.cell || ay < 0 || ay > spec.cell) fail(`register [${ax},${ay}] outside the ${spec.cell}px cell`)
+  }
+  if (spec.valueLift && !(spec.valueLift.targetMean > 0 && spec.valueLift.targetMean < 1)) fail('valueLift.targetMean outside (0, 1)')
+  if (spec.palette) {
+    const known = canon().colors
+    for (const n of spec.palette) if (!known[n]) fail(`palette names unknown canon colour "${n}"`)
+  }
+  if (!Array.isArray(spec.frames) || spec.frames.length === 0) fail('frames must be a non-empty array')
+  const cells = spec.cols * spec.rows
+  const names = new Set<string>()
+  const indices = new Set<number>()
+  for (const f of spec.frames) {
+    if (!f.name || typeof f.name !== 'string') fail('a frame is missing its name')
+    if (names.has(f.name)) fail(`duplicate frame name "${f.name}"`)
+    names.add(f.name)
+    if (!isInt(f.i) || f.i < 0 || f.i >= cells) fail(`frame "${f.name}" index ${f.i} outside 0..${cells - 1}`)
+    if (indices.has(f.i)) fail(`frame "${f.name}" reuses cell index ${f.i} — a duplicate index silently deletes a frame`)
+    indices.add(f.i)
+    if (f.pivot !== undefined && f.pivot !== 'auto') {
+      if (spec.fit === 'shared') fail(`frame "${f.name}" declares a pivot under fit "shared" — registration owns the pivot; declare anchorX instead`)
+      const [px, py] = f.pivot
+      if (!Number.isFinite(px) || !Number.isFinite(py) || px < 0 || px > spec.cell || py < 0 || py > spec.cell) {
+        fail(`frame "${f.name}" pivot [${px},${py}] outside the ${spec.cell}px cell`)
+      }
+    }
+    if (f.anchorX !== undefined) {
+      if (spec.fit !== 'shared') fail(`frame "${f.name}" declares anchorX outside fit "shared"`)
+      if (!(f.anchorX >= 0 && f.anchorX <= 1)) fail(`frame "${f.name}" anchorX ${f.anchorX} outside 0..1`)
+    }
+    if (f.nudge !== undefined) {
+      if (spec.fit === 'shared') fail(`frame "${f.name}" declares a nudge under fit "shared" — placement is solved there, not nudged`)
+      if (!f.nudge.every(v => isInt(v) && Math.abs(v) <= 2)) fail(`frame "${f.name}" nudge [${f.nudge}] — a nudge is a 1-2px seam concession, not a placement tool`)
+    }
+    // Under "shared", sockets are bbox FRACTIONS; elsewhere they are cell coordinates.
+    const socketMax = spec.fit === 'shared' ? 1 : spec.cell
+    for (const [sn, sv] of Object.entries(f.sockets ?? {})) {
+      if (!Array.isArray(sv) || sv.length !== 2 || !sv.every(Number.isFinite) || sv[0] < 0 || sv[0] > socketMax || sv[1] < 0 || sv[1] > socketMax) {
+        fail(`frame "${f.name}" socket "${sn}" is not a ${spec.fit === 'shared' ? '0..1 bbox fraction' : 'coordinate inside the cell'}`)
+      }
+    }
+  }
+  for (const [alias, target] of Object.entries(spec.aliases ?? {})) {
+    if (names.has(alias)) fail(`alias "${alias}" collides with a frame name`)
+    if (!names.has(target)) fail(`alias "${alias}" points at unknown frame "${target}"`)
+  }
+  for (const w of spec.waivers ?? []) {
+    if (!w.gate || typeof w.gate !== 'string') fail('a waiver is missing its gate id')
+    if (!w.reason || typeof w.reason !== 'string' || w.reason.trim().length < 8) fail(`waiver "${w.gate}" needs a real reason`)
+  }
+  const resolvable = (n: string): boolean => names.has(n) || !!spec.aliases?.[n]
+  for (const [cn, clip] of Object.entries(spec.clips ?? {})) {
+    if (!clip.frames?.length) fail(`clip "${cn}" has no frames`)
+    for (const fr of clip.frames) if (!resolvable(fr)) fail(`clip "${cn}" references unknown frame "${fr}"`)
+  }
+}
+
 export interface FrameReport {
   name: string
   index: number
@@ -147,7 +255,7 @@ export interface FrameReport {
   colors: number
   bounds: { x: number; y: number; w: number; h: number } | null
   pivot: [number, number]
-  pivotSource: 'declared' | 'detected'
+  pivotSource: 'declared' | 'detected' | 'registered'
   meanLuminance: number
 }
 
@@ -210,15 +318,15 @@ function salienceRescue(
  * catchlight §2.4 explicitly asks for on metal — so brightness above a threshold is protected. Noise
  * is removed; highlights are not.
  */
-function despeckle(idx: Int16Array, cell: number, pal: PaletteSubset, protectDelta: number): number {
+function despeckle(idx: Int16Array, w: number, h: number, pal: PaletteSubset, protectDelta: number): number {
   const out = Int16Array.from(idx)
   let cleaned = 0
-  for (let y = 1; y < cell - 1; y++) {
-    for (let x = 1; x < cell - 1; x++) {
-      const i = y * cell + x
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const i = y * w + x
       const p = idx[i]
       if (p < 0) continue
-      const n = [idx[i - 1], idx[i + 1], idx[i - cell], idx[i + cell]]
+      const n = [idx[i - 1], idx[i + 1], idx[i - w], idx[i + w]]
       if (n.some(v => v < 0)) continue                 // on the silhouette edge: leave the outline alone
       if (!n.every(v => v === n[0]) || n[0] === p) continue
       if (luminance(pal.rgb[p]) - luminance(pal.rgb[n[0]]) >= protectDelta) continue   // a specular
@@ -238,8 +346,8 @@ function despeckle(idx: Int16Array, cell: number, pal: PaletteSubset, protectDel
  * floor, as dirt on the screen. Components at or below `minPixels` that are not the largest mass are
  * erased. The largest component is never touched, whatever its size.
  */
-function dropStrayIslands(idx: Int16Array, cell: number, minPixels: number): number {
-  const label = new Int32Array(cell * cell).fill(-1)
+function dropStrayIslands(idx: Int16Array, w: number, h: number, minPixels: number): number {
+  const label = new Int32Array(w * h).fill(-1)
   const sizes: number[] = []
   const stack: number[] = []
   for (let p = 0; p < idx.length; p++) {
@@ -250,12 +358,12 @@ function dropStrayIslands(idx: Int16Array, cell: number, minPixels: number): num
     while (stack.length) {
       const q = stack.pop()!
       size++
-      const qx = q % cell, qy = (q / cell) | 0
+      const qx = q % w, qy = (q / w) | 0
       const push = (n: number) => { if (idx[n] >= 0 && label[n] < 0) { label[n] = id; stack.push(n) } }
       if (qx > 0) push(q - 1)
-      if (qx < cell - 1) push(q + 1)
-      if (qy > 0) push(q - cell)
-      if (qy < cell - 1) push(q + cell)
+      if (qx < w - 1) push(q + 1)
+      if (qy > 0) push(q - w)
+      if (qy < h - 1) push(q + w)
     }
     sizes.push(size)
   }
@@ -327,20 +435,18 @@ function silhouetteBounds(c: Cell, chromaKey: boolean): { x0: number; y0: number
  * sample has been snapped to the ramp step it belongs to.
  */
 function reduce(
-  c: Cell, cell: number, pal: PaletteSubset,
+  c: Cell, outW: number, outH: number, pal: PaletteSubset,
   opts: Required<Pick<CompileSpec, 'coverage' | 'chromaKey'>> & { salience: { minShare: number; minDelta: number } | false; gamma: number },
 ): { idx: Int16Array } {
-  const idx = new Int16Array(cell * cell).fill(-1)
+  const idx = new Int16Array(outW * outH).fill(-1)
   if (c.w < 1 || c.h < 1) return { idx }
   const votes = new Map<number, number>()
   // Memoise the palette lookup: a 1254px source has ~1.5M pixels but only thousands of distinct colours.
   const lut = new Map<number, number>()
-  for (let oy = 0; oy < cell; oy++) {
-    const sy0 = Math.min(c.h - 1, Math.round(oy * c.h / cell))
-    const sy1 = Math.min(c.h, Math.max(sy0 + 1, Math.round((oy + 1) * c.h / cell)))
-    for (let ox = 0; ox < cell; ox++) {
-      const sx0 = Math.min(c.w - 1, Math.round(ox * c.w / cell))
-      const sx1 = Math.min(c.w, Math.max(sx0 + 1, Math.round((ox + 1) * c.w / cell)))
+  for (let oy = 0; oy < outH; oy++) {
+    const sy0 = Math.min(c.h - 1, Math.round(oy * c.h / outH)), sy1 = Math.min(c.h, Math.max(sy0 + 1, Math.round((oy + 1) * c.h / outH)))
+    for (let ox = 0; ox < outW; ox++) {
+      const sx0 = Math.min(c.w - 1, Math.round(ox * c.w / outW)), sx1 = Math.min(c.w, Math.max(sx0 + 1, Math.round((ox + 1) * c.w / outW)))
       votes.clear()
       let opaque = 0, total = 0
       for (let sy = sy0; sy < sy1; sy++) for (let sx = sx0; sx < sx1; sx++) {
@@ -364,7 +470,7 @@ function reduce(
       let winner = -1, best = -1
       for (const [p, n] of votes) if (n > best) { best = n; winner = p }
       if (opts.salience) winner = salienceRescue(votes, winner, pal, opts.salience.minShare, opts.salience.minDelta, opaque)
-      idx[oy * cell + ox] = winner
+      idx[oy * outW + ox] = winner
     }
   }
   return { idx }
@@ -382,7 +488,52 @@ function detectPivot(idx: Int16Array, cell: number): [number, number] {
   return [Math.round((lo + hi) / 2), Math.min(cell, footY + 1)]
 }
 
+/**
+ * Provenance values that are DERIVED, never typed. The first shipped sidecars carried
+ * `"promptHash": "see art/bardo-combat-sprites.md"` — prose in a field that promised a hash, which is
+ * no provenance at all. A spec now names the checked-in prompt FILE and the reference master, and the
+ * compiler hashes both; hand-typing the hashes is rejected so they cannot drift from the files.
+ */
+function computedProvenance(spec: CompileSpec): Partial<SheetProvenance> {
+  const p = spec.provenance
+  if (!p) return {}
+  const out: Partial<SheetProvenance> = {}
+  const norm = (s: string): string => s.split('\\').join('/')
+  if (p.promptHash && !p.promptFile) {
+    throw new Error(`spec ${spec.id}: provenance.promptHash is computed from provenance.promptFile — name the prompt file, do not type a hash`)
+  }
+  if (p.promptFile) {
+    if (!existsSync(p.promptFile)) throw new Error(`spec ${spec.id}: provenance.promptFile "${p.promptFile}" does not exist`)
+    // Full 64-hex digest: the shipped sidecars and their provenance test pin the whole sha256, and a
+    // reviewer can verify it with sha256sum without knowing a truncation convention.
+    out.promptHash = createHash('sha256').update(readFileSync(p.promptFile)).digest('hex')
+  }
+  if (p.referenceHashes) {
+    throw new Error(`spec ${spec.id}: provenance.referenceHashes is computed from the approved anchor — do not type it`)
+  }
+  // Custody anchors (both from art/approved, both hashed into referenceHashes):
+  //  - approvedSource: a human-approved editable source that IS the compile input — identity-checked
+  //    against spec.input so "the thing you approved is the thing you compiled";
+  //  - approvedReference: a style anchor admitted through the checkpoint, not necessarily the input.
+  for (const [field, value] of [['approvedSource', p.approvedSource], ['approvedReference', p.approvedReference]] as const) {
+    if (!value) continue
+    if (!norm(value).startsWith('art/approved/')) throw new Error(`spec ${spec.id}: provenance.${field} "${value}" must live under art/approved/`)
+    if (!existsSync(value)) throw new Error(`spec ${spec.id}: provenance.${field} "${value}" does not exist`)
+  }
+  if (p.approvedSource && norm(p.approvedSource) !== norm(spec.input)) {
+    throw new Error(`spec ${spec.id}: provenance.approvedSource must name the retained compile input (${spec.input}), not "${p.approvedSource}"`)
+  }
+  const anchor = p.approvedSource ?? p.approvedReference
+  if (anchor) out.referenceHashes = [createHash('sha256').update(readFileSync(anchor)).digest('hex')]
+  return out
+}
+
+
 export async function compileSheet(spec: CompileSpec, specPath = '<inline>'): Promise<{ def: SheetDef; report: CompileReport }> {
+  validateCompileSpec(spec, specPath)
+  // The approval boundary runs INSIDE the compiler, not only in the CLI, so a programmatic compile
+  // aimed at public/assets is held to the same human checkpoint as pnpm art compile.
+  if (isProductionPath(spec.output)) verifyApproval(spec.provenance?.approvedSource ?? spec.provenance?.approvedReference, specPath)
   const cell = spec.cell
   const chromaKey = spec.chromaKey ?? true
   const coverage = spec.coverage ?? 0.5
@@ -395,13 +546,6 @@ export async function compileSheet(spec: CompileSpec, specPath = '<inline>'): Pr
   const margin = spec.margin ?? 0
   const pal = subset(spec.palette)
   const maxColors = spec.maxColors ?? canon().budgets[spec.kind] ?? 16
-  if (!Array.isArray(spec.frames) || spec.frames.length === 0) throw new Error('compile: spec must declare at least one frame')
-  const cells = spec.cols * spec.rows
-  for (const f of spec.frames) {
-    if (!Number.isInteger(f.i) || f.i < 0 || f.i >= cells) throw new Error(`compile: frame "${f.name}" index ${f.i} outside 0..${cells - 1}`)
-  }
-
-  validateProvenance(spec, specPath)
 
   const raw = readFileSync(spec.input)
   const sourceHash = createHash('sha256').update(raw).digest('hex').slice(0, 16)
@@ -429,30 +573,52 @@ export async function compileSheet(spec: CompileSpec, specPath = '<inline>'): Pr
   const W = spec.cols * cell, H = spec.rows * cell
   const atlas = Buffer.alloc(W * H * 4)
   const byIndex = new Map<number, FrameSpec>()
-  const frameNames = new Set<string>()
-  for (const f of spec.frames) {
-    if (frameNames.has(f.name)) throw new Error(`compile: duplicate frame name "${f.name}"`)
-    if (byIndex.has(f.i)) throw new Error(`compile: frames "${byIndex.get(f.i)!.name}" and "${f.name}" both use cell ${f.i}`)
-    frameNames.add(f.name)
-    byIndex.set(f.i, f)
-  }
+  for (const f of spec.frames) byIndex.set(f.i, f)
   const frames: FrameReport[] = []
+  const socketsByName = new Map<string, Record<string, [number, number]>>()
   const usedColors = new Set<string>()
 
-  // `fit: pose` removes the generator's excess matte, but it must not normalize every silhouette to
-  // full height independently. One shared source-space square preserves actor scale across the whole
-  // sheet; each pose still gets its own crop, south placement, declared pivot, and sockets.
+  const srcCell = (index: number): Cell => {
+    const col = index % spec.cols, row = Math.floor(index / spec.cols)
+    const left = Math.round(col * meta.width / spec.cols)
+    const right = Math.round((col + 1) * meta.width / spec.cols)
+    const top = Math.round(row * meta.height / spec.rows)
+    const bottom = Math.round((row + 1) * meta.height / spec.rows)
+    return extractCell(src, meta.width, left, top, right - left, bottom - top)
+  }
+
+  // fit "shared": ONE source→output scale for the whole sheet, the largest that fits every
+  // silhouette inside the cell around the canonical anchor. Solved in a prepass over the declared
+  // frames. This is what per-frame "pose" fitting could not give: under it a compact pose compiled
+  // LARGER than a tall one (the shipped Brute swung 19% in body scale between idle and contact, worst
+  // exactly across the wind-up the player is staring at), because each frame filled the cell alone.
+  // fit "pose": one shared source-space square across the sheet — each pose keeps its own crop,
+  // south placement, and declared pivot, but the source→output scale is identical for every frame,
+  // so the actor's body cannot resize between poses. (An earlier per-frame version normalised every
+  // silhouette to full cell height independently; both remediation lanes measured and killed that.)
   let poseSide = 0
   if (fit === 'pose') {
-    for (const [index, fs] of byIndex) {
-      const col = index % spec.cols, row = Math.floor(index / spec.cols)
-      const left = Math.round(col * meta.width / spec.cols), right = Math.round((col + 1) * meta.width / spec.cols)
-      const top = Math.round(row * meta.height / spec.rows), bottom = Math.round((row + 1) * meta.height / spec.rows)
-      const region = extractCell(src, meta.width, left, top, right - left, bottom - top)
-      const b = silhouetteBounds(region, chromaKey)
-      if (!b) throw new Error(`compile: cell ${index} ("${fs.name}") has no opaque pose`)
+    for (const f of spec.frames) {
+      const b = silhouetteBounds(srcCell(f.i), chromaKey)
+      if (!b) throw new Error(`compile: cell ${f.i} ("${f.name}") has no opaque pose`)
       poseSide = Math.max(poseSide, b.x1 - b.x0 + 1, b.y1 - b.y0 + 1)
     }
+  }
+
+  let sharedScale = 0
+  if (fit === 'shared') {
+    if (!spec.register) throw new Error(`compile: fit "shared" requires "register" — the canonical anchor is what the shared placement is solved against`)
+    let maxW = 0, maxH = 0
+    for (const f of spec.frames) {
+      const b = silhouetteBounds(srcCell(f.i), chromaKey)
+      if (!b) throw new Error(`compile: cell ${f.i} ("${f.name}") has no opaque pose`)
+      maxW = Math.max(maxW, b.x1 - b.x0 + 1)
+      maxH = Math.max(maxH, b.y1 - b.y0 + 1)
+    }
+    const [, ay] = spec.register
+    const vBudget = ay - margin          // content occupies rows margin .. ay-1; feet row ay is the pivot
+    const hBudget = cell - margin * 2
+    sharedScale = Math.min(vBudget / maxH, hBudget / maxW)
   }
 
   for (let row = 0; row < spec.rows; row++) {
@@ -460,28 +626,82 @@ export async function compileSheet(spec: CompileSpec, specPath = '<inline>'): Pr
       const index = row * spec.cols + col
       const fs = byIndex.get(index)
       if (!fs) continue
-      const left = Math.round(col * meta.width / spec.cols)
-      const right = Math.round((col + 1) * meta.width / spec.cols)
-      const top = Math.round(row * meta.height / spec.rows)
-      const bottom = Math.round((row + 1) * meta.height / spec.rows)
-      let region = extractCell(src, meta.width, left, top, right - left, bottom - top)
+      let region = srcCell(index)
 
-      // A 4x2 sheet drawn on a square canvas has cells twice as tall as they are wide. Cropping to the
-      // silhouette first preserves the pose's real aspect instead of squashing it into the grid.
-      if (fit === 'pose') {
-        const b = silhouetteBounds(region, chromaKey)
-        if (!b) throw new Error(`compile: cell ${index} ("${fs.name}") has no opaque pose`)
-        region = padToSquare(extractCell(region.data as Uint8Array, region.w, b.x0, b.y0, b.x1 - b.x0 + 1, b.y1 - b.y0 + 1), poseSide)
-      }
-
-      const available = cell - margin * 2
-      const sub = reduce(region, available, pal, { coverage, chromaKey, salience, gamma })
-      if (despeckleOpt) cleanedPixels += despeckle(sub.idx, available, pal, despeckleOpt.protectDelta)
-      if (minIsland > 0) strayPixels += dropStrayIslands(sub.idx, available, minIsland)
-      // Re-expand into the full cell, anchored south (feet down) so the margin is headroom, not a float.
-      const idx = new Int16Array(cell * cell).fill(-1)
-      for (let y = 0; y < available; y++) for (let x = 0; x < available; x++) {
-        idx[(y + cell - margin - available) * cell + (x + margin)] = sub.idx[y * available + x]
+      let idx: Int16Array
+      let placed: { x0: number; y0: number; w: number; h: number } | null = null
+      if (fit === 'shared') {
+        const b = silhouetteBounds(region, chromaKey)!
+        const crop = extractCell(region.data as Uint8Array, region.w, b.x0, b.y0, b.x1 - b.x0 + 1, b.y1 - b.y0 + 1)
+        const outW = Math.max(1, Math.round(crop.w * sharedScale))
+        const outH = Math.max(1, Math.round(crop.h * sharedScale))
+        const sub = reduce(crop, outW, outH, pal, { coverage, chromaKey, salience, gamma })
+        if (despeckleOpt) cleanedPixels += despeckle(sub.idx, outW, outH, pal, despeckleOpt.protectDelta)
+        if (minIsland > 0) strayPixels += dropStrayIslands(sub.idx, outW, outH, minIsland)
+        const [ax, ay] = spec.register!
+        const fx = fs.anchorX ?? 0.5
+        const x0 = Math.round(ax - fx * (outW - 1))
+        const y0 = ay - outH                          // content bottom row = ay - 1: feet meet the pivot
+        if (x0 < margin || x0 + outW - 1 > cell - 1 - margin || y0 < margin) {
+          throw new Error(`compile: frame "${fs.name}" does not fit at the shared scale: placed x${x0}..${x0 + outW - 1} y${y0}..${ay - 1} against margin ${margin} in a ${cell}px cell — adjust anchorX, margin, or the cell size rather than re-scaling one frame`)
+        }
+        idx = new Int16Array(cell * cell).fill(-1)
+        for (let y = 0; y < outH; y++) for (let x = 0; x < outW; x++) {
+          idx[(y0 + y) * cell + (x0 + x)] = sub.idx[y * outW + x]
+        }
+        placed = { x0, y0, w: outW, h: outH }
+        if (fs.sockets) {
+          const outSockets: Record<string, [number, number]> = {}
+          for (const [sn, [fxs, fys]] of Object.entries(fs.sockets)) {
+            outSockets[sn] = [Math.round(x0 + fxs * (outW - 1)), Math.round(y0 + fys * (outH - 1))]
+          }
+          socketsByName.set(fs.name, outSockets)
+        }
+      } else {
+        // A 4x2 sheet drawn on a square canvas has cells twice as tall as they are wide. Cropping to
+        // the silhouette first preserves the pose's real aspect instead of squashing it into the grid.
+        if (fit === 'pose') {
+          const b = silhouetteBounds(region, chromaKey)
+          if (!b) throw new Error(`compile: cell ${index} ("${fs.name}") has no opaque pose`)
+          region = padToSquare(extractCell(region.data as Uint8Array, region.w, b.x0, b.y0, b.x1 - b.x0 + 1, b.y1 - b.y0 + 1), poseSide)
+        }
+        const available = cell - margin * 2
+        const sub = reduce(region, available, available, pal, { coverage, chromaKey, salience, gamma })
+        if (despeckleOpt) cleanedPixels += despeckle(sub.idx, available, available, pal, despeckleOpt.protectDelta)
+        if (minIsland > 0) strayPixels += dropStrayIslands(sub.idx, available, available, minIsland)
+        // Re-expand into the full cell, anchored south (feet down) so the margin is headroom, not a float.
+        idx = new Int16Array(cell * cell).fill(-1)
+        for (let y = 0; y < available; y++) for (let x = 0; x < available; x++) {
+          idx[(y + cell - margin - available) * cell + (x + margin)] = sub.idx[y * available + x]
+        }
+        // Canonical registration: translate content AND pivot together onto the sheet anchor, so the
+        // on-screen placement is bit-identical while the cell registration becomes uniform. A declared
+        // nudge is the one sanctioned deviation (±2px), for pulling art off a cell seam.
+        if (spec.register || fs.nudge) {
+          const declared = fs.pivot && fs.pivot !== 'auto' ? fs.pivot as [number, number] : null
+          if (!declared) throw new Error(`compile: frame "${fs.name}": registration/nudge under fit "${fit}" needs a declared pivot to translate from`)
+          const [ax, ay] = spec.register ?? declared
+          const dx = ax - declared[0] + (fs.nudge?.[0] ?? 0)
+          const dy = ay - declared[1] + (fs.nudge?.[1] ?? 0)
+          if (fs.sockets) {
+            const moved: Record<string, [number, number]> = {}
+            for (const [sn, [sx, sy]] of Object.entries(fs.sockets)) moved[sn] = [sx + dx, sy + dy]
+            socketsByName.set(fs.name, moved)
+          }
+          if (dx !== 0 || dy !== 0) {
+            const moved = new Int16Array(cell * cell).fill(-1)
+            for (let y = 0; y < cell; y++) for (let x = 0; x < cell; x++) {
+              const p = idx[y * cell + x]
+              if (p < 0) continue
+              const nx = x + dx, ny = y + dy
+              if (nx < 0 || nx >= cell || ny < 0 || ny >= cell) {
+                throw new Error(`compile: frame "${fs.name}": registering pivot [${declared}] onto [${ax},${ay}] pushes opaque pixels off the cell (offset ${dx},${dy}) — the pose does not fit this registration`)
+              }
+              moved[ny * cell + nx] = p
+            }
+            idx = moved
+          }
+        }
       }
 
       let opaque = 0, lumSum = 0
@@ -506,8 +726,8 @@ export async function compileSheet(spec: CompileSpec, specPath = '<inline>'): Pr
       frames.push({
         name: fs.name, index, opaque, colors: frameColors.size,
         bounds: bx1 < bx0 ? null : { x: bx0, y: by0, w: bx1 - bx0 + 1, h: by1 - by0 + 1 },
-        pivot: declared ?? detectPivot(idx, cell),
-        pivotSource: declared ? 'declared' : 'detected',
+        pivot: spec.register ? [...spec.register] as [number, number] : declared ?? detectPivot(idx, cell),
+        pivotSource: spec.register ? 'registered' : declared ? 'declared' : 'detected',
         meanLuminance: opaque ? +(lumSum / opaque).toFixed(4) : 0,
       })
     }
@@ -535,7 +755,8 @@ export async function compileSheet(spec: CompileSpec, specPath = '<inline>'): Pr
   const sheetFrames: Record<string, SheetFrame> = {}
   for (const fr of frames) {
     const fs = byIndex.get(fr.index)!
-    sheetFrames[fr.name] = { i: fr.index, pivot: fr.pivot, ...(fs.sockets ? { sockets: fs.sockets } : {}) }
+    const sockets = socketsByName.get(fr.name) ?? fs.sockets
+    sheetFrames[fr.name] = { i: fr.index, pivot: fr.pivot, ...(sockets ? { sockets } : {}) }
   }
   const def: SheetDef = {
     id: spec.id,
@@ -543,15 +764,18 @@ export async function compileSheet(spec: CompileSpec, specPath = '<inline>'): Pr
     kind: spec.kind,
     cell, cols: spec.cols, rows: spec.rows,
     palette: canon().name,
+    ...(spec.palette ? { ramp: [...spec.palette] } : {}),
     maxColors,
     ...(spec.facing ? { facing: spec.facing } : {}),
     ...(spec.mirror !== undefined ? { mirror: spec.mirror } : {}),
     frames: sheetFrames,
     ...(spec.aliases ? { aliases: spec.aliases } : {}),
     ...(spec.clips ? { clips: spec.clips } : {}),
+    ...(spec.waivers ? { waivers: spec.waivers } : {}),
     source: {
       provider: spec.provenance?.provider ?? 'unknown',
       ...spec.provenance,
+      ...computedProvenance(spec),
       compiler: COMPILER_VERSION,
       sourceFile: relative(process.cwd(), spec.input),
       sourceHash,

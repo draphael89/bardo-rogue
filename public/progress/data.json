@@ -1,7 +1,7 @@
 {
   "title": "Bardo Rogue",
   "subtitle": "The Greek gate: two powers, twelve vows, fire, an elite that turns a light blade, a ferryman who is owed, and Minos",
-  "updated": "2026-08-28T23:35:00-04:00",
+  "updated": "2026-08-29T13:55:00Z",
   "now": "greek-gate",
   "round": 2,
   "timeline": [
@@ -556,6 +556,10 @@
     {
       "t": "23:35",
       "text": "An eight-angle code review of the controller-pause commit: the sealed doorway still glowed 'open' in two more renderers, the death-screen Start press paused the game on arrival, and damageTaken counted vessels the player never had. All eight findings fixed; doorOpens() is now the one place the open-door rule lives."
+    },
+    {
+      "t": "13:55",
+      "text": "Independent combat/feel/art audit: 68/100. The fight's truth is on the floor; the actors stay still. COMBAT_QUALITY_AUDIT.md."
     }
   ],
   "pieces": [

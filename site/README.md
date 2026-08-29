@@ -31,11 +31,17 @@ python3 -m http.server 8899 -d site/dist
 - `_headers` ships immutable caching for hashed `/img`, `/fonts`, `/assets`.
 - Connect the playbardo.com domain in the Cloudflare dashboard.
 
-## Before launch
+## Download CTA
 
-- Replace every `ENTER_THE_BARDO_URL` href in `site/src/index.html` with the real
-  play/wishlist link (search for the string; a comment marks it). This is the one
-  remaining placeholder on the page.
+Both CTAs point at the GitHub release asset for the notarized macOS build:
+
+```
+https://github.com/draphael89/bardo-rogue/releases/download/v0.1.0-mac-alpha.1/Bardo-Rogue-0.1.0-mac-arm64.dmg
+```
+
+The tag is pinned to the exact commit the DMG was built from. When a new build ships,
+update the URL, the version in the tag, and the size in `.cta-note` together — the fine
+print under the button is not generated.
 
 ## Two rules that are easy to break
 

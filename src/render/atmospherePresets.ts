@@ -23,11 +23,18 @@ export interface AtmospherePreset {
    * pair of rooms differed by 2.3 of 255, and not one room in the game read warm -- the wine Hall
    * and the gold Landing both came out bluer than they were red.
    *
-   * These are HUE shifts held near one value. Green carries most of the luminance (Rec.709 weights
-   * it 0.715), so it moves least: the floor changes colour without changing how bright it is, which
-   * is what keeps a body readable against it and keeps the authored sheets' figure/ground contrast
-   * gate honest. Only `tilemap.sprite` takes this. The starfield and the door cluster are separate
-   * sprites, so the open door stays gold -- that is still the walkable signal, not a mood.
+   * These are HUE shifts that spend as little brightness as they can. Green carries most of the
+   * luminance (Rec.709 weights it 0.715), so it is the channel held highest -- but a tint can only
+   * multiply, and pulling a warm hue out of blue-grey stone costs value no matter how it is spent.
+   * Measured (Rec.709, as a fraction of the untinted floor): Bardo 1.000, ash 0.919, ice 0.898,
+   * bronze 0.864, iron 0.857, gold 0.845, river 0.828, water 0.794, wine 0.754, wine-fire 0.718.
+   * So a realm floor is up to 28% darker than the hub's, never brighter -- the direction that
+   * matters, because `tools/art/gates.ts` grades authored bodies against a pinned floor luminance
+   * and a floor that only ever darkens cannot let an illegible sprite through. A test bounds the
+   * fall; do not add a tint below it without re-reading that gate.
+   *
+   * Only `tilemap.sprite` takes this. The starfield and the door cluster are separate sprites, so
+   * the open door stays gold -- that is still the walkable signal, not a mood.
    */
   floorTint: number
   /**

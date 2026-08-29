@@ -83,10 +83,17 @@ describe('a realm is a surface, not only a name', () => {
     }
   })
 
-  it('keeps green high, so a floor changes hue without going dark', () => {
-    // Green carries 0.715 of Rec.709 luminance. Letting it fall is how a coloured room becomes an
-    // unreadable one, and it is what the authored sheets' figure/ground gate assumes about the floor.
+  it('spends brightness for hue, but only downward and only so far', () => {
+    // A tint can only multiply, so pulling a warm hue out of blue-grey stone costs luminance -- the
+    // wine-fire floor is the dearest at 0.718 of the untinted one. Two directions matter and both
+    // are asserted, because `tools/art/gates.ts` grades authored bodies against ONE pinned floor
+    // luminance: nothing may be brighter than the hub it was measured on, and nothing may fall so
+    // far that the gate is grading against a floor the game no longer has.
+    const luma = (c: number) => (0.2126 * R(c) + 0.7152 * G(c) + 0.0722 * B(c)) / 255
     for (const id of Object.keys(LAYOUTS) as LayoutId[]) {
+      const l = luma(atmosphereFor(id).floorTint)
+      expect(l, `${id} floor is brighter than the reference`).toBeLessThanOrEqual(1)
+      expect(l, `${id} floor is too dark to grade a body against`).toBeGreaterThanOrEqual(0.7)
       expect(G(atmosphereFor(id).floorTint), `${id} floor green`).toBeGreaterThanOrEqual(168)
     }
   })

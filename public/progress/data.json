@@ -1,10 +1,14 @@
 {
   "title": "Bardo Rogue",
   "subtitle": "First Gate: rooms-as-data, a generated route, a town that remembers",
-  "updated": "2026-08-29T08:28:00-04:00",
-  "now": "smith-keeps-his-sentence",
+  "updated": "2026-08-29T08:32:00-04:00",
+  "now": "loop-beats-read",
   "round": 3,
   "timeline": [
+    {
+      "t": "08:32",
+      "text": "The toll, the Unburied, the verdict, and Settings still read as authored. No leftover on those four cards."
+    },
     {
       "t": "08:28",
       "text": "The Smith and a claimed vow keep their written case. Credits name the cast. The stall still ends on PAY."

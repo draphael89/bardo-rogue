@@ -1,10 +1,14 @@
 {
   "title": "Bardo Rogue",
   "subtitle": "First Gate: rooms-as-data, a generated route, a town that remembers",
-  "updated": "2026-08-29T15:25:00-04:00",
+  "updated": "2026-08-29T16:20:00-04:00",
   "now": "hall-plate-wine",
   "round": 3,
   "timeline": [
+    {
+      "t": "16:20",
+      "text": "Review round on PR 20: three P2s, all real. The Oath-Bound and the Warden had their heavy poise breaks suppressed by a rule that only knew the brute — the sim now says which bodies do not yield to a light. The plant latch resets where swing ids restart, and one shared promiseFrame() keeps the drawing on the same frame as the dust."
+    },
     {
       "t": "15:25",
       "text": "The elite keeps its shield. A flank light used to stagger the Oath-Bound, and staggerTicks outran the light chain, so one hit put the guard down and MEASURED 0% uptime for the rest of the fight. It now inherits the line shade's poise: 85%. COMMIT, FLANK and BURN are three answers again."

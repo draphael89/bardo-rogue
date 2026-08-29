@@ -15,6 +15,23 @@ import type { SheetClip } from './sheet'
  *  subdivide startup, and 3 ticks is the judged minimum for the launch pose to read at 60Hz. */
 export const DODGE_START_TICKS = 3
 
+/**
+ * The tick a RENDER FRAME must DISPLAY for the heavy's promise to have been made, given tuning's
+ * `heavyCommitTick`. They are not the same number and the difference is one frame the player feels:
+ * `capturePlayerInput` runs before `updatePlayer`, which increments stateTick BEFORE testing
+ * `stateTick < heavyCommitTick`, so a dodge pressed on the frame showing N is judged at N+1.
+ * Measured, not derived: with heavyCommitTick 4, presses on displayed ticks 0-2 cancel and presses
+ * on 3-10 are silently dropped.
+ *
+ * It lives here, pure and parameterised, because TWO consumers need the same answer — the presenter,
+ * which fires the plant dust, the blade glow and the camera drop, and `swingClipFrame`, which picks
+ * the plant DRAWING. They were computed separately and disagreed by one frame, which would have put
+ * a future authored plant pose behind every other cue in the commitment beat.
+ */
+export function promiseFrame(commitTick: number): number {
+  return Math.max(0, commitTick - 1)
+}
+
 /** Which of `count` frames owns tick `t` of a phase `len` ticks long, split as evenly as the tick
  *  grid allows. `len <= 0` or a single frame collapses to 0, so a three-frame clip never branches. */
 function share(t: number, len: number, count: number): number {

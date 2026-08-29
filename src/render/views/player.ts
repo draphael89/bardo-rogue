@@ -12,7 +12,7 @@ import type { Sheet } from '../sheet'
 import { ARM, armOf } from '@/sim/weapons'
 import { restoreSword, updateBow } from './bow'
 import { nearestHeroDirection, stableHeroDirection, verticalDodgeFrame, type HeroDirection } from '../heroDirection'
-import { dodgeClipFrame, rollClipFrame, swingClipFrame, tickClipFrame } from '../clipSelect'
+import { dodgeClipFrame, promiseFrame, rollClipFrame, swingClipFrame, tickClipFrame } from '../clipSelect'
 
 const deg = (d: number): number => d * Math.PI / 180
 
@@ -68,8 +68,10 @@ export function heroFrameName(sheet: Sheet, p: Player, world: World, time: numbe
   // The heavy also hands over its commitment tick, so a sheet that authors a plant pose can land it
   // on the tick the sim actually stops taking a dodge rather than at an arbitrary fraction.
   const s = tuning.player.attack.swings[p.swingIndex]
+  // The DISPLAYED promise frame, not the raw sim threshold: this selects a drawing for the frame the
+  // player is looking at, and the presenter fires the rest of the commitment beat on that same frame.
   return swingClipFrame(clips[SWING_CLIPS[p.swingIndex]], s, p.stateTick,
-    s.heavy ? tuning.player.attack.heavyCommitTick : undefined)
+    s.heavy ? promiseFrame(tuning.player.attack.heavyCommitTick) : undefined)
 }
 
 function authoredDirectionFor(v: EntityView, p: Player, bladeEquipped: boolean): HeroDirection | null {

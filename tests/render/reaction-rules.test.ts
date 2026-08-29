@@ -35,31 +35,46 @@ describe('the struck body', () => {
 })
 
 describe('the poise-break sentence', () => {
-  function stagger(kind: 'caster' | 'charger', commit: boolean) {
+  // Drive the real damage path and read the real event, per kind and per prior state. The rule the
+  // presenter applies is `heavyOnly || interrupted`, so that is what is asserted — not its spelling.
+  function stagger(kind: 'brute' | 'oathbound' | 'warden' | 'caster' | 'charger', state: string, heavy: boolean) {
     const w = createWorld(1, 'empty')
     stepWorld(w, emptyInput())
     const e = w.spawnEnemy(kind, w.player.x + 40, w.player.y)!
-    e.hp = 99
-    e.state = commit ? 'windup' : 'chase'
+    e.hp = 999
+    e.state = state as typeof e.state
     e.stateTick = 0
+    e.aimAngle = Math.atan2(w.player.y - e.y, w.player.x - e.x)
+    const toward = e.aimAngle + Math.PI / 2   // off the flank, so the elite's guard never blocks
     w.events.length = 0
-    damageEnemy(w, e, 1, 0, 0, false, 0, 1, { source: 'blade', originX: w.player.x, originY: w.player.y, direction: 0, sweep: 1, cleave: false, contactDepth: 0.5 })
-    const ev = w.events.find(x => x.type === 'enemyStagger')
-    expect(ev).toBeDefined()
-    return (ev as { interrupted: boolean }).interrupted
+    damageEnemy(w, e, 2, toward, 90, heavy, 3, 1, { source: 'blade', originX: w.player.x, originY: w.player.y, direction: toward, sweep: 1, cleave: false, contactDepth: 0.5 })
+    const ev = w.events.find(x => x.type === 'enemyStagger') as { interrupted: boolean; heavyOnly: boolean } | undefined
+    return ev && { ...ev, plays: ev.heavyOnly || ev.interrupted }
   }
 
-  it('a light that takes a wind-up away reports the interrupt', () => {
-    expect(stagger('caster', true)).toBe(true)
-    expect(stagger('charger', true)).toBe(true)
+  it('a light that takes a wind-up away reports the interrupt and earns the sentence', () => {
+    expect(stagger('caster', 'windup', false)).toMatchObject({ interrupted: true, plays: true })
+    expect(stagger('charger', 'windup', false)).toMatchObject({ interrupted: true, plays: true })
   })
+
   it('the same light on a body that was only walking does not', () => {
-    expect(stagger('caster', false)).toBe(false)
-    expect(stagger('charger', false)).toBe(false)
+    expect(stagger('caster', 'chase', false)).toMatchObject({ interrupted: false, heavyOnly: false, plays: false })
+    expect(stagger('charger', 'chase', false)).toMatchObject({ interrupted: false, heavyOnly: false, plays: false })
   })
-  it('and the presenter spends the shockwave on exactly those two cases', () => {
+
+  // The regression this rule shipped with: `big` recognised only the brute, so an ordinary heavy on
+  // a chasing Oath-Bound or an orbiting Warden — bodies that do not yield to a light at ALL — had
+  // its break suppressed. Eligibility is the sim's `heavyOnly`; `big` is only the brute's camera.
+  it('a heavy break on ANY heavy-only body earns the sentence, tell or no tell', () => {
+    for (const [kind, calm] of [['brute', 'chase'], ['oathbound', 'chase'], ['warden', 'orbit']] as const) {
+      expect(stagger(kind, calm, true)).toMatchObject({ interrupted: false, heavyOnly: true, plays: true })
+      expect(stagger(kind, 'windup', true)?.plays ?? true).toBe(true)
+    }
+  })
+
+  it('and the presenter spends the shockwave on exactly that rule', () => {
     const src = readFileSync('src/render/presenter.ts', 'utf8')
-    expect(src).toContain('if (big || ev.interrupted) this.particles.poiseBreak(ev.x, ev.y, big)')
+    expect(src).toContain('if (ev.heavyOnly || ev.interrupted) this.particles.poiseBreak(ev.x, ev.y, big)')
   })
 })
 

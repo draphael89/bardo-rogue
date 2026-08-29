@@ -197,7 +197,7 @@ export function damageEnemy(
       e.state = 'stagger'
       e.stateTick = 0
       e.hitDone = false
-      world.emit({ type: 'enemyStagger', id: e.id, x: e.x, y: e.y, interrupted: brokeCommitment })
+      world.emit({ type: 'enemyStagger', id: e.id, x: e.x, y: e.y, interrupted: brokeCommitment, heavyOnly: true })
     }
   } else if (kind === 'brute' || kind === 'oathbound') {
     // The elite is the line shade PLUS ONE RULE, so it inherits the line shade's poise. It used to
@@ -210,7 +210,7 @@ export function damageEnemy(
       e.state = 'stagger'
       e.stateTick = 0
       e.hitDone = false
-      world.emit({ type: 'enemyStagger', id: e.id, x: e.x, y: e.y, interrupted: brokeCommitment })
+      world.emit({ type: 'enemyStagger', id: e.id, x: e.x, y: e.y, interrupted: brokeCommitment, heavyOnly: true })
     } else {
       e.kbx += Math.cos(angle) * tuning.brute.lightNudge * 10
       e.kby += Math.sin(angle) * tuning.brute.lightNudge * 10
@@ -219,7 +219,7 @@ export function damageEnemy(
     e.state = 'stagger'
     e.stateTick = 0
     e.hitDone = false
-    world.emit({ type: 'enemyStagger', id: e.id, x: e.x, y: e.y, interrupted: brokeCommitment })
+    world.emit({ type: 'enemyStagger', id: e.id, x: e.x, y: e.y, interrupted: brokeCommitment, heavyOnly: false })
   }
   const interrupted = brokeCommitment && e.state === 'stagger'
   return { outcome: 'landed', landed: true, killed: false, guarded, interrupted, resolvedDamage: damage }

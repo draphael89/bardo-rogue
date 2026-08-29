@@ -8,6 +8,7 @@ import type { EnemyKind, HitSource, SimEvent } from '@/sim/events'
 import { tuning } from '@/tuning'
 import { EntityView, createPlayerView, createEnemyView, updatePlayerView, updateEnemyView, makePropSprite, BoltView, ArrowView, EchoView, MirrorBoltView, drawAimLine, drawSwingArc, drawSwingTip, drawBowAim } from './views'
 import { updatePlayerRim } from './views/player'
+import { promiseFrame } from './clipSelect'
 import { ARM, armOf } from '@/sim/weapons'
 import { buildTilemap, type TilemapView } from './tilemap'
 import { Camera } from './camera'
@@ -34,18 +35,6 @@ import { MINOS } from './minosInk'
 import { LAMPAD } from './lampadInk'
 import { SPAWN, debtCoin, spawnInk, spawnPad } from './spawnInk'
 import { arrivalFlash, atmosphereFor, VEIL_FLASH } from './atmospherePresets'
-
-/**
- * The heavy's promise, expressed in the stateTick a RENDER FRAME is showing.
- *
- * Not the same number as tuning's `heavyCommitTick`, and the difference is one frame the player
- * feels. `capturePlayerInput` runs before `updatePlayer`, which increments stateTick BEFORE testing
- * `stateTick < heavyCommitTick` — so a dodge pressed on the frame that displays stateTick N is
- * judged at N+1. Measured, not derived: with heavyCommitTick 4, presses on displayed ticks 0-2
- * cancel and presses on 3-10 are silently dropped. The frame that shows 3 is therefore the first
- * frame on which leaving has already stopped working, and it is the frame the plant belongs on.
- */
-const heavyPromiseFrame = (): number => tuning.player.attack.heavyCommitTick - 1
 
 // Reads sim state + events every frame and drives everything visible. Never mutates the sim.
 /** The realm's stone for the room we are standing in. One expression, so both build sites agree. */
@@ -79,7 +68,11 @@ export class Presenter {
   title: TitleOverlay
   private lastHurtAngle = 0
   private emberAcc = 0
-  private heavyPlantedSwing = -1      // the swingId whose commitment beat has already fired
+  // The swingId whose commitment beat has already fired. This is ACTION-ID state, so it resets
+  // wherever action ids restart — bindWorld and the `returned` handler, next to reversalActions —
+  // because returnToHub sets world.swingCounter back to 0 without replacing this Presenter, and a
+  // stale id that the next run happens to reuse would eat that heavy's plant dust and camera drop.
+  private heavyPlantedSwing = -1
   // contact reaction on real time, so it plays out *inside* the hit-stop instead of waiting for it
   private recoilX = 0; private recoilY = 0
   // the dodge-through mark: where the read happened, which way the roll was going, and how far
@@ -188,6 +181,7 @@ export class Presenter {
     this.impacts.length = 0
     this.actionFeedback.reset()
     this.reversalActions.clear()
+    this.heavyPlantedSwing = -1
     this.hardLock.reset()
   }
 
@@ -349,11 +343,14 @@ export class Presenter {
           const S = J.stagger
           // only the heavy breaks a brute's poise, so only that break is worth the camera
           const big = this.world.enemies.find(e => e.id === ev.id)?.kind === 'brute'
-          // ...and the shockwave is the same promise as the camera. Caster, charger and Oath-Bound
-          // stagger on ANY landed hit, so firing the break sentence unconditionally spent it on the
-          // most routine event in the game and left nothing louder for the moment a tell actually
-          // died. It plays for a body that only yields to the heavy, or for a commitment taken away.
-          if (big || ev.interrupted) this.particles.poiseBreak(ev.x, ev.y, big)
+          // ...and the shockwave is the same promise. Caster and charger stagger on ANY landed hit,
+          // so firing the break sentence unconditionally spent it on the most routine event in the
+          // game and left nothing louder for the moment a tell actually died. It plays for a body
+          // whose poise does not yield to a light at all, or for a commitment taken away.
+          // `heavyOnly` comes from the sim rather than being re-derived here: `big` is about the
+          // brute's extra CAMERA, and using it for eligibility silently dropped the Oath-Bound's and
+          // the Warden's ordinary heavy breaks, which is the exact rule this line exists to keep.
+          if (ev.heavyOnly || ev.interrupted) this.particles.poiseBreak(ev.x, ev.y, big)
           this.camera.addTrauma(big ? S.bruteTrauma : S.trauma)
           if (big) { this.camera.punchZoom(S.bruteZoom); this.flash(S.bruteFlash, 0xffffff); this.postfx.pulse() }
           break
@@ -475,6 +472,7 @@ export class Presenter {
           // returnToHub restarts swingCounter at zero without replacing this Presenter.
           applyActionFeedbackLifecycle(this.actionFeedback, ev)
           this.reversalActions.clear()
+          this.heavyPlantedSwing = -1
           this.impacts.length = 0
           this.dodgedT = this.grazeT = this.reversalT = -1
           this.rebuildRoom()
@@ -842,7 +840,7 @@ export class Presenter {
     const s = tuning.player.attack.swings[p.swingIndex]
     if (p.state !== 'attack' || !s.heavy || p.stateTick >= s.startup) { this.emberAcc = 0; return }
     this.camera.lean(p.swingAngle + Math.PI, J.swing.heavyWindKick)
-    const promise = heavyPromiseFrame()
+    const promise = promiseFrame(tuning.player.attack.heavyCommitTick)
     if (p.stateTick >= promise && this.heavyPlantedSwing !== p.swingId) {
       this.heavyPlantedSwing = p.swingId
       this.camera.kick(Math.PI / 2, J.swing.heavyPlantKick)

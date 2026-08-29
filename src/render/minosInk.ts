@@ -21,7 +21,8 @@ export const MINOS = {
   shardAlt: 0x6a2038,
   eye: 0x9e4658,
   eyeHot: 0xf0d8dc,
-  wash: 0xe8d0d4,
+  /** Hit flash, phase body, slam screen — Hall-hot, never cream. */
+  wash: 0xc07080,
   commit: 0xffffff,
 } as const
 

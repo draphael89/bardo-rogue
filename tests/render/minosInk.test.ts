@@ -13,6 +13,8 @@ describe('minos ink', () => {
     expect(MINOS.circle).toBe(0x6a2038)
     expect(MINOS.veil).toBe(0x8a4068)
     expect(MINOS.fan).toBe(0x9e4658)
+    expect(MINOS.wash).toBe(MINOS.circleHot)
+    expect(MINOS.wash).not.toBe(0xe8d0d4)
   })
 
   it('his life plate is wine, never a gold door', () => {

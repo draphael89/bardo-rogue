@@ -83,12 +83,8 @@ interface CellStats {
   opaque: number
   bbox: { x: number; y: number; w: number; h: number } | null
   meanLum: number
-  topLum: number
-  bottomLum: number
   /** Colour histogram as hex -> count, for inter-frame identity. */
   hist: Map<string, number>
-  /** Per-colour sum of y positions, for the family-gradient light metric. */
-  ySum: Map<string, number>
   /** Centroid of opaque mass, in cell pixels. */
   cx: number
   cy: number
@@ -103,7 +99,6 @@ function cellStats(ctx: GateContext, name: string, index: number): CellStats {
   const ox = (index % def.cols) * cell, oy = Math.floor(index / def.cols) * cell
   const mask = new Uint8Array(cell * cell)
   const hist = new Map<string, number>()
-  const ySum = new Map<string, number>()
   let opaque = 0, lumSum = 0, sx = 0, sy = 0
   let x0 = cell, y0 = cell, x1 = -1, y1 = -1
   // Duplicate detection hashes the cell's VISIBLE identity: full RGBA for opaque pixels, a single
@@ -127,21 +122,6 @@ function cellStats(ctx: GateContext, name: string, index: number): CellStats {
       if (y > y1) y1 = y
       const hex = rgbToHex(c)
       hist.set(hex, (hist.get(hex) ?? 0) + 1)
-      ySum.set(hex, (ySum.get(hex) ?? 0) + y)
-    }
-  }
-  // Light direction is judged across the SILHOUETTE's vertical thirds, not the cell's. Cell thirds
-  // false-fail every low pose: a lying corpse's top cell-third is empty, so the metric compared the
-  // body against nothing and reported "lit from below" for art that was simply short.
-  let topSum = 0, topN = 0, botSum = 0, botN = 0
-  if (x1 >= x0) {
-    const bh = y1 - y0 + 1
-    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
-      if (!mask[y * cell + x]) continue
-      const i = ((oy + y) * width + ox + x) * 4
-      const l = luminance([pixels[i], pixels[i + 1], pixels[i + 2]])
-      if (y - y0 < bh / 3) { topSum += l; topN++ }
-      else if (y - y0 >= (bh * 2) / 3) { botSum += l; botN++ }
     }
   }
   const hash = createHash('sha1').update(Buffer.from(hashParts)).digest('hex')
@@ -166,9 +146,7 @@ function cellStats(ctx: GateContext, name: string, index: number): CellStats {
     name, index, opaque,
     bbox: x1 < x0 ? null : { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 },
     meanLum: opaque ? lumSum / opaque : 0,
-    topLum: topN ? topSum / topN : 0,
-    bottomLum: botN ? botSum / botN : 0,
-    hist, ySum, cx: opaque ? sx / opaque : 0, cy: opaque ? sy / opaque : 0,
+    hist, cx: opaque ? sx / opaque : 0, cy: opaque ? sy / opaque : 0,
     components, hash,
   }
 }
@@ -179,7 +157,8 @@ const familyOf = (name: string): string => name.replace(/(Hi|Lo|Dim|Hot|\d+)$/, 
 /**
  * Light direction, measured as FORM shading rather than a vertical luminance split.
  *
- * Two failed metrics preceded this one. A thirds split — of the cell or of the silhouette — cannot
+ * Two failed metrics preceded this one, and both are worth naming because the failure mode repeats.
+ * A thirds split — of the cell or of the silhouette — cannot
  * tell "lit from below" apart from "carries its brightest material low": the hero rests a bright
  * greatsword at his boots and failed in seven frames while being perfectly north-lit. A family-wide
  * gradient still conflated separate FORMS of one material: iron is both the shoulder plate (dark,
@@ -388,13 +367,32 @@ export function runGates(ctx: GateContext): GateResult[] {
   // (hurt sits beside light1Start), and comparing them measured atlas layout, not identity.
   const byName = new Map(stats.map(s => [s.name, s]))
   const resolveName = (n: string): string => def.frames[n] ? n : (def.aliases?.[n] ?? n)
+  const inClip = new Set<string>()
   for (const [clipName, clip] of Object.entries(def.clips ?? {})) {
     const seq = clip.frames.map(n => byName.get(resolveName(n))).filter(Boolean) as CellStats[]
+    for (const s of seq) inClip.add(s.name)
     for (let i = 1; i < seq.length; i++) {
       const d = histDistance(seq[i - 1].hist, seq[i].hist)
       add(`identity:${clipName}:${seq[i - 1].name}->${seq[i].name}`, d <= 0.45,
         `palette-histogram distance ${d.toFixed(3)} (want <= 0.45)`, 'judge')
     }
+  }
+  // Clip-scoping alone would leave every frame no clip names — idle, hurt, dead, chase, the most
+  // displayed drawings in the game — compared against nothing at all. Those are measured against the
+  // REST OF THE SHEET, leave-one-out, which is pose-agnostic and so does not reintroduce the
+  // atlas-layout artefact the clip scoping removed. Without this a regenerated idle drawn as a
+  // different character passes every gate as long as it stays inside the declared ramp.
+  for (const s of stats) {
+    if (inClip.has(s.name)) continue
+    const ref = new Map<string, number>()
+    for (const o of stats) {
+      if (o.name === s.name) continue
+      for (const [hex, n] of o.hist) ref.set(hex, (ref.get(hex) ?? 0) + n)
+    }
+    if (!ref.size) continue
+    const d = histDistance(s.hist, ref)
+    add(`identity:sheet:${s.name}`, d <= 0.45,
+      `palette-histogram distance ${d.toFixed(3)} vs the rest of the sheet (want <= 0.45)`, 'judge')
   }
   // Two frames with identical pixels is a wasted cell and a hidden coupling: deliberate reuse is what
   // aliases exist to state. Hard failure — there is no judgment call in which two byte-identical

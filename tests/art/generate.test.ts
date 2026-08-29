@@ -195,6 +195,29 @@ describe('generate (mocked fetch)', () => {
     expect(files.some(f => f.endsWith('.manifest.json'))).toBe(true)  // failure path still records the run
   })
 
+  it.each([
+    ['an empty image list', () => new Response(JSON.stringify({ detail: 'nothing' }), { status: 200 })],
+    ['a non-PNG payload', () => new Response(JSON.stringify({ image: { type: 'base64', base64: Buffer.from('<html>').toString('base64') } }), { status: 200 })],
+    ['an undecodable PNG', () => new Response(JSON.stringify({ image: { type: 'base64', base64: Buffer.concat([refPng.subarray(0, 12), Buffer.alloc(8)]).toString('base64') } }), { status: 200 })],
+  ])('records the run when a later request fails with %s', async (_label, failure) => {
+    // Every exit after the first paid call must leave BOTH the candidate and its manifest behind —
+    // the request hash, the references and their digests, the usage. Three of these exits used to
+    // drop the manifest, so a surviving paid image had no record of what produced it.
+    vi.stubEnv('PIXELLAB_SECRET', 'test-token')
+    let call = 0
+    vi.stubGlobal('fetch', vi.fn(async () => {
+      call++
+      return call === 1
+        ? new Response(JSON.stringify({ image: { type: 'base64', base64: refPng.toString('base64') } }), { status: 200 })
+        : failure()
+    }))
+    const out = join(dir, `exit-${_label.replace(/\W+/g, '-')}`)
+    await expect(generate('pixellab', spec({ count: 3 }), out)).rejects.toThrow(/saved 1 candidate/)
+    const files = readdirSync(out)
+    expect(files.some(f => f.endsWith('.png'))).toBe(true)
+    expect(files.some(f => f.endsWith('.manifest.json')), 'the surviving candidate must keep its run record').toBe(true)
+  })
+
   it('surfaces a non-2xx as an error without retrying', async () => {
     vi.stubEnv('PIXELLAB_SECRET', 'test-token')
     const fetchMock = vi.fn(async () => new Response('quota', { status: 402, statusText: 'Payment Required' }))

@@ -306,26 +306,38 @@ export async function generate(provider: ProviderName, spec: GenerateSpec, outDi
     return manifest
   }
 
+  // EVERY exit after the first paid call carries the same survivor note, manifest included: a run
+  // that dies on request three has still bought two images, and the record of what they cost, what
+  // conditioned them, and which request produced them is exactly what makes a retry an informed
+  // decision rather than a second blind spend.
+  const savedNote = (): string => files.length
+    ? `; saved ${files.length} candidate(s) in ${outDir} (manifest ${writeManifest()}) — inspect them before retrying`
+    : ''
+
   for (const req of reqs) {
     let res: Response
     try {
       res = await fetch(req.url, { method: req.method, headers: req.headers, body: JSON.stringify(req.body) })
     } catch (e) {
-      const saved = files.length ? `; saved ${files.length} candidate(s) in ${outDir} (manifest ${writeManifest()}) — inspect them before retrying` : ''
-      throw new Error(`generate: ${provider} request failed: ${e instanceof Error ? e.message : e}${saved}`)
+      throw new Error(`generate: ${provider} request failed: ${e instanceof Error ? e.message : e}${savedNote()}`)
     }
     if (!res.ok) {
       const body = (await res.text()).slice(0, 400)
-      const saved = files.length ? `; saved ${files.length} candidate(s) in ${outDir} (manifest ${writeManifest()}) — inspect them before retrying` : ''
-      throw new Error(`generate: ${provider} returned ${res.status} ${res.statusText}: ${body}${saved}`)
+      throw new Error(`generate: ${provider} returned ${res.status} ${res.statusText}: ${body}${savedNote()}`)
     }
     const json = await res.json() as Record<string, unknown>
     const batch = decodeImages(json)
-    if (!batch.length) throw new Error(`generate: ${provider} returned no images: ${JSON.stringify(json).slice(0, 400)}${files.length ? ` (${files.length} earlier candidate(s) already saved in ${outDir})` : ''}`)
+    if (!batch.length) throw new Error(`generate: ${provider} returned no images: ${JSON.stringify(json).slice(0, 400)}${savedNote()}`)
     for (const b64 of batch) {
       const buf = Buffer.from(String(b64).replace(/^data:image\/\w+;base64,/, ''), 'base64')
-      if (!isPng(buf)) throw new Error(`generate: ${provider} returned a payload that is not a PNG (${buf.length} bytes) — not admitting it as a candidate`)
-      await sharp(buf).metadata() // throws if the PNG is truncated or undecodable
+      if (!isPng(buf)) throw new Error(`generate: ${provider} returned a payload that is not a PNG (${buf.length} bytes) — not admitting it as a candidate${savedNote()}`)
+      // sharp's own error is unreadable out of context, and letting it escape bare would also skip
+      // the survivor note.
+      try {
+        await sharp(buf).metadata()
+      } catch (e) {
+        throw new Error(`generate: ${provider} returned an undecodable PNG (${buf.length} bytes): ${e instanceof Error ? e.message : e}${savedNote()}`)
+      }
       // Content-hash names: a rerun with different randomness cannot clobber an earlier paid batch,
       // and identical content dedupes itself.
       const contentHash = sha256(buf)

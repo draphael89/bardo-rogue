@@ -107,16 +107,31 @@ describe('judged gates', () => {
     c.def.clips = { walk: { frames: ['f0', 'f1'], timing: 'ticks', ticks: [6, 6], loop: true } }
     expect(gate(runGates(c), 'clip:walk:planted-feet').ok).toBe(false)
   })
-  it('identity is judged within a clip, not across unrelated atlas neighbours', async () => {
-    // Two frames in different palettes: as unrelated cells no identity gate compares them;
-    // in one clip, the drift fires.
+  it('identity is judged within a clip, never between unrelated atlas neighbours', async () => {
+    // Adjacent atlas cells are unrelated poses (hurt sits beside light1Start), so comparing them
+    // pairwise measured atlas layout rather than identity. No PAIRWISE gate may exist between two
+    // frames that no clip puts in sequence; inside a clip, drift fires.
     const wine = (x: number, y: number): string | null => body()(x, y) ? 'purple2' : null
     const free = runGates(await ctx([body(), wine]))
-    expect(free.some(g => g.gate.startsWith('identity:'))).toBe(false)
+    expect(free.some(g => /^identity:.*->/.test(g.gate))).toBe(false)
     const c = await ctx([body(), wine])
     c.def.clips = { turn: { frames: ['f0', 'f1'], timing: 'ticks', ticks: [6, 6] } }
     const clipped = runGates(c)
     expect(gate(clipped, 'identity:turn:f0->f1').ok).toBe(false)
+  })
+
+  it('a frame no clip names is still checked, against the rest of the sheet', async () => {
+    // Clip-scoping alone left idle/hurt/dead/chase — the most displayed drawings in the game —
+    // compared against nothing: a regenerated idle drawn as a DIFFERENT CHARACTER passed every gate
+    // as long as it stayed inside the declared ramp. Leave-one-out against the sheet closes that,
+    // and stays pose-agnostic, so it does not reintroduce the atlas-layout artefact above.
+    const wine = (x: number, y: number): string | null => body()(x, y) ? 'purple2' : null
+    const c = await ctx([body(), body(5, 7, 26, 28), wine])
+    c.def.clips = { walk: { frames: ['f0', 'f1'], timing: 'ticks', ticks: [6, 6] } }
+    const rs = runGates(c)
+    expect(gate(rs, 'identity:sheet:f2').ok).toBe(false)          // in no clip, and a stranger
+    expect(rs.some(g => g.gate === 'identity:sheet:f0')).toBe(false) // the clip already covers it
+    expect(gate(rs, 'identity:walk:f0->f1').ok).toBe(true)
   })
 })
 

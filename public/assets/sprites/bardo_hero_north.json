@@ -190,11 +190,11 @@
   "source": {
     "provider": "openai",
     "model": "gpt-image (built-in tool)",
-    "approvedSource": "art/source/bardo_hero_north_alpha_v7.png",
+    "approvedSource": "art/approved/bardo_hero_north_alpha_v7.png",
     "promptFile": "art/bardo-combat-sprites.md",
-    "promptHash": "9630ffaa43cc52d756502023f515b6b26e5c5bd5a3acea271e79e9752b908141",
+    "promptHash": "48e838b1f87f62c86c89db1bef18c85e063581a64d9e41fae853fb1787ff0bb1",
     "compiler": "bardo-art/1",
-    "sourceFile": "art/source/bardo_hero_north_alpha_v7.png",
+    "sourceFile": "art/approved/bardo_hero_north_alpha_v7.png",
     "sourceHash": "7daa50b38c56da47"
   }
 }

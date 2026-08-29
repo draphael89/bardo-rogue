@@ -55,7 +55,7 @@ export interface SheetProvenance {
   referenceHashes?: string[]
   /** A style/reference input admitted through the explicit art/approved human checkpoint. */
   approvedReference?: string
-  /** A deliberately approved editable source that is itself the compile input. */
+  /** A human-approved editable source under art/approved that is itself the compile input. */
   approvedSource?: string
   /** Compiler identity + the exact source it was built from. Lineage, not decoration. */
   compiler?: string

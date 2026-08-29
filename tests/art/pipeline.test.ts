@@ -412,12 +412,14 @@ describe('review findings', () => {
   it('verifies prompt-record hashes and distinguishes approved sources from admitted references', () => {
     const dir = mkdtempSync(join(tmpdir(), 'bardo-provenance-'))
     const source = join(dir, 'source.png'), promptFile = join(dir, 'prompt.txt')
+    const approvedSource = 'art/approved/bardo_hero_alpha_v1.png'
     writeFileSync(source, 'source')
     writeFileSync(promptFile, 'exact retained prompt')
     const promptHash = createHash('sha256').update(readFileSync(promptFile)).digest('hex')
-    const base = { id: 'x', kind: 'character', input: source, output: join(dir, 'out.png'), cell: 32, cols: 1, rows: 1, frames: [] } as CompileSpec
-    expect(() => validateProvenance({ ...base, provenance: { provider: 'test', approvedSource: source, promptFile, promptHash } }, 'x')).not.toThrow()
-    expect(() => validateProvenance({ ...base, provenance: { provider: 'test', approvedSource: source, promptFile, promptHash: '0'.repeat(64) } }, 'x')).toThrow(/does not match/)
+    const base = { id: 'x', kind: 'character', input: approvedSource, output: join(dir, 'out.png'), cell: 32, cols: 1, rows: 1, frames: [] } as CompileSpec
+    expect(() => validateProvenance({ ...base, provenance: { provider: 'test', approvedSource, promptFile, promptHash } }, 'x')).not.toThrow()
+    expect(() => validateProvenance({ ...base, provenance: { provider: 'test', approvedSource, promptFile, promptHash: '0'.repeat(64) } }, 'x')).toThrow(/does not match/)
+    expect(() => validateProvenance({ ...base, input: source, provenance: { provider: 'test', approvedSource: source } }, 'x')).toThrow(/under art\/approved/)
     expect(() => validateProvenance({ ...base, provenance: { provider: 'test', approvedReference: source } }, 'x')).toThrow(/under art\/approved/)
   })
 

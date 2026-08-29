@@ -29,12 +29,13 @@ Each spec records its own grid, palette ramp, pivots, sockets, clips and provena
 generated sheet has tall 4x2 cells. Those crops all use one sheet-wide source scale, so a crouched pose
 cannot be enlarged independently; pivots and sockets still own each frame's placement.
 
-The files under `art/source/` are the deliberately approved editable masters and the direct compiler
-inputs, recorded as `approvedSource`. They are not style references admitted through
-`art/approved/`, so the specs do not call them `approvedReference`. `promptFile` names this retained
-prompt record, and `promptHash` is its compiler-verified SHA-256 rather than an instruction to “see” a
-document. Human approval remains explicit: automated gates reject objective contract failures, but
-they do not substitute for judging identity, pose readability, or taste at 1x.
+The accepted editable masters live under `art/approved/` and are the direct compiler inputs, recorded
+as `approvedSource`. The compiler rejects an `approvedSource` outside that custody boundary. A separate
+`approvedReference` is reserved for an accepted style reference used to condition another generation.
+`promptFile` names this retained prompt record, and `promptHash` is its compiler-verified SHA-256 rather
+than an instruction to “see” a document. Human approval remains explicit: automated gates reject
+objective contract failures, but they do not substitute for judging identity, pose readability, or
+taste at 1x.
 
 The original normalizer (`tools/process-sprite-sheet.mjs`) is gone. It sampled one source point per
 output pixel, which at ~39 source pixels per output pixel is a coin flip at every edge — that is why

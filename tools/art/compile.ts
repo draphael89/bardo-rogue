@@ -73,8 +73,8 @@ export function validateProvenance(spec: CompileSpec, where: string): void {
   }
   if (p.approvedSource) {
     const source = normalize(p.approvedSource)
-    if (source !== normalize(spec.input) || !existsSync(source)) {
-      throw new Error(`sheet ${where}: approvedSource must name the retained compile input`)
+    if (!source.startsWith(`art/approved/`) || source !== normalize(spec.input) || !existsSync(source)) {
+      throw new Error(`sheet ${where}: approvedSource must name the retained compile input under art/approved`)
     }
   }
   if (p.promptFile && !p.promptHash) throw new Error(`sheet ${where}: promptFile requires promptHash`)

@@ -329,20 +329,21 @@ function makeShrineCluster(atlas: Atlas, s: ArenaShrine): { root: Container; syn
     // invites a second walk.
     if (!taken) {
       const r = tuning.run.shrineRadius
-      let prev = -1
+      // Each row reaches out to whichever NEIGHBOUR is further out, which is the only way a stepped
+      // circle comes out 8-connected: where the arc is turning fast a row's own span jumps two or
+      // three pixels past the last one, and a single pixel per row leaves holes. Carrying the
+      // previous row's span forward is not enough either — it closes the narrowing half and leaves
+      // the widening half, and the caps, in dots. Checked by flood fill for every r in 3..40.
+      const spanAt = (dy: number) => Math.round(Math.sqrt(Math.max(0, r * r - dy * dy)))
       for (let dy = -r; dy <= r; dy++) {
-        const span = Math.round(Math.sqrt(Math.max(0, r * r - dy * dy)))
+        const span = spanAt(dy)
         if (span < 1) continue
-        if (Math.abs(dy) > r - 2) {
-          markPx(body, -span, dy + 3, span * 2, 1, ink.ring)
-        } else {
-          // Close the horizontal gap where the circle is turning fast, or the arc comes out as a
-          // row of unconnected dots at 4x upscale.
-          const w = prev < 0 ? 1 : Math.max(1, prev - span + 1)
-          markPx(body, -span, dy + 3, w, 1, ink.ring)
-          markPx(body, span - w, dy + 3, w, 1, ink.ring)
-        }
-        prev = span
+        const up = spanAt(dy - 1), down = spanAt(dy + 1)
+        // A row whose neighbour has fallen off the circle is a cap, and closes across.
+        if (up < 1 || down < 1) { markPx(body, -span, dy + 3, span * 2 + 1, 1, ink.ring); continue }
+        const lo = Math.min(span, up, down)
+        markPx(body, lo, dy + 3, span - lo + 1, 1, ink.ring)
+        markPx(body, -span, dy + 3, span - lo + 1, 1, ink.ring)
       }
     }
     // hard 1px contact shadow, straight down: the only offset that stays on the pixel grid

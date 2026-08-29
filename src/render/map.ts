@@ -66,17 +66,21 @@ export class RouteMap {
       && age < R.holdTicks + R.fadeTicks
     this.root.visible = show
     if (!show) return
-    const t = age < R.holdTicks ? 1 : Math.max(0, 1 - (age - R.holdTicks) / R.fadeTicks)
-    this.g.alpha = t
-    // Words first, then the surface they were written on — the same order the reveal arrives in.
-    this.type.tint = fadeToBlack(typeBehindPlate(t))
     const path = run.roomHistory.map(v => v.id).join('>')
     const plan = mapPlan(world.rooms, room.id)
     const next = plan.doors.map(d => `${d.mark}:${d.dest}`).join('|')
     const nextKey = `${tuning.view.width}|${path}|${next}|${plan.then ?? ''}`
-    if (nextKey === this.key) return
-    this.key = nextKey
-    this.paint(plan)
+    if (nextKey !== this.key) {
+      this.key = nextKey
+      this.paint(plan)
+    }
+    // AFTER any repaint, never before it: `clear()` installs a fresh Graphics at alpha 1 and resets
+    // the type's tint to white, so a relayout or a suppression toggle landing mid-fade would flash
+    // the strip back to full for a frame.
+    const t = age < R.holdTicks ? 1 : Math.max(0, 1 - (age - R.holdTicks) / R.fadeTicks)
+    this.g.alpha = t
+    // Words first, then the surface they were written on — the same order the reveal arrives in.
+    this.type.tint = fadeToBlack(typeBehindPlate(t))
   }
 
   private paint(plan: MapPlan): void {

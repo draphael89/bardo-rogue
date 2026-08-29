@@ -133,7 +133,8 @@ const ordered = [...samples].sort((a, b) => a - b)
 const quantile = (p: number) => ordered[Math.max(0, Math.min(ordered.length - 1, Math.ceil(p * ordered.length) - 1))]!
 const mean = samples.reduce((sum, value) => sum + value, 0) / samples.length
 const variance = samples.reduce((sum, value) => sum + (value - mean) ** 2, 0) / samples.length
-const ticks = golden?.ticks ?? 0
+if (golden === null) throw new Error('benchmark produced no result')
+const ticks = golden.ticks
 const result = {
   scenario: mode === 'replay' ? `replay:${replayPath}` : mode === 'loop' ? `loop:${botName}:seed-${seed}` : `dense:e${enemies}:p${projectiles}:t${denseTicks}`,
   mode,

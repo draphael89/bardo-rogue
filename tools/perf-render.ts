@@ -5,8 +5,29 @@
 //   pnpm perf:render -- --profile warden --frames 600 --out /tmp/render.json
 import { writeFileSync } from 'node:fs'
 import { chromium } from '@playwright/test'
+import type { Presenter } from '../src/render/presenter'
+import type { World } from '../src/sim/world'
 
 type Profile = 'warden' | 'dense'
+
+interface RenderState {
+  tick: number
+  room: Record<string, unknown>
+  player: Record<string, unknown>
+  enemies: readonly unknown[]
+  bolts: number
+}
+
+interface BrowserGame {
+  world: World
+  presenter: Presenter
+  loop: { stop(): void }
+  pause(value: boolean): boolean
+  bot(name: 'idle' | null): void
+  hash(): number
+  step(count: number): void
+  state(): RenderState
+}
 
 const args = Object.fromEntries(process.argv.slice(2).map((arg, index, all) =>
   arg.startsWith('--') ? [arg.slice(2), all[index + 1] ?? '1'] : []).filter(row => row.length))
@@ -33,7 +54,7 @@ try {
   const cdp = await context.newCDPSession(page)
 
   const setup = await page.evaluate((kind) => {
-    const game = (window as any).__game
+    const game = (window as unknown as { __game: BrowserGame }).__game
     game.pause(true)
     game.loop.stop()
     game.bot(kind === 'warden' ? 'idle' : null)
@@ -44,14 +65,15 @@ try {
       world.events.length = 0
       game.presenter.handleEvents([])
     }
-    const gl = game.presenter.ra.app.renderer.gl
+    const renderer = game.presenter.ra.app.renderer as unknown as { gl?: WebGLRenderingContext }
+    const gl = renderer.gl
     const ext = gl?.getExtension('WEBGL_debug_renderer_info')
     return {
       hash: game.hash(),
-      enemies: game.world.enemies.filter((enemy: any) => enemy.active).length,
-      projectiles: game.world.projectiles.filter((projectile: any) => projectile.active).length,
-      renderer: ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl?.getParameter(gl.RENDERER),
-      vendor: ext ? gl.getParameter(ext.UNMASKED_VENDOR_WEBGL) : gl?.getParameter(gl.VENDOR),
+      enemies: game.world.enemies.filter(enemy => enemy.active).length,
+      projectiles: game.world.projectiles.filter(projectile => projectile.active).length,
+      renderer: gl && ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl?.getParameter(gl.RENDERER),
+      vendor: gl && ext ? gl.getParameter(ext.UNMASKED_VENDOR_WEBGL) : gl?.getParameter(gl.VENDOR),
       userAgent: navigator.userAgent,
       dpr: devicePixelRatio,
       viewport: [innerWidth, innerHeight],
@@ -59,7 +81,7 @@ try {
   }, profile)
 
   const runFrames = async (count: number, advance: boolean) => page.evaluate(async ({ count, advance }) => {
-    const game = (window as any).__game
+    const game = (window as unknown as { __game: BrowserGame }).__game
     const workMs: number[] = []
     const intervalsMs: number[] = []
     let previous = performance.now()
@@ -78,7 +100,7 @@ try {
   }, { count, advance })
 
   await runFrames(warmups, profile === 'warden')
-  const hashBefore = await page.evaluate(() => (window as any).__game.hash())
+  const hashBefore = await page.evaluate(() => (window as unknown as { __game: BrowserGame }).__game.hash())
   await cdp.send('Profiler.enable')
   await cdp.send('Profiler.setSamplingInterval', { interval: 100 })
   await cdp.send('HeapProfiler.enable')
@@ -106,7 +128,7 @@ try {
     slowest: [...resources].sort((a, b) => b.duration - a.duration).slice(0, 10),
   }
   if (args.resources) writeFileSync(args.resources, JSON.stringify(resources, null, 2) + '\n')
-  const state = measured.state as any
+  const state = measured.state
   const result = {
     scenario: `render:${profile}`,
     profile,

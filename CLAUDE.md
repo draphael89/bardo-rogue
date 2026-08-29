@@ -21,6 +21,9 @@ Standing directive for agents working here: `GAUNTLET.md` (build/critic loop, co
 - Any change to what `stepWorld` or `createWorld` can reach (most of `src/sim/`, and `src/tuning.ts`) breaks the pinned hashes in `tests/sim/replay.test.ts`. If intended: `pnpm record-bots`, paste the printed hashes into the test. Never hand-edit a hash, and never run `record-bots` to make a failure go away — it would launder real drift into the fixtures. `src/sim/save.ts` and `src/sim/storage.ts` are pure document code that the sim never calls (`tests/sim/boundary.test.ts` asserts it), so editing them must NOT change a hash.
 - `pnpm shot`/`pnpm poses` never start Vite; use `--stepwise 1` for a deterministic frame (free-run overshoots by up to 4 ticks).
 
+## Landing page
+`site/` is the PlayBardo.com marketing one-pager: `pnpm site:build` -> static `site/dist` (see `site/README.md`). It never touches the game build or `public/assets`.
+
 ## Platform
 The browser is the development target and stays first-class; `desktop/` is a thin Electron host around the same build. `src/sim/` and `src/render/` never learn which host they are in — everything host-specific goes behind `src/platform/`. Saves are one versioned JSON envelope (`src/sim/save.ts`), stored in localStorage on the web and in `userData/saves` on the desktop. The full rationale, phases and the Steam path: `PLATFORM_STRATEGY.md`.
 

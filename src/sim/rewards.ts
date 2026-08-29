@@ -1,3 +1,4 @@
+import { tuning } from '@/tuning'
 import { setDoorWalkable } from './arena'
 import { BOONS, BOON_IDS, DEITIES, grantBoon, hasBoon, type BoonId, type Deity } from './boons'
 import type { InputFrame } from './input'
@@ -102,6 +103,11 @@ export function updateReward(world: World, input: InputFrame): void {
     // The rite's modal (rites.ts) holds the same rule.
     return
   }
+  // Deliberately AFTER the nudge above: the selection stays live through the whole reveal, so a
+  // player who already knows the card they want loses nothing to the wait. Only the irreversible
+  // half is held. The input layer clears latched presses at the same boundary; this is the
+  // deterministic half of that guard, and the half a replay or a bot also has to obey.
+  if (world.tick - world.phaseTick < tuning.run.modalArmTicks) return
   if (!input.confirm) return
   const id = offer.options[offer.focus]
   grantBoon(world, id)

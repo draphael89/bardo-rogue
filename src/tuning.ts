@@ -157,6 +157,10 @@ export const tuning = {
     // at roomClearSlowmo, ~1 s of wall clock) plus a beat, so the ignite is always SEEN before it
     // can be taken -- including the case where the room cleared with the body already on the focal.
     shrineArmTicks: 20,
+    // The exits-phase route strip (src/render/map.ts). It is a summary of a plan the doors already
+    // wear, so it holds long enough to be read and then leaves the play area rather than sitting
+    // across the upper third of it until the player picks a door.
+    routeStrip: { holdTicks: 300, fadeTicks: 30 },
     transitionTicks: 8,   // 133 ms: enough for a threshold blink, never enough to break momentum
     // 400 ms before a modal will take an answer. The room's own offer no longer opens on the kill
     // tick -- it opens when you walk into what the room lit (shrineArmTicks above) -- but three

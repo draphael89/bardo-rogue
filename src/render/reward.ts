@@ -7,7 +7,7 @@ import { obolsLabel, SHOP_COPY, shopCost } from '@/sim/economy'
 import { MYSTERY_COPY, canAffordMystery } from '@/sim/mystery'
 import type { MysteryOffer, RewardOffer, ShopOffer } from '@/sim/session'
 import { tuning } from '@/tuning'
-import { backPause, clampPauseFocus, duoFooter, meetingVeil, offerAct, offerCardHeight, offerSpoken, pauseFooter, pauseNudge, resolvePause, shopAct, shopSpoken, showBuildStrip, townTally, victoryKeptLine, wrapPauseFocus, type PauseAct, type PausePage, type TitleNudge } from './titleMenu'
+import { backPause, buildStripLadder, clampPauseFocus, duoFooter, meetingVeil, offerAct, offerCardHeight, offerSpoken, pauseFooter, pauseNudge, resolvePause, shopAct, shopSpoken, showBuildStrip, townTally, victoryKeptLine, wrapPauseFocus, type PauseAct, type PausePage, type TitleNudge } from './titleMenu'
 import { label, placeCentered, placeLeft, placeRight, wrappedCentered, wrappedExtent, P } from './ui'
 import { clamp01 } from './anim'
 
@@ -35,6 +35,9 @@ function fadeToBlack(t: number): number {
  * text floating over the room. Holding the type back for the first third of the plate's own fade
  * puts them in the order the eye expects — surface, then writing.
  */
+// The fight band's own row: under the life plate (y 2..28), above the play area's own business.
+const STRIP_Y = 30
+
 const TYPE_LAG = 0.35
 function behind(t: number): number {
   return clamp01((t - TYPE_LAG) / (1 - TYPE_LAG))
@@ -59,6 +62,13 @@ export class RewardOverlay {
   private build = new Container()
   private buildG = new Graphics()
   private buildText = label('', 'meta', P.bone)
+  // The purse is its own right-anchored chip. On the strip it was the LAST thing on a row that grew
+  // off the side of the screen, so the number a player checks before a stall was the first thing to
+  // be clipped. Anchored to the other edge it cannot be crowded out by a fifth vow.
+  private purseText = label('', 'meta', P.gold)
+  // Text metrics are the expensive half of this and neither string changes per frame; `updateBuild`
+  // used to re-measure both on every one of them while walking nothing at all.
+  private buildKey = ''
   private meta = new Container()
   private metaG = new Graphics()
   private metaText = label('', 'meta', P.dim)
@@ -82,12 +92,12 @@ export class RewardOverlay {
     this.root.visible = false
     this.body.addChild(this.g)
     this.root.addChild(this.scrim, this.body)
-    this.build.addChild(this.buildG, this.buildText)
+    this.build.addChild(this.buildG, this.buildText, this.purseText)
     this.meta.addChild(this.metaG, this.metaText)
     layer.addChild(this.build, this.meta, this.root)
   }
 
-  relayout(): void { this.key = '' }
+  relayout(): void { this.key = ''; this.buildKey = '' }
   setPaused(paused: boolean): void {
     if (this.paused === paused) return
     this.paused = paused
@@ -266,16 +276,52 @@ export class RewardOverlay {
     this.metaG.rect(tuning.view.width - 10, 6, 2, 18).fill({ color: P.gold })
   }
 
+  /**
+   * What you carry, on the left; what you can spend, on the right; both on the same plate the
+   * meetings use.
+   *
+   * Two things were wrong here. The plate was clamped to the view and the TEXT was not, so it grew
+   * off the right of the screen — measured, four vows reach x=449 against a 448px room wall and the
+   * run's ceiling of five reaches 534 in a 480px frame. And the plate was `P.void` at 0.84, which
+   * sampled (5,4,7) against a floor of (2,1,5): no plate at all, so the row read as bare text with
+   * an unexplained gold tick floating on the room. Both strips now wear the overlay face.
+   */
   private updateBuild(world: World): void {
     if (!this.build.visible) return
     const ids = world.session.run?.boons.map(b => b.id) ?? []
     const purse = world.session.run?.obols ?? 0
-    const vows = ids.map(id => BOONS[id].name).join('  ·  ')
-    this.buildText.text = vows ? `${vows}   ·   ${obolsLabel(purse)}` : obolsLabel(purse)
-    placeLeft(this.buildText, 13, 39)
-    const w = Math.min(tuning.view.width - 26, this.buildText.width + 14)
-    this.buildG.clear().roundRect(8, 30, w, 18, 2).fill({ color: P.void, alpha: 0.84 })
-    this.buildG.rect(8, 30, 2, 18).fill({ color: ids.length || purse ? P.gold : 0x4c4c56 })
+    const nextKey = `${ids.join('|')}|${purse}|${tuning.view.width}`
+    if (nextKey === this.buildKey) return
+    this.buildKey = nextKey
+    const W = tuning.view.width
+    const g = this.buildG.clear()
+
+    // right first: the purse owns its edge, and what is left over is the vows' budget
+    this.purseText.visible = purse > 0
+    let rightEdge = W - 8
+    if (purse > 0) {
+      this.purseText.text = obolsLabel(purse)
+      placeRight(this.purseText, W - 13, STRIP_Y + 9)
+      const pw = Math.round(this.purseText.width) + 12
+      g.roundRect(W - 8 - pw, STRIP_Y, pw, 18, 2).fill({ color: P.face, alpha: 0.92 })
+      g.rect(W - 10, STRIP_Y, 2, 18).fill({ color: P.gold })
+      rightEdge = W - 8 - pw - 6
+    }
+
+    this.buildText.visible = ids.length > 0
+    if (!ids.length) return
+    const budget = rightEdge - 13 - 6
+    const names = ids.map(id => BOONS[id].name)
+    // Longest legal form that measures inside what is left. The ladder is authored in titleMenu.ts;
+    // only this side knows what the glyphs actually came to, which is why the walk lives here.
+    for (const form of buildStripLadder(names)) {
+      this.buildText.text = form
+      if (this.buildText.width <= budget) break
+    }
+    placeLeft(this.buildText, 13, STRIP_Y + 9)
+    const w = Math.round(this.buildText.width) + 14
+    g.roundRect(8, STRIP_Y, w, 18, 2).fill({ color: P.face, alpha: 0.92 })
+    g.rect(8, STRIP_Y, 2, 18).fill({ color: P.gold })
   }
 
   private clear(): void {

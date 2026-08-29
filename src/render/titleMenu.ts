@@ -140,6 +140,30 @@ export function hidePlaceCaption(s: { offer: boolean; shop: boolean; mystery: bo
   return s.offer || s.shop || s.mystery || s.rite || s.won
 }
 
+/**
+ * The fight strip, progressively shorter, for a row that cannot wrap.
+ *
+ * `updateBuild` clamped its PLATE to the view and never its text, which is placed at x=13 and grew
+ * right without limit. Measured against the shipped font at 480px: four vows already reach x=449,
+ * one past the room's right wall, and the run's real ceiling of five reaches 534 — 54px off the side
+ * of the screen, taking the purse with it. This is the death card's `deathCarriedLadder` problem in
+ * a different row, so it is the same shape of answer: hand the renderer every legal form longest
+ * first and let it stop at the one that measures inside the space it actually has.
+ *
+ * Names are dropped from the END, keeping the earliest, so the strip never reshuffles under a player
+ * who has learned to read the left of it. The last form is a bare count, which is a real loss and
+ * the honest one to take while the row is a single unwrapped line.
+ */
+export function buildStripLadder(names: readonly string[]): string[] {
+  if (names.length === 0) return ['']
+  const forms = [names.join('  ·  ')]
+  for (let k = names.length - 1; k >= 1; k--) {
+    forms.push(`${names.slice(0, k).join('  ·  ')}  ·  +${names.length - k}`)
+  }
+  forms.push(names.length === 1 ? '1 VOW' : `${names.length} VOWS`)
+  return forms
+}
+
 /** The fight strip names what you carry. An empty first fight does not wear UNMARKED BLADE. */
 export function showBuildStrip(s: {
   hasRun: boolean

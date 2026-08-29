@@ -123,8 +123,11 @@ export class Presenter {
     this.hud = new Hud(atlas, L.hud)
     this.flashOverlay = new Sprite(Texture.WHITE); this.flashOverlay.width = tuning.view.width; this.flashOverlay.height = tuning.view.height
     this.flashOverlay.alpha = 0; L.hud.addChild(this.flashOverlay)
-    this.reward = new RewardOverlay(L.hud)
+    // The route strip is built FIRST so it sits under the meetings rather than over them. It hides
+    // itself while a modal is pending, so nothing was visibly wrong — but a strip that draws above a
+    // 92%-opacity god is one missed condition away from being wrong, and the order is free.
     this.routeMap = new RouteMap(L.hud)
+    this.reward = new RewardOverlay(L.hud)
     // Above the reward overlay in z-order: the title is the one thing that covers everything.
     this.title = new TitleOverlay(L.hud)
     // juice hooks
@@ -1220,7 +1223,10 @@ export class Presenter {
     } else this.flashOverlay.alpha = 0
     this.hud.setChromeHidden(this.title.visible)
     this.reward.setSuppressed(this.title.visible)
-    this.routeMap.setSuppressed(this.title.visible)
+    // A banner and the plan are sequential, not simultaneous: the slab names the vow you just took,
+    // and the strip is for the rest of the phase. Sharing the frame is what made claiming a boon the
+    // busiest moment in the game.
+    this.routeMap.setSuppressed(this.title.visible || this.hud.bannerUp(w))
     this.reward.update(w)
     this.hud.setHushFight(this.reward.root.visible && !this.title.visible)
     this.hud.update(w, dtSec)

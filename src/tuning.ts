@@ -122,6 +122,13 @@ export const tuning = {
   // Eight ticks keeps a charger pack dangerous while making each release individually readable.
   enemyTellStartGap: 8,
   roomClearSlowmo: 0.2, roomClearSlowmoTicks: 12,
+  // Minimum reveal beats before a live confirm/restart may leave the death or victory screen.
+  // Enforced in the INPUT layer only (src/input): bots, replays and the debug override bypass it,
+  // so the sim stays ungated and the pinned replay fixtures cannot drift.
+  reveal: {
+    deathMinTicks: 50,    // the death card's key cap lands at CT beat 46 (hud.ts): the way out works only once it is shown
+    victoryMinTicks: 30,  // the victory card arrives in one beat; half a second so a buffered press cannot skip it unread
+  },
   run: {
     doorHalfW: 22,        // px: the open door is three tiles wide
     doorEnterMaxY: 32,    // px: north wall-face row; overlapping it while the door is open enters

@@ -3,7 +3,7 @@ import { crispText } from './textCrisp'
 import type { Atlas } from './atlas'
 import type { EnemyKind } from '@/sim/events'
 import type { World } from '@/sim/world'
-import { hasBoon } from '@/sim/boons'
+import { BOONS, hasBoon } from '@/sim/boons'
 import { HUB_ID } from '@/sim/rooms'
 import { tuning } from '@/tuning'
 
@@ -66,7 +66,9 @@ const BANNER_Y = 44, BAND_H = 28, OPEN = 8, CLOSE = 10   // the card sits clear 
 // The camera holds the corpse at the centre of the frame. A centred slab buried the last moment — the thing
 // both R1 critics named. The stele stands to the left of the body so the live room is the death snapshot
 // (§8.2.1 still owns the arch: star-sky, never a pasted still of the room).
-const CARD = { w: 216, h: 190, top: 42, left: 10 }
+// h grew 190 -> 206 to seat the carried build under the summary rows (same 16 px the build zone needs);
+// everything else on the card keeps its authored position, only the key cap rides down with the bottom.
+const CARD = { w: 216, h: 206, top: 42, left: 10 }
 const CARD_X = CARD.left
 const CARD_CX = CARD_X + Math.round(CARD.w / 2)
 const ARCH_TOP = CARD.top + 14
@@ -85,7 +87,7 @@ const SILL_HALF = 28
 // centred on the corpse, never a full-frame scrim — and only then does the stele open. The old schedule put the
 // card's border on screen 3 ticks after the killing blow and had the arena at a flat (8,7,14) by tick 15, so the
 // death showed the player neither his corpse, nor his killer, nor the room.
-const CT = { hold: 4, dim: 12, stele: 12, steleOpen: 8, sky: 20, title: 22, cross: 26, sub: 30, rows: [34, 37, 40], act: 46 }
+const CT = { hold: 4, dim: 12, stele: 12, steleOpen: 8, sky: 20, title: 22, cross: 26, sub: 30, rows: [34, 37, 40], build: 43, act: 46 }
 // Fight chrome (life plate, wave, boss) holds through the contact hold, then hands the frame to the stele.
 // Settled is 0 — a dim WAVE box and an empty heart plate at 0.4 were still the second-brightest objects
 // beside the card's gold. The place name stays; it is the named floor (§8.2.3), not a survival readout.
@@ -223,6 +225,8 @@ export class Hud {
   private cardTitle: Text
   private cardSub: Text
   private cardRows: { label: Text; value: Text }[] = []
+  private cardArm: Text               // the run's weapon, set as the build divider's nameplate
+  private cardBuild: Text             // the carried vows, or the strip's unmarked state
   private cardKey: Text               // the key cap's letter: R, or START on a pad
   private cardAct: Text
   private cardKeyStr = 'boot'         // last drawn card geometry; the card is redrawn only when its pose changes
@@ -309,6 +313,20 @@ export class Hud {
       value.anchor.set(1, 0); value.position.set(CARD_X + CARD.w - 26, CARD.top + 128 + i * 10)
       this.cardRows.push({ label, value })
     }
+    // The weapon rides the divider as its nameplate (it costs no width there), and the vows wrap
+    // under it rather than trailing off: a long run's build is the one line of this card the player
+    // earned, so all of it is shown. The wrap is the card's near-full face — four vows, two of them
+    // the longest in the game, still pack into two lines.
+    this.cardArm = new Text({
+      text: '', style: { fontFamily: 'Kenney Mini', fontSize: 8, fill: C.boneDim, letterSpacing: 1 }, resolution: 1,
+    })
+    this.cardArm.anchor.set(0.5, 0); this.cardArm.position.set(CARD_CX, CARD.top + 156)
+    this.cardBuild = new Text({
+      text: '',
+      style: { fontFamily: 'Kenney Mini', fontSize: 8, fill: C.bone, letterSpacing: 1, align: 'center', wordWrap: true, wordWrapWidth: CARD.w - 20, lineHeight: 9 },
+      resolution: 1,
+    })
+    this.cardBuild.anchor.set(0.5, 0); this.cardBuild.position.set(CARD_CX, CARD.top + 167)
     this.cardKey = new Text({ text: 'R', style: { fontFamily: 'Kenney Mini', fontSize: 8, fill: C.bone }, resolution: 1 })
     this.cardKey.anchor.set(0.5, 0)
     this.cardAct = new Text({ text: 'BEGIN AGAIN', style: { fontFamily: 'Kenney Mini', fontSize: 8, fill: C.bone, letterSpacing: 1 }, resolution: 1 })
@@ -317,7 +335,7 @@ export class Hud {
     layer.addChild(this.markG, this.crownG, this.hurtG, this.bandG, this.banner, this.sub,
       this.plateG, this.rig, this.waveG, this.waveText, this.bossG, this.bossName,
       this.footG, this.place, this.hintRow,
-      this.scrimG, this.cardG, this.cardTitle, this.cardSub, this.cardKey, this.cardAct)
+      this.scrimG, this.cardG, this.cardTitle, this.cardSub, this.cardArm, this.cardBuild, this.cardKey, this.cardAct)
     for (const r of this.cardRows) layer.addChild(r.label, r.value)
     this.hideDeathCard()
     this.applyCrisp()
@@ -865,7 +883,7 @@ export class Hud {
     if (this.cardKeyStr === '') return
     this.cardKeyStr = ''; this.veilKey = ''; this.deathAt = null; this.deathKiller = null
     this.scrimG.clear(); this.cardG.clear()
-    this.cardTitle.visible = this.cardSub.visible = this.cardKey.visible = this.cardAct.visible = false
+    this.cardTitle.visible = this.cardSub.visible = this.cardArm.visible = this.cardBuild.visible = this.cardKey.visible = this.cardAct.visible = false
     for (const r of this.cardRows) r.label.visible = r.value.visible = false
   }
 
@@ -936,6 +954,22 @@ export class Hud {
       // the value lands hard: one tick bleached to bone-white, then it settles into bone
       r.value.tint = age === CT.rows[i] ? C.wickWhite : C.bone
     }
+    // The build: what the run carried into this death, the victory card's own tally in the card's
+    // row face. session.run stays intact until the return is confirmed, so it is read straight; a
+    // boonless run states the build strip's unmarked line, and a stock scenario (no run) says nothing.
+    // A vow's name is joined with no-break spaces so the wrap can only ever break BETWEEN vows —
+    // pixi's word wrap does not treat U+00A0 as a breaking space.
+    const run = world.session.run
+    const atomic = (s: string) => s.replace(/ /g, '\u00a0')
+    const build = !run ? '' : run.boons.length
+      ? run.boons.map(b => atomic(BOONS[b.id].name)).join(' · ')
+      : 'UNMARKED BLADE'
+    const arm = run && run.boons.length ? (run.weapon === 'bow' ? 'THE BOW' : 'THE BLADE') : ''
+    if (this.cardBuild.text !== build) this.cardBuild.text = build
+    if (this.cardArm.text !== arm) this.cardArm.text = arm
+    this.cardArm.visible = !!arm && age >= CT.build
+    this.cardBuild.visible = !!build && age >= CT.build
+    this.cardBuild.tint = age === CT.build ? C.wickWhite : C.bone
     // The pop is a VALUE ramp plus a one-pixel settle: whole poses, integer positions, no resampled glyphs.
     const t = age - CT.title
     this.cardTitle.visible = age >= CT.title
@@ -947,7 +981,7 @@ export class Hud {
     const capW = Math.round(this.cardKey.width) + 9
     const actW = capW + 5 + Math.round(this.cardAct.width)
     const ax = CARD_CX - Math.round(actW / 2)
-    const ay = CARD.top + 166
+    const ay = CARD.top + 188
     this.cardKey.position.set(ax + Math.round(capW / 2), ay + 2)
     this.cardAct.position.set(ax + capW + 5, ay + 2)
     this.cardKey.visible = this.cardAct.visible = age >= CT.act
@@ -1010,6 +1044,21 @@ export class Hud {
       const y = CARD.top + 133 + i * 10
       const x0 = CARD_X + 27 + Math.round(r.label.width), x1 = CARD_X + CARD.w - 28 - Math.round(r.value.width)
       for (let x = x0 + 2; x < x1 - 1; x += 4) g.rect(x, y, 1, 1).fill({ color: C.boneLo, alpha: 0.7 })
+    }
+    // The carried build sits under the same cut the tally does, so the card reads as three registers:
+    // the fiction, what happened, what you carried. A marked build's weapon is the divider's own
+    // nameplate — the cut opens around it — so the weapon is stated without costing the vows a line.
+    if (build && age >= CT.build) {
+      const dy = CARD.top + 159
+      if (arm) {
+        const half = Math.round(this.cardArm.width / 2) + 5
+        g.rect(CARD_X + 26, dy, CARD_CX - half - (CARD_X + 26), 1).fill({ color: C.iron })
+        g.rect(CARD_CX + half, dy, CARD_X + CARD.w - 26 - (CARD_CX + half), 1).fill({ color: C.iron })
+      } else {
+        g.rect(CARD_X + 26, dy, CARD.w - 52, 1).fill({ color: C.iron })
+      }
+      diamond(g, CARD_X + 23, dy, C.goldDim, 0.9)
+      diamond(g, CARD_X + CARD.w - 24, dy, C.goldDim, 0.9)
     }
 
     // The way back. A key cap in the hint row's grammar, on its own inset shelf, and the ONLY thing on this card
@@ -1284,7 +1333,7 @@ export class Hud {
     // stopping it being snapped to the pixel grid. `place` keeps its shadow: it is the only label
     // drawn straight over the room with nothing behind it.
     for (const t of [this.banner, this.sub, this.waveText, this.bossName,
-      this.cardTitle, this.cardSub, this.cardKey, this.cardAct]) {
+      this.cardTitle, this.cardSub, this.cardArm, this.cardBuild, this.cardKey, this.cardAct]) {
       t.filters = [crispText]
       t.roundPixels = true
     }

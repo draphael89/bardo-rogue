@@ -3,6 +3,8 @@ import { Container, Point } from 'pixi.js'
 import type { RenderApp } from '@/render/app'
 import { InputSystem } from '@/input'
 import { createWorld } from '@/sim/scenarios'
+import { emptyInput } from '@/sim/input'
+import { finishRun, prepareWeapon, startRun } from '@/sim/session'
 import { stepWorld } from '@/sim/step'
 import type { World } from '@/sim/world'
 import { tuning } from '@/tuning'
@@ -269,6 +271,96 @@ describe('modal input', () => {
     expect(aimDeg(rearmed)).toBe(-90)
     expect(rearmed.attack).toBe(true)
     expect(rearmed.attackHeld).toBe(true)
+  })
+})
+
+describe('reveal gate on death and victory', () => {
+  // The gate lives in the device layer only: sample() swallows confirm/restart until the staged
+  // card has actually shown the way out. Bots, replays and the debug override feed the sim
+  // directly (src/main.ts), so the pinned replay fixtures never pass through it.
+
+  it('swallows keyboard confirm and restart until the death card reveals the way out', () => {
+    const h = harness()
+    const w = createWorld(1, 'empty')
+    w.player.state = 'dead'
+    w.player.deathTick = w.tick
+    const N = tuning.reveal.deathMinTicks
+    for (let age = 1; age < N; age++) {
+      w.tick++
+      h.win.fire('keydown', key('Enter')); h.win.fire('keyup', key('Enter'))
+      h.win.fire('keydown', key('KeyR')); h.win.fire('keyup', key('KeyR'))
+      const f = h.input.sample(w)
+      expect(f.confirm ?? false, `confirm leaked at age ${age}`).toBe(false)
+      expect(f.restart, `restart leaked at age ${age}`).toBe(false)
+    }
+    w.tick++                    // age === N: the gate opens
+    h.win.fire('keydown', key('Enter')); h.win.fire('keyup', key('Enter'))
+    expect(h.input.sample(w).confirm).toBe(true)
+    h.win.fire('keydown', key('KeyR')); h.win.fire('keyup', key('KeyR'))
+    expect(h.input.sample(w).restart).toBe(true)
+  })
+
+  it('gates a fresh gamepad press the same way: the gate sits where devices are normalized', () => {
+    const pad: FakePad = { axes: [0, 0, 0, 0], buttons: Array.from({ length: 16 }, () => ({ pressed: false })) }
+    const h = harness(pad)
+    const w = createWorld(1, 'empty')
+    h.input.sample(w)           // one live sample so the modal flip is a boundary, not the first frame
+    w.player.state = 'dead'
+    w.player.deathTick = w.tick
+    w.tick += 2                 // past the boundary, still far inside the gate
+    h.input.sample(w)
+    pad.buttons[2]!.pressed = true          // a fresh edge, not a hold inherited across the boundary
+    expect(h.input.sample(w).confirm ?? false).toBe(false)
+    pad.buttons[2]!.pressed = false
+    h.input.sample(w)
+    w.tick = w.player.deathTick + tuning.reveal.deathMinTicks
+    pad.buttons[2]!.pressed = true
+    expect(h.input.sample(w).confirm).toBe(true)
+  })
+
+  it('holds the victory confirm until the card has been readable', () => {
+    const h = harness()
+    const w = createWorld(1, 'loop')
+    prepareWeapon(w)
+    startRun(w, 'threshold')
+    finishRun(w, 'won')         // sets roomPhase 'resolved' and phaseTick = tick
+    const N = tuning.reveal.victoryMinTicks
+    for (let age = 1; age < N; age++) {
+      w.tick++
+      h.win.fire('keydown', key('Enter')); h.win.fire('keyup', key('Enter'))
+      expect(h.input.sample(w).confirm ?? false, `confirm leaked at age ${age}`).toBe(false)
+    }
+    w.tick++
+    h.win.fire('keydown', key('Enter')); h.win.fire('keyup', key('Enter'))
+    expect(h.input.sample(w).confirm).toBe(true)
+  })
+
+  it('leaves restart alone while the run is live', () => {
+    const h = harness()
+    const w = createWorld(1, 'empty')
+    h.win.fire('keydown', key('KeyR')); h.win.fire('keyup', key('KeyR'))
+    expect(h.input.sample(w).restart).toBe(true)
+  })
+
+  it('the debug override bypasses the gate entirely', () => {
+    const h = harness()
+    const w = createWorld(1, 'empty')
+    w.player.state = 'dead'
+    w.player.deathTick = w.tick
+    w.tick++                    // age 1, deep inside the gate
+    h.input.override = { ...emptyInput(), confirm: true, restart: true }
+    const f = h.input.sample(w)
+    expect(f.confirm).toBe(true)
+    expect(f.restart).toBe(true)
+  })
+
+  it('the sim itself stays ungated: a scripted confirm one tick after death still returns', () => {
+    const w = createWorld(1, 'loop')
+    w.player.state = 'dead'
+    w.player.deathTick = w.tick
+    stepWorld(w, { ...emptyInput(), confirm: true })
+    expect(w.player.state).toBe('free')
+    expect(w.returns).toBe(1)
   })
 })
 

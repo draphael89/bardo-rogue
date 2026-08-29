@@ -262,7 +262,20 @@ export class InputSystem {
       f.confirm = this.pressed.has('Enter') || this.pressed.has('Space') || this.pressed.has('KeyJ') || this.pressed.has('KeyZ') || this.mousePressed || padAttackEdge || dodge || heavy
       f.moveX = 0; f.moveY = 0; f.attack = false; f.attackHeld = false; f.heavy = false; f.dodge = false
     } else if (world.player.state === 'dead' || (world.roomPhase === 'resolved' && world.session.run?.result !== 'active')) {
-      f.confirm = this.pressed.has('Enter') || this.pressed.has('Space') || this.pressed.has('KeyJ') || this.pressed.has('KeyZ') || this.mousePressed || padAttackEdge || dodge || heavy
+      // The reveal owns its opening beats: canReturn() is true on the killing tick itself, so a
+      // press already streaming in (a mash, a fresh pad edge) would skip the whole staged card.
+      // Gated here, after every device is normalized, so keyboard, mouse and pad wait alike — and
+      // ONLY here: bots, replays and the debug override hand their frames to the sim directly
+      // (src/main.ts), so recorded fixtures never see this gate.
+      // A stock scenario idles in 'resolved' with no run at all; that is not a reveal, so it never gates.
+      const dead = world.player.state === 'dead'
+      const revealStart = dead ? world.player.deathTick
+        : world.session.run && world.session.run.result !== 'active' ? world.phaseTick : -1
+      if (revealStart >= 0 && world.tick - revealStart < (dead ? tuning.reveal.deathMinTicks : tuning.reveal.victoryMinTicks)) {
+        f.restart = false   // restart returns too (src/sim/step.ts:22), so it waits with confirm
+      } else {
+        f.confirm = this.pressed.has('Enter') || this.pressed.has('Space') || this.pressed.has('KeyJ') || this.pressed.has('KeyZ') || this.mousePressed || padAttackEdge || dodge || heavy
+      }
     }
     this.pressed.clear(); this.mousePressed = false; this.mouseHeavyPressed = false
     return f

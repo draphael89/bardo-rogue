@@ -99,7 +99,9 @@ export class RewardOverlay {
     const rite = this.paused ? null : world.session.run?.pendingRite
     const victory = !this.paused && world.session.run?.result === 'won'
     this.root.visible = !!offer || !!rite || victory || this.paused
+    // The death card carries the build itself now, so the strip stands down instead of doubling it.
     this.build.visible = !!world.session.run && world.roomPhase !== 'town' && !this.root.visible
+      && world.player.state !== 'dead'
     this.updateMeta(world)
     this.updateBuild(world)
     if (!this.root.visible) return

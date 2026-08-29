@@ -98,13 +98,22 @@ export function stepWorld(world: World, input: InputFrame): void {
 function resolveOverlaps(world: World, moved: boolean): void {
   const p = world.player
   const es = world.enemies
+  // Pool slots after the last live enemy cannot participate in this tick. Find that boundary once
+  // rather than re-reading the inactive tail in every pass and for every ordered pair. Separation
+  // only changes positions, so the boundary is stable for all four deterministic passes.
+  let end = es.length
+  while (end > 0) {
+    const e = es[end - 1]
+    if (e.active && e.state !== 'dead') break
+    end--
+  }
   // A roll ghosts for its whole travel phase, not just its i-frame window. Being hittable on the
   // brake tail is the price of the roll; being body-blocked mid-flight is a broken promise.
   const playerGhost = p.dodgeTick >= 0 && p.dodgeTick < tuning.player.dodge.travel
   // Four passes are cheap at the 32-body ceiling and converge wall-pinned triples below a quarter
   // pixel without an order-random solver. Fixed count keeps replays bit-for-bit deterministic.
   for (let pass = 0; pass < 4; pass++) {
-    for (let i = 0; i < es.length; i++) {
+    for (let i = 0; i < end; i++) {
       const a = es[i]
       if (!a.active || a.state === 'dead') continue
       if (!playerGhost && p.state !== 'dead' && a.state !== 'dash') {
@@ -112,7 +121,7 @@ function resolveOverlaps(world: World, moved: boolean): void {
         else separate(world.arena, p, p.radius, a, a.radius, 1, 0)
       }
       if (!moved) continue
-      for (let j = i + 1; j < es.length; j++) {
+      for (let j = i + 1; j < end; j++) {
         const b = es[j]
         if (!b.active || b.state === 'dead') continue
         if (a.state === 'dash' || b.state === 'dash') continue

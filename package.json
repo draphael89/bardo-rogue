@@ -4,6 +4,7 @@
   "private": true,
   "main": "desktop/out/main.cjs",
   "type": "module",
+  "packageManager": "pnpm@10.33.0",
   "scripts": {
     "dev": "vite --port 5173 --strictPort",
     "build": "tsc --noEmit && vite build && tsx tools/check-build.ts",
@@ -25,6 +26,8 @@
     "strip": "tsx tools/strip.ts",
     "record-bot": "tsx tools/record-bot.ts",
     "record-bots": "tsx tools/record-bot.ts --all",
+    "smoke": "tsx tools/smoke.ts",
+    "matrix": "tsx tools/matrix.ts",
     "art": "tsx tools/art.ts",
     "palette": "tsx tools/art.ts palette",
     "fx": "tsx tools/make-bardo-fx.ts"

@@ -9,6 +9,8 @@ import { queueSpawn } from '@/sim/waves'
 import { MAX_ENEMIES, MAX_PROJECTILES } from '@/sim/world'
 import { runReplay, type Replay } from '@/sim/replay'
 import { tuning } from '@/tuning'
+import { parkForModal } from '@/sim/session'
+import { SLOW_FULL } from '@/sim/world'
 
 describe('hashWorld covers the whole sim state', () => {
   it('sees a player-state-only difference', () => {
@@ -52,6 +54,32 @@ describe('hashWorld covers the whole sim state', () => {
     expect(hashWorld(stock)).not.toBe(hashWorld(window))
     expect(hashWorld(stock)).not.toBe(hashWorld(action))
     expect(hashWorld(window)).not.toBe(hashWorld(action))
+  })
+})
+
+describe('modal handoff', () => {
+  it('parks every transient action and both world clocks before full-screen choices', () => {
+    const world = createWorld(1, 'empty')
+    world.timeScale = 0.25
+    world.slowmoTicks = 9
+    world.freeze = 4
+    world.slowRate = 250
+    world.slowTicks = 12
+    world.slowAcc = 333
+    Object.assign(world.player, {
+      state: 'attack', stateTick: 5, attackQueuedAt: 3, heavyQueuedAt: 4, dodgeQueuedAt: 5,
+      dodgeTick: 2, dodgeRead: 2, dodgeProcTick: 7, reversalTicks: 8, reversalActionId: 9,
+      bladeActionConnected: true, swingFromRoll: true, vx: 30, vy: -20,
+    })
+
+    parkForModal(world)
+
+    expect(world).toMatchObject({ timeScale: 1, slowmoTicks: 0, freeze: 0, slowRate: SLOW_FULL, slowTicks: 0, slowAcc: 0 })
+    expect(world.player).toMatchObject({
+      state: 'free', stateTick: 0, attackQueuedAt: -1, heavyQueuedAt: -1, dodgeQueuedAt: -1,
+      dodgeTick: -1, dodgeRead: 0, dodgeProcTick: -1, reversalTicks: 0, reversalActionId: -1,
+      bladeActionConnected: false, swingFromRoll: false, vx: 0, vy: 0,
+    })
   })
 })
 

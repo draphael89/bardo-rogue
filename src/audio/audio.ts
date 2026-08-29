@@ -37,6 +37,12 @@ export interface Voice {
 
 export const dbToGain = (db: number): number => Math.pow(10, db / 20)
 
+/**
+ * Seconds the master takes to reach silence before a pause stops the clock, and to come back after.
+ * Long enough to cover a transient's tail, short enough that pausing still feels instant.
+ */
+export const SUSPEND_FADE = 0.06
+
 /** 0..1 slider -> linear gain on a dB curve. Store the slider, never the gain. */
 export function sliderToGain(slider01: number, floorDb = -60): number {
   if (slider01 <= 0) return 0
@@ -260,6 +266,92 @@ export class AudioSystem {
     if (!m) this.ensureBed()
   }
 
+  private _suspended = false
+  /** The real context, recorded at load(). Never the offline renderer's, which must not be paused. */
+  private liveCtx: AudioContext | null = null
+  private suspendGen = 0
+  get suspended(): boolean { return this._suspended }
+  /** Whether browser policy is still withholding the live clock from non-gesture input. */
+  get needsGesture(): boolean {
+    return !this._muted && this.liveCtx !== null && this.liveCtx.state !== 'running'
+  }
+
+  /**
+   * Pause owns the whole clock, not the master fader. Fading alone would leave the bed's loops and
+   * every scheduled voice running behind the pause screen: the music would come back bars further on
+   * than where it stopped, a door stinger queued 1.2 s out would fire the instant play resumed, and
+   * a tab left paused would keep a synthesiser awake indefinitely. Suspending freezes `currentTime`
+   * itself, and every deadline in this file is expressed in context time, so nothing drifts or
+   * expires while the game is away.
+   *
+   * The fade is not decoration. Half the cues here are 30-200 ms transients, and cutting the clock
+   * mid-waveform clicks on the way down and finishes a chopped hit on the way up — so the master
+   * ramps to silence first and the clock stops a beat later, under cover.
+   */
+  /**
+   * Ask the browser to let the clock run, if it is not running and we did not stop it ourselves.
+   *
+   * The two listeners installed by `load` cover mouse and keyboard. A controller-only player fires
+   * neither — and a gamepad button is not a user activation in any browser — so without a path that
+   * asks again they were the one input device that got a silent game. This cannot force a refused
+   * resume; it makes sure the game keeps asking, so audio starts the moment the browser allows it.
+   * Cheap enough to call every frame: it returns before touching a promise unless there is
+   * something to fix.
+   */
+  tryUnlock(): void {
+    if (this._suspended) return
+    const c = this.liveCtx
+    if (!c || c.state === 'running') return
+    void c.resume().catch(() => { /* refused without a gesture; we will ask again */ })
+  }
+
+  /** Resume inside a real pointer/key activation and report the browser's actual decision. */
+  async resumeFromGesture(): Promise<boolean> {
+    this.setSuspended(false)
+    const c = this.liveCtx
+    if (this._muted || !c) return true
+    try { await c.resume() } catch { return false }
+    return c.state === 'running'
+  }
+
+  setSuspended(s: boolean): void {
+    if (s === this._suspended) return
+    this._suspended = s
+    const c = this.liveCtx
+    if (!c) return
+    const gen = ++this.suspendGen
+    const master = this.master
+    const level = () => (this._muted ? 0 : this.masterLevel())
+
+    if (s) {
+      if (master) {
+        const t = this.now()
+        master.gain.cancelScheduledValues(t)
+        master.gain.setTargetAtTime(0, t, SUSPEND_FADE / 3)
+      }
+      // A rapid pause/unpause must not land this suspend after the resume; the generation guard is
+      // what keeps a mashed Escape key from wedging the game silent.
+      setTimeout(() => {
+        if (gen !== this.suspendGen || !this._suspended) return
+        void c.suspend().catch(() => { /* already closed or refused; the fade still silenced it */ })
+      }, SUSPEND_FADE * 1000)
+      return
+    }
+
+    void c.resume().then(() => {
+      if (gen !== this.suspendGen || this._suspended) return
+      if (!master) return
+      const t = this.now()
+      master.gain.cancelScheduledValues(t)
+      master.gain.setTargetAtTime(level(), t, SUSPEND_FADE / 3)
+    }).catch(() => {
+      // A programmatic resume outside a user gesture can be refused. Bring the fader back anyway so
+      // the game is audible again the moment the browser lets the context run.
+      if (gen !== this.suspendGen || this._suspended || !master) return
+      master.gain.setTargetAtTime(level(), this.now(), SUSPEND_FADE / 3)
+    })
+  }
+
   private masterLevel(): number { return dbToGain(MIX.masterDb) * this.slider.master }
   private now(): number { return (this.ctx?.currentTime ?? 0) + this.timeOffset }
 
@@ -270,6 +362,9 @@ export class AudioSystem {
   async load(files: string[], base = '/assets/audio/', ctx?: BaseAudioContext): Promise<void> {
     if (!ctx && typeof AudioContext === 'undefined') return
     this.ctx = ctx ?? new AudioContext()
+    // Only a context we created is ours to pause. OfflineAudioContext also declares suspend(), but
+    // its version takes a required time argument and pausing a render would wedge it forever.
+    this.liveCtx = ctx ? null : (this.ctx as AudioContext)
     this.buildGraph()
     files = files.filter(f => !ANNOUNCER.has(f.replace('.ogg', '')))
     await Promise.all(files.map(async f => {
@@ -287,8 +382,12 @@ export class AudioSystem {
     await this.buildBed()
     if (typeof window !== 'undefined' && 'resume' in this.ctx) {
       const c = this.ctx as AudioContext
-      const unlock = () => { c.resume(); window.removeEventListener('pointerdown', unlock); window.removeEventListener('keydown', unlock) }
-      window.addEventListener('pointerdown', unlock); window.addEventListener('keydown', unlock)
+      // The gesture unlock must not undo a deliberate pause: a player who pauses before ever
+      // clicking would otherwise get the bed back by dismissing the dialog. It also stays installed
+      // as the recovery path for a suspend the browser initiated on its own (mobile audio focus, a
+      // backgrounded tab) - without it, an interrupted context stays silent with nothing to revive it.
+      window.addEventListener('pointerdown', () => this.tryUnlock())
+      window.addEventListener('keydown', () => this.tryUnlock())
     }
   }
 

@@ -88,14 +88,19 @@ export const SLICE_ROOM_2_BLADE: WaveDef[] = [{ groups: [
   ] },
 ] }]
 
+// Charon's Landing is where the Oath-Bound is introduced, and it is introduced ALONE: the shield is
+// a rule to be read, and a rule taught inside a crowd is a rule learned by accident. The pressure
+// arrives afterwards, once the answer is known.
 export const SLICE_ROOM_3: WaveDef[] = [{ groups: [
   { delay: 0, spawns: [
-    { kind: 'brute', x: 8, y: 5 },
-    { kind: 'caster', x: 21, y: 4 },
+    { kind: 'oathbound', x: 13, y: 5 },
   ] },
-  { delay: 55, whenRemainingAtMost: 1, spawns: [
+  { delay: 40, whenRemainingAtMost: 0, spawns: [
+    { kind: 'caster', x: 21, y: 4 },
     { kind: 'charger', x: 4, y: 10 },
-    { kind: 'charger', x: 22, y: 10 },
+  ] },
+  { delay: 40, whenRemainingAtMost: 1, spawns: [
+    { kind: 'brute', x: 8, y: 5 },
   ] },
 ] }]
 
@@ -103,7 +108,13 @@ export const SLICE_WARDEN: WaveDef[] = [{ groups: [{ delay: 20, spawns: [
   { kind: 'warden', x: 13, y: 5 },
 ] }] }]
 
-export function queueSpawn(world: World, s: SpawnDef): void {
+/**
+ * `opts.ticks` overrides the telegraph length and `opts.debt` marks the arrival as the refused
+ * toll's. Only the toll uses either: that body is not part of a wave's phrasing, it has to arrive
+ * after the room's own opening rather than inside it, and it announces itself when it lands.
+ */
+export function queueSpawn(world: World, s: SpawnDef, opts: { ticks?: number; debt?: boolean } = {}): void {
+  const ticks = opts.ticks ?? tuning.spawnTelegraphTicks
   let x = s.x * TILE, y = s.y * TILE
   const radius = s.kind === 'dummy' ? 6 : tuning[s.kind].radius
   // Authored formations can mirror into asymmetric room masonry. Resolve the telegraph itself to
@@ -119,7 +130,7 @@ export function queueSpawn(world: World, s: SpawnDef): void {
     }
     x = bestX; y = bestY
   }
-  world.spawnQueue.push({ kind: s.kind, x, y, ticksLeft: tuning.spawnTelegraphTicks })
+  world.spawnQueue.push({ kind: s.kind, x, y, ticksLeft: ticks, total: ticks, ...(opts.debt ? { debt: true } : {}) })
   world.emit({ type: 'spawnTelegraph', x, y, kind: s.kind })
 }
 
@@ -128,7 +139,12 @@ export function updateSpawnQueue(world: World): void {
     const s = world.spawnQueue[i]
     s.ticksLeft--
     // a full pool emits poolOverflow and returns null; keep the entry and retry next tick
-    if (s.ticksLeft <= 0 && world.spawnEnemy(s.kind, s.x, s.y)) world.spawnQueue.splice(i, 1)
+    if (s.ticksLeft <= 0 && world.spawnEnemy(s.kind, s.x, s.y)) {
+      // The account is read out when the body is standing in the room, not when its mark went down
+      // two and a half seconds earlier under a room-name banner nobody could see past.
+      if (s.debt) world.emit({ type: 'riteDebtCalled' })
+      world.spawnQueue.splice(i, 1)
+    }
   }
 }
 
@@ -172,7 +188,10 @@ export function updateWaves(world: World): void {
       const production = world.scenario === 'loop'
       const reward = production ? room.reward : undefined
       const victory = production && !!room.boss
-      world.doorOpen = !reward && !victory
+      // The flag means "the way onward is open", so it is only ever raised when there IS a way
+      // onward. Raising it in an exit-less debug room made the clear play a door-opening sound and
+      // flare the door glow over doors that (correctly) stayed shut.
+      world.doorOpen = !reward && !victory && world.hasNextRoom()
       world.roomClearTick = world.tick
       world.timeScale = tuning.roomClearSlowmo
       world.slowmoTicks = tuning.roomClearSlowmoTicks
@@ -184,7 +203,7 @@ export function updateWaves(world: World): void {
         b.active = false
         world.emit({ type: 'boltHitWall', x: b.x, y: b.y })
       }
-      if (world.doorOpen && world.hasNextRoom()) setDoorWalkable(world.arena, true)
+      if (world.doorOpen) setDoorWalkable(world.arena, true)
       world.emit({ type: 'roomClear', hasNext: world.hasNextRoom(), reward: !!reward, victory })
       if (victory) finishRun(world, 'won')
       else if (reward) offerReward(world, reward)

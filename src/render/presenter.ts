@@ -21,7 +21,9 @@ import { Atmosphere } from './atmosphere'
 import { seedFx } from './fxRng'
 import { BOONS } from '@/sim/boons'
 import { ActionFeedbackGate, applyActionFeedbackLifecycle, crowdScreenMultiplier, guardedHitScreenScale, hasHostileFloorThreat, wardenAttackFeedback } from './feedback'
+import { guardUp } from '@/sim/enemies/oathbound'
 import { RewardOverlay } from './reward'
+import { TitleOverlay } from './title'
 import { HardLockFeedback } from './hardLock'
 import { contactKillKey, enemyReactionTransform, grazeFeedbackGeometry, impactStampForHit, recognizedContactKills, type ImpactStamp } from './contact'
 
@@ -51,6 +53,7 @@ export class Presenter {
   damageNumbers: DamageNumbers
   atmosphere: Atmosphere
   reward: RewardOverlay
+  title: TitleOverlay
   private lastHurtAngle = 0
   private emberAcc = 0
   // contact reaction on real time, so it plays out *inside* the hit-stop instead of waiting for it
@@ -94,6 +97,8 @@ export class Presenter {
     this.flashOverlay = new Sprite(Texture.WHITE); this.flashOverlay.width = tuning.view.width; this.flashOverlay.height = tuning.view.height
     this.flashOverlay.alpha = 0; L.hud.addChild(this.flashOverlay)
     this.reward = new RewardOverlay(L.hud)
+    // Above the reward overlay in z-order: the title is the one thing that covers everything.
+    this.title = new TitleOverlay(L.hud)
     // juice hooks
     this.lighting = new Lighting(ra, atlas, this.particles, ra.app.renderer, world.arena)
     this.postfx = new PostFx(ra)
@@ -255,6 +260,7 @@ export class Presenter {
           this.postfx.pulse(); this.lastHurtAngle = ev.angle // juice hook
           break
         case 'playerDeath': {
+          this.hud.setKiller(ev.by)
           this.camera.addTrauma(0.8)
           // juice hook: the player shatters like an enemy and stays hidden until restart
           const v = this.playerView
@@ -342,6 +348,13 @@ export class Presenter {
         case 'swing':
           // the greatsword's wind-up plants the feet and drags the camera back off the swing line
           if (ev.heavy) { this.camera.addTrauma(J.swing.heavyWindTrauma); this.particles.dust(ev.x, ev.y + 5, ev.angle + Math.PI, J.swing.heavyPlantDust) }
+          // A swing thrown out of a roll is its own verb, so it gets its own mark: the roll's cold
+          // colour thrown forward along the blade. It borrows the dodge's language rather than
+          // inventing a third one, because that is what it is — the roll, continued.
+          if (ev.dash) {
+            const DG = tuning.juice.dodged
+            this.particles.hitSparks(ev.x, ev.y, ev.angle, 4, DG.ringMid)
+          }
           break
         case 'boltCut': this.particles.hitSparks(ev.x, ev.y, 0, 10, 0xe0a0ff); this.camera.addTrauma(0.15); break
         case 'boltHitWall': this.particles.puff(ev.x, ev.y, 3, 0xb070ff); break
@@ -387,7 +400,12 @@ export class Presenter {
           this.camera.addTrauma(0.22)
           this.camera.punchZoom(J.zoom.roomClear)
           this.postfx.pulse()
-          this.hud.showBanner(ev.name, ev.index + 1 < ev.total ? '' : 'the last chamber', 1.8)
+          // A room that opens with a rite introduces itself through the speaker standing in it, so
+          // the arrival banner would only be a second title bleeding through the modal. The place
+          // label still carries the name, and the answer gets the banner instead.
+          if (this.world.roomPhase !== 'entering') {
+            this.hud.showBanner(ev.name, ev.index + 1 < ev.total ? '' : 'the last chamber', 1.8)
+          }
           this.hud.place.text = ev.name
           break
         case 'returned': {
@@ -431,6 +449,18 @@ export class Presenter {
           break
         case 'rewardOffered':
         case 'rewardFocus':
+        case 'riteOffered':
+        case 'riteFocus':
+          break
+        case 'riteChosen':
+          // Paying is a thing taken out of you; refusing is a thing left behind. Same beat, opposite
+          // colour, and the flash is the only feedback either answer gets before the room starts.
+          this.flash(0.4, ev.paid ? 0x9e4658 : 0xd4b060)
+          this.particles.ring(ev.x, ev.y, ev.paid ? 0xc06070 : 0xd4b060)
+          this.hud.showBanner(ev.paid ? 'THE TOLL IS PAID' : 'YOU CROSS OWED', ev.paid ? 'he carries you' : 'the river remembers', 1.6)
+          break
+        case 'riteDebtCalled':
+          this.hud.showBanner('THE ACCOUNT IS READ', 'the river sent one after you', 1.8)
           break
         case 'boonChosen': {
           const def = BOONS[ev.boon]
@@ -443,6 +473,43 @@ export class Presenter {
         }
         case 'brandApplied':
           this.particles.ring(ev.x, ev.y, ev.stacks >= 3 ? 0xff9a30 : 0xb03010)
+          break
+        case 'burnApplied':
+          this.particles.flame(ev.x, ev.y - 4)
+          this.particles.puff(ev.x, ev.y, 3, 0xff8c30)
+          break
+        case 'burnTick':
+          this.particles.flame(ev.x, ev.y - 3)
+          break
+        case 'brandPassed': {
+          // The debt has to be SEEN to move, or a mark reappearing on another body reads as a bug.
+          // Embers walk the whole span so the eye follows them to their new owner.
+          const steps = 6
+          for (let i = 1; i <= steps; i++) {
+            const t = i / (steps + 1)
+            this.particles.ember(ev.fromX + (ev.toX - ev.fromX) * t, ev.fromY + (ev.toY - ev.fromY) * t)
+          }
+          this.particles.ring(ev.toX, ev.toY, 0xff9a30)
+          break
+        }
+        case 'guardBlocked': {
+          // Bronze, not blood: a turned blow must never wear the contact language of a landed one,
+          // or the player learns the wrong lesson from the loudest signal on screen.
+          this.particles.hitSparks(ev.x, ev.y, ev.angle + Math.PI, 6, 0xf0c070)
+          this.camera.addTrauma(0.08)
+          const v = this.enemyViews.get(ev.id)
+          if (v) v.squash = Math.round(J.squashTicks * 0.6)
+          break
+        }
+        case 'interrupt':
+          // Catching someone mid-word is the hardest read the heavy can buy. It gets its own
+          // punctuation: a hard white ring and a shove, over and above the hit that carried it.
+          this.particles.ring(ev.x, ev.y, 0xfff4d8)
+          this.particles.puff(ev.x, ev.y, 7, 0xffd070)
+          this.camera.addTrauma(0.22)
+          this.postfx.pulse()
+          break
+        case 'burnEnded':
           break
         case 'brandConsumed':
           this.particles.ring(ev.x, ev.y, 0xffe090)
@@ -896,7 +963,7 @@ export class Presenter {
     for (let i = 0; i < this.spawnMarkers.length; i++) {
       const s = w.spawnQueue[i]
       this.spawnMarkers[i].sprite.visible = !!s
-      if (s) this.spawnMarkers[i].update(s.x, s.y, s.ticksLeft, tuning.spawnTelegraphTicks)
+      if (s) this.spawnMarkers[i].update(s.x, s.y, s.ticksLeft, s.total)
     }
 
     if (w.freeze <= 0 && this.playerView.squash > 0) this.playerView.squash -= dtSec * 60
@@ -914,6 +981,8 @@ export class Presenter {
       if (!e.active) continue
       if (e.kind === 'caster' && e.state === 'aim') drawAimLine(this.fxGraphics, e, slowAlpha)
       if (e.brand > 0) drawBrandPips(this.fxGraphics, e, slowAlpha)
+      if (e.burn > 0) drawBurn(this.fxGraphics, this.groundFx, e, slowAlpha, this.time)
+      if (guardUp(e)) drawGuard(this.fxGraphics, e, slowAlpha)
     }
     if (w.session.run?.primedBrand) drawPrimedEdge(this.fxGraphics, p, alpha)
     if (armOf(w) === ARM.bow) drawBowAim(this.fxGraphics, p, alpha)
@@ -959,8 +1028,11 @@ export class Presenter {
       if (this.flashOverlay.height !== tuning.view.height) this.flashOverlay.height = tuning.view.height
       this.flashOverlay.alpha = this.flashAlpha; this.flashAlpha = Math.max(0, this.flashAlpha - dtSec * 6)
     } else this.flashOverlay.alpha = 0
+    this.hud.setChromeHidden(this.title.visible)
+    this.reward.setSuppressed(this.title.visible)
     this.hud.update(w, dtSec)
     this.reward.update(w)
+    this.title.update(w, dtSec)
   }
 }
 
@@ -973,6 +1045,68 @@ function drawBrandPips(g: Graphics, e: Enemy, alpha: number): void {
     g.rect(px, y, 3, 3).fill(i < e.brand ? (e.brand === 3 ? 0xffcc56 : 0xff7a18) : 0x3a2018)
     if (i < e.brand) g.rect(px + 1, y, 1, 2).fill(0xfff0c0)
   }
+}
+
+// Brand counts, so it is drawn as pips you can read at a glance: you need the number to know what a
+// heavy will cash. Burn does not count - the exact stack never changes a decision - so it is drawn
+// as fire ON the body instead of a second row of counters competing with the first.
+function drawBurn(g: Graphics, ground: Graphics, e: Enemy, alpha: number, time: number): void {
+  const x = Math.round(lerp(e.px, e.x, alpha))
+  const y = Math.round(lerp(e.py, e.y, alpha))
+  // The pool first, under the body: a burning shape is lit from below, and this is what makes the
+  // status legible across a room at speed. The licks are the detail, not the signal.
+  const pulse = 0.5 + 0.5 * Math.sin(time * 7)
+  const pr = e.radius + 3 + e.burn
+  ground.ellipse(x, y + 3, pr, Math.round(pr * 0.5)).fill({ color: 0xff7a18, alpha: 0.10 + 0.05 * e.burn + 0.04 * pulse })
+  const licks = 3 + e.burn
+  for (let i = 0; i < licks; i++) {
+    // A cheap deterministic flicker: each lick has its own phase, so they never pulse in unison.
+    const phase = time * 9 + i * 2.1
+    const sway = Math.sin(phase) * 3
+    const rise = ((phase * 0.5) % 1)
+    const lx = Math.round(x + sway + (i - licks / 2) * 3)
+    // Rooted at the body and climbing only to just above it, so the Brand pips keep the airspace
+    // over the head to themselves and the two statuses never read as one stacked readout.
+    const ly = Math.round(y + 2 - rise * (e.radius + 7))
+    const h = 1 + Math.round((1 - rise) * 2)
+    // The ramp stays hot most of the way up: the dark tail of a fire is invisible on a dark floor,
+    // which is where the first pass lost most of its pixels.
+    g.rect(lx, ly, 1, h).fill(rise < 0.55 ? 0xffe08a : rise < 0.85 ? 0xffa03a : 0xd4551c)
+  }
+}
+
+// A sentence with a clock on it. The outer ring is the ground that will be struck and never moves,
+// so the player can judge the edge exactly; the inner ring closes toward the centre as the delay
+// runs out, which is the countdown. It is drawn on the FLOOR layer only — a hazard that paints over
+// a body would hide the thing the player is dodging.
+// The shield, drawn as the arc it actually covers. This is the whole teaching surface for the elite:
+// the arc is present exactly when a light blow would be turned, and gone the instant it would land -
+// when the shade is burning, staggered, or committed to its own swing. A player never has to be told
+// the rule, only shown it twice.
+function drawGuard(g: Graphics, e: Enemy, alpha: number): void {
+  const x = Math.round(lerp(e.px, e.x, alpha))
+  const y = Math.round(lerp(e.py, e.y, alpha))
+  const span = (tuning.oathbound.guardArcDeg * Math.PI) / 360
+  // Held in front of the body and OUTSIDE it. This took three passes: at body radius and at chest
+  // height the 32px silhouette ate the arc, and on the floor plane it read as one more ground
+  // telegraph among several. A shield is a thing held up, so it is drawn above the body, one
+  // shield's distance out, where nothing else in the frame is competing for those pixels.
+  const r = e.radius + 14
+  const cy = y - 6
+  const steps = 30
+  // A dark backing row under a bronze face, the same two-tone treatment every readable mark in this
+  // game uses, so it holds its edge on lit stone and on shadow alike. Two passes rather than two
+  // fills per pixel: the arc is redrawn every frame for every guarding body.
+  for (let i = 0; i <= steps; i++) {
+    const a = e.aimAngle - span + (span * 2 * i) / steps
+    g.rect(Math.round(x + Math.cos(a) * r), Math.round(cy + Math.sin(a) * r * 0.85) + 1, 1, 2)
+  }
+  g.fill({ color: 0x120d18, alpha: 0.85 })
+  for (let i = 0; i <= steps; i++) {
+    const a = e.aimAngle - span + (span * 2 * i) / steps
+    g.rect(Math.round(x + Math.cos(a) * r), Math.round(cy + Math.sin(a) * r * 0.85), 1, 1)
+  }
+  g.fill({ color: 0xd8a45c, alpha: 0.95 })
 }
 
 function drawPrimedEdge(g: Graphics, p: World['player'], alpha: number): void {

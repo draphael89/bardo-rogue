@@ -1,7 +1,9 @@
 import type { ArmId } from './weapons'
-import type { BoonId } from './boons'
+import type { BoonId, Deity } from './boons'
+import type { DeathKind } from './events'
 import type { DoorMark } from './arena'
-import type { World } from './world'
+import type { RiteId } from './rites'
+import { SLOW_FULL, type World } from './world'
 import { ARM, grantArm } from './weapons'
 import { Rng, STREAM, streamSeed } from './rng'
 import { tuning } from '@/tuning'
@@ -25,7 +27,17 @@ export interface RewardOffer {
   family: RewardFamily
   options: [BoonId, BoonId, BoonId]
   focus: 0 | 1 | 2
+  deity: Deity            // who is speaking; the door's mark promised this
+  fromRite: boolean       // the ferryman's payout, not the room's own reward — the screen must say so
 }
+
+export interface RiteOffer {
+  id: RiteId
+  focus: 0 | 1
+}
+
+/** How the run answered the realm's one rite. `null` until it has been asked and answered. */
+export type RiteAnswer = null | 'paid' | 'refused'
 
 export interface RunState {
   seed: number
@@ -38,9 +50,19 @@ export interface RunState {
   roomId: string
   roomHistory: RoomVisit[]
   pendingReward: RewardOffer | null
+  // The toll, in its three states: being asked, paid (and owed a vow at this room's end), or
+  // refused. A refusal outlives the room it was made in — that is the whole point of it.
+  pendingRite: RiteOffer | null
+  // Answered once per run and never again: `enterRoom` is the general room API, and without this a
+  // back-edge or a return-to-room path would turn a permanent cost into a repeatable drain.
+  riteAnswer: RiteAnswer
+  riteBoonOwed: boolean
+  riteDebt: boolean
   result: RunResult
   startedTick: number
   primedBrand: boolean
+  killedBy: DeathKind          // 'none' until something lands the killing blow
+  killedRanged: boolean
 }
 
 export interface MetaStateV1 {
@@ -83,9 +105,11 @@ export function startRun(world: World, firstRoomId: string): boolean {
   const weapon = world.session.preparedWeapon
   if (!weapon) return false
   const attempt = world.session.meta.attempts + 1
-  // Each attempt gets its own deterministic stream. A second run is different, while replaying the
-  // same session commands from the same seed remains exact.
-  const runSeed = streamSeed(world.seed, STREAM.gameplay ^ Math.imul(world.returns + 1, 0x45d9f3b))
+  // Each attempt gets its own deterministic stream, keyed on the PERSISTED attempt count rather than
+  // this session's return count. Both differ run to run, but only attempts survives a reload, so
+  // yesterday's opening is not handed back to you today. Replays carry their own meta snapshot
+  // (replay.ts), so a recorded attempt still reproduces exactly.
+  const runSeed = streamSeed(world.seed, STREAM.gameplay ^ Math.imul(attempt, 0x45d9f3b))
   world.session.meta.attempts = attempt
   world.player.hp = world.player.maxHp = tuning.player.hp
   world.session.run = {
@@ -99,9 +123,15 @@ export function startRun(world: World, firstRoomId: string): boolean {
     roomId: firstRoomId,
     roomHistory: [],
     pendingReward: null,
+    pendingRite: null,
+    riteAnswer: null,
+    riteBoonOwed: false,
+    riteDebt: false,
     result: 'active',
     startedTick: world.tick,
     primedBrand: false,
+    killedBy: 'none',
+    killedRanged: false,
   }
   world.rng = new Rng(runSeed)
   world.boonBits = 0
@@ -149,7 +179,37 @@ export function finishRun(world: World, result: Exclude<RunResult, 'active'>): v
     depth: run.depth,
     ticks: Math.max(0, world.tick - run.startedTick),
     boons: run.boons.map(b => b.id),
+    by: run.killedBy,
+    ranged: run.killedRanged,
   })
+}
+
+/**
+ * Park the body for a full-screen modal. Both of the game's modals — the gods' offer and the
+ * ferryman's toll — freeze the room behind them, so they must leave the player in the same state or
+ * the first tick after one of them behaves differently from the first tick after the other.
+ */
+export function parkForModal(world: World): void {
+  world.timeScale = 1
+  world.slowmoTicks = 0
+  world.freeze = 0
+  world.slowRate = SLOW_FULL
+  world.slowTicks = 0
+  world.slowAcc = 0
+  const p = world.player
+  p.state = 'free'
+  p.stateTick = 0
+  p.attackQueuedAt = -1
+  p.heavyQueuedAt = -1
+  p.dodgeQueuedAt = -1
+  p.dodgeTick = -1
+  p.dodgeRead = 0
+  p.dodgeProcTick = -1
+  p.reversalTicks = 0
+  p.reversalActionId = -1
+  p.bladeActionConnected = false
+  p.swingFromRoll = false
+  p.vx = p.vy = 0
 }
 
 export function clearRunForTown(world: World): void {

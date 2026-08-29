@@ -1,7 +1,7 @@
 import { Container, Sprite } from 'pixi.js'
 import type { Atlas } from './atlas'
 import type { World } from '@/sim/world'
-import { TILE } from '@/sim/arena'
+import { TILE, doorOpens, type ArenaDoor } from '@/sim/arena'
 import { tuning } from '@/tuning'
 import { FX_UNIT, FOG_UNIT, quantizeFxAlpha, quantizeFxRotation } from './fxUnits'
 
@@ -34,7 +34,7 @@ export class Atmosphere {
   readonly root = new Container()
   private rays: Sprite[] = []
   private doorGlow: Sprite
-  private extraDoorGlows: Sprite[] = []
+  private extraDoorGlows: Array<{ s: Sprite; d: ArenaDoor }> = []
   private fog: Sprite[] = []
   private motes: Mote[] = []
   private t = 0
@@ -132,17 +132,19 @@ export class Atmosphere {
     const spanY = inner.y1 - inner.y0
 
     const glowPulse = 1 + Math.sin(this.t * 2.1) * 0.08
-    const open = world.doorOpen ? 1 : 0
     // Same split as src/render/light.ts: a shut door is not yet a gameplay signal (§3.2.4),
-    // so its bloom stays under the key on the focal object. Opening it is what buys the glow.
+    // so its bloom stays under the key on the focal object. Opening it is what buys the glow —
+    // asked per door, or a sealed doorway blooms over solid wall.
     const shut = 0.34
+    const open = doorOpens(world.arena.door, world.doorOpen) ? 1 : 0
     this.doorGlow.scale.set((A.doorGlowRadius * 1.7 * glowPulse * (open ? 1.85 : 0.62)) / 128)
     this.doorGlow.alpha = A.doorGlowAlpha * (open ? 3.4 : shut) * doorFade * (0.85 + Math.sin(this.t * 3.2) * 0.15)
     this.doorGlow.tint = open ? 0xff8a40 : A.doorGlowTint
-    for (const g of this.extraDoorGlows) {
-      g.scale.set((A.doorGlowRadius * 1.1 * glowPulse * (open ? 1.6 : 0.58)) / 128)
-      g.alpha = A.doorGlowAlpha * (open ? 2.6 : shut) * doorFade * (0.85 + Math.sin(this.t * 2.8) * 0.15)
-      g.tint = open ? 0xffe090 : A.doorGlowTint
+    for (const { s: g, d: dr } of this.extraDoorGlows) {
+      const o = doorOpens(dr, world.doorOpen) ? 1 : 0
+      g.scale.set((A.doorGlowRadius * 1.1 * glowPulse * (o ? 1.6 : 0.58)) / 128)
+      g.alpha = A.doorGlowAlpha * (o ? 2.6 : shut) * doorFade * (0.85 + Math.sin(this.t * 2.8) * 0.15)
+      g.tint = o ? 0xffe090 : A.doorGlowTint
     }
 
     for (let i = 0; i < this.rays.length; i++) {
@@ -178,7 +180,7 @@ export class Atmosphere {
   }
 
   private placeExtraDoorGlows(arena: World['arena']): void {
-    for (const s of this.extraDoorGlows) s.destroy()
+    for (const { s } of this.extraDoorGlows) s.destroy()
     this.extraDoorGlows = []
     const A = tuning.juice.atmosphere
     for (const d of arena.doors) {
@@ -193,7 +195,7 @@ export class Atmosphere {
         default: { const _e: never = d.dir; return _e }
       }
       this.root.addChild(s)
-      this.extraDoorGlows.push(s)
+      this.extraDoorGlows.push({ s, d })
     }
   }
 }

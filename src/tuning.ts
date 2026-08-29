@@ -131,6 +131,30 @@ export const tuning = {
     transitionTicks: 8,   // 133 ms: enough for a threshold blink, never enough to break momentum
   },
 
+  // THE TOLL. The run's one non-combat beat, and the only place a permanent cost is on the table.
+  // lifeCost is a whole vessel out of five, which is the same unit the shore's offering gives back —
+  // paying is meant to be felt for the rest of the descent, not shrugged off.
+  // The refusal is not paid here: it is paid in the Hall of Minos, where the account is read out.
+  rites: {
+    toll: {
+      lifeCost: 1,
+      debtKind: 'charger' as const,   // the river sends something that swims
+      debtX: 4, debtY: 12,            // tiles: the hall's far corner, at the water — never on top of the player
+      debtDelay: 150,                 // ticks: its mark is on the floor before Minos, and it wades in a second after him
+    },
+  },
+
+  // Status effects: the shared vocabulary boons compose through. Burn is deliberately modest -
+  // enemies here have 2 to 8 life, so a status that out-damages the sword would replace the sword.
+  status: {
+    burn: {
+      maxStacks: 3,
+      ticks: 60 * 3,      // the whole sentence, refreshed by a new ignition
+      interval: 24,       // ticks between bites: slow enough to read as fire, not a damage number fountain
+      damage: 1,          // per stack, per bite
+    },
+  },
+
   boons: {
     cleave: { radiusAdd: 9, arcAdd: 44, damageAdd: 0, smearAdd: 3 },
     brandMax: 3,
@@ -145,12 +169,42 @@ export const tuning = {
     echoRadius: 9,
     echoLife: 10,
     echoDamage: 1,
+    // Phlegethon's Kiss: the heavy already commits; the fire is the reason to keep committing.
+    emberKissBurn: 2,
+    // Unanswered pays for a read, so it pays properly: a second helping of the heavy's own damage
+    // on top of the swing that earned it, plus the knockback of being caught mid-word.
+    unansweredDamage: 4,
+    unansweredKnockback: 200,
+    unansweredHitstop: 7,
+    // The debt passes to whoever is close enough to inherit it - about three tiles.
+    debtRange: 56,
+    // Hecate's torch reaches a little further than her blade does.
+    torchRange: 72,
+    torchBurn: 2,
+    // The duo. Two stacks on everything the burst touches, so a branded crowd goes up at once.
+    pyreBurn: 2,
   },
 
   brute: {
     hp: 8, radius: 7, speed: 48, attackRange: 26,
     windup: 20, lungeDist: 24, lungeTicks: 6, active: 5, hitRadius: 20, hitArcDeg: 120,
     recovery: 34, staggerTicks: 20, lightNudge: 4, damage: 1, knockbackScale: 0.5,
+  },
+  // The elite: a Fallen Hoplite that still remembers its oath, and its shield. Tougher and slower
+  // than the line shade, and its whole design is the guard - the numbers below are deliberately close
+  // to the brute's, because the difference is meant to be the RULE, not the statline.
+  oathbound: {
+    hp: 12, radius: 7, speed: 40, attackRange: 26,
+    windup: 24, lungeDist: 22, lungeTicks: 6, active: 5, hitRadius: 20, hitArcDeg: 110,
+    recovery: 32, staggerTicks: 26, damage: 1, knockbackScale: 0.35,
+    idleTicks: 20,
+    // Wide enough that walking around it is a real detour, narrow enough that it is not a full circle:
+    // there is always an answer behind them.
+    guardArcDeg: 170,
+    // A turned blow still lands on something: the shield shoves back and the frame catches, so a
+    // block reads as a physical event rather than as damage that failed to register.
+    blockKnockback: 26,
+    blockHitstop: 4,
   },
   caster: {
     hp: 3, radius: 5, retreatRange: 70, prefMin: 90, prefMax: 130, speed: 40, strafeSpeed: 30,
@@ -161,7 +215,8 @@ export const tuning = {
     freezeTicks: 16, commitLead: 9, dashSpeed: 160, dashDist: 80, recovery: 30, damage: 1, staggerTicks: 8, knockbackScale: 1.2,
     hoverMinTicks: 40, hoverMaxTicks: 90,
   },
-  // First judge. Three deterministic sentences rotate: leave the judgment circle, read the gaps in
+  // MINOS, JUDGE OF THE FIRST GATE. The code name stays `warden` because the enemy kind is an
+  // append-only hashed enum. Three deterministic sentences rotate: leave the judgment circle, read the gaps in
   // an outward veil burst, then cross an aimed fan. At half life the veil breaks in its own safe
   // beat before faster tells, a denser ring, and a second fan volley arrive. Poise: lights bounce;
   // heavies stagger only while he is not committed.

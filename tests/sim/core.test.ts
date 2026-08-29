@@ -8,10 +8,13 @@ import { Metrics } from '@/sim/metrics'
 import { tuning } from '@/tuning'
 import { isPlayerInvulnerable } from '@/sim/combat'
 import { arcHits } from '@/sim/combat'
-import { grantBoon, hasBoon, swingReach } from '@/sim/boons'
+import { grantBoon, hasBoon, resolveWeaponOnHit, swingReach } from '@/sim/boons'
 import { ARM, grantArm } from '@/sim/weapons'
 import { damageEnemyForTest, hurtPlayer } from '@/sim/combat'
 import { HUB_ID } from '@/sim/rooms'
+import { overlapsSolid } from '@/sim/collision'
+import { guardUp } from '@/sim/enemies/oathbound'
+import { applyBurn } from '@/sim/status'
 
 function run(world: ReturnType<typeof createWorld>, ticks: number, bot = makeBot('idle'), metrics?: Metrics) {
   for (let i = 0; i < ticks; i++) {
@@ -31,6 +34,33 @@ describe('determinism', () => {
     const a = createWorld(1, 'full'), b = createWorld(2, 'full')
     run(a, 600, makeBot('kite')); run(b, 600, makeBot('kite'))
     expect(hashWorld(a)).not.toBe(hashWorld(b))
+  })
+
+  // The digest writes every field unconditionally, at a fixed offset in its record. The old
+  // `if (x) write(x)` guards were an aliasing machine: two adjacent conditionals of the same width
+  // let two DIFFERENT worlds feed identical bytes, so a replay of one "verified" against the other.
+  // An external audit reproduced the first two of these; the third is the same class one level up.
+  describe('no adjacent-field aliasing', () => {
+    it('separates a boss by which attack he is committed to, not only that he is in one', () => {
+      const a = createWorld(1, 'boss'), b = createWorld(1, 'boss')
+      const ea = a.spawnEnemy('warden', 160, 96)!
+      const eb = b.spawnEnemy('warden', 160, 96)!
+      ea.phase = 1; ea.pattern = 0
+      eb.phase = 0; eb.pattern = 1
+      expect(hashWorld(a)).not.toBe(hashWorld(b))
+    })
+    it('separates two hostile bolts by the damage they carry', () => {
+      const a = createWorld(1, 'boss'), b = createWorld(1, 'boss')
+      a.fireProjectile(100, 100, 0, 96, 3, 60, 0, 1, 0, 'bolt', 'warden')
+      b.fireProjectile(100, 100, 0, 96, 3, 60, 0, 4, 0, 'bolt', 'warden')
+      expect(hashWorld(a)).not.toBe(hashWorld(b))
+    })
+    it('separates the world-level counters that share a neighbourhood', () => {
+      const a = createWorld(1, 'boss'), b = createWorld(1, 'boss')
+      a.boonBits = 3; a.returns = 0
+      b.boonBits = 0; b.returns = 3
+      expect(hashWorld(a)).not.toBe(hashWorld(b))
+    })
   })
 })
 
@@ -366,6 +396,38 @@ describe('room clear', () => {
     const hp = p.hp
     run(w, 200)
     expect(p.hp, 'the player was hit after the room was already clear').toBe(hp)
+  })
+})
+
+describe('the clear only announces a door when there is one', () => {
+  it('an exit-less debug room finishes with the flag down and no door sound queued', () => {
+    const w = createWorld(1, 'wave1')
+    forceRoomClear(w)
+    // The room is done, but there is nowhere onward: the flag stays down, so the door glow, the
+    // door sprites, and the doorOpen_1 sound (all keyed to it) stay quiet over doors that are shut.
+    expect(w.wave.state).toBe('done')
+    expect(w.doorOpen).toBe(false)
+    expect(w.events.some(e => e.type === 'roomClear' && !e.hasNext)).toBe(true)
+  })
+
+  it('a blow reports the vessels it took, not the vessels it swung for', () => {
+    const w = createWorld(1, 'empty')
+    w.player.hp = 1
+    hurtPlayer(w, 0, 2)
+    const hurt = w.events.find(e => e.type === 'playerHurt')!
+    expect(hurt).toBeDefined()
+    expect(hurt.type === 'playerHurt' && hurt.damage).toBe(1)
+  })
+
+  it('god mode loses no vessels but still counts its touches', () => {
+    const w = createWorld(1, 'empty')
+    w.player.god = true
+    const m = new Metrics()
+    hurtPlayer(w, 0, 2)
+    m.consume(w, w.events)
+    expect(w.player.hp).toBe(tuning.player.hp)
+    expect(m.damageTaken).toBe(0)
+    expect(m.hitsTaken).toBe(1)
   })
 })
 
@@ -844,5 +906,181 @@ describe('return', () => {
     play(a); play(b)
     expect(a.roomName).toBe('THE BARDO')
     expect(hashWorld(a)).toBe(hashWorld(b))
+  })
+})
+
+// The elite exists to make the heavy necessary rather than merely available. These pin the three
+// answers, because a rule with only one answer is a wall.
+describe('the Oath-Bound Hoplite', () => {
+  function armed(seed = 1) {
+    const w = createWorld(seed, 'empty')
+    stepWorld(w, emptyInput())
+    return w
+  }
+  function facing(w: ReturnType<typeof createWorld>, x: number, y: number) {
+    const e = w.spawnEnemy('oathbound', x, y)!
+    e.state = 'chase'
+    e.hp = 99
+    e.aimAngle = Math.atan2(w.player.y - e.y, w.player.x - e.x)   // shield toward the player
+    return e
+  }
+
+  it('turns a light blow that lands on the face of the shield', () => {
+    const w = armed()
+    const e = facing(w, w.player.x + 40, w.player.y)
+    const hp0 = e.hp
+    const toward = Math.atan2(e.y - w.player.y, e.x - w.player.x)
+    damageEnemyForTest(w, e, 2, toward, 90, false, 3)
+    expect(e.hp).toBe(hp0)
+    expect(w.events.some(ev => ev.type === 'guardBlocked')).toBe(true)
+    expect(w.events.some(ev => ev.type === 'hit')).toBe(false)
+  })
+
+  // The guard is a rule about what the blade can do to this body, so it has to turn everything the
+  // blade was carrying — not just the damage. A blow that stacked Brand and spent a perfect-dodge
+  // prime while the player was told, in sparks and in sound, that it had been refused let a player
+  // stand in front of bronze doing nothing and cash the mark with one heavy.
+  it('turns everything the blow was carrying, not only its damage', () => {
+    const w = armed()
+    grantBoon(w, 'ashenEdge')
+    const e = facing(w, w.player.x + 40, w.player.y)
+    const toward = Math.atan2(e.y - w.player.y, e.x - w.player.x)
+    w.session.run = null
+    w.player.dodgeProcTick = -1
+    for (let i = 0; i < 20; i++) {
+      const brandBefore = e.brand
+      const result = damageEnemyForTest(w, e, 2, toward, 90, false, 3)
+      if (result.landed) resolveWeaponOnHit(w, e, false, brandBefore, toward, 17, result)
+      e.lastHitSwingId = 0
+    }
+    expect(e.brand).toBe(0)
+  })
+
+  it('a turned blow is a whiff: the swing pays its whiff penalty', () => {
+    const w = armed()
+    const e = facing(w, w.player.x + 22, w.player.y)
+    const light = tuning.player.attack.swings[0]
+    let blocked = false, ticks = 0
+    stepWorld(w, { ...emptyInput(), attack: true, aimX: 1, aimY: 0 })
+    for (let i = 0; i < 80 && w.player.state === 'attack'; i++) {
+      stepWorld(w, { ...emptyInput(), aimX: 1, aimY: 0 })
+      if (w.events.some(ev => ev.type === 'guardBlocked')) blocked = true
+      ticks++
+    }
+    expect(blocked).toBe(true)
+    // startup + active + recovery is the connected length; a turned blow must not buy it.
+    expect(ticks).toBeGreaterThan(light.startup + light.active + light.recovery)
+  })
+
+  it('names which Warden pattern Minos is delivering so each release keeps its own presentation', () => {
+    const w = createWorld(5, 'boss')
+    w.player.god = true
+    const seen = new Set<string>()
+    for (let t = 0; t < 4000 && seen.size < 2; t++) {
+      const m = w.enemies.find(e => e.active && e.kind === 'warden')
+      if (m && !m.phase) m.hp = Math.min(m.hp, Math.floor(m.maxHp / 2))
+      stepWorld(w, emptyInput())
+      for (const ev of w.events) {
+        if (ev.type !== 'enemyAttack' || ev.kind !== 'warden') continue
+        expect(ev.pattern).toBeDefined()
+        seen.add(ev.pattern)
+      }
+      w.events.length = 0
+    }
+    expect(seen.size).toBeGreaterThan(1)
+  })
+
+  it('holds its shield toward you from the tick it arrives, not from the tick it chases', () => {
+    const w = armed()
+    // Standing WEST of it, which is where the pooled default aimAngle of zero points away from.
+    const e = w.spawnEnemy('oathbound', w.player.x + 40, w.player.y)!
+    e.hp = 99
+    expect(e.state).toBe('idle')
+    stepWorld(w, emptyInput())
+    const hp0 = e.hp
+    const toward = Math.atan2(e.y - w.player.y, e.x - w.player.x)
+    damageEnemyForTest(w, e, 2, toward, 90, false, 3)
+    expect(e.hp).toBe(hp0)
+    expect(w.events.some(ev => ev.type === 'guardBlocked')).toBe(true)
+  })
+
+  it('opens to the committed swing', () => {
+    const w = armed()
+    const e = facing(w, w.player.x + 40, w.player.y)
+    const hp0 = e.hp
+    const toward = Math.atan2(e.y - w.player.y, e.x - w.player.x)
+    damageEnemyForTest(w, e, 4, toward, 260, true, 8)
+    expect(e.hp).toBe(hp0 - 4)
+    expect(e.state).toBe('stagger')
+  })
+
+  it('covers only what it faces, so flanking lands', () => {
+    const w = armed()
+    const e = facing(w, w.player.x + 40, w.player.y)
+    const hp0 = e.hp
+    // struck from behind: the blow travels the same way the shade is looking
+    damageEnemyForTest(w, e, 2, e.aimAngle, 90, false, 3)
+    expect(e.hp).toBe(hp0 - 2)
+  })
+
+  it('drops the guard while it is burning, and shows it', () => {
+    const w = armed()
+    const e = facing(w, w.player.x + 40, w.player.y)
+    const toward = Math.atan2(e.y - w.player.y, e.x - w.player.x)
+    expect(guardUp(e)).toBe(true)
+    applyBurn(w, e, 1, 23)
+    expect(guardUp(e)).toBe(false)
+    const hp0 = e.hp
+    damageEnemyForTest(w, e, 2, toward, 90, false, 3)
+    expect(e.hp).toBe(hp0 - 2)
+  })
+
+  it('cannot hide behind its own swing', () => {
+    const w = armed()
+    const e = facing(w, w.player.x + 40, w.player.y)
+    e.state = 'attack'
+    expect(guardUp(e)).toBe(false)
+  })
+
+  it('never turns a status tick, which has no blow behind it', () => {
+    const w = armed()
+    const e = facing(w, w.player.x + 40, w.player.y)
+    const hp0 = e.hp
+    damageEnemyForTest(w, e, 1, Math.atan2(e.y - w.player.y, e.x - w.player.x), 0, false, 0, 0, { silent: true })
+    expect(e.hp).toBe(hp0 - 1)
+  })
+})
+
+// Two bugs an adversarial review caught in the boss and status work. Both were silent: one made a
+// replay able to diverge with nothing failing, the other cross-wired two enemies through a shared
+// scratch field. They get regression tests because neither would have announced itself.
+describe('regressions', () => {
+  it('hashes fire: two worlds that differ only in who is burning are not the same world', () => {
+    const a = createWorld(1, 'empty')
+    const b = createWorld(1, 'empty')
+    stepWorld(a, emptyInput()); stepWorld(b, emptyInput())
+    const ea = a.spawnEnemy('brute', 200, 120)!
+    const eb = b.spawnEnemy('brute', 200, 120)!
+    expect(hashWorld(a)).toBe(hashWorld(b))
+    applyBurn(a, ea, 2, 29)
+    expect(hashWorld(a)).not.toBe(hashWorld(b))
+    applyBurn(b, eb, 2, 29)
+    expect(hashWorld(a)).toBe(hashWorld(b))
+  })
+
+  it('does not let a cut bolt drag Minos across the room', () => {
+    // `targetX` means "the id of the bolt I loosed" and is scanned across EVERY enemy when a bolt is
+    // cut. A boss that stored a bolt COUNTER there could be matched by a caster's projectile id.
+    const w = createWorld(1, 'empty')
+    stepWorld(w, emptyInput())
+    const minos = w.spawnEnemy('warden', w.player.x, w.player.y - 150)!
+    minos.phase = 1
+    minos.state = 'windup'; minos.stateTick = 0
+    minos.aimAngle = Math.atan2(w.player.y - minos.y, w.player.x - minos.x)
+    const bolt = w.fireProjectile(minos.x, minos.y, minos.aimAngle, 96, 3, 60, 0, 1, 0, 'bolt', 'warden')!
+    // Whatever he is doing, he must not be carrying a value that looks like a projectile id.
+    const liveIds = w.projectiles.filter(b => b.active).map(b => b.id)
+    expect(liveIds).toContain(bolt.id)
+    expect(liveIds).not.toContain(minos.targetX)
   })
 })

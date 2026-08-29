@@ -26,6 +26,7 @@ export interface GameApi {
   state(): unknown
   frameStats(): unknown
   fxSeed(n: number): void
+  title(show?: boolean): boolean
   mute(m?: boolean): boolean
   debug(v?: boolean): boolean
   record(on?: boolean): boolean
@@ -40,11 +41,13 @@ export function installApi(host: {
   tick(): void
   setOverride(f: InputFrame | null): void
   setBot(b: ((w: World) => InputFrame) | null): void
+  pause(p?: boolean): boolean
   loop: Loop
   presenter: unknown
   metrics: Metrics
   mute(m?: boolean): boolean
   debug(v?: boolean): boolean
+  title(show?: boolean): boolean
   record(on?: boolean): boolean
   stopRecord(): Replay
   download(name?: string): void
@@ -59,9 +62,9 @@ export function installApi(host: {
     presenter: host.presenter,
     reset: (seed, scenario, opts) => host.reset(seed, scenario, opts),
     step: (n = 1) => { for (let i = 0; i < n; i++) host.tick() },
-    setInput: f => host.setOverride(f ? { moveX: 0, moveY: 0, aimX: 1, aimY: 0, aimSoft: false, attack: false, attackHeld: false, dodge: false, restart: false, ...f } : null),
+    setInput: f => host.setOverride(f ? { moveX: 0, moveY: 0, aimX: 1, aimY: 0, aimSoft: false, attack: false, attackHeld: false, heavy: false, dodge: false, restart: false, ...f } : null),
     bot: name => host.setBot(name ? makeBot(name) : null),
-    pause: p => { host.loop.paused = p ?? !host.loop.paused; return host.loop.paused },
+    pause: p => host.pause(p),
     hash: () => hashWorld(host.getWorld()),
     state: () => {
       const w = host.getWorld()
@@ -96,7 +99,14 @@ export function installApi(host: {
             roomId: w.session.run.roomId,
             history: w.session.run.roomHistory.map(v => v.id),
             result: w.session.run.result,
+            boons: w.session.run.boons.map(b => b.id),
+            killedBy: w.session.run.killedBy,
+            killedRanged: w.session.run.killedRanged,
             reward: w.session.run.pendingReward ? { ...w.session.run.pendingReward } : null,
+            rite: w.session.run.pendingRite ? { ...w.session.run.pendingRite } : null,
+            riteAnswer: w.session.run.riteAnswer,
+            riteBoonOwed: w.session.run.riteBoonOwed,
+            riteDebt: w.session.run.riteDebt,
           } : null,
         },
         rack: w.arena.rack ? { ...w.arena.rack, taken: !!w.arena.rackTaken } : null,
@@ -112,6 +122,7 @@ export function installApi(host: {
     frameStats: () => host.loop.stats(),
     // force the presentation PRNG (particles, flicker, damage-number jitter) so a capture is reproducible
     fxSeed: n => seedFx(n),
+    title: show => host.title(show),
     mute: m => host.mute(m),
     debug: v => host.debug(v),
     record: on => host.record(on),

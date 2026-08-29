@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { AudioSystem, PlayOpts } from '@/audio/audio'
+import { AudioSystem, type PlayOpts } from '@/audio/audio'
 import { playEventSfx, resetSfxState } from '@/audio/sfxMap'
 import type { HitEvent, WardenAttackPattern } from '@/sim/events'
 
@@ -28,6 +28,46 @@ describe('wall-roll audio truth', () => {
     expect(plays.map(x => x.name)).toEqual(['swordStone2', 'impactGeneric_light'])
     expect(plays.every(x => (x.opts.gain ?? 1) < 0.5)).toBe(true)
     expect(plays.every(x => x.opts.x === 41 && x.opts.y === 73)).toBe(true)
+  })
+})
+
+describe('browser audio activation truth', () => {
+  function withLiveContext(context: { state: AudioContextState; resume(): Promise<void> }): AudioSystem {
+    const audio = new AudioSystem()
+    ;(audio as unknown as { liveCtx: typeof context }).liveCtx = context
+    return audio
+  }
+
+  it('keeps asking for a real gesture after a programmatic controller resume is refused', async () => {
+    const context = {
+      state: 'suspended' as AudioContextState,
+      resume: () => Promise.reject(new Error('not a user activation')),
+    }
+    const audio = withLiveContext(context)
+
+    expect(audio.needsGesture).toBe(true)
+    audio.tryUnlock()
+    await Promise.resolve()
+    expect(audio.needsGesture).toBe(true)
+  })
+
+  it('reports the actual gesture resume decision instead of assuming sound started', async () => {
+    const accepted = {
+      state: 'suspended' as AudioContextState,
+      async resume() { this.state = 'running' },
+    }
+    const rejected = {
+      state: 'suspended' as AudioContextState,
+      resume: () => Promise.reject(new Error('refused')),
+    }
+
+    const audible = withLiveContext(accepted)
+    expect(await audible.resumeFromGesture()).toBe(true)
+    expect(audible.needsGesture).toBe(false)
+
+    const silent = withLiveContext(rejected)
+    expect(await silent.resumeFromGesture()).toBe(false)
+    expect(silent.needsGesture).toBe(true)
   })
 })
 
@@ -87,7 +127,7 @@ describe('combat audio authority', () => {
     } as unknown as AudioSystem
 
     resetSfxState()
-    playEventSfx(audio, { type: 'playerHurt', x: 10, y: 20, angle: 0, hp: 4, maxHp: 12 })
+    playEventSfx(audio, { type: 'playerHurt', x: 10, y: 20, angle: 0, hp: 4, maxHp: 12, damage: 1 })
     expect(combat.at(-1)).toEqual([0, 1 / 3])
     playEventSfx(audio, { type: 'offeringTaken', kind: 'life', x: 10, y: 20, hp: 8, maxHp: 12 })
     expect(combat.at(-1)).toEqual([0, 2 / 3])

@@ -23,7 +23,7 @@ export function updateProjectiles(world: World): void {
         if (Math.hypot(e.x - b.x, e.y - b.y) > b.radius + e.radius) continue
         const brandBefore = e.brand
         const source = b.kind === 'mirror' ? 'mirror' : b.kind === 'echo' ? 'echo' : 'arrow'
-        damageEnemy(world, e, b.damage, b.angle, tuning.bow.knockback, false, tuning.bow.hitstop, b.actionId, {
+        const result = damageEnemy(world, e, b.damage, b.angle, tuning.bow.knockback, false, tuning.bow.hitstop, b.actionId, {
           source,
           originX: b.px, originY: b.py,
           direction: b.angle,
@@ -31,7 +31,8 @@ export function updateProjectiles(world: World): void {
           cleave: false,
           contactDepth: 1,
         })
-        resolveWeaponOnHit(world, e, false, brandBefore, b.angle, b.actionId)
+        // The shot is spent either way, but a shield that turned it also turns its riders.
+        if (result.landed) resolveWeaponOnHit(world, e, false, brandBefore, b.angle, b.actionId, result)
         b.active = false
         break
       }
@@ -41,11 +42,12 @@ export function updateProjectiles(world: World): void {
     const d = Math.hypot(p.x - b.x, p.y - b.y)
     const hitR = b.radius + p.radius
     if (d <= hitR) {
+      const src = b.srcKind === 'player' ? 'none' : b.srcKind
       if (isPlayerDodgeInvulnerable(world)) {
-        hurtPlayer(world, b.angle, b.damage) // announces the read once; the bolt stays
+        hurtPlayer(world, b.angle, b.damage, src, true) // announces the read once; the bolt stays
         continue
       }
-      hurtPlayer(world, b.angle, b.damage)
+      hurtPlayer(world, b.angle, b.damage, src, true)
       b.active = false
     } else if (d <= hitR + tuning.bullet.grazePx) {
       noteNearMiss(world, b.angle, b.x, b.y, 'projectile')

@@ -5,6 +5,10 @@ export interface InputFrame {
   aimSoft: boolean                  // coarse/contextual aim (movement, arrows, retained): sim may apply assist; Q lock is exact
   attack: boolean                   // pressed this tick (edge / discrete bot request)
   attackHeld: boolean               // physically held; sustains combo flow but is never queued after release
+  // The committed swing, as its own verb. It is edge-only and never held: a heavy you did not
+  // deliberately ask for is a heavy you resent. It opens from neutral, finishes a chain early, and
+  // launches out of a roll — the three places a player wants to spend the commitment.
+  heavy: boolean
   dodge: boolean                    // pressed this tick (edge)
   restart: boolean
   choiceDelta?: -1 | 0 | 1        // reward focus, edge-triggered
@@ -12,5 +16,5 @@ export interface InputFrame {
 }
 
 export function emptyInput(): InputFrame {
-  return { moveX: 0, moveY: 0, aimX: 1, aimY: 0, aimSoft: false, attack: false, attackHeld: false, dodge: false, restart: false }
+  return { moveX: 0, moveY: 0, aimX: 1, aimY: 0, aimSoft: false, attack: false, attackHeld: false, heavy: false, dodge: false, restart: false }
 }

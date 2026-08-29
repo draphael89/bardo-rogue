@@ -2,9 +2,13 @@ import { tuning, type SwingDef } from '@/tuning'
 import { angleDiff, deg } from './math'
 import { SLOW_FULL } from './world'
 import type { World, Enemy } from './world'
-import type { GrazeSource, HitSource } from './events'
+import type { DeathKind, GrazeSource, HitSource } from './events'
 import { finishRun } from './session'
 import { ARM, armOf } from './weapons'
+import { guardBlocks } from './enemies/oathbound'
+// boons.ts imports damageEnemy. Both sides expose hoisted function declarations and do no top-level
+// work, so the cycle is stable without a registration layer.
+import { resolveKill } from './boons'
 
 // --- swing curves -------------------------------------------------------------------------------
 // Sim and renderer read the same three functions, so the hitbox is exactly where the crescent is.
@@ -81,6 +85,18 @@ export interface HitProvenance {
   contactDepth: number
 }
 
+export type DamageResult =
+  | { outcome: 'ignored'; landed: false; killed: false; guarded: false; interrupted: false; resolvedDamage: 0 }
+  | { outcome: 'blocked'; landed: false; killed: false; guarded: true; interrupted: false; resolvedDamage: 0 }
+  | { outcome: 'landed'; landed: true; killed: boolean; guarded: boolean; interrupted: boolean; resolvedDamage: number }
+
+const IGNORED_DAMAGE: DamageResult = {
+  outcome: 'ignored', landed: false, killed: false, guarded: false, interrupted: false, resolvedDamage: 0,
+}
+const BLOCKED_DAMAGE: DamageResult = {
+  outcome: 'blocked', landed: false, killed: false, guarded: true, interrupted: false, resolvedDamage: 0,
+}
+
 export function damageEnemy(
   world: World,
   e: Enemy,
@@ -91,9 +107,19 @@ export function damageEnemy(
   hitstop: number,
   sourceActionId: number,
   provenance: HitProvenance,
-): void {
-  if (!e.active || e.state === 'dead') return
+  options: { silent?: boolean } = {},
+): DamageResult {
+  if (!e.active || e.state === 'dead') return IGNORED_DAMAGE
+  const silent = options.silent === true
+  if (!silent && guardBlocks(e, angle, heavy)) {
+    e.kbx += Math.cos(angle) * tuning.oathbound.blockKnockback
+    e.kby += Math.sin(angle) * tuning.oathbound.blockKnockback
+    addFreeze(world, tuning.oathbound.blockHitstop)
+    world.emit({ type: 'guardBlocked', id: e.id, x: e.x, y: e.y, angle, actionId: sourceActionId })
+    return BLOCKED_DAMAGE
+  }
   const kind = e.kind
+  const priorState = e.state
   const attemptedDamage = damage
   // The Warden's lesson is punish timing, not raw health. His veil halves (and integer-clamps)
   // damage while composed; recover and stagger are the authored full-damage openings. The hit event
@@ -104,11 +130,11 @@ export function damageEnemy(
   }
   const mitigatedDamage = Math.max(0, attemptedDamage - damage)
   e.hp -= damage
-  e.flash = tuning.juice.flashTicks
+  if (!silent) e.flash = tuning.juice.flashTicks
   const killed = e.hp <= 0
   const actionId = sourceActionId
   const scale = kind === 'dummy' ? 0 : tuning[kind].knockbackScale
-  const kb = killed ? knockback * 1.5 : knockback * scale
+  const kb = silent ? 0 : killed ? knockback * 1.5 : knockback * scale
   e.kbx += Math.cos(angle) * kb
   e.kby += Math.sin(angle) * kb
   // Compound effects may add a smaller shove after the committed contact (Final Judgment is the
@@ -118,7 +144,7 @@ export function damageEnemy(
     e.knockbackHeavy = true
     e.knockbackActionId = sourceActionId
   }
-  e.facing = Math.cos(angle) > 0 ? -1 : 1 // face the attacker
+  if (!silent) e.facing = Math.cos(angle) > 0 ? -1 : 1 // face the attacker
 
   // Copy the complete contact sentence before any later action can change the player or projectile.
   // Provenance is deliberately mandatory: a future weapon cannot silently reconstruct an old hit
@@ -142,12 +168,16 @@ export function damageEnemy(
   if (killed) {
     e.state = 'dead'
     e.stateTick = 0
-    addFreeze(world, resolvedHitstop + tuning.hitstop.killBonus)
-    world.emit(hit)
+    if (!silent) {
+      addFreeze(world, resolvedHitstop + tuning.hitstop.killBonus)
+      world.emit(hit)
+    }
     world.emit({ type: 'kill', x: e.x, y: e.y, angle, kind, id: e.id, actionId })
+    resolveKill(world, e)
     e.active = false
-    return
+    return { outcome: 'landed', landed: true, killed: true, guarded, interrupted: false, resolvedDamage: damage }
   }
+  if (silent) return { outcome: 'landed', landed: true, killed: false, guarded, interrupted: false, resolvedDamage: damage }
   addFreeze(world, resolvedHitstop)
   world.emit(hit)
 
@@ -179,6 +209,9 @@ export function damageEnemy(
     e.hitDone = false
     world.emit({ type: 'enemyStagger', id: e.id, x: e.x, y: e.y })
   }
+  const interrupted = (priorState === 'windup' || priorState === 'aim' || priorState === 'freeze')
+    && e.state === 'stagger'
+  return { outcome: 'landed', landed: true, killed: false, guarded, interrupted, resolvedDamage: damage }
 }
 
 // Test/debug convenience only. Production combat must call damageEnemy with a complete immutable
@@ -192,8 +225,9 @@ export function damageEnemyForTest(
   heavy: boolean,
   hitstop: number,
   sourceActionId = world.player.swingId,
-): void {
-  damageEnemy(world, e, damage, angle, knockback, heavy, hitstop, sourceActionId, {
+  options: { silent?: boolean } = {},
+): DamageResult {
+  return damageEnemy(world, e, damage, angle, knockback, heavy, hitstop, sourceActionId, {
     source: 'blade',
     originX: world.player.x,
     originY: world.player.y,
@@ -201,11 +235,11 @@ export function damageEnemyForTest(
     sweep: tuning.player.attack.swings[world.player.swingIndex]?.sweep ?? 0,
     cleave: false,
     contactDepth: 0.65,
-  })
+  }, options)
 }
 
 // Returns true if damage was applied. During dodge i-frames the sim records a successful dodge instead.
-export function hurtPlayer(world: World, angle: number, damage: number): boolean {
+export function hurtPlayer(world: World, angle: number, damage: number, by: DeathKind = 'none', ranged = false): boolean {
   const p = world.player
   if (p.state === 'dead') return false
   const dodgeInvulnerable = isPlayerDodgeInvulnerable(world)
@@ -235,6 +269,7 @@ export function hurtPlayer(world: World, angle: number, damage: number): boolean
     return false
   }
   if (p.god) damage = 0
+  const hpBefore = p.hp
   p.hp = Math.max(0, p.hp - damage)
   const run = world.session.run
   if (run) { run.hp = p.hp; run.maxHp = p.maxHp }
@@ -243,18 +278,20 @@ export function hurtPlayer(world: World, angle: number, damage: number): boolean
   p.kbx += Math.cos(angle) * tuning.player.hurtKnockback * 6
   p.kby += Math.sin(angle) * tuning.player.hurtKnockback * 6
   addFreeze(world, tuning.player.hurtHitstop)
-  world.emit({ type: 'playerHurt', x: p.x, y: p.y, angle, hp: p.hp, maxHp: p.maxHp })
+  world.emit({ type: 'playerHurt', x: p.x, y: p.y, angle, hp: p.hp, maxHp: p.maxHp, damage: hpBefore - p.hp })
   if (p.hp <= 0) {
     p.state = 'dead'
     p.stateTick = 0
     p.bladeActionConnected = false
+    p.swingFromRoll = false
     p.reversalTicks = 0
     p.reversalActionId = -1
     p.deathTick = world.tick
     world.timeScale = tuning.player.deathSlowmo
     world.slowmoTicks = tuning.player.deathSlowmoTicks
     clearBulletTime(world)   // death owns the clock; composing the two would crawl at 1/16 speed
-    world.emit({ type: 'playerDeath', x: p.x, y: p.y })
+    if (run) { run.killedBy = by; run.killedRanged = ranged }
+    world.emit({ type: 'playerDeath', x: p.x, y: p.y, by, ranged })
     finishRun(world, 'lost')
   } else {
     beginPlayerHurtReaction(world)
@@ -280,6 +317,7 @@ function beginPlayerHurtReaction(world: World): void {
   p.state = 'hurt'
   p.stateTick = 0
   p.bladeActionConnected = false
+  p.swingFromRoll = false
   // Kill the interrupted lunge without erasing hostile knockback, which has its own velocity lane.
   p.vx *= tuning.player.hurtVelocityRetain
   p.vy *= tuning.player.hurtVelocityRetain

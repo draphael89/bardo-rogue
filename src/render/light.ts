@@ -2,6 +2,7 @@ import { Container, RenderTexture, Sprite, Texture, type Renderer } from 'pixi.j
 import type { RenderApp } from './app'
 import type { Atlas } from './atlas'
 import type { World } from '@/sim/world'
+import { doorOpens, type ArenaDoor } from '@/sim/arena'
 import type { Particles } from './particles'
 import { tuning } from '@/tuning'
 import { noise } from './camera'
@@ -19,7 +20,7 @@ export class Lighting {
   private cores: Array<{ s: Sprite; src: { radius: number; strength: number } }> = []
   private windows: Sprite[] = []
   private door: Sprite
-  private extraDoors: Sprite[] = []
+  private extraDoors: Array<{ s: Sprite; d: ArenaDoor }> = []
   private player: Sprite
   private out: Sprite
   private t = 0
@@ -48,7 +49,7 @@ export class Lighting {
   rebind(arena: World['arena']): void {
     for (const s of this.braziers) s.destroy()
     for (const s of this.windows) s.destroy()
-    for (const s of this.extraDoors) s.destroy()
+    for (const { s } of this.extraDoors) s.destroy()
     this.braziers = []
     this.windows = []
     this.extraDoors = []
@@ -97,7 +98,7 @@ export class Lighting {
         default: { const _e: never = d.dir; return _e }
       }
       this.scene.addChild(s)
-      this.extraDoors.push(s)
+      this.extraDoors.push({ s, d })
     }
     // §3.2.7 the pool is baked into the room art; this only adds the falloff on top of it,
     // and it leans toward the focal object so the lift knows where the eye is going.
@@ -164,20 +165,22 @@ export class Lighting {
 
     const doorN = noise(this.t * 7 + 11) * 0.55 + noise(this.t * 19 + 4) * 0.45
     const doorF = 1 + doorN * L.doorFlicker
-    const open = world.doorOpen ? 1 : 0
     // §3.2.4 allows a source beyond the key and two accents only when it is a gameplay
     // signal, and it names "an open door". A SHUT door is not a signal yet — you cannot use
     // it — so it keeps a low ember at its foot and the key on the focal object stays the
     // brightest static thing in the room (§3.2.5). The moment it opens it takes the light,
-    // which is also what makes the open read from anywhere on the floor.
+    // which is also what makes the open read from anywhere on the floor. Asked PER DOOR: a
+    // sealed doorway that flared with the room's flag was a beacon pointed at solid wall.
     const shut = 0.34
+    const open = doorOpens(world.arena.door, world.doorOpen) ? 1 : 0
     this.door.scale.set((L.doorRadius * 1.6 * doorF * (open ? 1.7 : 0.62)) / 128)
     this.door.alpha = L.doorAlpha * (open ? 2.5 : shut) * (1 - d * 0.85)
     this.door.tint = open ? 0xff8a40 : L.doorTint
-    for (const s of this.extraDoors) {
-      s.scale.set((L.doorRadius * 1.2 * doorF * (open ? 1.55 : 0.58)) / 128)
-      s.alpha = L.doorAlpha * (open ? 2.2 : shut) * (1 - d * 0.85)
-      s.tint = open ? 0xffe090 : L.doorTint
+    for (const { s, d: dr } of this.extraDoors) {
+      const o = doorOpens(dr, world.doorOpen) ? 1 : 0
+      s.scale.set((L.doorRadius * 1.2 * doorF * (o ? 1.55 : 0.58)) / 128)
+      s.alpha = L.doorAlpha * (o ? 2.2 : shut) * (1 - d * 0.85)
+      s.tint = o ? 0xffe090 : L.doorTint
     }
 
     const px = lerp(p.px, p.x, alpha), py = lerp(p.py, p.y, alpha)

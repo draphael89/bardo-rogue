@@ -3,7 +3,7 @@ import { buildArena, setDoorWalkable, type Arena, type DoorMark } from './arena'
 import type { SimEvent, EnemyKind } from './events'
 import { tuning } from '@/tuning'
 import type { WaveDef } from './waves'
-import { roomsFor, type RoomDef } from './rooms'
+import { assignDoorRoles, roomsFor, type RoomDef } from './rooms'
 import { makeSessionState, type GameSessionState, type MetaStateV1, type RoomPhase } from './session'
 
 export const SLOW_FULL = 1000   // scale unit for slowRate, not a tunable
@@ -25,10 +25,12 @@ export interface Player extends Body {
   moveAngle: number           // last non-zero movement direction
   dodgeDirX: number; dodgeDirY: number
   swingIndex: number; swingAngle: number; swingId: number
+  swingFromRoll: boolean          // this swing was thrown out of a roll — the dash attack
   bladeActionConnected: boolean // current blade swing hit a body or cut a hostile bolt
   assistTargetId: number          // soft-aim hysteresis; 0 means no retained target
   controlTick: number             // advances on unfrozen player ticks; hit-stop never ages intent
   attackQueuedAt: number          // controlTick of a discrete request; -1 means none
+  heavyQueuedAt: number           // the committed swing has its own queue, so a light never eats it
   dodgeQueuedAt: number
   dodgeTick: number               // roll clock; survives a late-roll attack overlay, -1 after its full authored timeline
   iframes: number
@@ -68,6 +70,10 @@ export interface Enemy extends Body {
   poseTick: number              // semantic enemy animation clock; advances only with the hostile world
   brand: number                 // 0..3 stacks from Ashen Edge
   brandTicks: number            // status expiry; refreshed whenever Brand is applied
+  burn: number                  // 0..N stacks of the river's fire: damage already under way
+  burnTicks: number             // expiry
+  burnAcc: number               // ticks until the next bite
+  burnActionId: number          // immutable action that ignited/refreshed the current burn
   knockbackHeavy: boolean       // current shove came from a committed contact and may punctuate on stone
   knockbackActionId: number     // immutable action identity for that possible wall contact
 }
@@ -80,9 +86,16 @@ export interface Projectile extends Body {
   damage: number
   actionId: number            // player action that launched it; survives later draws before impact
   kind: ProjectileKind
+  // Who loosed it. A bolt outlives its caster, so the killing blow has to carry its own attribution
+  // rather than asking the world who is still standing.
+  srcKind: EnemyKind | 'player'
 }
 
-export interface SpawnEntry { kind: EnemyKind; x: number; y: number; ticksLeft: number }
+// `total` is the telegraph's authored length, kept beside the countdown so the marker can draw its
+// own progress. `debt` marks the one body the refused toll sends, so its arrival can announce
+// itself. Neither is hashed: `ticksLeft` alone decides when the body arrives, and an announcement
+// is presentation.
+export interface SpawnEntry { kind: EnemyKind; x: number; y: number; ticksLeft: number; total: number; debt?: boolean }
 
 export type WaveState = 'idle' | 'pending' | 'active' | 'done'
 
@@ -141,6 +154,7 @@ export class World {
     this.roomName = room.name
     this.roomPhase = room.kind === 'bardo' ? 'town' : room.waves?.length ? 'fighting' : room.exits?.length ? 'exits' : 'resolved'
     this.arena = buildArena(this.visualRng, room.kind)
+    assignDoorRoles(this.arena, room)
     if (room.startDoorOpen && this.hasNextRoom()) {
       this.doorOpen = true
       setDoorWalkable(this.arena, true)
@@ -175,7 +189,7 @@ export class World {
     return e
   }
 
-  fireProjectile(x: number, y: number, angle: number, speed: number, radius: number, life: number, team: 0 | 1 = 0, damage = 1, actionId = 0, kind: ProjectileKind = team === 1 ? 'arrow' : 'bolt'): Projectile | null {
+  fireProjectile(x: number, y: number, angle: number, speed: number, radius: number, life: number, team: 0 | 1 = 0, damage = 1, actionId = 0, kind: ProjectileKind = team === 1 ? 'arrow' : 'bolt', srcKind: EnemyKind | 'player' = 'player'): Projectile | null {
     const p = this.projectiles.find(p => !p.active)
     if (!p) { this.emit({ type: 'poolOverflow', pool: 'projectile', x, y, angle }); return null }
     p.id = this.nextProjectileId++
@@ -187,6 +201,7 @@ export class World {
     p.damage = damage
     p.actionId = actionId
     p.kind = kind
+    p.srcKind = srcKind
     return p
   }
 
@@ -202,8 +217,9 @@ export function makePlayer(x: number, y: number): Player {
     x, y, px: x, py: y, vx: 0, vy: 0, kbx: 0, kby: 0, radius: tuning.player.radius,
     hp: tuning.player.hp, maxHp: tuning.player.hp,
     state: 'free', stateTick: 0, facing: 1, aimAngle: 0, moveAngle: 0,
-    dodgeDirX: 1, dodgeDirY: 0, swingIndex: 0, swingAngle: 0, swingId: 0, bladeActionConnected: false, assistTargetId: 0,
-    controlTick: 0, attackQueuedAt: -1, dodgeQueuedAt: -1, dodgeTick: -1,
+    dodgeDirX: 1, dodgeDirY: 0, swingIndex: 0, swingAngle: 0, swingId: 0,
+    swingFromRoll: false, bladeActionConnected: false, assistTargetId: 0,
+    controlTick: 0, attackQueuedAt: -1, heavyQueuedAt: -1, dodgeQueuedAt: -1, dodgeTick: -1,
     iframes: 0, flash: 0, moveX: 0, moveY: 0, footTick: 0, deathTick: -1, god: false,
     arm: 0, armed: true, dodgeRead: 0, dodgeProcTick: -1, reversalTicks: 0, reversalActionId: -1,
   }
@@ -215,11 +231,11 @@ export function makeEnemy(): Enemy {
     hp: 1, maxHp: 1, state: 'idle', stateTick: 0, facing: 1, aimAngle: 0, targetX: 0, targetY: 0,
     lastHitSwingId: -1, flash: 0, hitDone: false, orbitAngle: 0, orbitDir: 1, hoverTicks: 0, cooldown: 0, dashTicks: 0, spawnTick: 0,
     phase: 0, phasePending: false, actionPhase: 0, pattern: 0, patternCursor: 0, patternStep: 0, poseTick: 0,
-    brand: 0, brandTicks: 0,
+    brand: 0, brandTicks: 0, burn: 0, burnTicks: 0, burnAcc: 0, burnActionId: -1,
     knockbackHeavy: false, knockbackActionId: 0,
   }
 }
 
 export function makeProjectile(): Projectile {
-  return { id: 0, active: false, x: 0, y: 0, px: 0, py: 0, vx: 0, vy: 0, kbx: 0, kby: 0, radius: 3, life: 0, angle: 0, team: 0, damage: 1, actionId: 0, kind: 'bolt' }
+  return { id: 0, active: false, x: 0, y: 0, px: 0, py: 0, vx: 0, vy: 0, kbx: 0, kby: 0, radius: 3, life: 0, angle: 0, team: 0, damage: 1, actionId: 0, kind: 'bolt', srcKind: 'player' }
 }

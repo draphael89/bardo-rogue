@@ -720,3 +720,109 @@ describe('heavy bullet time', () => {
     expect(live.slowTicks).toBeLessThanOrEqual(tuning.bullet.maxTicks)
   })
 })
+
+// The heavy is the game's one committed action, and until now it could only be reached by finishing
+// a two-hit chain. As its own verb it has to keep every promise the chain version made — same reach,
+// same feint window — while being available the moment a player reads an opening.
+describe('the heavy as its own verb', () => {
+  const HEAVY = tuning.player.attack.swings.length - 1
+  const heavyDef = tuning.player.attack.swings[HEAVY]
+  const light = tuning.player.attack.swings[0]
+
+  function world() {
+    const w = createWorld(1, 'empty')
+    stepWorld(w, emptyInput())
+    return w
+  }
+
+  it('opens from neutral with the committed swing, not the first light', () => {
+    const w = world()
+    stepWorld(w, { ...emptyInput(), heavy: true })
+    expect(w.player.state).toBe('attack')
+    expect(w.player.swingIndex).toBe(HEAVY)
+    expect(tuning.player.attack.swings[w.player.swingIndex].heavy).toBe(true)
+  })
+
+  it('keeps the chain intact: light, light, then the slam', () => {
+    const w = world()
+    stepWorld(w, { ...emptyInput(), attack: true })
+    expect(w.player.swingIndex).toBe(0)
+    const seen = new Set<number>([0])
+    for (let i = 0; i < 120; i++) {
+      stepWorld(w, { ...emptyInput(), attackHeld: true })
+      seen.add(w.player.swingIndex)
+      if (w.player.swingIndex === HEAVY) break
+    }
+    expect([...seen].sort()).toEqual([0, 1, 2])
+  })
+
+  it('cuts a chain short: a heavy called during a light recovery skips the second light', () => {
+    const w = world()
+    stepWorld(w, { ...emptyInput(), attack: true })
+    // run to the first tick the light's recovery accepts a follow-up (whiffing, so pay the penalty)
+    const gate = light.startup + light.active + light.chainFrom + light.whiffPenalty
+    for (let i = w.player.stateTick; i < gate; i++) stepWorld(w, emptyInput())
+    stepWorld(w, { ...emptyInput(), heavy: true })
+    expect(w.player.swingIndex).toBe(HEAVY)
+  })
+
+  it('lets the roll win when both are asked for on the same tick', () => {
+    const w = world()
+    stepWorld(w, { ...emptyInput(), heavy: true, dodge: true })
+    expect(w.player.state).toBe('dodge')
+  })
+
+  it('launches out of a roll once the travel has committed', () => {
+    const w = world()
+    stepWorld(w, { ...emptyInput(), dodge: true, moveX: 1 })
+    for (let i = 1; i < tuning.player.dodge.attackCancelFrom; i++) stepWorld(w, emptyInput())
+    stepWorld(w, { ...emptyInput(), heavy: true })
+    expect(w.player.state).toBe('attack')
+    expect(w.player.swingIndex).toBe(HEAVY)
+    // the roll's promise is untouched: it still owns displacement and i-frames to the end of travel
+    expect(isPlayerInvulnerable(w)).toBe(true)
+  })
+
+  it('still allows the feint: plant the heavy, then bail before the commit tick', () => {
+    const w = world()
+    stepWorld(w, { ...emptyInput(), heavy: true })
+    expect(w.player.stateTick).toBe(0)
+    stepWorld(w, { ...emptyInput(), dodge: true })
+    expect(w.player.state).toBe('dodge')
+  })
+
+  it('commits once the feet plant', () => {
+    const w = world()
+    stepWorld(w, { ...emptyInput(), heavy: true })
+    for (let i = 0; i < tuning.player.attack.heavyCommitTick; i++) stepWorld(w, emptyInput())
+    stepWorld(w, { ...emptyInput(), dodge: true })
+    expect(w.player.state).toBe('attack')
+    expect(w.player.swingIndex).toBe(HEAVY)
+  })
+
+  it('spends both requests, so a declined light cannot fire a phantom swing later', () => {
+    const w = world()
+    stepWorld(w, { ...emptyInput(), heavy: true, attack: true })
+    expect(w.player.swingIndex).toBe(HEAVY)
+    expect(w.player.attackQueuedAt).toBe(-1)
+    expect(w.player.heavyQueuedAt).toBe(-1)
+  })
+
+  it('is inert on the bow rather than becoming a surprise draw', () => {
+    const w = createWorld(1, 'bow')
+    stepWorld(w, emptyInput())
+    expect(w.player.arm).toBe(ARM.bow)
+    stepWorld(w, { ...emptyInput(), heavy: true })
+    expect(w.player.state).toBe('free')
+  })
+
+  it('reaches exactly as far opening as it does finishing', () => {
+    // one heavy definition, one set of numbers: whatever the player learns about its reach holds
+    // whether they earned it through a chain or asked for it cold.
+    expect(heavyDef.radius).toBeGreaterThan(light.radius)
+    expect(heavyDef.heavy).toBe(true)
+    const w = world()
+    stepWorld(w, { ...emptyInput(), heavy: true })
+    expect(tuning.player.attack.swings[w.player.swingIndex]).toBe(heavyDef)
+  })
+})

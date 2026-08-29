@@ -124,7 +124,7 @@ describe('action-composed screen feedback', () => {
     bolt.active = false
     world.fireProjectile(100, 100, 0, 20, 3, 30, 1, 1)
     expect(hasHostileFloorThreat(world)).toBe(false)
-    world.spawnQueue.push({ kind: 'caster', x: 120, y: 80, ticksLeft: 10 })
+    world.spawnQueue.push({ kind: 'caster', x: 120, y: 80, ticksLeft: 10, total: 10 })
     expect(hasHostileFloorThreat(world)).toBe(true)
     world.spawnQueue.length = 0
     const enemy = world.spawnEnemy('caster', 140, 80)!

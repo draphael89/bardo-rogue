@@ -1,8 +1,13 @@
 // Sim -> presentation messages. The sim pushes; presenter/audio/metrics consume and clear each frame.
-export type EnemyKind = 'brute' | 'caster' | 'charger' | 'dummy' | 'warden'
+export type EnemyKind = 'brute' | 'caster' | 'charger' | 'dummy' | 'warden' | 'oathbound'
+
+// What landed the killing blow. 'none' covers the cases with no body behind them (a scripted hurt,
+// a debug kill), and keeps the death card honest instead of naming an innocent bystander.
+export type DeathKind = EnemyKind | 'none'
 
 import type { ArmId } from './weapons'
-import type { BoonId } from './boons'
+import type { BoonId, Deity } from './boons'
+import type { RiteId } from './rites'
 
 // Presentation must be able to render a contact after the player has moved, changed weapon, or
 // started another swing. These values are therefore snapshots of the action that caused the hit,
@@ -45,11 +50,16 @@ export type EnemyAttackEvent =
   | (EnemyAttackBase & { readonly kind: Exclude<EnemyKind, 'warden'>; readonly pattern?: never })
 
 export type SimEvent =
-  | { type: 'swing'; x: number; y: number; angle: number; swing: number; heavy: boolean }
+  | { type: 'swing'; x: number; y: number; angle: number; swing: number; heavy: boolean; dash: boolean }
   | HitEvent
   | { type: 'kill'; x: number; y: number; angle: number; kind: EnemyKind; id: number; actionId: number }
-  | { type: 'playerHurt'; x: number; y: number; angle: number; hp: number; maxHp: number }
-  | { type: 'playerDeath'; x: number; y: number }
+  // `damage` is what was actually taken — zero under god mode — so metrics can count vessels lost
+  // rather than times touched: the Warden's slam takes two, and the difference is the balance signal.
+  | { type: 'playerHurt'; x: number; y: number; angle: number; hp: number; maxHp: number; damage: number }
+  // The sim names the killer. Presentation used to guess it from the nearest living body, which was
+  // wrong exactly when it mattered most: a charger that dashed past, a bolt whose caster was already
+  // dead. `ranged` separates "the mark found you" from "the body reached you".
+  | { type: 'playerDeath'; x: number; y: number; by: DeathKind; ranged: boolean }
   | { type: 'dodge'; x: number; y: number; angle: number }
   | { type: 'dodgeEnd'; x: number; y: number }
   | { type: 'dodgeWall'; x: number; y: number; angle: number }
@@ -73,12 +83,24 @@ export type SimEvent =
   | { type: 'offeringTaken'; kind: 'life'; x: number; y: number; hp: number; maxHp: number }
   | { type: 'weaponPrepared'; weapon: ArmId; x: number; y: number }
   | { type: 'runStarted'; weapon: ArmId }
-  | { type: 'rewardOffered'; options: [BoonId, BoonId, BoonId] }
+  | { type: 'rewardOffered'; options: [BoonId, BoonId, BoonId]; deity: Deity }
   | { type: 'rewardFocus'; focus: 0 | 1 | 2 }
   | { type: 'boonChosen'; boon: BoonId; x: number; y: number }
+  | { type: 'riteOffered'; rite: RiteId }
+  | { type: 'riteFocus'; focus: 0 | 1 }
+  | { type: 'riteChosen'; rite: RiteId; paid: boolean; x: number; y: number }
+  // the refused toll, collected where it was always going to be collected
+  | { type: 'riteDebtCalled' }
   | { type: 'brandApplied'; id: number; stacks: number; x: number; y: number }
+  | { type: 'burnApplied'; id: number; stacks: number; x: number; y: number }
+  | { type: 'burnTick'; id: number; stacks: number; x: number; y: number }
+  | { type: 'burnEnded'; id: number; x: number; y: number }
   | { type: 'brandConsumed'; id: number; stacks: number; x: number; y: number }
-  | { type: 'runWon' | 'runLost'; depth: number; ticks: number; boons: BoonId[] }
+  | { type: 'brandPassed'; fromX: number; fromY: number; toX: number; toY: number; stacks: number }
+  | { type: 'interrupt'; id: number; x: number; y: number }
+  // A light blow turned by a raised shield. It is not a hit and must never read as one.
+  | { type: 'guardBlocked'; id: number; x: number; y: number; angle: number; actionId: number }
+  | { type: 'runWon' | 'runLost'; depth: number; ticks: number; boons: BoonId[]; by: DeathKind; ranged: boolean }
   | { type: 'draw'; x: number; y: number; angle: number }
   | { type: 'arrowLoose'; x: number; y: number; angle: number }
   | { type: 'arrowHitWall'; x: number; y: number }

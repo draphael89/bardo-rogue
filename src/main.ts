@@ -3,9 +3,10 @@ import { loadAtlas, loadFonts } from '@/render/atlas'
 import { Presenter } from '@/render/presenter'
 import { createWorld } from '@/sim/scenarios'
 import { stepWorld } from '@/sim/step'
+import { canReturn } from '@/sim/return'
 import type { World } from '@/sim/world'
 import type { InputFrame } from '@/sim/input'
-import { InputSystem } from '@/input'
+import { InputSystem, PAD_RESTART } from '@/input'
 import { Loop } from '@/loop'
 import { AudioSystem } from '@/audio/audio'
 import { playEventSfx } from '@/audio/sfxMap'
@@ -90,6 +91,7 @@ async function boot() {
   audio.setListener(world.player.x, world.player.y)
   platform.setRunActive(world.session.run !== null)
   let userPaused = false
+  let debugPaused = false
   let metrics = new Metrics()
   const presenter = new Presenter(ra, atlas, world)
   presenter.setReducedEffects(reducedEffects)
@@ -98,7 +100,7 @@ async function boot() {
   // stationary player and a freshly reset room must spatialize enemy tells just as accurately.
   presenter.onEvent = ev => playEventSfx(audio, ev, world.player)
   ra.viewOverride = viewOverride
-  ra.onViewResize = () => { presenter.rebuildRoom(); presenter.hud.relayout(); presenter.reward.relayout() }
+  ra.onViewResize = () => { presenter.rebuildRoom(); presenter.hud.relayout(); presenter.reward.relayout(); presenter.title.relayout() }
   const input = new InputSystem(ra)
   const overlay = new DebugOverlay(ra.layers.debug, ra.layers.hud)
   overlay.setVisible(debug)
@@ -174,6 +176,10 @@ async function boot() {
   }
 
   const tick = () => {
+    // The Start press that confirms a death/victory return is consumed by THIS tick — and by the
+    // time render() runs, canReturn is already false again. Latch the pre-tick state so the pause
+    // toggle can tell "the run is live" apart from "you just confirmed a return with this press".
+    if (canReturn(world)) returnOpenThisFrame = true
     // always sample live input, even when a bot or replay drives the sim, so latched presses do not pile up
     const live = input.sample(world)
     // The Q reticle describes the controls actually driving this run. It is presentation-only and
@@ -228,6 +234,13 @@ async function boot() {
       god: rep.god,
       ...(rep.scenario === 'loop' ? { meta: rep.meta ?? defaultMetaState() } : {}),
     })
+    // A replay is a measurement, even when it is installed through the live debug API after boot.
+    // Do not leave the first-impression title intercepting F/V/E/I while the replay owns input.
+    presenter.title.setSoundGate(false)
+    presenter.title.setShown(false)
+    // Recompute the hold after hiding the title: the initial title is what paused a fresh boot, but
+    // an explicit player pause remains authoritative if a replay is installed later.
+    setPaused(userPaused)
     replayFrames = rep.frames.length ? rep.frames : null
     replayIdx = 0
   }
@@ -242,19 +255,73 @@ async function boot() {
 
   const loop = new Loop({
     tick,
-    render: (alpha, dt) => { presenter.reward.setPaused(userPaused); presenter.render(alpha, dt); overlay.update(world, loop); updateRecText(); ra.renderFrame() },
+    render: (alpha, dt) => {
+      // The pad is polled here rather than in the input system because the simulation is stopped
+      // while the title is up (and while paused), and a controller player must not be the one
+      // person who cannot start — or unpause. One snapshot per frame; getGamepads() allocates.
+      const pad = firstPad()
+      const titleWasUp = presenter.title.visible
+      const titleStartNow = padWantsStart(pad)
+      if (titleWasUp && titleStartNow && !padTitlePrev) void dismissTitle()
+      padTitlePrev = titleStartNow
+      // Start is the controller's pause. During the loop's live gameplay the sim ignores the pad's
+      // legacy restart mapping entirely, so a controller-only player had NO route to the pause
+      // screen — the only listeners are keyboard P and Escape. Edge-triggered against its own
+      // previous state, and never on the frame that dismissed the title, or the same press would
+      // land the player straight in the pause card. On the death and victory screens Start keeps
+      // its existing job (confirm the return) — judged by whether a return was open when this
+      // frame's ticks BEGAN, because the tick that consumed the press has already closed it.
+      const startNow = padStartButton(pad)
+      if (startNow && !padStartPrev && !titleWasUp && world.scenario === 'loop' && !returnOpenThisFrame && !canReturn(world)) {
+        setPaused(!userPaused)
+      }
+      padStartPrev = startNow
+      returnOpenThisFrame = false
+      presenter.reward.setPaused(userPaused)
+      presenter.render(alpha, dt)
+      overlay.update(world, loop)
+      updateRecText()
+      ra.renderFrame()
+    },
     timeScale: () => world.timeScale,
   })
+
+  // Start, A, X, or either shoulder — the same buttons that confirm everywhere else in the game.
+  // The pause listens to PAD_RESTART, the input system's own Start mapping, so remapping the button
+  // there moves both jobs together.
+  const PAD_START = [0, 2, 3, 5, 7, ...PAD_RESTART]
+  let padStartPrev = false
+  let padTitlePrev = false
+  let returnOpenThisFrame = false
+  const firstPad = (): Gamepad | null => {
+    const pads = typeof navigator !== 'undefined' && navigator.getGamepads ? navigator.getGamepads() : []
+    return (pads && pads[0]) || null
+  }
+  const padStartButton = (pad: Gamepad | null): boolean =>
+    !!pad && PAD_RESTART.some(i => !!pad.buttons[i]?.pressed)
+  const padWantsStart = (pad: Gamepad | null): boolean =>
+    !!pad && PAD_START.some(i => !!pad.buttons[i]?.pressed)
 
   installApi({
     getWorld: () => world,
     reset, tick,
     setOverride: f => { input.override = f },
     setBot: b => { bot = b },
+    pause: p => {
+      debugPaused = p ?? !debugPaused
+      loop.paused = debugPaused || userPaused || presenter.title.visible
+      return loop.paused
+    },
     loop,
     presenter,
     get metrics() { return metrics },
     mute: m => { audio.muted = m ?? !audio.muted; return audio.muted },
+    title: show => {
+      const want = show ?? !presenter.title.visible
+      if (want) { presenter.title.setShown(true); loop.paused = true; audio.setSuspended(true) }
+      else void dismissTitle()
+      return presenter.title.visible
+    },
     debug: v => { overlay.setVisible(v ?? !overlay.visible); return overlay.visible },
     record, stopRecord, replay,
     download: name => { if (recorder.recording) stopRecord(); recorder.download(name) },
@@ -263,7 +330,6 @@ async function boot() {
   // Re-running resize() after a fullscreen change lets the view re-fit to the new aspect. The
   // fullscreen call itself lives in src/platform (it is the host's job); this is the renderer's.
   document.addEventListener('fullscreenchange', () => ra.resize())
-
   const exportSave = async () => {
     // Nothing was read, so there is nothing to export: serialising the in-memory defaults here would
     // hand the player a zeroed file labelled as their backup of the inaccessible profile.
@@ -307,7 +373,7 @@ async function boot() {
       }
       reducedEffects = savedSave.settings.reducedEffects
       presenter.setReducedEffects(reducedEffects)
-      userPaused = false; loop.paused = false
+      setPaused(false)
       // reset() rebuilds the world with the imported meta and rebinds the presenter. Deliberately not a
       // reload: that would drop ?bot=/?seed=, destroy window.__game mid-evaluate and break an attached
       // Playwright page.
@@ -316,8 +382,68 @@ async function boot() {
     } finally { importing = false }
   }
 
+  // The title is held over the living hub: the simulation is stopped but the loop keeps rendering,
+  // so the room the player is about to stand in gutters and drifts behind its own name. A run driven
+  // by a bot or a replay skips it - those are measurements, not first impressions.
+  const wantsTitle = scenario === 'loop' && !botName
+  presenter.title.setShown(wantsTitle)
+
+  // One place decides what "paused" means, so the sim, the audio clock and the overlay can never
+  // disagree. Pausing used to stop only the simulation: the bed kept playing behind the overlay and
+  // a backgrounded tab kept a synthesiser running indefinitely.
+  const setPaused = (p: boolean) => {
+    const playerHeld = p || presenter.title.visible
+    userPaused = p
+    loop.paused = playerHeld || debugPaused
+    // The debug hold freezes deterministic captures but deliberately leaves the rendered/audio
+    // surface live, matching the API's original contract. Player/title pause owns the audio clock.
+    audio.setSuspended(playerHeld)
+  }
+
+  // A gamepad button is not browser user activation. It may ask the browser to resume audio, but it
+  // may not dismiss the title until the audio clock actually runs. A real key/click performs that
+  // resume inside its activation; mute=1 bypasses the gate because silence was explicitly requested.
+  const dismissTitle = async (gesture = false): Promise<boolean> => {
+    if (!presenter.title.visible) return true
+    audio.setSuspended(false)
+    if (!mute) {
+      if (gesture) await audio.resumeFromGesture()
+      else audio.tryUnlock()
+      if (audio.needsGesture) {
+        presenter.title.setSoundGate(true)
+        loop.paused = true
+        return false
+      }
+    }
+    presenter.title.setSoundGate(false)
+    presenter.title.setShown(false)
+    setPaused(userPaused)
+    return true
+  }
+  if (wantsTitle) setPaused(false)
+
+  // Losing focus is a pause the player did not ask for but always wants: a tab switch should not
+  // cost health, and it should not keep making noise from behind another window.
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden && !presenter.title.visible) setPaused(true)
+  })
+
+  // A click answers the title too. Registered on the window rather than the canvas so a player who
+  // clicks the letterbox is not left staring at a screen that ignores them.
+  window.addEventListener('mousedown', () => { void dismissTitle(true) })
+
   window.addEventListener('keydown', e => {
-    if ((e.code === 'Escape' || e.code === 'KeyP') && !e.repeat) { e.preventDefault(); userPaused = !userPaused; loop.paused = userPaused }
+    // F belongs to the host even while the title is holding the sim. Treating every title key as
+    // "descend" swallowed the desktop app's first fullscreen press and made the advertised window
+    // control appear broken until the player pressed it twice.
+    if (e.code === 'KeyF' && !e.repeat) { e.preventDefault(); void platform.fullscreen(); return }
+    if (presenter.title.visible) {
+      if (e.repeat) return
+      e.preventDefault()
+      void dismissTitle(true)
+      return
+    }
+    if ((e.code === 'Escape' || e.code === 'KeyP') && !e.repeat) { e.preventDefault(); setPaused(!userPaused) }
     if (e.code === 'KeyV' && !e.repeat && !importing) {
       reducedEffects = !reducedEffects
       storedReducedEffects = reducedEffects        // an explicit player choice, so it is the one that persists
@@ -327,7 +453,6 @@ async function boot() {
     if (e.code === 'F1') { e.preventDefault(); overlay.toggle() }
     if (e.code === 'F2') { e.preventDefault(); record() }
     if (e.code === 'F3') { e.preventDefault(); if (recorder.recording) stopRecord(); recorder.download() }
-    if (e.code === 'KeyF' && !e.repeat) { e.preventDefault(); void platform.fullscreen() }
     // Save management is reachable only from the pause screen, so it can never fire mid-fight.
     if (userPaused && !importing && e.code === 'KeyE' && !e.repeat) { e.preventDefault(); void exportSave() }
     if (userPaused && !importing && e.code === 'KeyI' && !e.repeat) { e.preventDefault(); void importSave() }
@@ -349,7 +474,7 @@ async function boot() {
   else if (scenario === 'shore') presenter.hud.showBanner('THE FAR SHORE', 'a life waits', 1.8)
   else if (scenario === 'blessed') presenter.hud.showBanner('THE THRESHOLD', 'the blade reaches farther', 1.8)
   else if (scenario === 'bow') presenter.hud.showBanner('THE THRESHOLD', 'the string is taut', 1.8)
-  else if (scenario === 'boss') presenter.hud.showBanner('THE WARDEN', 'the first judge', 1.8)
+  else if (scenario === 'boss') presenter.hud.showBanner('MINOS', 'judge of the first gate', 1.8)
   else presenter.hud.showBanner(scenario.toUpperCase(), '', 1.2)
 
   // A profile that will not be saved, or one that had to be rescued, is told to the PLAYER at boot,

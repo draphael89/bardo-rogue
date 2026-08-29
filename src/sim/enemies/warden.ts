@@ -72,7 +72,7 @@ function selectPattern(e: Enemy): void {
 function fireBolt(world: World, e: Enemy, angle: number, contract: WardenProjectileContract): void {
   const ox = e.x + Math.cos(angle) * contract.spawnOffset
   const oy = e.y + Math.sin(angle) * contract.spawnOffset
-  const bolt = world.fireProjectile(ox, oy, angle, contract.speed, contract.boltRadius, contract.lifeTicks, 0, tuning.warden.boltDamage)
+  const bolt = world.fireProjectile(ox, oy, angle, contract.speed, contract.boltRadius, contract.lifeTicks, 0, tuning.warden.boltDamage, 0, 'bolt', 'warden')
   if (bolt) world.emit({ type: 'boltFired', x: ox, y: oy, angle })
 }
 

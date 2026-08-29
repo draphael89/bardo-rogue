@@ -1,5 +1,4 @@
 import { Graphics, type Container } from 'pixi.js'
-import type { Texture } from 'pixi.js'
 import type { Atlas } from '../atlas'
 import type { Enemy } from '@/sim/world'
 import type { Arena } from '@/sim/arena'
@@ -8,6 +7,15 @@ import { hasLineOfSight, overlapsSolid, raycastSolidDistance } from '@/sim/colli
 import { lerp, clamp01, easeOutCubic, lerpAngle } from '../anim'
 import { isDangerPointVisible } from '../terrain'
 import { BRUTE_COMMIT_LEAD as COMMIT_LEAD } from '@/sim/enemies/brute'
+import { OATH_COMMIT_LEAD } from '@/sim/enemies/oathbound'
+
+// The Oath-Bound is the Fallen Hoplite's silhouette with one rule added, so it is drawn by this
+// view — but it is NOT drawn on the Hoplite's clock. Its wind-up is 24 to the Hoplite's 20 and it
+// keeps tracking you six ticks from the end rather than five, so a rim hardcoded to brute timings
+// said "committed" for three ticks while the shade was still turning onto you, and the danger mark
+// jumped backwards on the commit frame. Every timing below reads the body's own block.
+function cfgOf(e: Enemy) { return e.kind === 'oathbound' ? tuning.oathbound : tuning.brute }
+function leadOf(e: Enemy): number { return e.kind === 'oathbound' ? OATH_COMMIT_LEAD : COMMIT_LEAD }
 import { EntityView, HALF_PI, type EnemyFrame, type Pose } from './shared'
 import type { Sheet } from '../sheet'
 
@@ -46,33 +54,33 @@ export function bindBruteArt(v: EntityView, atlas: Atlas): void {
 
 export function bruteFrameName(e: Enemy): string {
   if (e.flash > 0 || e.state === 'stagger') return 'hurt'
-  if (e.state === 'windup') return e.stateTick < Math.ceil(tuning.brute.windup * 0.55) ? 'windupEarly' : 'windupCommit'
-  if (e.state === 'attack') return e.stateTick <= tuning.brute.lungeTicks ? 'release' : 'contact'
+  if (e.state === 'windup') return e.stateTick < Math.ceil(cfgOf(e).windup * 0.55) ? 'windupEarly' : 'windupCommit'
+  if (e.state === 'attack') return e.stateTick <= cfgOf(e).lungeTicks ? 'release' : 'contact'
   if (e.state === 'recover') return 'recover'
   if (e.state === 'chase' && Math.hypot(e.vx, e.vy) > 5) return 'chase'
   return 'idle'
 }
 
-function tellSpan(): number { return tuning.brute.windup + tuning.brute.lungeTicks + CONTACT_LEAD }
+function tellSpan(e: Enemy): number { const B = cfgOf(e); return B.windup + B.lungeTicks + CONTACT_LEAD }
 function tellProgress(e: Enemy, tk: number): number {
-  const B = tuning.brute
-  if (e.state === 'windup') return clamp01(tk / tellSpan())
-  if (e.state === 'attack') return clamp01((B.windup + tk) / tellSpan())
+  const B = cfgOf(e)
+  if (e.state === 'windup') return clamp01(tk / tellSpan(e))
+  if (e.state === 'attack') return clamp01((B.windup + tk) / tellSpan(e))
   return 1
 }
 
 // stateTick 1 is the first movement update, but its render interval starts at the pre-move pose.
 // Offset the interpolated clock by that one held release tick so current position + remaining reach
 // always names the same eventual landing point.
-export function bruteTellLungeTravel(tk: number): number {
-  const B = tuning.brute
+export function bruteTellLungeTravel(tk: number, e?: Enemy): number {
+  const B = e ? cfgOf(e) : tuning.brute
   return clamp01((tk - 1) / B.lungeTicks) * B.lungeDist
 }
 
 export function updateBruteView(v: EntityView, e: Enemy, f: EnemyFrame, out: Pose, arena: Arena): void {
   const { time, tk, speed } = f
   let sx = 1, sy = 1, rot = 0, hop = 0
-  const B = tuning.brute
+  const B = cfgOf(e)
   if (e.state === 'chase' && speed > 5) { hop = Math.abs(Math.sin(time * 9)) * 2; rot = (e.vx / B.speed) * 0.1 }
   else if (e.state === 'windup') {
     // ONE shape, one direction, linear in ticks so no two frames are the same: he rises onto the balls
@@ -136,7 +144,7 @@ function updateBruteWeapon(v: EntityView, e: Enemy, x: number, y: number, alpha:
   const f = e.facing
   const tk = e.stateTick + alpha
   let angle = -HALF_PI + f * 1.35, wx = x + f * 4, wy = y - 2 - hop, front = true
-  const B = tuning.brute
+  const B = cfgOf(e)
   if (e.state === 'windup') {
     // The hammer starts hanging at his side and climbs to over the shoulder, arriving at the top on the
     // release tick. It stays on ONE side of vertical the whole way, so the head — the topmost pixel of
@@ -197,7 +205,7 @@ function updateBruteTell(v: EntityView, e: Enemy, x: number, y: number, tk: numb
   const g = tellFor(v)
   if (!g) return
   const hi = tellHiFor(v)
-  const B = tuning.brute
+  const B = cfgOf(e)
   const s = e.state
   const live = s === 'windup' || s === 'attack'
   const scorching = s === 'recover' && tk < SCORCH_TICKS
@@ -211,7 +219,7 @@ function updateBruteTell(v: EntityView, e: Enemy, x: number, y: number, tk: numb
   const past = s === 'attack' ? tk - (B.lungeTicks + CONTACT_LEAD) : 0
   const bloom = s === 'windup' ? clamp01((tk + 1) / 2.5) : past > 0 ? clamp01(1 - past / 4) : 1
   const fade = scorching ? 1 - tk / SCORCH_TICKS : 1
-  const travelled = s === 'attack' ? bruteTellLungeTravel(tk) : 0
+  const travelled = s === 'attack' ? bruteTellLungeTravel(tk, e) : 0
   const plannedAhead = scorching ? 0 : B.lungeDist - travelled
   // Predict from the interpolated body using the same circle/solid contract as movement. A pillar
   // shortens both the run-up and the eventual strike origin; the mark can never continue behind it.
@@ -231,7 +239,7 @@ function updateBruteTell(v: EntityView, e: Enemy, x: number, y: number, tk: numb
   const front = q * reach
   // Broken rim = he can still turn. The sim tracks your position while stateTick <= windup - COMMIT_LEAD,
   // so the last tick the aim can move is stateTick 14; the rim goes solid on 15, the first tick it cannot.
-  const dashed = s === 'windup' && tk < B.windup - COMMIT_LEAD + 1
+  const dashed = s === 'windup' && tk < B.windup - leadOf(e) + 1
   const density = scorching ? fade : lerp(0.22, 1, q)            // how solid the burn behind the front is
 
   // ---- classify -----------------------------------------------------------------------------------
@@ -521,7 +529,7 @@ function impactFor(v: EntityView): Impact | null {
 function updateBruteImpact(v: EntityView, e: Enemy, f: EnemyFrame): void {
   const rec = impactFor(v)
   if (!rec) return
-  const B = tuning.brute
+  const B = cfgOf(e)
   const contact = e.state === 'attack' && e.stateTick > B.lungeTicks   // the sim tick the arc tests, not the interpolated one
   if (contact && !rec.fired) {
     rec.fired = true

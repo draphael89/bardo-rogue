@@ -13,6 +13,7 @@ import { clearBulletTime } from './combat'
 import { SLOW_FULL } from './world'
 import { triggerPerfectDodge } from './boons'
 import { updateReward } from './rewards'
+import { updateRite } from './rites'
 import { tuning } from '@/tuning'
 
 // One deterministic tick. Presentation must never call anything else on the sim.
@@ -37,10 +38,15 @@ export function stepWorld(world: World, input: InputFrame): void {
     updateReward(world, input)
     return
   }
+  // A rite holds the room the same way an offer does: nothing moves until it is answered.
+  if (world.roomPhase === 'entering') {
+    updateRite(world, input)
+    return
+  }
 
   // presses during hit-stop still buffer; that is what makes chaining feel responsive
   const peaceful = world.roomPhase === 'town'
-  const playerInput = peaceful ? { ...input, attack: false, attackHeld: false, dodge: false } : input
+  const playerInput = peaceful ? { ...input, attack: false, attackHeld: false, heavy: false, dodge: false } : input
   capturePlayerInput(world, playerInput)
 
   if (world.freeze > 0) {

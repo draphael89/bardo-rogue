@@ -44,7 +44,8 @@ export function playEventSfx(a: AudioSystem, ev: SimEvent, listener?: Readonly<{
       // The bed leans back 5 dB for the length of the string; the woosh itself stays on SFX.
       a.duck(...MIX.duck.by.playerCommit)
       a.play('woosh', { ...at, gain: ev.heavy ? 1.35 : 1.2, pitch: ev.heavy ? 0.8 : 1.1, pitchVar: 0.1, lead: true })
-      a.swish(ev.heavy ? 1.4 : 1.3, ev.heavy ? 170 : 110, ev.heavy ? 1.2 : 1.45, ev, true)
+      // A swing out of a roll rides higher and tighter: the same blade, carried by the dodge.
+      a.swish(ev.heavy ? 1.4 : 1.3, ev.heavy ? 170 : 110, ev.dash ? 1.7 : ev.heavy ? 1.2 : 1.45, ev, true)
       break
     case 'hit':
       // the consequence, deliberately under the cause: a landed hit is confirmation, not news.
@@ -141,6 +142,12 @@ export function playEventSfx(a: AudioSystem, ev: SimEvent, listener?: Readonly<{
       } else if (ev.kind === 'warden') {
         a.bell(1.35, 196, 0.7, 'sfx', 0, { ...at, partials: 'plate', glideTo: 130, strike: 0.7, cap: 'tell' })
         a.play('creature', { ...at, gain: 0.4, pitch: 0.5 })
+      } else if (ev.kind === 'oathbound') {
+        // Bronze, and rising: a shield being set rather than a body winding up. It shares nothing
+        // with the Empusa's bell, because a player who has learned the roster by ear must not get
+        // the freeze-and-dash answer from a shade that is about to plant and bash.
+        a.bell(1.15, 660, 0.5, 'sfx', 0, { ...at, partials: 'bowl', glideTo: 880, strike: 0.9, cap: 'tell' })
+        a.play('impactPlate_medium', { ...at, gain: 0.34, pitch: 0.85 })
       } else {
         a.bell(1.07, 2200, 0.24, 'sfx', 0, { ...at, partials: 'plate', glideTo: 3400, strike: 0.4, cap: 'tell' })
         a.play('creature', { ...at, gain: 0.28, pitch: 1.4 })
@@ -156,6 +163,13 @@ export function playEventSfx(a: AudioSystem, ev: SimEvent, listener?: Readonly<{
         a.play('woosh', { ...at, gain: 0.9, pitch: 1.5 })
         a.bell(0.82, 3200, 0.16, 'sfx', 0, { ...at, partials: 'plate', glideTo: 2000, cap: 'strike' })
         a.swish(0.5, 120, 1.5, ev)
+      } else if (ev.kind === 'oathbound') {
+        // The bash committing. Bronze driven forward, not a blade cutting air — it is the only
+        // enemy commit in the roster that had no sound at all, so a player watching a caster across
+        // the room learned about it by taking it.
+        a.play('impactPlate_medium', { ...at, gain: 1.15, pitch: 0.72 })
+        a.play('woosh', { ...at, gain: 0.7, pitch: 0.95 })
+        a.swish(0.5, 170, 0.8, ev)
       } else if (ev.kind === 'warden') {
         if (ev.pattern === 'slam') {
           a.play('woosh', { ...at, gain: 1.4, pitch: 0.55 })
@@ -206,7 +220,9 @@ export function playEventSfx(a: AudioSystem, ev: SimEvent, listener?: Readonly<{
     case 'roomClear':
       a.bell(1, 261.63, 3.6)
       a.bell(0.6, 392, 3.0, 'music', 0.45)
-      a.play('doorOpen_1', { gain: 0.6, delay: 1.2, bus: 'ui' })
+      // The door only sounds when a door is actually opening: a clear with nowhere onward (the
+      // final room, a debug arena) gets the bells and nothing creaking.
+      if (ev.hasNext && !ev.reward && !ev.victory) a.play('doorOpen_1', { gain: 0.6, delay: 1.2, bus: 'ui' })
       break
     case 'roomEnter':
       a.play('doorOpen_1', { gain: 0.45, bus: 'ui' })
@@ -238,6 +254,28 @@ export function playEventSfx(a: AudioSystem, ev: SimEvent, listener?: Readonly<{
     case 'rewardFocus':
       a.play('impactGeneric_light', { gain: 0.14, pitch: 1.7 + ev.focus * 0.08, bus: 'ui' })
       break
+    // The ferryman is not a god and does not get their bell. He gets the low end of the same
+    // instrument with the struck wood left in, the way a hull knocks against a post.
+    case 'riteOffered':
+      a.bell(0.7, 110, 3.4, 'ui', 0, { partials: 'plate', strike: 1 })
+      a.bell(0.3, 164.81, 2.6, 'music', 0.26)
+      break
+    case 'riteFocus':
+      a.play('impactGeneric_light', { gain: 0.14, pitch: 1.3 + ev.focus * 0.1, bus: 'ui' })
+      break
+    case 'riteChosen':
+      // Paying rings clean and holds its pitch: a coin dropped into a palm, and the transaction is
+      // closed. Refusing does not ring — it slides a fifth downward and keeps going, which is the
+      // sound of something being carried off rather than settled.
+      if (ev.paid) a.bell(0.66, 220, 2.6, 'ui', 0, { partials: 'tone', strike: 0.8 })
+      else a.bell(0.6, 130.81, 4.2, 'ui', 0, { partials: 'plate', glideTo: 87.31, strike: 0.35 })
+      a.bell(0.34, ev.paid ? 329.63 : 98, 2.4, 'music', 0.22)
+      break
+    case 'riteDebtCalled':
+      // The same falling figure, an octave down and much later. It is the only cue in the game that
+      // quotes an earlier one, because it is the only consequence that crosses a room boundary.
+      a.bell(0.5, 87.31, 4.4, 'music', 0, { partials: 'plate', glideTo: 65.41, strike: 0.2 })
+      break
     case 'boonChosen':
       a.play('swordMetal', { ...at, gain: 0.55, pitch: 1.25, bus: 'ui' })
       a.bell(0.82, 392, 3.0, 'music')
@@ -249,6 +287,28 @@ export function playEventSfx(a: AudioSystem, ev: SimEvent, listener?: Readonly<{
     case 'brandConsumed':
       a.play('impactPunch_heavy', { ...at, gain: 0.42 + ev.stacks * 0.08, pitch: 0.9 })
       a.thump(0.35 + ev.stacks * 0.1, 135, 62, 0.18)
+      break
+    // Fire announces itself once, on ignition, and then keeps quiet. A cue on every bite would put
+    // a metronome under any fight where two bodies are alight.
+    case 'burnApplied':
+      a.play('impactGeneric_light', { ...at, gain: 0.2, pitch: 1.5 })
+      break
+    case 'burnTick':
+    case 'burnEnded':
+      break
+    // A blow turned by bronze: metal, high and short, and clearly not the sound of meat.
+    case 'guardBlocked':
+      a.play('swordStone2', { ...at, gain: 1.0, pitch: 1.35, pitchVar: 0.08 })
+      a.play('impactGeneric_light', { ...at, gain: 0.3, pitch: 1.5 })
+      break
+    case 'brandPassed':
+      a.play('impactGeneric_light', { x: ev.toX, y: ev.toY, gain: 0.22, pitch: 1.35 })
+      break
+    // The interrupt is the rarest good thing a heavy can do, so it gets the loudest single sound the
+    // blade has and a struck bowl over it.
+    case 'interrupt':
+      a.play('impactPunch_heavy', { ...at, gain: 0.5, pitch: 1.08 })
+      a.bell(0.26, 1046.5, 0.9, 'ui')
       break
     case 'runWon':
       a.bell(1, 196, 4.2)
@@ -285,7 +345,7 @@ export function playEventSfx(a: AudioSystem, ev: SimEvent, listener?: Readonly<{
 function listen(a: AudioSystem, ev: SimEvent): void {
   switch (ev.type) {
     case 'footstep': case 'swing': case 'dodge': case 'dodgeWall': case 'dodgeEnd': case 'dodged': case 'reversal': case 'graze':
-    case 'draw': case 'arrowLoose': case 'weaponPrepared': case 'boonChosen':
+    case 'draw': case 'arrowLoose': case 'weaponPrepared': case 'boonChosen': case 'riteChosen':
     case 'playerHurt': case 'playerDeath': case 'returned': a.setListener(ev.x, ev.y)
   }
 }

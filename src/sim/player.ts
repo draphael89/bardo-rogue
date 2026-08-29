@@ -14,6 +14,7 @@ export function capturePlayerInput(world: World, input: InputFrame): void {
   // Unarmed presses are not future attacks. In particular, holding attack in the Bardo must not
   // manufacture a swing before the rack has physically armed the player.
   if (input.attack && p.armed) p.attackQueuedAt = p.controlTick
+  if (input.heavy && p.armed) p.heavyQueuedAt = p.controlTick
   // A second dodge press during travel is not a future action: accepting it would make a roll
   // repeat after the player released the button. Landing presses are real requests, however, and
   // get the same short grace window as an attack cancel.
@@ -49,6 +50,7 @@ export function updatePlayer(world: World, input: InputFrame): void {
   if (p.iframes > 0) p.iframes--
   if (p.flash > 0) p.flash--
   expireIntent(p, 'attackQueuedAt', P.attack.buffer)
+  expireIntent(p, 'heavyQueuedAt', P.attack.buffer)
   expireIntent(p, 'dodgeQueuedAt', P.dodge.buffer)
 
   // aim
@@ -81,8 +83,12 @@ export function updatePlayer(world: World, input: InputFrame): void {
   if (p.state === 'dead') { applyKnockback(world); return }
 
   // --- state transitions from buffered input ---
+  // Priority is a promise about intent, and it is the same everywhere: the roll wins, because its
+  // i-frames are the one thing the player must be able to reach; then the heavy, because asking for
+  // the committed swing is always deliberate; then the light, which a held button can also produce.
   if (p.state === 'free') {
     if (hasIntent(p, p.dodgeQueuedAt, P.dodge.buffer)) startDodge(world)
+    else if (wantsHeavy(world, p)) beginHeavyAttack(world)
     else if (hasIntent(p, p.attackQueuedAt, P.attack.buffer) || (input.attackHeld && armOf(world) === ARM.blade)) beginAttack(world)
   } else if (p.state === 'hurt') {
     if (p.stateTick >= P.hurtReactionTicks) {
@@ -90,17 +96,23 @@ export function updatePlayer(world: World, input: InputFrame): void {
       // Input capture continues through hit-stop and the recoil. Dodge wins the tie, matching every
       // other return-to-control gate, and both stock buffers outlast this deliberately short state.
       if (hasIntent(p, p.dodgeQueuedAt, P.dodge.buffer)) startDodge(world)
+      else if (wantsHeavy(world, p)) beginHeavyAttack(world)
       else if (hasIntent(p, p.attackQueuedAt, P.attack.buffer) || (input.attackHeld && armOf(world) === ARM.blade)) beginAttack(world)
     }
   } else if (p.state === 'dodge') {
     if (p.stateTick >= P.dodge.total) {
       p.state = 'free'; p.stateTick = 0
       if (hasIntent(p, p.dodgeQueuedAt, P.dodge.buffer)) startDodge(world)
+      else if (wantsHeavy(world, p)) beginHeavyAttack(world)
       else if (hasIntent(p, p.attackQueuedAt, P.attack.buffer) || (input.attackHeld && armOf(world) === ARM.blade)) beginAttack(world)
     }
     // Attacking overlays the last five travel ticks; dodgeTick keeps owning displacement, collision,
     // and i-frames while the blade starts up. The cancel changes the pose, never the roll's promise.
-    else if (hasIntent(p, p.attackQueuedAt, P.attack.buffer) && p.stateTick >= P.dodge.attackCancelFrom) beginAttack(world)
+    // Either weight can come out of the roll: the light is the dash attack, the heavy is the leap.
+    else if (p.stateTick >= P.dodge.attackCancelFrom) {
+      if (wantsHeavy(world, p)) beginHeavyAttack(world)
+      else if (hasIntent(p, p.attackQueuedAt, P.attack.buffer)) beginAttack(world)
+    }
   } else if (p.state === 'attack' && armOf(world) === ARM.bow) {
     const B = tuning.bow
     if (p.stateTick === B.draw) looseArrow(world)
@@ -124,10 +136,15 @@ export function updatePlayer(world: World, input: InputFrame): void {
       p.state = 'free'; p.stateTick = 0
       p.bladeActionConnected = false
       if (hasIntent(p, p.dodgeQueuedAt, P.dodge.buffer)) startDodge(world)
+      else if (wantsHeavy(world, p)) beginHeavyAttack(world)
       else if (hasIntent(p, p.attackQueuedAt, P.attack.buffer)) beginAttack(world)
     }
     else if (recoveryTick >= 0) {
       if (hasIntent(p, p.dodgeQueuedAt, P.dodge.buffer) && recoveryTick >= s.dodgeCancelFrom) startDodge(world)
+      // A heavy called for during a light's recovery cuts the chain short and cashes it in now. This
+      // is the combo's punctuation: light, light, slam is still there, but so is light-into-slam the
+      // moment you read an opening, without spending a swing you no longer want.
+      else if (!s.heavy && wantsHeavy(world, p) && recoveryTick >= s.chainFrom + wp) startSwing(world, HEAVY)
       else if ((hasIntent(p, p.attackQueuedAt, P.attack.buffer) || input.attackHeld) && recoveryTick >= s.chainFrom + wp && p.swingIndex < P.attack.swings.length - 1) startSwing(world, p.swingIndex + 1)
     }
   }
@@ -227,10 +244,9 @@ export function updatePlayer(world: World, input: InputFrame): void {
         if (arcHits(p.x, p.y, mid, reach.radius, spanDeg, e.x, e.y, e.radius)
           && hasLineOfSight(world.arena, p.x, p.y, e.x, e.y)) {
           e.lastHitSwingId = p.swingId
-          p.bladeActionConnected = true
           const toward = Math.atan2(e.y - p.y, e.x - p.x)
           const brandBefore = e.brand
-          damageEnemy(world, e, reach.damage, toward, s.knockback, s.heavy, s.hitstop, p.swingId, {
+          const result = damageEnemy(world, e, reach.damage, toward, s.knockback, s.heavy, s.hitstop, p.swingId, {
             source: 'blade',
             originX: p.x, originY: p.y,
             direction: toward,
@@ -238,7 +254,11 @@ export function updatePlayer(world: World, input: InputFrame): void {
             cleave: !s.heavy && hasBoon(world, 'cleave'),
             contactDepth: Math.hypot(e.x - p.x, e.y - p.y) / Math.max(1, reach.radius),
           })
-          resolveWeaponOnHit(world, e, s.heavy, brandBefore, toward, p.swingId)
+          // A shield can stamp the per-swing dedupe without granting a hit-confirm or carrying riders.
+          if (result.landed) {
+            p.bladeActionConnected = true
+            resolveWeaponOnHit(world, e, s.heavy, brandBefore, toward, p.swingId, result)
+          }
         }
       }
       for (const b of world.projectiles) {
@@ -305,28 +325,56 @@ function beginAttack(world: World): void {
   const reversal = p.reversalTicks > 0
   if (armOf(world) === ARM.bow) startDraw(world)
   else startSwing(world, 0)
-  if (reversal) {
-    p.reversalTicks = 0
-    p.reversalActionId = p.swingId
-    // The dodge created the breath; the follow-up belongs to the player. The live blade/loosed
-    // arrow closes it, so startup remains a legible setup rather than a hidden fixed combo script.
-    world.emit({
-      type: 'reversal', x: p.x, y: p.y, angle: p.swingAngle, actionId: p.swingId,
-      weapon: armOf(world) === ARM.bow ? 'bow' : 'blade',
-    })
-  }
+  if (reversal) spendReversal(world)
+}
+
+// The committed swing is the last entry in the chain and also its own opener, so it has one name.
+const HEAVY = tuning.player.attack.swings.length - 1
+
+function beginHeavyAttack(world: World): void {
+  if (!world.player.armed || armOf(world) !== ARM.blade) return
+  const reversal = world.player.reversalTicks > 0
+  startSwing(world, HEAVY)
+  if (reversal) spendReversal(world)
+}
+
+function spendReversal(world: World): void {
+  const p = world.player
+  p.reversalTicks = 0
+  p.reversalActionId = p.swingId
+  // The dodge created the breath; the follow-up belongs to the player. The live blade/loosed
+  // arrow closes it, so startup remains a legible setup rather than a hidden fixed combo script.
+  world.emit({
+    type: 'reversal', x: p.x, y: p.y, angle: p.swingAngle, actionId: p.swingId,
+    weapon: armOf(world) === ARM.bow ? 'bow' : 'blade',
+  })
+}
+
+// The bow has no second weight, and a heavy request there would silently become a draw. Consume
+// nothing and let the request expire rather than surprising the player with the wrong action.
+function wantsHeavy(world: World, p: Player): boolean {
+  return armOf(world) === ARM.blade && hasIntent(p, p.heavyQueuedAt, tuning.player.attack.buffer)
 }
 
 function startSwing(world: World, index: number): void {
   const p = world.player
-  p.state = 'attack'; p.stateTick = 0; p.attackQueuedAt = -1
+  // Any swing consumes both requests: the one that launched it, and the one it declined. Leaving the
+  // loser queued is how a game grows phantom inputs a second later.
+  p.state = 'attack'; p.stateTick = 0; p.attackQueuedAt = -1; p.heavyQueuedAt = -1
   p.swingIndex = index
   p.bladeActionConnected = false
   p.swingAngle = p.aimAngle
   p.swingId = ++world.swingCounter
   p.facing = Math.cos(p.swingAngle) >= 0 ? 1 : -1
   const s = tuning.player.attack.swings[index]
-  world.emit({ type: 'swing', x: p.x, y: p.y, angle: p.swingAngle, swing: index, heavy: s.heavy })
+  // A swing thrown out of a roll is the dash attack: same blade, different sentence. Latched HERE,
+  // at the press, rather than re-derived per active tick from the roll clock — that clock dies at
+  // dodge.total (20) and the heavy's startup is 12 from an earliest cancel of 8, so a heavy out of
+  // a roll never has a live clock to read by the time its blade is out. Sampling it per tick also
+  // made a late light flicker between arcs mid-swing, in the sim and in the drawn crescent alike.
+  p.swingFromRoll = p.dodgeTick >= 0
+  const dash = p.dodgeTick >= 0 && p.dodgeTick < tuning.player.dodge.travel
+  world.emit({ type: 'swing', x: p.x, y: p.y, angle: p.swingAngle, swing: index, heavy: s.heavy, dash })
 }
 
 function endDodgeTravelAtWall(world: World): void {
@@ -373,7 +421,7 @@ function applyKnockback(world: World): void {
   if (Math.abs(p.kbx) < 1 && Math.abs(p.kby) < 1) { p.kbx = 0; p.kby = 0 }
 }
 
-type IntentKey = 'attackQueuedAt' | 'dodgeQueuedAt'
+type IntentKey = 'attackQueuedAt' | 'heavyQueuedAt' | 'dodgeQueuedAt'
 
 function hasIntent(p: Player, at: number, maxAge: number): boolean {
   return at >= 0 && p.controlTick - at <= maxAge

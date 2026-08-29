@@ -1,9 +1,9 @@
 {
   "title": "Bardo Rogue",
-  "subtitle": "Gauntlet against Enter the Gungeon & Hades — two marked doors, then the rest",
-  "updated": "2026-08-28T20:57:00Z",
-  "now": "combat-feel",
-  "round": 4,
+  "subtitle": "The Greek gate: two powers, twelve vows, fire, an elite that turns a light blade, a ferryman who is owed, and Minos",
+  "updated": "2026-08-28T23:35:00-04:00",
+  "now": "greek-gate",
+  "round": 2,
   "timeline": [
     {
       "t": "16:54",
@@ -510,36 +510,52 @@
       "text": "Kill flash 0.35 -> 0.12; it was louder than getting hurt and washed out the next telegraph. 68 -> 107 tests. Enemy tuning is the open follow-up: kite clears in 28-33s vs a 60-120s target."
     },
     {
-      "t": "18:35",
-      "text": "Combat audit reopened at current HEAD. 184 tests green. Independent controls score 87; combat transaction 84; Warden depth 58. The 90+ blockers are timing truth, boss mastery, action attribution, and directional continuity."
+      "t": "20:08",
+      "text": "Truth pass in: seeds vary across reloads, the sim names the killer, 100/100 seeds reach home."
     },
     {
-      "t": "18:48",
-      "text": "Trust pass in: perfect dodge now means the roll's real iframe window, bolt cuts are confirms, and a head-on wall ends travel instead of granting a stationary invulnerable tumble. Focused mechanics 37/37."
+      "t": "20:14",
+      "text": "Parked CI template + manual browser smoke + acceptance matrix. The matrix immediately reported that mashing wins 2%."
     },
     {
-      "t": "19:00",
-      "text": "Directional hero pipeline passes: original north/back and south/front 16-pose sheets, 15 colors, binary alpha. Blade idle, run, hit, light/heavy, dodge, land, and death no longer drop to the 16px placeholder on vertical input."
+      "t": "20:19",
+      "text": "The heavy is its own button. Ten contract tests; the neutral opener still coils 8px and throws 30."
     },
     {
-      "t": "19:05",
-      "text": "Aim clarity in: arrow/right-stick ownership releases cleanly; Q lock now has acquire, retained, break, and clear presentation. Enemy mastery pass and blind directional-motion critic are running."
+      "t": "20:31",
+      "text": "Two powers, twelve vows, and fire. The offer screen has a face on it now."
     },
     {
-      "t": "19:25",
-      "text": "Enemy mastery and contact truth in: Warden slam/ring/fan rotate deliberately, phase two latches safely, and every hit carries immutable source, geometry, guard, and damage provenance."
+      "t": "20:52",
+      "text": "Minos inherits the Warden mastery contract: taught slam, ring, and fan patterns with a safe half-life transition."
     },
     {
-      "t": "19:50",
-      "text": "Cover is one truth now. Blade, projectiles, hostile arcs, Judgment, aim assist, and every enemy tell use the same exact rounded-tile ray. Guard, hurt, listener, and max-HP feedback also report authoritative state."
+      "t": "21:05",
+      "text": "A title, held over the Bardo itself. The room breathes behind its own name."
     },
     {
-      "t": "20:21",
-      "text": "Replay and balance gates close: 252 tests, deterministic fixtures, 8/8 skilled full clears, 0/8 naive clears, 8/8 Warden clears, zero pool overflow, and isolated simulation below the 2ms ceiling."
+      "t": "21:20",
+      "text": "The Oath-Bound turns light blades. Bot fell to 76%, learned the rule, came back to 91%."
     },
     {
-      "t": "20:57",
-      "text": "Combat 90+ passes. Independent full audit scores 93 overall with every key dimension 91–96; the final north/south melee-and-roll gate passes 91–94 after a one-tick tuck and continuously visible blade."
+      "t": "21:30",
+      "text": "Adversarial review found four real bugs, all mine, all silent. Fixed with regressions."
+    },
+    {
+      "t": "21:50",
+      "text": "THE TOLL. The run's one beat of quiet: pay a vessel of life for a fourth vow, or cross owed and let Minos hear about it."
+    },
+    {
+      "t": "22:25",
+      "text": "A 25-agent adversarial pass found ten real defects across the change set. All ten fixed: a boon that never fired, a shield that only half blocked, a boss that collapsed to one attack, two telegraphs that lied."
+    },
+    {
+      "t": "23:05",
+      "text": "An external audit graded the branch 78 and was right: hashWorld's conditional writes were an aliasing machine (three reproduced collisions, now impossible), the matrix and smoke could pass on zero cases, and the smoke never rendered a frame over the screens it claimed to prove. All fixed; the smoke now boots the title with a real keypress."
+    },
+    {
+      "t": "23:35",
+      "text": "An eight-angle code review of the controller-pause commit: the sealed doorway still glowed 'open' in two more renderers, the death-screen Start press paused the game on arrival, and damageTaken counted vessels the player never had. All eight findings fixed; doorOpens() is now the one place the open-door rule lives."
     }
   ],
   "pieces": [
@@ -828,17 +844,69 @@
     },
     {
       "id": "combat-feel",
-      "take": "32",
-      "name": "Every input tells the truth",
       "status": "done",
-      "title": "Combat 90+: timing truth, authored direction, deliberate boss patterns, and exact feedback attribution",
-      "blurb": "A second audit found the seams left after the first feel pass. Mechanics, aim, cover, boss cadence, contact feedback, audio authority, and full directional combat art now move as one contract. A fresh implementation audit scores the result 93/100.",
-      "bar": "Hades feel + Gungeon combat readability",
-      "rounds": 5,
-      "verdict": "ours",
-      "gap": "Human headphone/speaker, physical-controller, browser/device, and maximum-density phase-two certification remains release QA.",
-      "before": "audit/poses.png",
-      "after": "audit/directional-poses.png"
+      "title": "Controls & game feel: keyboard aim, hold-to-attack, dodge ghosting, wall-safe crowds, turn rate, sword latency, perfect-dodge bullet time, flash hierarchy",
+      "rounds": 0
+    },
+    {
+      "id": "truth-pass",
+      "status": "done",
+      "title": "Truth pass: attempt-keyed seeds, sim-authoritative death cause, shared tile routing (100/100 seeds traverse)",
+      "rounds": 1
+    },
+    {
+      "id": "ci-instruments",
+      "status": "parked",
+      "title": "Manual golden-path browser smoke, seeded acceptance matrix, and doc tests; CI workflow template parked pending authorization",
+      "rounds": 1
+    },
+    {
+      "id": "pause-audio",
+      "status": "done",
+      "title": "Pause owns the audio clock and the tab; fades before it stops the clock so transients do not click",
+      "rounds": 2
+    },
+    {
+      "id": "heavy-verb",
+      "status": "done",
+      "title": "The heavy becomes its own verb: own input, own queue, roll > heavy > light, chain-cut, roll launch",
+      "rounds": 1
+    },
+    {
+      "id": "statuses-gods",
+      "status": "done",
+      "title": "Burn joins Brand; twelve vows across the Kindly One and Hecate, with one reachable pact",
+      "rounds": 2
+    },
+    {
+      "id": "deity-offer",
+      "status": "done",
+      "title": "The offer becomes a meeting: authored 24x24 masks, name, epithet, a spoken line",
+      "rounds": 2
+    },
+    {
+      "id": "minos",
+      "status": "done",
+      "title": "Minos identity around the Warden's slam, ring, and fan mastery contract; per-pattern telegraphs that do not lie",
+      "rounds": 1
+    },
+    {
+      "id": "oathbound",
+      "status": "done",
+      "title": "The Oath-Bound Hoplite: one guard rule with three answers - commit, flank, or burn it",
+      "rounds": 3
+    },
+    {
+      "id": "title-screen",
+      "status": "done",
+      "title": "A title held over the living hub, which remembers your descents",
+      "rounds": 2
+    },
+    {
+      "id": "review-fixes",
+      "status": "done",
+      "title": "Adversarial review: unhashed fire, a boss/caster scratch-field collision, an unreachable duo, a swingable hub",
+      "rounds": 1
     }
   ]
 }

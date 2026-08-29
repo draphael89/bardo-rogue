@@ -120,7 +120,7 @@ export function updateCaster(world: World, e: Enemy): void {
       }
       if (e.stateTick >= C.aimTicks) {
         const ox = e.x + Math.cos(e.aimAngle) * (e.radius + 4), oy = e.y + Math.sin(e.aimAngle) * (e.radius + 4)
-        const bolt = world.fireProjectile(ox, oy, e.aimAngle, C.boltSpeed * BOLT_SPEED_SCALE, C.boltRadius, C.boltLifeTicks)
+        const bolt = world.fireProjectile(ox, oy, e.aimAngle, C.boltSpeed * BOLT_SPEED_SCALE, C.boltRadius, C.boltLifeTicks, 0, 1, 0, 'bolt', 'caster')
         e.targetX = bolt ? bolt.id : 0
         if (bolt) world.emit({ type: 'boltFired', x: ox, y: oy, angle: e.aimAngle })
         world.emit({ type: 'enemyAttack', id: e.id, kind: 'caster', x: e.x, y: e.y, angle: e.aimAngle })

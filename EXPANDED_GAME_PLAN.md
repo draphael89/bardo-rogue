@@ -1,5 +1,10 @@
 # Bardo Rogue — Expanded Game Plan
 
+> **HISTORICAL — superseded by `VERTICAL_SLICE_PLAN.md`.** This audit was written at `1ef5b18`, before the
+> production loop was assembled. Its section 1-2 findings (no reward drafting, no boss, no persistence,
+> the default URL booting the `full` arena, the Bardo reusing the Crossing) describe a build that no
+> longer exists. Read it for the reasoning that led to the slice, not for the state of the game.
+
 Current-tree audit: 2026-08-28, commit `1ef5b18` (`origin/main`). This expands the combat audit in `AUDIT_REPORT.md` against the game that exists now, 21 commits later. The priorities in section 8 supersede the older report's separate strike lists.
 
 ## 1. Verdict

@@ -1,5 +1,5 @@
 import { Container, Sprite, RenderTexture, Graphics, type DestroyOptions, type Renderer } from 'pixi.js'
-import { TILE, T, type Arena, type ArenaDoor, type DoorMark, type ArenaOffering, type ArenaRack } from '@/sim/arena'
+import { TILE, T, type Arena, type ArenaDoor, type DoorMark, type ArenaOffering, type ArenaRack, doorOpens } from '@/sim/arena'
 import type { Atlas } from './atlas'
 import { tuning } from '@/tuning'
 
@@ -133,7 +133,9 @@ function makeDoorCluster(atlas: Atlas, d: ArenaDoor): { root: Container; setOpen
   root.addChild(glow, spr, wingA, wingB, mark)
   return {
     root,
-    setOpen(open) {
+    setOpen(roomOpen) {
+      // The cluster owns the exit gating, so a second caller can never forget it.
+      const open = doorOpens(d, roomOpen)
       spr.texture = atlas.room(open ? T.doorOpen : T.doorClosed)
       const show = open && !!d.mark
       wingA.visible = wingB.visible = show

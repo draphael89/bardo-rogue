@@ -19,9 +19,15 @@ per tick: `stepWorld(world, inputFrame)`.
 | `pnpm sim -- ...` | Headless bot or replay run in Node, prints metrics JSON (`tools/headless.ts`) |
 | `pnpm shot -- ...` | Playwright: open the game, run ticks, screenshot + state JSON (`tools/shot.ts`) |
 | `pnpm record-bots` | Regenerate the replay fixtures in `replays/` (`tools/record-bot.ts`) |
+| `pnpm matrix` | Seeded acceptance gate: every seed must resolve and come home; reports the win-rate band (`tools/matrix.ts`) |
+| `pnpm smoke` | Drives both endings of the production loop in a real browser and asserts the golden path (`tools/smoke.ts`; needs a server) |
 | `pnpm record-bot -- --bot kite --scenario full --seed 1 --out replays/x.json` | Record one bot run |
 | `pnpm poses` | Pose sheet of key animation frames (`tools/poses.ts`) |
+| `pnpm strip -- ...` | Frame strip of anything that moves, for judging motion (`tools/strip.ts`; writes a JSON state/event sidecar beside the PNG) |
+| `pnpm assets` / `pnpm tiles` | Regenerate `public/assets/` (Kenney subset, then the original bardo tilesets). Both rewrite `manifest.json`; run `tiles` **after** `assets` or the bardo sprites drop out. |
 | `pnpm build` | Web build, then `tools/check-build.ts` gates the payload (no evidence, no video, no missing asset, within budget) |
+| `pnpm check:build` | Re-run the built-payload gate against the current `dist/` |
+| `pnpm art` / `pnpm palette` / `pnpm fx` | Run the authored-art gates, canonical-palette gate, or rebuild the Bardo FX sheets |
 | `pnpm desktop:dev` | Electron shell against the already-running `:5173`. Does NOT start Vite; HMR still works inside the shell. |
 | `pnpm desktop:build` | `pnpm build` (payload gate included) then compiles `desktop/*.cts` to `desktop/out/*.cjs` |
 | `pnpm desktop:start` | Runs the PACKAGED code path (`app://bardo/`) against the local `dist/`, without packaging anything |
@@ -29,7 +35,8 @@ per tick: `stepWorld(world, inputFrame)`.
 | `pnpm desktop:dist` | Phase 7: electron-builder arm64 dmg+zip. Needs macOS and the electron-builder devDependency (not installed). |
 
 `pnpm sim -- --scenario wave3 --bot naive-melee --seeds 1-20 --ticks 10800` prints one row per seed:
-swings, hitsLanded, whiffSwings, kills, dodges, successfulDodges, boltsFired, boltsCut, enemyAttacks, damageTaken,
+swings, hitsLanded, whiffSwings, kills, dodges, successfulDodges, boltsFired, boltsCut, enemyAttacks, damageTaken
+(HP actually lost — the Warden's slam counts 2, god mode counts 0), hitsTaken (times touched, god mode included),
 deaths, wavesCleared, roomsEntered, boonsChosen, runResult, runSeconds, clear/death time, final room/phase, and timing.
 A stock combat scenario stops 2 s after clear or death; the production `loop` stops after its return to the Bardo.
 
@@ -48,7 +55,7 @@ A stock combat scenario stops 2 s after clear or death; the production `loop` st
 
 Combat slow-motion: `__game.state().slow` is `{ rate, ticks }` — rate is per-mille, 1000 is full speed. Force it with `__game.world.slowRate = 250; __game.world.slowTicks = 120`.
 
-Keys in the game: WASD move, arrows aim (8-way, and holding one pins the facing so you strafe), mouse aim, click/J/Z attack, Space/Shift/K/X dodge, P/Escape pause, V reduced effects, F fullscreen. With no arrow and an untouched mouse, aim follows movement. Rewards use A/D or left/right, then Enter/Space/attack to claim. The same confirm returns after death or victory.
+Keys in the game: WASD move, arrows aim (8-way, and holding one pins the facing so you strafe), mouse aim, left-click/J/Z light attack, right-click/L/C heavy attack, Space/Shift/K/X dodge, P/Escape pause, V reduced effects, F fullscreen. With no arrow and an untouched mouse, aim follows movement. Rewards use A/D or left/right, then Enter/Space/attack to claim. The same confirm returns after death or victory.
 While paused, E exports the save file and I imports one; an import is refused during a live run, and
 refused if either file came from a newer build than this one.
 F1 toggles the debug overlay, F2 toggles recording, F3 downloads the last recording.
@@ -63,11 +70,11 @@ Available once the page has booted (`await page.waitForFunction(() => !!window._
 - `loop`: the fixed-step loop; `loop.paused`, `loop.frameTimes`.
 - `reset(seed?, scenario?, { god? })`: fresh world. Omitted args keep the current run's seed/scenario.
 - `step(n = 1)`: advance the sim n ticks by hand (pause first, or the loop keeps ticking too).
-- `setInput(partial | null)`: force an `InputFrame` (`moveX moveY aimX aimY aimSoft attack dodge restart choiceDelta confirm`). Forced action/modal fields fire once, then clear. `null` returns control to the keyboard.
+- `setInput(partial | null)`: force an `InputFrame` (`moveX moveY aimX aimY aimSoft attack attackHeld heavy dodge restart choiceDelta confirm`). Forced action/modal fields fire once, then clear. `null` returns control to the keyboard.
 - `bot(name | null)`: swap in or remove any bot listed above.
 - `pause(p?)`: pause/unpause the loop, returns the new state.
 - `hash()`: FNV hash of the sim state. Equal hashes = identical worlds.
-- `state()`: compact JSON snapshot: tick, freeze/slow, room and phase, player/armed state, session/meta/run/reward/history, rack/offering, boons, enemies, bolts, and metrics.
+- `state()`: compact JSON snapshot: tick, freeze/slow, room and phase, player/armed state, session/meta/run/reward/rite/history, rack/offering, boons, enemies, bolts, and metrics.
 - `frameStats()`: `{ frames, p50, p95, max }` render frame time in ms over the last 240 frames.
 - `mute(m?)`, `debug(v?)`: toggle audio / overlay, return the new state.
 - `record(on?)`: start (resets to a fresh run of the current seed/scenario) or stop recording. Returns whether recording.
@@ -87,13 +94,16 @@ Available once the page has booted (`await page.waitForFunction(() => !!window._
 
 ## Record and replay
 
-A replay is `{ v: 1, seed, scenario, god?, meta?: MetaStateV1, frames: InputFrame[] }` (`src/sim/replay.ts`).
-On disk it is run-length encoded: `runs: [moveX, moveY, aimX, aimY, flags, count]` with axes as ints
-x10000 and flags bits
-`1 aimSoft, 2 attack, 4 dodge, 8 restart, 16 attackHeld, 32 confirm, 64 choice-left, 128 choice-right`.
-The browser quantizes every frame to 1/10000 before the sim sees it, so what was played and what is
-stored are identical. A `loop` replay's hash depends on its `meta`, because `hashWorld` folds
+A replay is `{ v: 1, seed, scenario, god?, meta?: MetaStateV1, frames: InputFrame[] }` (`src/sim/replay.ts`). On disk it is run-length
+encoded: `runs: [moveX, moveY, aimX, aimY, flags, count]` with axes as ints x10000 and flags bits
+`1 aimSoft, 2 attack, 4 dodge, 8 restart, 16 attackHeld, 32 confirm, 64 choice-left, 128 choice-right, 256 heavy`
+(the table in `src/sim/replay.ts` is the source of truth; `pnpm test` fails if this line drifts from it). The browser quantizes every frame to 1/10000 before the sim sees it, so
+what was played and what is stored are identical. A `loop` replay's hash depends on its `meta`, because `hashWorld` folds
 attempts and victories in for that scenario; the pinned fixtures are all non-`loop` and carry none.
+
+The workflow at `ci/github-actions.yml` is a parked template, not active CI. Until a separately
+authorised move to `.github/workflows/ci.yml`, run the documented typecheck, test, build, matrix,
+browser-smoke, art, and desktop gates manually before merging.
 
 - Browser: F2 starts a fresh run and records; F2 again stops; F3 downloads `<scenario>-<seed>-<ticks>.json`. Move the
   file into `replays/`. A restart (R) ends the recording. "REC" blinks top-centre while recording, "REPLAY" while replaying.

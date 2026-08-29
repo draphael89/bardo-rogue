@@ -54,6 +54,13 @@ export interface ArenaDoor {
   col: number
   row: number
   mark?: DoorMark
+  /**
+   * Is this doorway an exit of the CURRENT room? Assigned by enterRoom from the room graph. An
+   * arena kind owns its masonry — a threshold hall always has both doorways — but which of them
+   * lead anywhere is the room's decision, and a door that leads nowhere must never open: an open
+   * door is a promise about what walking into it does.
+   */
+  exit?: boolean
 }
 
 export interface Prop { x: number; y: number; tile: number; sortY: number; sheet: 'room' | 'prop' }
@@ -86,21 +93,34 @@ export interface Arena {
 export const ARENA_COLS = 26
 export const ARENA_ROWS = 15
 
+/**
+ * Does this door open when the room's doors open? THE one place the rule lives. Collision
+ * (setDoorWalkable), the door sprites (tilemap), and both glow layers (light, atmosphere) all ask
+ * this same question — the last audit found the rule duplicated in two of them and simply absent
+ * from the other two, which left a sealed doorway glowing "come use me" over solid wall.
+ */
+export function doorOpens(d: ArenaDoor, open: boolean): boolean {
+  return open && !!d.exit
+}
+
 export function setDoorWalkable(a: Arena, open: boolean): void {
   for (const d of a.doors) {
+    // Opening is for exits only; closing closes everything. A non-exit doorway stays wall forever.
+    const doorOpen = doorOpens(d, open)
+
     switch (d.dir) {
       case 'north':
         for (const dc of [-1, 0, 1] as const) {
           const c = d.col + dc
           if (c <= 0 || c >= a.cols - 1) continue
-          a.solid[d.row * a.cols + c] = open ? 0 : 1
+          a.solid[d.row * a.cols + c] = doorOpen ? 0 : 1
         }
         break
       case 'east':
         for (const dr of [-1, 0, 1] as const) {
           const r = d.row + dr
           if (r <= 1 || r >= a.rows - 1) continue
-          a.solid[r * a.cols + d.col] = open ? 0 : 1
+          a.solid[r * a.cols + d.col] = doorOpen ? 0 : 1
         }
         break
       default: { const _e: never = d.dir; return _e }
@@ -277,8 +297,11 @@ function buildThreshold(rng: Rng): Arena {
   }
 
   // ---- the wall: north door, east door, one window pair, one relief. None mirrored ----
-  const door: ArenaDoor = { dir: 'north', col: 13, row: 1, mark: 'combat' }
-  const east: ArenaDoor = { dir: 'east', col: 25, row: 7, mark: 'gift' }
+  // No marks at construction: assignDoorRoles is the single writer, stamping mark and exit from
+  // the room graph on every path that pairs an arena with a room. A baked default here would be
+  // dead two lines later — and would quietly dress the doors of any future path that forgets it.
+  const door: ArenaDoor = { dir: 'north', col: 13, row: 1 }
+  const east: ArenaDoor = { dir: 'east', col: 25, row: 7 }
   const doors: ArenaDoor[] = [door, east]
   base[idx(door.col, door.row)] = T.wallFace
   base[idx(east.col, east.row)] = T.capEast
@@ -415,7 +438,7 @@ function buildBardo(rng: Rng): Arena {
     base[idx(c, r)] = r === 3 ? T.matNorth : r === 11 ? T.matSouth : T.matBody
   }
 
-  const door: ArenaDoor = { dir: 'north', col: 13, row: 1, mark: 'combat' }
+  const door: ArenaDoor = { dir: 'north', col: 13, row: 1 }
   const doors = [door]
   base[idx(door.col, door.row)] = T.wallFace
   base[idx(4, 1)] = T.windowL

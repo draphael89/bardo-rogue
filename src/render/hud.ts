@@ -96,12 +96,16 @@ function fightChrome(cardAge: number): number {
   return 0
 }
 
+// The shades of this realm, by name. A death card's first job is to teach, and the silhouette
+// already teaches which body it was - so the name gets to do the other job, which is to make the
+// place feel like somewhere with its own dead in it rather than enemy types 1 through 3.
 function takenBy(kind: EnemyKind | 'none'): string {
   switch (kind) {
-    case 'brute': return 'THE HEAVY'
-    case 'caster': return 'THE MARK'
-    case 'charger': return 'THE RUSH'
-    case 'warden': return 'THE WARDEN'
+    case 'brute': return 'A FALLEN HOPLITE'
+    case 'oathbound': return 'AN OATH-BOUND HOPLITE'
+    case 'caster': return 'A LAMPAD'
+    case 'charger': return 'AN EMPUSA'
+    case 'warden': return 'MINOS'
     case 'dummy': return 'A BLOW'
     case 'none': return 'A BLOW'
     default: {
@@ -111,24 +115,7 @@ function takenBy(kind: EnemyKind | 'none'): string {
   }
 }
 
-// Presentation-only: nearest living body (or hostile bolt) on the killing frame. The sim does not
-// store a killer id; this lane does not own combat.ts. Latch the result — do not re-pick as they walk off.
-function inferKiller(world: World): EnemyKind | 'none' {
-  const p = world.player
-  let best: EnemyKind | 'none' = 'none'
-  let bestD = 40 * 40
-  for (const e of world.enemies) {
-    if (!e.active) continue
-    const d = (e.x - p.x) * (e.x - p.x) + (e.y - p.y) * (e.y - p.y)
-    if (d < bestD) { bestD = d; best = e.kind }
-  }
-  for (const b of world.projectiles) {
-    if (!b.active || b.team !== 0) continue
-    const d = (b.x - p.x) * (b.x - p.x) + (b.y - p.y) * (b.y - p.y)
-    if (d < bestD) { bestD = d; best = 'caster' }
-  }
-  return best
-}
+
 // The veil: five nested ellipses centred on the corpse, each contributing one hard step. Composited they reach
 // ~0.33 at the frame corner and exactly 0 on the body, so the world stays the card's ground (§3.2.3 — light
 // pools, it does not wash) instead of a blackout. Radii are in view px, x and y, at the settled step.
@@ -241,7 +228,11 @@ export class Hud {
   private cardKeyStr = 'boot'         // last drawn card geometry; the card is redrawn only when its pose changes
   private veilKey = ''                // last drawn veil step; ~540 whole-pixel rects, so it redraws 8 times, not 60/s
   private deathAt: { x: number; y: number } | null = null   // the corpse's screen pixel, latched on the killing frame
-  private deathKiller: EnemyKind | 'none' | null = null     // latched with deathAt; who stood over you
+  // Who killed you is a FACT the sim names on the blow, carried by the playerDeath event and pushed
+  // in by the presenter. This used to be guessed from the nearest living body on the killing frame,
+  // which was wrong exactly where it mattered most: a bolt is deactivated the instant it lands and a
+  // charger has usually dashed past, so a ranged or drive-by death named a bystander — or 'A BLOW'.
+  private deathKiller: EnemyKind | 'none' | null = null
   waveText: Text
   banner: Text
   sub: Text
@@ -272,7 +263,7 @@ export class Hud {
     this.waveText = new Text({ text: '', style: { fontFamily: 'Kenney Pixel', fontSize: 16, fill: C.bone }, resolution: 1 })
     this.waveText.anchor.set(1, 0); this.waveText.position.set(V.width - 12, 2)
     this.bossName = new Text({
-      text: 'THE WARDEN',
+      text: 'MINOS',
       style: { fontFamily: 'Kenney Mini', fontSize: 8, fill: C.bone, letterSpacing: 2 },
       resolution: 1,
     })
@@ -352,6 +343,9 @@ export class Hud {
   }
 
   clearBanner() { this.bannerTicks = 0; this.hideBanner() }
+
+  /** The sim named the killer; the card states it. Called from the playerDeath event. */
+  setKiller(kind: EnemyKind | 'none'): void { this.deathKiller = kind }
 
   update(world: World, _dtSec: number) {
     const p = world.player
@@ -881,7 +875,7 @@ export class Hud {
     //    The corpse's screen pixel is latched on the killing frame and every later beat is anchored to it, so the
     //    veil never slides when the camera's death trauma shakes the world under it.
     if (!this.deathAt || age <= 1) this.deathAt = this.playerPx() ?? this.deathAt
-    if (this.deathKiller === null || age <= 1) this.deathKiller = inferKiller(world)
+
     const at = this.deathAt
     // The veil: an aperture closing on the corpse in eight whole steps, not a scrim dropped over the frame. It is
     // 0 on the body and ~0.33 at the far corner, so the room keeps its texture and its hierarchy and becomes the
@@ -1227,7 +1221,20 @@ export class Hud {
   }
 
   // --- place plate + control hint --------------------------------------------------------------------------------
+  /**
+   * Hide every piece of fight chrome at once. Suppression used to be scattered across the life
+   * plate, the wave box, the crown and the footer, so a full-screen overlay had no way to say
+   * "not now" without adding a sixth special case.
+   */
+  setChromeHidden(hidden: boolean): void {
+    if (this.chromeHidden === hidden) return
+    this.chromeHidden = hidden
+    if (hidden) { this.place.alpha = 0; this.footG.clear(); this.hintRow.alpha = 0 }
+  }
+  private chromeHidden = false
+
   private updateFooter(world: World, now: number) {
+    if (this.chromeHidden) { this.place.alpha = 0; this.footG.clear(); return }
     const p = world.player
     const dead = p.state === 'dead'
     const intro = this.bannerTicks > 0 && this.bannerStart >= 0 && now - this.bannerStart < this.bannerTicks && this.bannerTone === 'wave'
@@ -1249,7 +1256,7 @@ export class Hud {
 
     const age = now - this.hintStart
     const alpha = age < this.hintTicks - 80 ? 0.8 : Math.max(0, (this.hintTicks - age) / 80) * 0.8
-    this.hintRow.alpha = dead || world.roomPhase === 'town' || world.roomPhase === 'reward' ? 0 : alpha
+    this.hintRow.alpha = this.chromeHidden || dead || world.roomPhase === 'town' || world.roomPhase === 'reward' || world.roomPhase === 'entering' ? 0 : alpha
     this.hintRow.visible = this.hintRow.alpha > 0.02
   }
 
@@ -1302,12 +1309,16 @@ export class Hud {
     g.clear()
 
     // Same legend either way: a glyph for the device you are actually holding, then what it does.
-    type Item = { kind: 'word' | 'crosshair' | 'lmb' | 'stickL' | 'stickR' | 'btnX' | 'btnA'; word?: string; label: string }
+    type Item = { kind: 'word' | 'crosshair' | 'lmb' | 'stickL' | 'stickR' | 'btnX' | 'btnA' | 'btnY'; word?: string; label: string }
+    // The heavy earns a slot here the day it becomes its own button: a verb nobody is told about is
+    // a verb nobody uses. Lock loses its place on the keyboard row instead — it is the one entry a
+    // player can discover without being shown, and the row must not outgrow its plate.
     const items: Item[] = this.padMode
-      ? [{ kind: 'stickL', label: 'MOVE' }, { kind: 'stickR', label: 'AIM' }, { kind: 'btnX', label: 'STRIKE' }, { kind: 'btnA', label: 'DODGE' }]
+      ? [{ kind: 'stickL', label: 'MOVE' }, { kind: 'stickR', label: 'AIM' }, { kind: 'btnX', label: 'STRIKE' },
+         { kind: 'btnY', label: 'HEAVY' }, { kind: 'btnA', label: 'DODGE' }]
       : [{ kind: 'word', word: 'WASD', label: 'MOVE' }, { kind: 'word', word: 'ARROWS', label: 'AIM' },
-         { kind: 'word', word: 'J', label: 'STRIKE' }, { kind: 'word', word: 'SPACE', label: 'DODGE' },
-         { kind: 'word', word: 'Q', label: 'LOCK' }]
+         { kind: 'word', word: 'J', label: 'STRIKE' }, { kind: 'word', word: 'L', label: 'HEAVY' },
+         { kind: 'word', word: 'SPACE', label: 'DODGE' }]
 
     const GAP = 4, SEP = 12
     const widths = items.map(it => it.kind === 'word' ? this.measure(it.word!) + 9 : it.kind === 'lmb' ? 9 : it.kind === 'crosshair' ? 11 : 10)
@@ -1380,7 +1391,7 @@ export class Hud {
       default: {            // pad: sticks and face buttons share one octagon shell
         const cx = x + 5, top = y + 1
         const stick = it.kind === 'stickL' || it.kind === 'stickR'
-        const col = it.kind === 'btnX' ? C.gold : it.kind === 'btnA' ? C.bone : edge
+        const col = it.kind === 'btnX' ? C.gold : it.kind === 'btnY' ? C.ember : it.kind === 'btnA' ? C.bone : edge
         g.rect(x + 3, top + 9, 5, 1).fill({ color: C.void, alpha: 0.9 })
         g.rect(x + 2, top + 1, 7, 7).fill(face)
         g.rect(x + 1, top + 2, 9, 5).fill(face)
@@ -1396,7 +1407,9 @@ export class Hud {
           g.rect(nub - 1, top + 3, 3, 3).fill(ink)
         } else {
           // 3x5 hand-set letters: the 8px webfont overflows a 10px button shell
-          const rows = it.kind === 'btnX' ? ['X.X', 'X.X', '.X.', 'X.X', 'X.X'] : ['.X.', 'X.X', 'XXX', 'X.X', 'X.X']
+          const rows = it.kind === 'btnX' ? ['X.X', 'X.X', '.X.', 'X.X', 'X.X']
+            : it.kind === 'btnY' ? ['X.X', 'X.X', '.X.', '.X.', '.X.']
+            : ['.X.', 'X.X', 'XXX', 'X.X', 'X.X']
           for (let ry = 0; ry < 5; ry++) for (let rx = 0; rx < 3; rx++) if (rows[ry][rx] === 'X') g.rect(cx - 1 + rx, top + 2 + ry, 1, 1).fill(col)
         }
         break

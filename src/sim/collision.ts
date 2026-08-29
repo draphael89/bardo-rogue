@@ -153,11 +153,20 @@ export function moveWithWalls(a: Arena, e: { x: number; y: number }, dx: number,
 // contact is a face, a diagonal corner, or the arena boundary. Fixed work keeps replays deterministic.
 function furthestClear(a: Arena, e: { x: number; y: number }, axis: 'x' | 'y', from: number, delta: number, r: number): number {
   let clear = 0, blocked = 1
-  for (let i = 0; i < 12; i++) {
-    const mid = (clear + blocked) * 0.5
-    e[axis] = from + delta * mid
-    if (overlapsSolid(a, e.x, e.y, r)) blocked = mid
-    else clear = mid
+  if (axis === 'x') {
+    const y = e.y
+    for (let i = 0; i < 12; i++) {
+      const mid = (clear + blocked) * 0.5
+      if (overlapsSolid(a, from + delta * mid, y, r)) blocked = mid
+      else clear = mid
+    }
+  } else {
+    const x = e.x
+    for (let i = 0; i < 12; i++) {
+      const mid = (clear + blocked) * 0.5
+      if (overlapsSolid(a, x, from + delta * mid, r)) blocked = mid
+      else clear = mid
+    }
   }
   const tangent = from + delta * clear
   return exactFaceContact(a, e, axis, tangent, delta, r)

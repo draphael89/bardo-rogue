@@ -4,7 +4,7 @@ import { BOON, type BoonId, type Deity } from './boons'
 import { ARM, grantArm, type ArmId } from './weapons'
 import type { RiteId } from './rites'
 import { Rng } from './rng'
-import { FIRST_GATE, buildSliceRooms, installRoute, templateForSeed, type RouteNodeKind, type RunMap } from './route'
+import { FIRST_GATE, buildSliceRooms, installRoute, mapFromRooms, templateForSeed, type RouteNodeKind, type RunMap } from './route'
 import { enterRoomById } from './rooms'
 import type { MysteryChoice, MysteryOffer, RewardFamily, RewardOffer, RiteAnswer, RiteOffer, RoomPhase, RoomVisit, ShopGood, ShopOffer } from './session'
 import type { World } from './world'
@@ -72,6 +72,8 @@ export interface RunCheckpoint {
   hp: number
   maxHp: number
   depth: number
+  /** Ticks this attempt had already run when the snapshot was taken. See restoreCheckpoint. */
+  elapsed: number
   boonBits: number
   boons: CheckpointBoon[]
   history: CheckpointVisit[]
@@ -87,6 +89,8 @@ export interface RunCheckpoint {
   pendingShop: CheckpointShop | null
   pendingMystery: CheckpointMystery | null
   mysteryHunt: boolean
+  /** The answer the Smith has not spoken to yet. Session state, not run state, but it dies with a reload. */
+  lastMystery: MysteryChoice | null
   obols: number
   rerolls: number
 }
@@ -147,12 +151,22 @@ export function captureCheckpoint(world: World): RunCheckpoint | null {
     hp: run.hp,
     maxHp: run.maxHp,
     depth: run.depth,
+    // A resumed attempt is one attempt, so its clock has to cross the reload. Without this the
+    // world restarts at tick 0, startedTick with it, and the eventual runWon/runLost reports only
+    // the time since the resume -- a 9-minute descent that was reloaded once reads as 90 seconds.
+    elapsed: Math.max(0, world.tick - run.startedTick),
     boonBits: run.boonBits,
     boons: run.boons.map(b => ({ id: b.id, stacks: b.stacks })),
     history: cloneHistory(run.roomHistory),
     riteAnswer: run.riteAnswer,
     riteBoonOwed: run.riteBoonOwed,
-    riteDebt: run.riteDebt,
+    // Still OWED, not merely still flagged. enterRoom runs beginRoomFight -- which clears these two
+    // and converts them into a delayed spawn -- BEFORE it emits the roomEnter this snapshot rides
+    // on (rooms.ts). So at capture time the flag is already false and the shade is 150 ticks deep
+    // in spawnQueue, which no checkpoint carries. Reading the flag alone therefore threw away the
+    // whole consequence of refusing the toll: reload in the Hall and Minos came alone, forever.
+    // Restoring the flag re-collects it on re-entry, and re-entry rebuilds the room anyway.
+    riteDebt: run.riteDebt || world.spawnQueue.some(s => s.debt),
     primedBrand: run.primedBrand,
     boundaryRng: run.boundaryRng,
     phase: world.roomPhase,
@@ -161,7 +175,10 @@ export function captureCheckpoint(world: World): RunCheckpoint | null {
     pendingRite: cloneRite(run.pendingRite),
     pendingShop: cloneShop(run.pendingShop),
     pendingMystery: cloneMystery(run.pendingMystery),
-    mysteryHunt: run.mysteryHunt,
+    mysteryHunt: run.mysteryHunt || world.spawnQueue.some(s => s.hunt),
+    // Held on the session rather than the run, because the Smith answers it after the descent ends
+    // -- but a reload built a fresh session and the one-time UNBURIED line was simply never spoken.
+    lastMystery: world.session.lastMystery,
     obols: run.obols,
     rerolls: run.rerolls,
   }
@@ -181,6 +198,12 @@ export function restoreCheckpoint(world: World, snap: RunCheckpoint): boolean {
   const template = templateForSeed(snap.seed)
   const rooms = buildSliceRooms(template, new Rng(snap.seed))
   if (!rooms.some(r => r.id === snap.roomId)) return false
+  // A content update can leave snap.roomId present while moving the doors around it. The rebuilt
+  // rooms are what door traversal and the map overlay actually read, so a changed topology would
+  // walk the player down a route their snapshot never generated -- silently, and only for saves
+  // that crossed the update. Refusing sends them back to the Bardo with the attempt lost, which is
+  // the honest outcome: `map` is the route as it was, and it is either still true or it is not.
+  if (snap.map && routeSignature(mapFromRooms(rooms, template)) !== routeSignature(snap.map)) return false
   world.session.preparedWeapon = snap.weapon
   world.session.run = {
     seed: snap.seed,
@@ -202,7 +225,9 @@ export function restoreCheckpoint(world: World, snap: RunCheckpoint): boolean {
     riteBoonOwed: snap.riteBoonOwed,
     riteDebt: snap.riteDebt,
     result: 'active',
-    startedTick: 0,
+    // Backdated so the attempt's clock continues rather than restarting. world.tick is 0 at boot
+    // and non-zero when a save is imported mid-session, so the offset is computed, not assumed.
+    startedTick: world.tick - snap.elapsed,
     primedBrand: snap.primedBrand,
     killedBy: 'none',
     killedRanged: false,
@@ -213,6 +238,7 @@ export function restoreCheckpoint(world: World, snap: RunCheckpoint): boolean {
   world.boonBits = snap.boonBits
   world.player.hp = snap.hp
   world.player.maxHp = snap.maxHp
+  world.session.lastMystery = snap.lastMystery
   world.player.armed = true
   grantArm(world, snap.weapon)
   installRoute(world, rooms, template)
@@ -229,6 +255,15 @@ export function restoreCheckpoint(world: World, snap: RunCheckpoint): boolean {
   // enterRoom rebuilds the node; keep the door shut if this snapshot was a modal.
   if (snap.pendingReward || snap.pendingRite || snap.pendingShop || snap.pendingMystery) setDoorWalkable(world.arena, false)
   return world.rooms[world.roomIndex]?.id === snap.roomId
+}
+
+/**
+ * Route topology as one comparable string: node order, each node's kind, and every edge in order.
+ * Deliberately not a deep-equal on the objects -- CheckpointMap and RunMap are separate types that
+ * carry the same shape, and only that shape is what "the same route" means here.
+ */
+function routeSignature(map: { nodes: ReadonlyArray<{ id: string; kind: string; edges: ReadonlyArray<{ dir: string; to: string; mark: string }> }> }): string {
+  return map.nodes.map(n => `${n.id}:${n.kind}:${n.edges.map(e => `${e.dir}>${e.to}@${e.mark}`).join(',')}`).join('|')
 }
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
@@ -402,6 +437,13 @@ export function parseCheckpoint(input: unknown): RunCheckpoint | null {
   if (obols === null || obols < 0) return null
   const rerolls = input.rerolls === undefined ? 0 : int(input.rerolls)
   if (rerolls === null || rerolls < 0) return null
+  let lastMystery: MysteryChoice | null = null
+  if (input.lastMystery !== undefined && input.lastMystery !== null) {
+    if (typeof input.lastMystery !== 'string' || !Object.prototype.hasOwnProperty.call(MYSTERY, input.lastMystery)) return null
+    lastMystery = input.lastMystery as MysteryChoice
+  }
+  const elapsed = input.elapsed === undefined ? 0 : int(input.elapsed)
+  if (elapsed === null || elapsed < 0) return null
   return normalizeCheckpoint({
     version: 1,
     seed,
@@ -410,6 +452,7 @@ export function parseCheckpoint(input: unknown): RunCheckpoint | null {
     hp,
     maxHp,
     depth,
+    elapsed,
     boonBits,
     boons,
     history,
@@ -425,6 +468,7 @@ export function parseCheckpoint(input: unknown): RunCheckpoint | null {
     pendingShop,
     pendingMystery,
     mysteryHunt,
+    lastMystery,
     obols,
     rerolls,
   })
@@ -440,6 +484,7 @@ export function normalizeCheckpoint(cp: RunCheckpoint): RunCheckpoint {
     hp: cp.hp,
     maxHp: cp.maxHp,
     depth: cp.depth,
+    elapsed: cp.elapsed,
     boonBits: cp.boonBits,
     boons: cp.boons.map(b => ({ id: b.id, stacks: b.stacks })),
     history: cloneHistory(cp.history),
@@ -461,6 +506,7 @@ export function normalizeCheckpoint(cp: RunCheckpoint): RunCheckpoint {
     pendingShop: cloneShop(cp.pendingShop),
     pendingMystery: cloneMystery(cp.pendingMystery),
     mysteryHunt: cp.mysteryHunt,
+    lastMystery: cp.lastMystery,
     obols: cp.obols,
     rerolls: cp.rerolls,
   }

@@ -1,10 +1,14 @@
 {
   "title": "Bardo Rogue",
   "subtitle": "First Gate: rooms-as-data, a generated route, a town that remembers",
-  "updated": "2026-08-29T11:20:00-04:00",
+  "updated": "2026-08-29T13:30:00-04:00",
   "now": "hall-plate-wine",
   "round": 3,
   "timeline": [
+    {
+      "t": "13:30",
+      "text": "A refused toll still meets you in the Hall after a reload. The Unburied waits for the judge instead of the next fight. The death stele holds its own build line."
+    },
     {
       "t": "11:20",
       "text": "The pause card hides GIVE THE DESCENT BACK during a playtest, as the protocol always said it did. A no-dash bundle now replays as a no-dash run."

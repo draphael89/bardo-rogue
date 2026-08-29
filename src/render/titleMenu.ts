@@ -59,6 +59,18 @@ export function pauseSettingsFocus(canAbandon: boolean): number {
   return canAbandon ? 2 : 1
 }
 
+/**
+ * Focus after the abandon row has appeared or disappeared underneath it.
+ *
+ * The row count is not fixed while the card is open: arming a recording (F2 is reachable while
+ * paused) withdraws the abandon row, and a focus parked on the third row of a three-row card would
+ * then be highlighting a row that no longer exists. Pure and here rather than inside RewardOverlay
+ * because the overlay needs a live Pixi context to construct, so nothing in it can be unit-tested.
+ */
+export function clampPauseFocus(page: PausePage, focus: number, canAbandon: boolean): number {
+  return Math.min(Math.max(0, focus), pauseRows(page, canAbandon) - 1)
+}
+
 export function wrapPauseFocus(page: PausePage, focus: number, delta: -1 | 1, canAbandon: boolean): number {
   const n = pauseRows(page, canAbandon)
   return ((focus + delta) % n + n) % n
@@ -174,12 +186,32 @@ export function deathTakenLine(who: string): string {
   return `${who} TOOK YOU`
 }
 
-/** What you built, spoken as a carrying, not a CARRIED column. */
+/** What you built, spoken as a carrying, not a CARRIED column. The widest form the card may hold. */
 export function deathCarriedLine(names: readonly string[]): string {
   if (names.length === 0) return 'AN UNMARKED BLADE'
   if (names.length === 1) return `YOU CARRIED ${names[0]}`
   if (names.length === 2) return `YOU CARRIED ${names[0]} · ${names[1]}`
   return `YOU CARRIED ${names[0]} · +${names.length - 1}`
+}
+
+/**
+ * The same sentence, progressively shorter, for a card that cannot wrap.
+ *
+ * The death stele draws each row as a single unwrapped, unmasked Text inside 164px, and the widest
+ * forms simply draw past it. Measured against the shipped font: two full vow names is 240px, and
+ * the counted form the three-vow case has always used is 171-173px -- so the counted form was never
+ * a fit either, and trimming only the pair would have swapped a large overflow for a small one.
+ * hud.ts walks this list and stops at the first entry that measures inside the row, which is why
+ * the widths live there and not here: only the renderer knows what the glyphs actually came to.
+ *
+ * The last entry names the vow you built around and drops the count. That is a real loss on a
+ * four-vow death, and the honest one to take while the row is a single unwrapped line.
+ */
+export function deathCarriedLadder(names: readonly string[]): string[] {
+  if (names.length <= 1) return [deathCarriedLine(names)]
+  const counted = `YOU CARRIED ${names[0]} · +${names.length - 1}`
+  const alone = `YOU CARRIED ${names[0]}`
+  return names.length === 2 ? [deathCarriedLine(names), counted, alone] : [counted, alone]
 }
 
 const COUNT_WORD = ['NO', 'ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX'] as const

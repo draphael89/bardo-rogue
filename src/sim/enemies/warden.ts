@@ -161,7 +161,10 @@ export function updateWarden(world: World, e: Enemy): void {
         e.aimAngle = angleToPlayer(world, e)
         e.targetY = distToPlayer(world, e)
         e.hitDone = false
-        world.emit({ type: 'enemyWindup', id: e.id, kind: 'warden', x: e.x, y: e.y })
+        world.emit({
+          type: 'enemyWindup', id: e.id, kind: 'warden', x: e.x, y: e.y,
+          pattern: wardenSentenceOf(e.pattern),
+        })
       }
       break
     }

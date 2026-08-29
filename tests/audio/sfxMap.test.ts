@@ -87,6 +87,19 @@ describe('combat audio authority', () => {
     expect(Math.max(...guarded.map(x => x.opts.gain ?? 1))).toBeLessThan(Math.max(...exposed.map(x => x.opts.gain ?? 1)))
   })
 
+  it('names Minos windups as three sentences', () => {
+    const plays: string[] = []
+    const audio = {
+      play: (name: string) => { plays.push(name) },
+      bell: () => {}, duck: () => {},
+    } as unknown as AudioSystem
+
+    for (const pattern of ['slam', 'ring', 'fan'] as const) {
+      playEventSfx(audio, { type: 'enemyWindup', id: 8, kind: 'warden', pattern, x: 200, y: 90 })
+    }
+    expect(plays).toEqual(['creature', 'laserRetro', 'woosh2'])
+  })
+
   it('gives ring and fan releases no slam thump', () => {
     const thumps: WardenAttackPattern[] = []
     const current = { pattern: 'slam' as WardenAttackPattern }

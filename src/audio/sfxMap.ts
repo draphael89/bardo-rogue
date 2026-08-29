@@ -140,8 +140,16 @@ export function playEventSfx(a: AudioSystem, ev: SimEvent, listener?: Readonly<{
         a.bell(0.72, 2100, 0.3, 'sfx', 0, { ...at, partials: 'tone', glideTo: 3600, strike: 0.25, cap: 'tell' })
         a.play('laserRetro', { ...at, gain: 0.22, pitch: 1.6, lead: true })
       } else if (ev.kind === 'warden') {
-        a.bell(1.35, 196, 0.7, 'sfx', 0, { ...at, partials: 'plate', glideTo: 130, strike: 0.7, cap: 'tell' })
-        a.play('creature', { ...at, gain: 0.4, pitch: 0.5 })
+        if (ev.pattern === 'slam') {
+          a.bell(1.35, 196, 0.7, 'sfx', 0, { ...at, partials: 'plate', glideTo: 130, strike: 0.7, cap: 'tell' })
+          a.play('creature', { ...at, gain: 0.4, pitch: 0.5 })
+        } else if (ev.pattern === 'ring') {
+          a.bell(0.95, 720, 0.4, 'sfx', 0, { ...at, partials: 'tone', glideTo: 1280, strike: 0.28, cap: 'tell' })
+          a.play('laserRetro', { ...at, gain: 0.24, pitch: 1.15, lead: true })
+        } else {
+          a.bell(1.05, 1480, 0.32, 'sfx', 0, { ...at, partials: 'plate', glideTo: 2100, strike: 0.35, cap: 'tell' })
+          a.play('woosh2', { ...at, gain: 0.34, pitch: 1.25, lead: true })
+        }
       } else if (ev.kind === 'oathbound') {
         // Bronze, and rising: a shield being set rather than a body winding up. It shares nothing
         // with the Empusa's bell, because a player who has learned the roster by ear must not get

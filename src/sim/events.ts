@@ -59,6 +59,16 @@ export type EnemyAttackEvent =
   | (EnemyAttackBase & { readonly kind: 'warden'; readonly pattern: WardenAttackPattern })
   | (EnemyAttackBase & { readonly kind: Exclude<EnemyKind, 'warden'>; readonly pattern?: never })
 
+type EnemyWindupBase = {
+  readonly type: 'enemyWindup'
+  readonly id: number
+  readonly x: number; readonly y: number
+}
+
+export type EnemyWindupEvent =
+  | (EnemyWindupBase & { readonly kind: 'warden'; readonly pattern: WardenAttackPattern })
+  | (EnemyWindupBase & { readonly kind: Exclude<EnemyKind, 'warden'>; readonly pattern?: never })
+
 export type SimEvent =
   | { type: 'swing'; x: number; y: number; angle: number; swing: number; heavy: boolean; dash: boolean }
   | HitEvent
@@ -74,7 +84,7 @@ export type SimEvent =
   | { type: 'dodgeEnd'; x: number; y: number }
   | { type: 'dodgeWall'; x: number; y: number; angle: number }
   | { type: 'footstep'; x: number; y: number }
-  | { type: 'enemyWindup'; id: number; kind: EnemyKind; x: number; y: number }
+  | EnemyWindupEvent
   | EnemyAttackEvent
   | { type: 'enemyStagger'; id: number; x: number; y: number }
   | { type: 'enemyWallSlam'; id: number; kind: EnemyKind; x: number; y: number; angle: number; actionId: number }

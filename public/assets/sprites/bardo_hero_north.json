@@ -6,6 +6,24 @@
   "cols": 4,
   "rows": 4,
   "palette": "bardo.canon",
+  "ramp": [
+    "mortar",
+    "purple0",
+    "purple1",
+    "purple2",
+    "purple3",
+    "iron",
+    "ironHi",
+    "slate3",
+    "slateHi",
+    "brick",
+    "cope",
+    "goldDim",
+    "gold",
+    "goldHot",
+    "boneDim",
+    "bone"
+  ],
   "maxColors": 16,
   "facing": "north",
   "mirror": false,
@@ -187,12 +205,33 @@
       }
     }
   },
+  "waivers": [
+    {
+      "gate": "frame:light1Contact:height",
+      "reason": "The overage is the greatsword, not the body: on a vertical-facing sheet the blade extends along the camera axis and reads tall. Trimming the blade to satisfy the cap is the mistake SS11.1 already recorded."
+    },
+    {
+      "gate": "frame:light1Recover:height",
+      "reason": "The overage is the greatsword, not the body: on a vertical-facing sheet the blade extends along the camera axis and reads tall. Trimming the blade to satisfy the cap is the mistake SS11.1 already recorded."
+    },
+    {
+      "gate": "frame:heavyStart:height",
+      "reason": "The overage is the greatsword, not the body: on a vertical-facing sheet the blade extends along the camera axis and reads tall. Trimming the blade to satisfy the cap is the mistake SS11.1 already recorded."
+    },
+    {
+      "gate": "clip:light1:planted-feet",
+      "reason": "Judged per-frame registration: the follow-through reaches toward the camera and its ground contact was hand-placed at row 32 vs 26 for the swing. Canonical registration cannot hold this sheet without clipping art (measured), so the judged pivots stand with this written record."
+    }
+  ],
   "source": {
     "provider": "openai",
     "model": "gpt-image (built-in tool)",
     "approvedSource": "art/approved/bardo_hero_north_alpha_v7.png",
     "promptFile": "art/prompts/bardo_hero_north_alpha_v7.txt",
     "promptHash": "95d338877df0bb6871d43feb60c1f78745bcbfae4ea555652647e7443dd720c9",
+    "referenceHashes": [
+      "7daa50b38c56da473e947f685388cb1cb1bee14760bdbf7404621ecb0ce5867c"
+    ],
     "compiler": "bardo-art/1",
     "sourceFile": "art/approved/bardo_hero_north_alpha_v7.png",
     "sourceHash": "7daa50b38c56da47"

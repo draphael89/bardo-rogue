@@ -6,6 +6,24 @@
   "cols": 4,
   "rows": 4,
   "palette": "bardo.canon",
+  "ramp": [
+    "mortar",
+    "purple0",
+    "purple1",
+    "purple2",
+    "purple3",
+    "iron",
+    "ironHi",
+    "slate3",
+    "slateHi",
+    "brick",
+    "cope",
+    "goldDim",
+    "gold",
+    "goldHot",
+    "boneDim",
+    "bone"
+  ],
   "maxColors": 16,
   "facing": "east",
   "mirror": true,
@@ -14,112 +32,112 @@
       "i": 0,
       "pivot": [
         16,
-        28
+        30
       ]
     },
     "runA": {
       "i": 1,
       "pivot": [
         16,
-        28
+        30
       ]
     },
     "runB": {
       "i": 2,
       "pivot": [
         16,
-        28
+        30
       ]
     },
     "hurt": {
       "i": 3,
       "pivot": [
         16,
-        28
+        30
       ]
     },
     "light1Start": {
       "i": 4,
       "pivot": [
         16,
-        26
+        30
       ]
     },
     "light1Contact": {
       "i": 5,
       "pivot": [
         16,
-        26
+        30
       ]
     },
     "light1Recover": {
       "i": 6,
       "pivot": [
         16,
-        32
+        30
       ]
     },
     "light2Start": {
       "i": 7,
       "pivot": [
         16,
-        26
+        30
       ]
     },
     "light2Contact": {
       "i": 8,
       "pivot": [
         16,
-        25
+        30
       ]
     },
     "light2Recover": {
       "i": 9,
       "pivot": [
         16,
-        25
+        30
       ]
     },
     "heavyStart": {
       "i": 10,
       "pivot": [
         16,
-        25
+        30
       ]
     },
     "heavyContact": {
       "i": 11,
       "pivot": [
         16,
-        25
+        30
       ]
     },
     "dodgeStart": {
       "i": 12,
       "pivot": [
         16,
-        21
+        30
       ]
     },
     "dodgeTravel": {
       "i": 13,
       "pivot": [
         16,
-        14
+        30
       ]
     },
     "dodgeLand": {
       "i": 14,
       "pivot": [
         16,
-        21
+        30
       ]
     },
     "dead": {
       "i": 15,
       "pivot": [
         16,
-        23
+        30
       ]
     }
   },
@@ -187,12 +205,25 @@
       }
     }
   },
+  "waivers": [
+    {
+      "gate": "frame:light1Recover:height",
+      "reason": "The follow-through sweeps the greatsword to its apex; the 29px is blade, not body (body stays under the 26px cap). Trimming the blade to satisfy the cap is the mistake SS11.1 already recorded."
+    },
+    {
+      "gate": "frame:heavyContact:light-direction",
+      "reason": "The heavy smash drives the blade down-forward and its specular runs along the downswept cutting edge - correct steel behaviour that a vertical form-gradient reads as bright-south. The body forms are north-lit."
+    }
+  ],
   "source": {
     "provider": "openai",
     "model": "gpt-image (built-in tool)",
     "approvedSource": "art/approved/bardo_hero_alpha_v1.png",
     "promptFile": "art/prompts/bardo_hero_alpha_v1.txt",
     "promptHash": "b8c0ca894e710f079777f9348024f1c91d5980e98989cc722baea2fcc0f2820b",
+    "referenceHashes": [
+      "e944d3ec167bdf07e7e316b5ffa04c2235bece8dd7fde294a1b97d90870938ba"
+    ],
     "compiler": "bardo-art/1",
     "sourceFile": "art/approved/bardo_hero_alpha_v1.png",
     "sourceHash": "e944d3ec167bdf07"

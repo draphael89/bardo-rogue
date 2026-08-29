@@ -238,6 +238,14 @@ The current arena places braziers at `(0,7)` and `(25,7)` — inside the left an
 
 **Decision: the hero and all humanoid enemies are authored on a 32 × 32 canvas, with visible art at most 26 px tall, feet anchored at row 30, leaving 2 px of contact-shadow room.**
 
+Canvas ladder: 24 small, 32 humanoid, **48 large (compact motion), 64 large (tall motion envelope)**,
+96/128 boss. The 64 step exists because a measured motion envelope decides the canvas, not standing
+height alone: the Brute's committed wind-up raises the maul well above his idle silhouette, and
+holding both a ~36 px body and that apex at ONE scale needs 64. A frame's canonical anchor scales
+with the canvas (feet at row 30 of 32, row 60 of 64). The 26 px cap governs the standing BODY of a
+32-canvas humanoid; a weapon apex may exceed it only through a declared per-frame waiver naming the
+gate and the reason — trimming the blade to satisfy the cap is the exact mistake §11.1 records.
+
 Reasons:
 - 16 px characters cannot carry the bar. In the round-11 capture the hero is a smudge at 6 % of frame height and loses to every prop in the room.
 - 32 px is **already proven in this pipeline**: `bardo_props.png` ships 32 × 32 sprites through the same atlas and sort path.

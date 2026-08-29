@@ -21,7 +21,7 @@ import { Recorder } from '@/input/recorder'
 import { tuning } from '@/tuning'
 import { Text } from 'pixi.js'
 import { defaultMetaState, type MetaStateV1 } from '@/sim/session'
-import { bumpRevision, defaultSave, serializeSave, parseSave, type BardoSave } from '@/sim/save'
+import { bumpRevision, defaultSave, serializeSave, parseSave, CONTENT_REVISION, type BardoSave } from '@/sim/save'
 import { detectPlatform, PROFILE_ID } from '@/platform'
 import { loadSave, saveFilename } from '@/platform/saveFile'
 
@@ -33,6 +33,16 @@ async function boot() {
   const debug = q.get('debug') === '1'
   const mute = q.get('mute') === '1'
   const botName = q.get('bot') as BotName | null
+  // `?playtest=<condition>` arms a playtest session: the whole session records itself from tick 0,
+  // the named verb condition filters LIVE input only (bots and replays bypass it, and the filtered
+  // frames are what gets recorded, so an exported bundle replays exactly as the tester played), and
+  // F4 downloads the session bundle. Conditions and protocol: PLAYTEST.md.
+  const PLAYTEST_CONDITIONS = ['baseline', 'no-heavy', 'no-dash'] as const
+  type PlaytestCondition = typeof PLAYTEST_CONDITIONS[number]
+  const playtestRaw = q.get('playtest')
+  const playtest: PlaytestCondition | null =
+    playtestRaw && (PLAYTEST_CONDITIONS as readonly string[]).includes(playtestRaw) ? playtestRaw as PlaytestCondition : null
+  if (playtestRaw && !playtest) console.log(`[playtest] unknown condition "${playtestRaw}"; expected ${PLAYTEST_CONDITIONS.join(' | ')}`)
 
   // Widen the render target to the window's aspect before anything reads it, so the room is not
   // letterboxed into the middle third of a wide monitor. HEIGHT NEVER CHANGES: sprite scale, the
@@ -185,6 +195,18 @@ async function boot() {
     })
   }
 
+  // The A/B verb conditions, applied to live device input only. no-heavy removes the independent
+  // heavy verb (the chain's committed third swing is untouched, which IS the pre-verb behaviour).
+  // no-dash drops attack intent while the body is rolling, so the dodge-to-attack cancel never sees
+  // a press; a swing after the roll needs a fresh press on landing.
+  const filterVerbs = (f: InputFrame): InputFrame => {
+    if (playtest === 'no-heavy' && f.heavy) return { ...f, heavy: false }
+    if (playtest === 'no-dash' && world.player.state === 'dodge' && (f.attack || f.attackHeld || f.heavy)) {
+      return { ...f, attack: false, attackHeld: false, heavy: false }
+    }
+    return f
+  }
+
   const tick = () => {
     // The Start press that confirms a death/victory return is consumed by THIS tick — and by the
     // time render() runs, canReturn is already false again. Latch the pre-tick state so the pause
@@ -199,7 +221,7 @@ async function boot() {
     if (replayFrames) {
       frame = replayFrames[replayIdx++]
       if (replayIdx >= replayFrames.length) { replayFrames = null; console.log('[replay] finished; back to live input') }
-    } else frame = quantizeFrame(bot ? bot(world) : live)
+    } else frame = quantizeFrame(bot ? bot(world) : filterVerbs(live))
     recorder.capture(frame)
     stepWorld(world, frame)
     metrics.consume(world, world.events)
@@ -470,6 +492,44 @@ async function boot() {
     } finally { importing = false }
   }
 
+  // Arm the playtest session: record from tick zero (the world is fresh here, so no reset is
+  // needed), and keep the meta snapshot the recorder was handed — the exported bundle must carry
+  // the exact counters the run seed was derived from, not the ones the session has mutated since.
+  let playtestMeta: MetaStateV1 | undefined
+  if (playtest && !botName) {
+    playtestMeta = cur.scenario === 'loop'
+      ? { ...world.session.meta, unlockedWeapons: [...world.session.meta.unlockedWeapons] }
+      : undefined
+    recorder.start(cur.seed, cur.scenario, cur.god, playtestMeta)
+    console.log(`[playtest] session armed: condition "${playtest}", recording from tick 0 — F4 exports the bundle`)
+  }
+  const exportPlaytestBundle = () => {
+    if (!recorder.recording) { presenter.hud.showBanner('NOTHING RECORDING', 'reload to arm the playtest', 2.2); return }
+    // A snapshot, not a stop: the session keeps recording so a tester can export after every run.
+    const snapshot: Replay = { v: 1, seed: cur.seed, scenario: cur.scenario, frames: [...recorder.frames] }
+    if (cur.god) snapshot.god = true
+    if (playtestMeta) snapshot.meta = playtestMeta
+    // The bundle IS a valid encoded replay with one extra key, so `pnpm sim -- --replay bundle.json`
+    // replays it with no unwrapping. The condition rides along for the analyst, not the decoder.
+    const bundle = {
+      ...JSON.parse(replayToJson(snapshot)) as Record<string, unknown>,
+      playtest: {
+        condition: playtest,
+        build: CONTENT_REVISION,
+        exportedAt: new Date().toISOString(),
+        attempts: world.session.meta.attempts,
+        victories: world.session.meta.victories,
+        metrics: metrics.summary(),
+      },
+    }
+    const name = `bundle-${playtest}-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.json`
+    const href = URL.createObjectURL(new Blob([JSON.stringify(bundle)], { type: 'application/json' }))
+    const a = document.createElement('a')
+    a.href = href; a.download = name; a.click()
+    setTimeout(() => URL.revokeObjectURL(href), 1000)
+    presenter.hud.showBanner('BUNDLE EXPORTED', 'send the download to the organizer', 2.4)
+  }
+
   // The title is held over the living hub: the simulation is stopped but the loop keeps rendering,
   // so the room the player is about to stand in gutters and drifts behind its own name. A run driven
   // by a bot or a replay skips it - those are measurements, not first impressions.
@@ -552,6 +612,7 @@ async function boot() {
     if (e.code === 'F1') { e.preventDefault(); overlay.toggle() }
     if (e.code === 'F2') { e.preventDefault(); record() }
     if (e.code === 'F3') { e.preventDefault(); if (recorder.recording) stopRecord(); recorder.download() }
+    if (e.code === 'F4' && playtest && !e.repeat) { e.preventDefault(); exportPlaytestBundle() }
     // Save management is reachable only from the pause screen, so it can never fire mid-fight.
     if (userPaused && !importing && e.code === 'KeyE' && !e.repeat) { e.preventDefault(); void exportSave() }
     if (userPaused && !importing && e.code === 'KeyI' && !e.repeat) { e.preventDefault(); void importSave() }

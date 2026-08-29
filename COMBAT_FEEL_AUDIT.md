@@ -1,5 +1,10 @@
 # Combat, Controls & Game-Feel Deep Audit
 
+> **Read first.** This file is a 2026-08-27 **system-gap** audit (76) plus a 2026-08-28
+> **implementation closeout** (95). The 95 scores whether listed systems were built, not how
+> combat feels to play. The independent player-first audit is
+> [`COMBAT_QUALITY_AUDIT.md`](COMBAT_QUALITY_AUDIT.md) — **68/100**, 2026-08-29.
+
 ## Implementation closeout — 2026-08-28
 
 **Final implementation score:** **95/100**

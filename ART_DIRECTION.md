@@ -14,10 +14,11 @@ Do not relitigate these. Build to them.
 
 | Constraint | Value | Why it is fixed |
 |---|---|---|
-| Internal render target | 480 × 270 | Integer-upscales perfectly to 1080p (4×) and 1440p. It is Hyper Light Drifter's exact resolution. Measured clean today. |
-| World grid | 16 px per tile | The sim, collision, and every shipped tile assume it. |
-| Lineage | Elevated pixel art (Gungeon / HLD) | Not Hades' HD painted rendering. We study Hades for light, mass, and composition, never for its brushwork. |
-| Character canvas | 32 × 32 (see §4.1) | Decided here. Most expensive decision to reverse. |
+| Internal render target | 640 × 360 | Integer-upscales to 1080p (3×) and 1440p (4×). Superseded 480 × 270 by ADR 0002 (2026-08-29): the concept bar's detail is unreachable at the old density, and the asset ledger was measured near-greenfield. |
+| Sim grid | 16 units per tile | The sim, collision, and every tuning number assume it. Unchanged by ADR 0002 — presentation never rewrites the sim. |
+| Art grid | 24 px per tile | The world renders onto the target at a 1.5× world-render scale, so tile art carries 24 px per 16-unit tile. |
+| Lineage | Elevated pixel art (Blasphemous density, Gungeon/HLD discipline) | Not Hades' HD painted rendering. We study Hades for light, mass, and composition, never for its brushwork. |
+| Character canvas | 64 × 64 hero (see §4.1) | Re-decided by ADR 0002 with the whole ladder at 1.5×. |
 | Damage rule | No untelegraphed damage | The telegraph is a visual budget, not a gameplay footnote. See §6.7. |
 
 **Build to the renderer we have.** The stack already gives you: a baked 1× room texture (`tilemap.ts` renders the whole floor into one `RenderTexture`), arbitrary 1× vector overlays baked into that same texture, a multiplied lightmap with tinted additive sources (`light.ts`), additive atmosphere sprites, and a colour grade. Everything in this document is reachable with those. Nothing here asks for a new renderer.
@@ -94,6 +95,9 @@ Value, not hue, is the load-bearing axis. Every colour belongs to a band. Bands 
 | `ember` | `#FF7A18` | B3 | Flame body. |
 | `emberHi` | `#FFCC56` | B5 | Flame core. |
 | `emberLo` | `#B03010` | B2 | Flame shadow, scorch. |
+| `numenDim` | `#1A4A48` | B1 | Numinous shadow. Bardo only (§1.3.6). |
+| `numen` | `#2E8A80` | B3 | Numinous body — the star pool, a Seal's live edge, the Ferryman's lantern glass. |
+| `numenHi` | `#7FE8D8` | B5 | Numinous core. 1–2 px. |
 
 **Cloth / organic**
 
@@ -123,6 +127,9 @@ Value, not hue, is the load-bearing axis. Every colour belongs to a band. Bands 
 3. **Every asset spans at least 3 bands.** An asset entirely inside one band has no form.
 4. **No pure black, no pure white.** Ever. `#08070E` and `#ECF0F6` are the ends.
 5. **Fractional alpha is not a colour.** See §2.1.
+6. **The numen ramp marks the numinous, nothing else.** It appears only in the Bardo, only on what
+   touches the beyond (the star pool, Seals, the Ferryman's lantern), at B4/B5 small-area budgets.
+   It is forbidden inside Duat and Mictlan rooms, whose realm hues own that range (§9.1, §9.3).
 
 ---
 
@@ -234,29 +241,42 @@ The current arena places braziers at `(0,7)` and `(25,7)` — inside the left an
 
 ## §4. Silhouette language
 
-### 4.1 Character canvas: 32 × 32 — DECISION
+### 4.1 Character canvas: the 1.5× ladder — DECISION (revised by ADR 0002)
 
-**Decision: the hero and all humanoid enemies are authored on a 32 × 32 canvas, with visible art at most 26 px tall, feet anchored at row 30, leaving 2 px of contact-shadow room.**
+**Decision: the hero is authored on a 64 × 64 canvas with a visible standing body of at most 40 px,
+feet anchored at row 60, leaving 4 px of contact-shadow room. Humanoid enemies author on 48 × 64
+(compact motion) or 64 × 64 (tall motion envelope). The body is authored unarmed-first, with the
+sword a separate paired state — an unarmed idle always exists, so the baked-sword fallback bug can
+never recur.**
 
-Canvas ladder: 24 small, 32 humanoid, **48 large (compact motion), 64 large (tall motion envelope)**,
-96/128 boss. The 64 step exists because a measured motion envelope decides the canvas, not standing
-height alone: the Brute's committed wind-up raises the maul well above his idle silhouette, and
-holding both a ~36 px body and that apex at ONE scale needs 64. A frame's canonical anchor scales
-with the canvas (feet at row 30 of 32, row 60 of 64). The 26 px cap governs the standing BODY of a
-32-canvas humanoid; a weapon apex may exceed it only through a declared per-frame waiver naming the
-gate and the reason — trimming the blade to satisfy the cap is the exact mistake §11.1 records.
+Canvas ladder (each step 1.5× the original): 36 small, 48 humanoid (compact motion), **64
+humanoid/large (tall motion envelope)**, 96 large, 144/192 boss. A measured motion envelope decides
+the canvas, not standing height alone: the Brute's committed wind-up raises the maul well above his
+idle silhouette, and the hero's cape and greatsword arcs are the same lesson — which is why the hero
+takes 64 outright. A frame's canonical anchor scales with the canvas (feet at row 45 of 48, row 60
+of 64). The 40 px cap governs the standing BODY; a weapon apex may exceed it only through a declared
+per-frame waiver naming the gate and the reason — trimming the blade to satisfy the cap is the exact
+mistake §11.1 records.
 
 Reasons:
-- 16 px characters cannot carry the bar. In the round-11 capture the hero is a smudge at 6 % of frame height and loses to every prop in the room.
-- 32 px is **already proven in this pipeline**: `bardo_props.png` ships 32 × 32 sprites through the same atlas and sort path.
-- 32 is exactly 2 tiles, so authoring aligns to the 16 px grid. It is a power of two, so atlas maths stays trivial.
-- A ~24 px visible body reads as 1.5 tiles, which is the Gungeon proportion.
-- The 6–8 px of headroom holds helm crests, weapon arcs, hair, horns, and squash without a second atlas.
-- **It costs the sim nothing.** Collision stays at radius 5, the feet anchor and feet-Y sort already exist, and the sprite simply overhangs its collider — exactly as the 32 px props already do.
+- The concept bar's detail (cape sigil, armor step, blade edge) lives between 26 px and 39 px. A
+  ~39–40 px body at 640 × 360 occupies the same fraction of the frame as 26 px did at 480 × 270 —
+  the reference images' figure-to-world ratio is preserved; only the grain gets finer.
+- A ~36 px visible body reads as 1.5 tiles of 24 px art — the Gungeon proportion, unchanged.
+- 64 is a power of two and 48 art-px is exactly 2 tiles, so atlas maths and grid alignment stay
+  trivial.
+- The headroom holds helm crests, weapon arcs, cape flow, and squash without a second atlas.
+- **It costs the sim nothing.** Collision radii, feet anchors, and feet-Y sort are sim-side and
+  unchanged; the sprite overhangs its collider exactly as before.
 
-**This is the most expensive decision in this document to reverse.** Once a frame set is authored at 32, every animation, every atlas cell, and every hand-placed pivot is sized to it. Change it before the first character sheet, or never.
+**This decision was reversed once, knowingly, by ADR 0002 — at the last moment it was cheap** (the
+hero regenerating, the Bardo new, combat actors still placeholders). Once this frame set is authored
+at the 1.5× ladder, every animation, atlas cell, and hand-placed pivot is sized to it, and the next
+reversal costs the whole catalogue. Do not relitigate it per-asset.
 
-Other canvases: small/flying enemy **24 × 24**. Large enemy or miniboss **48 × 48**. Boss **96 × 96** or **128 × 128**. Floor decal prop **16 × 16**. Prop with mass **32 × 32**. Wide furniture **48 × 32**.
+Other canvases: small/flying enemy **36 × 36**. Large enemy or miniboss **72 × 72** (96 for a tall
+envelope). Boss **144 × 144** or **192 × 192**. Floor decal prop **24 × 24**. Prop with mass
+**48 × 48**. Wide furniture **72 × 48**.
 
 ### 4.2 The black test
 
@@ -277,7 +297,7 @@ Fill the sprite with solid black at 1× and place it on mid grey. If you cannot 
 ### 5.1 The focal-object rule
 
 **One memorable object per room.** It is:
-- **Off-centre.** On the 26 × 15 grid, its centre lands near col 9 or col 17, and near row 6 or row 10. **Never at col 13, row 7–8.**
+- **Off-centre.** On the 26 × 15 combat grid, its centre lands near col 9 or col 17, and near row 6 or row 10. **Never at col 13, row 7–8.** (Bardo islands apply this per island — §8.4.)
 - **Large.** At least 3 × 3 tiles.
 - **Massed.** It occludes things behind it and casts a shadow. A floor decal is not a focal object. *A flat plate with a graphic circle on it is a floor decal.*
 - **Lit.** It gets the key (§3.2).
@@ -306,9 +326,9 @@ Concretely, the floor has all three:
 
 ## §6. FX and particles
 
-Everything is authored and composited at 480 × 270, before the upscale. Nothing is authored at output resolution.
+Everything is authored and composited at 640 × 360, before the upscale. Nothing is authored at output resolution.
 
-1. **Integer pixels.** Particles snap to integer positions at 480 × 270. Rotation quantizes to 8 or 16 steps. A freely rotating soft sprite is the loudest "not pixel art" tell there is.
+1. **Integer pixels.** Particles snap to integer positions at 640 × 360. Rotation quantizes to 8 or 16 steps. A freely rotating soft sprite is the loudest "not pixel art" tell there is.
 2. **No visible soft gradient.** A gradient may live in the multiplied lightmap. It may never appear as an additive blob over the scene. If you can see the falloff ring, it is wrong. The current door glow and motes ride soft 64 px circles at alpha 0.55 and are on the edge of this rule.
 3. **Sparks:** 1×1 or 1×2 px, B5, at most 3 hues, straight travel, hard cut, no tail longer than 4 frames. Sparks never scale.
 4. **Blood and ichor:** chunky. 2×2 and 3×2 blobs, 3 values, hard dark rim on the ground decal. Decals persist, darken by one band, then stop.
@@ -320,13 +340,13 @@ Everything is authored and composited at 480 × 270, before the upscale. Nothing
    - **STRIKE**, 1–5 ticks. The hit. The brightest pixels in the frame.
 
    **Hue reservation.** Hostile telegraphs use the realm's reserved hostile hue (§9). Player and friendly telegraphs use `gold` → `goldHot`. No static asset in a realm may fill more than 16 contiguous pixels with that realm's hostile hue.
-8. **Known violation to fix.** `postfx.ts` applies the chromatic aberration filter to the **upscaled** quad with an offset in output pixels. At 4× upscale a 2 px offset is a half-world-pixel colour fringe — soft-res gloss over hard pixels, in violation of §6.1. Quantize the offset to a multiple of the upscale factor, or move the filter before the upscale. The grade filter is fine: it is a per-pixel op with no resampling.
+8. **Known violation to fix.** `postfx.ts` applies the chromatic aberration filter to the **upscaled** quad with an offset in output pixels. At a 3× upscale a 2 px offset is a fractional-world-pixel colour fringe — soft-res gloss over hard pixels, in violation of §6.1. Quantize the offset to a multiple of the upscale factor, or move the filter before the upscale. The grade filter is fine: it is a per-pixel op with no resampling.
 
 ---
 
 ## §7. UI and type
 
-1. **The HUD lives in the outer 24 px band** of the 480 × 270 frame and never overlaps playable floor.
+1. **The HUD lives in the outer 36 px band** of the 640 × 360 frame and never overlaps playable floor.
 2. **One bitmap font.** 5×7 caps and lowercase with 1 px descenders, 1 px letterspacing, 8 px line height. **No anti-aliasing. No sub-pixel positions.** A second display face at 8×10 is used only for room names and deity names.
 3. **Text colour:** `bone #D0C0A8` on a void panel, or `gold #D4B060` for emphasis. **Never pure white** — it competes with the light hierarchy.
 4. **Panels:** 1 px `goldDim` border, 1 px `void` inner shadow, `#12141C` fill at 82 % alpha. Corners are authored 3×3 pieces, not a rounded rect primitive.
@@ -344,6 +364,11 @@ The game already has a motif nobody wrote down. Here it is, canonized.
 
 **Every space floats.** Rooms sit in `void #08070E` with sparse stars. No room ever touches the frame's edge — there is always void beyond the wall. This is the strongest identity asset the project owns. It is never dropped, in any realm, for any reason.
 
+Under the follow camera (ADR 0001) this rule is restated as a footprint cap: **no island or room
+mass exceeds ~20 × 10 tiles**, so wherever the camera rests, void shows. And the rule extends past
+the render target: the letterbox outside the game frame is painted with the same starfield void —
+void to the glass, one black, never two.
+
 **Ambient is always indigo `#1E1C38`.** Warm light is always an intrusion into it.
 
 ### 8.2 What threshold imagery always contains
@@ -359,6 +384,26 @@ Every room, transition, and set piece contains all five:
 ### 8.3 Forbidden in bardo framing
 
 Clocks. Hourglasses. Literal scales of justice outside Duat. Mist used as the answer to everything. Ghost-sheet apparitions. "Limbo grey" — the bardo is indigo and gold, not desaturated nothing.
+
+### 8.4 The Bardo district
+
+The hub is one continuous room of floating islands (ADR 0001) and belongs to no pantheon.
+
+1. **A pilgrimage line.** The arrival causeway (south, battlefield relics) rises north through the
+   Forge and Shrine islands to the Gate plaza. The axis gives the title screen its vista and the
+   player a destination; side islands hang off it.
+2. **Pantheon-neutral dressing.** No Greek keys, runes, ankhs, or stepped glyphs in permanent hub
+   dressing. The Gate is neutral stone; only its marks, banners, and light take the destination
+   realm's accent.
+3. **Seals foreshadow the waiting pantheons.** Each sealed place carries a visibly foreign
+   silhouette — knotwork in shadow on the chained bridge's arch, an obelisk profile on the dead
+   tower, a stepped mass drifting unreachable beyond the walkable edge. Silhouette only; legible
+   iconography would violate rule 2.
+4. **Inhabitants are silent presences** — the Smith, the unnamed Ferryman, the Keeper. Approached
+   and read, never talked at. The Ferryman is never called Charon (`CONTEXT.md`).
+5. **The numen ramp lives here** (§1.3.6) and nowhere else.
+6. **Each island is a framed composition.** Islands obey the §8.1 footprint cap and the §5 rules
+   individually: own focal object, own negative space, own light pool.
 
 ---
 
@@ -548,7 +593,7 @@ These are proven losing moves. A frame containing one of them fails review befor
 10. Anti-aliased or fractional-alpha primitives baked at 1×. (§2.1 Law 5)
 11. Soft radial gradients visible over the scene. (§6.2)
 12. Freely rotating soft particles. (§6.1)
-13. Sub-pixel or non-integer sprite positions at 480 × 270. (§6.1)
+13. Sub-pixel or non-integer sprite positions at 640 × 360. (§6.1)
 14. Pure black or pure white pixels. (§1.3.4)
 
 **Composition and light**

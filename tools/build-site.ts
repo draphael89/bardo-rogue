@@ -1,11 +1,15 @@
 /**
  * Build the PlayBardo.com landing page: site/src + site/art-src -> site/dist.
  *
- * - Key art: AVIF + WebP at 4 widths, content-hashed filenames (immutable caching).
- * - `<!-- @art ... -->` / `<!-- @artpreload ... -->` directives in index.html expand
- *   to full <picture>/<link rel=preload> markup so srcsets are generated, not hand-typed.
- * - Fonts copied from @fontsource packages, hashed; CSS/JS hashed last.
- * - Fails if any un-rewritten art/font/asset reference survives into dist.
+ * Two asset classes:
+ *   SCENES — full-bleed paintings. AVIF + WebP at 4 widths, no alpha.
+ *   UI     — small authored marks with transparency (emblem, seal, journey glyphs).
+ *            AVIF + WebP at 1x/2x of their declared display width, alpha preserved.
+ *
+ * `<!-- @art ... -->` / `<!-- @artpreload ... -->` directives in index.html expand to full
+ * <picture>/<link rel=preload> markup, so srcsets and intrinsic sizes are generated, not hand-typed.
+ * Fonts are copied from @fontsource and hashed; CSS/JS hashed last.
+ * The build fails if any un-rewritten art/font/asset reference survives into dist.
  */
 import { createHash } from 'node:crypto'
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
@@ -17,20 +21,31 @@ const SRC = path.join(ROOT, 'site/src')
 const ART = path.join(ROOT, 'site/art-src')
 const DIST = path.join(ROOT, 'site/dist')
 
-const WIDTHS = [640, 960, 1280, 1672]
-const NATIVE = { width: 1672, height: 941 }
+const SCENE_WIDTHS = [640, 960, 1280, 1672]
 
-/** slug -> source file in site/art-src */
-const IMAGES: Record<string, string> = {
+/** Full-bleed paintings: slug -> source file. */
+const SCENES: Record<string, string> = {
   hero: 'playbardo-hero-inspiration-01.png',
   death: 'playbardo-concept-02-death-is-the-door.png',
   trial: 'playbardo-concept-03-the-trial.png',
   offering: 'playbardo-concept-04-the-offering.png',
   town: 'playbardo-concept-05-town-between-worlds.png',
-  duat: 'playbardo-concept-06-duat-weighing-floor.png',
-  niflheim: 'playbardo-concept-07-niflheim-rime-court.png',
-  mictlan: 'playbardo-concept-08-mictlan-wind-of-knives.png',
+  duat: 'playbardo-underworld-duat.png',
+  niflheim: 'playbardo-underworld-niflheim.png',
+  mictlan: 'playbardo-underworld-mictlan.png',
   rebirth: 'playbardo-concept-09-rebirth.png',
+}
+
+/** Small authored marks with alpha. `display` is the CSS width they render at (1x). */
+const UI: Record<string, { file: string; display: number }> = {
+  logotype: { file: 'playbardo-logotype.png', display: 460 },
+  emblem: { file: 'playbardo-emblem.png', display: 96 },
+  seal: { file: 'playbardo-seal.png', display: 44 },
+  'glyph-fight': { file: 'playbardo-glyph-fight.png', display: 34 },
+  'glyph-boon': { file: 'playbardo-glyph-boon.png', display: 34 },
+  'glyph-descend': { file: 'playbardo-glyph-descend.png', display: 34 },
+  'glyph-die': { file: 'playbardo-glyph-die.png', display: 34 },
+  'glyph-return': { file: 'playbardo-glyph-return.png', display: 34 },
 }
 
 const FONTS = [
@@ -47,31 +62,40 @@ rmSync(DIST, { recursive: true, force: true })
 for (const d of ['img', 'fonts', 'assets']) mkdirSync(path.join(DIST, d), { recursive: true })
 
 // ---- images -----------------------------------------------------------------
-type ImgEntry = { hash: string; files: Map<string, number> } // "640.avif" -> bytes
-const built = new Map<string, ImgEntry>()
+type Entry = { hash: string; widths: number[]; nw: number; nh: number; bytes: Map<string, number> }
+const built = new Map<string, Entry>()
 
-for (const [slug, file] of Object.entries(IMAGES)) {
+const emit = async (slug: string, file: string, widths: number[]) => {
   const srcPath = path.join(ART, file)
   if (!existsSync(srcPath)) throw new Error(`missing art source: ${srcPath}`)
   const buf = readFileSync(srcPath)
-  const hash = shortHash(buf)
-  const entry: ImgEntry = { hash, files: new Map() }
+  const meta = await sharp(buf).metadata()
+  const nw = meta.width ?? 0
+  const nh = meta.height ?? 0
+  if (!nw || !nh) throw new Error(`unreadable image: ${srcPath}`)
+
+  // never upscale past the master
+  const use = [...new Set(widths.map((w) => Math.min(w, nw)))].sort((a, b) => a - b)
+  const entry: Entry = { hash: shortHash(buf), widths: use, nw, nh, bytes: new Map() }
   built.set(slug, entry)
-  for (const w of WIDTHS) {
+
+  for (const w of use) {
     const base = sharp(buf).resize({ width: w, kernel: 'lanczos3' })
     for (const [ext, pipe] of [
       ['avif', base.clone().avif({ quality: 52, effort: 4 })],
-      ['webp', base.clone().webp({ quality: 80 })],
+      ['webp', base.clone().webp({ quality: 82 })],
     ] as const) {
-      const out = path.join(DIST, 'img', `${slug}.${hash}-${w}.${ext}`)
-      const info = await pipe.toFile(out)
-      entry.files.set(`${w}.${ext}`, info.size)
+      const info = await pipe.toFile(path.join(DIST, 'img', `${slug}.${entry.hash}-${w}.${ext}`))
+      entry.bytes.set(`${w}.${ext}`, info.size)
     }
   }
 }
 
+for (const [slug, file] of Object.entries(SCENES)) await emit(slug, file, SCENE_WIDTHS)
+for (const [slug, { file, display }] of Object.entries(UI)) await emit(slug, file, [display, display * 2])
+
 // Open Graph card: 1200x630 center-weighted crop of the hero.
-const ogBuf = await sharp(path.join(ART, IMAGES.hero))
+const ogBuf = await sharp(path.join(ART, SCENES.hero))
   .resize({ width: 1200, height: 630, fit: 'cover', position: 'attention' })
   .jpeg({ quality: 82 })
   .toBuffer()
@@ -87,23 +111,26 @@ for (const size of [32, 180, 512]) {
 }
 
 // ---- fonts ------------------------------------------------------------------
-const fontMap = new Map<string, string>() // plain name -> hashed name
+const fontMap = new Map<string, string>()
 for (const rel of FONTS) {
-  const p = path.join(ROOT, 'node_modules', rel)
-  const buf = readFileSync(p)
+  const buf = readFileSync(path.join(ROOT, 'node_modules', rel))
   const plain = path.basename(rel)
   const hashed = plain.replace('.woff2', `.${shortHash(buf)}.woff2`)
   writeFileSync(path.join(DIST, 'fonts', hashed), buf)
   fontMap.set(plain, hashed)
 }
 
-// ---- helpers for reference rewriting ---------------------------------------
-const imgUrl = (slug: string, w: number, ext: string) => {
+// ---- reference rewriting ----------------------------------------------------
+const entryOf = (slug: string) => {
   const e = built.get(slug)
   if (!e) throw new Error(`unknown art slug: ${slug}`)
-  return `img/${slug}.${e.hash}-${w}.${ext}`
+  return e
 }
-const srcset = (slug: string, ext: string) => WIDTHS.map((w) => `${imgUrl(slug, w, ext)} ${w}w`).join(', ')
+const imgUrl = (slug: string, w: number, ext: string) => `img/${slug}.${entryOf(slug).hash}-${w}.${ext}`
+const srcset = (slug: string, ext: string) =>
+  entryOf(slug)
+    .widths.map((w) => `${imgUrl(slug, w, ext)} ${w}w`)
+    .join(', ')
 
 const parseDirective = (attrs: string) => {
   const out: Record<string, string> = {}
@@ -115,6 +142,9 @@ const parseDirective = (attrs: string) => {
 // ---- CSS / JS ---------------------------------------------------------------
 let css = readFileSync(path.join(SRC, 'styles.css'), 'utf8')
 for (const [plain, hashed] of fontMap) css = css.replaceAll(`fonts/${plain}`, `fonts/${hashed}`)
+// let CSS reference the underworld art's true aspect so panels never crop it
+const duat = entryOf('duat')
+css = css.replaceAll('/*@panel-aspect*/', `${duat.nw} / ${duat.nh}`)
 const cssName = `styles.${shortHash(css)}.css`
 writeFileSync(path.join(DIST, 'assets', cssName), css)
 
@@ -132,12 +162,14 @@ html = html.replace(/<!--\s*@artpreload\s+([^>]*?)-->/g, (_, attrs: string) => {
 
 html = html.replace(/<!--\s*@art\s+([^>]*?)-->/g, (_, attrs: string) => {
   const a = parseDirective(attrs)
+  const e = entryOf(a.slug)
   const eager = 'eager' in a
+  const fallbackW = e.widths[e.widths.length - 1]
   const img = [
-    `<img src="${imgUrl(a.slug, 1280, 'webp')}"`,
+    `<img src="${imgUrl(a.slug, fallbackW, 'webp')}"`,
     `srcset="${srcset(a.slug, 'webp')}"`,
     `sizes="${a.sizes}"`,
-    `width="${NATIVE.width}" height="${NATIVE.height}"`,
+    `width="${e.nw}" height="${e.nh}"`,
     `alt="${a.alt ?? ''}"`,
     a.class ? `class="${a.class}"` : '',
     eager ? 'loading="eager" fetchpriority="high"' : 'loading="lazy"',
@@ -156,10 +188,12 @@ writeFileSync(path.join(DIST, 'index.html'), html)
 
 cpSync(path.join(SRC, '_headers'), path.join(DIST, '_headers'))
 
-// ---- gate: no un-rewritten references, sane sizes ---------------------------
+// ---- gates ------------------------------------------------------------------
 const leftovers = [...html.matchAll(/(?:art\/|@art|@artpreload|assets\/styles\.css|assets\/main\.js)/g)]
 if (leftovers.length) throw new Error(`unrewritten references in index.html: ${leftovers.map((m) => m[0]).join(', ')}`)
 if (/fonts\/(?:cinzel|inter)-latin-\d+-normal\.woff2/.test(css)) throw new Error('unrewritten font reference in styles.css')
+if (css.includes('/*@panel-aspect*/')) throw new Error('unrewritten panel-aspect token in styles.css')
+if (/CAPTURE PENDING|GALLERY_SLOT/.test(html)) throw new Error('placeholder gallery markup is still present')
 
 let total = 0
 const walk = (dir: string): void =>
@@ -169,10 +203,18 @@ const walk = (dir: string): void =>
   })
 walk(DIST)
 
-const heroAvif1672 = built.get('hero')!.files.get('1672.avif')!
 console.log(`site/dist: ${kb(total)} total`)
-for (const [slug, e] of built) {
-  console.log(`  ${slug.padEnd(9)} avif ${WIDTHS.map((w) => kb(e.files.get(`${w}.avif`)!)).join(' / ')}`)
+for (const slug of Object.keys(SCENES)) {
+  const e = entryOf(slug)
+  console.log(`  ${slug.padEnd(9)} ${e.nw}x${e.nh}  avif ${e.widths.map((w) => kb(e.bytes.get(`${w}.avif`)!)).join(' / ')}`)
 }
-if (heroAvif1672 > 600 * 1024) throw new Error(`hero 1672w AVIF is ${kb(heroAvif1672)} — over the 600KB budget`)
+const uiBytes = Object.keys(UI).reduce((sum, slug) => {
+  const e = entryOf(slug)
+  return sum + e.widths.reduce((s, w) => s + (e.bytes.get(`${w}.avif`) ?? 0), 0)
+}, 0)
+console.log(`  ui marks (${Object.keys(UI).length}) avif total ${kb(uiBytes)}`)
+
+const heroLargest = entryOf('hero')
+const heroBytes = heroLargest.bytes.get(`${heroLargest.widths[heroLargest.widths.length - 1]}.avif`)!
+if (heroBytes > 600 * 1024) throw new Error(`hero AVIF is ${kb(heroBytes)} — over the 600KB budget`)
 console.log('site build OK')

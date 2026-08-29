@@ -19,7 +19,7 @@
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<!-- @artpreload slug="hero" sizes="100vw" -->
+<!-- @artpreload slug="hero" sizes="max(100vw, 190vh)" -->
 <link rel="stylesheet" href="assets/styles.css">
 <script type="application/ld+json">
 {"@context":"https://schema.org","@type":"VideoGame","name":"Bardo","url":"https://playbardo.com/","genre":"Action roguelike","description":"A visceral pixel-art action roguelike where every death begins another passage."}
@@ -36,12 +36,14 @@
 
 <header class="hero">
   <div class="hero__media" aria-hidden="true">
-    <!-- @art slug="hero" sizes="100vw" class="hero__img" eager alt="" -->
+    <!-- @art slug="hero" sizes="max(100vw, 190vh)" class="hero__img" eager alt="" -->
   </div>
   <canvas class="stars hero__stars" aria-hidden="true"></canvas>
   <div class="hero__scrim" aria-hidden="true"></div>
   <div class="hero__copy">
-    <h1 class="hero__title">Bardo</h1>
+    <h1 class="hero__title">
+      <!-- @art slug="logotype" sizes="(min-width: 720px) 460px, 74vw" class="hero__logo" eager alt="Bardo" -->
+    </h1>
     <p class="hero__headline">Cross the underworlds. Earn&nbsp;your&nbsp;rebirth.</p>
     <p class="hero__support">A visceral pixel-art action roguelike where every death begins another&nbsp;passage.</p>
     <a class="cta" href="ENTER_THE_BARDO_URL"><span>Enter the Bardo</span></a>
@@ -56,7 +58,7 @@
 
   <section class="prologue" id="prologue" aria-labelledby="prologue-h">
     <div class="prologue__media" aria-hidden="true">
-      <!-- @art slug="death" sizes="100vw" class="prologue__img" alt="" -->
+      <!-- @art slug="death" sizes="max(100vw, 170vh)" class="prologue__img" alt="" -->
     </div>
     <div class="prologue__scrim" aria-hidden="true"></div>
     <div class="section-copy prologue__copy">
@@ -67,24 +69,39 @@
 
   <section class="journey" aria-labelledby="journey-h">
     <div class="journey__media" aria-hidden="true">
-      <!-- @art slug="offering" sizes="100vw" class="journey__img" alt="" -->
+      <!-- @art slug="offering" sizes="max(100vw, 160vh)" class="journey__img" alt="" -->
     </div>
     <div class="journey__scrim" aria-hidden="true"></div>
     <div class="journey__inner">
       <h2 id="journey-h" class="journey__title">The passage</h2>
       <ol class="journey__rail">
-        <li class="journey__step"><span class="journey__num" aria-hidden="true">I</span>Fight</li>
-        <li class="journey__step"><span class="journey__num" aria-hidden="true">II</span>Receive boons</li>
-        <li class="journey__step"><span class="journey__num" aria-hidden="true">III</span>Descend</li>
-        <li class="journey__step"><span class="journey__num" aria-hidden="true">IV</span>Die — or escape</li>
-        <li class="journey__step"><span class="journey__num" aria-hidden="true">V</span>Return changed</li>
+        <li class="journey__step">
+          <span class="journey__glyph" aria-hidden="true"><!-- @art slug="glyph-fight" sizes="34px" alt="" --></span>
+          <span class="journey__label">Fight</span>
+        </li>
+        <li class="journey__step">
+          <span class="journey__glyph" aria-hidden="true"><!-- @art slug="glyph-boon" sizes="34px" alt="" --></span>
+          <span class="journey__label">Receive boons</span>
+        </li>
+        <li class="journey__step">
+          <span class="journey__glyph" aria-hidden="true"><!-- @art slug="glyph-descend" sizes="34px" alt="" --></span>
+          <span class="journey__label">Descend</span>
+        </li>
+        <li class="journey__step">
+          <span class="journey__glyph" aria-hidden="true"><!-- @art slug="glyph-die" sizes="34px" alt="" --></span>
+          <span class="journey__label">Die or escape</span>
+        </li>
+        <li class="journey__step">
+          <span class="journey__glyph" aria-hidden="true"><!-- @art slug="glyph-return" sizes="34px" alt="" --></span>
+          <span class="journey__label">Return changed</span>
+        </li>
       </ol>
     </div>
   </section>
 
   <section class="feature feature--combat" aria-labelledby="combat-h">
     <div class="feature__media" aria-hidden="true">
-      <!-- @art slug="trial" sizes="100vw" class="feature__img feature__img--trial" alt="" -->
+      <!-- @art slug="trial" sizes="max(100vw, 185vh)" class="feature__img feature__img--trial" alt="" -->
     </div>
     <div class="feature__scrim feature__scrim--left" aria-hidden="true"></div>
     <div class="embers" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></div>
@@ -101,15 +118,15 @@
     </div>
     <div class="worlds__triptych">
       <figure class="worlds__panel">
-        <!-- @art slug="duat" sizes="(min-width: 720px) 34vw, 100vw" class="worlds__img worlds__img--duat" alt="A sandstone weighing chamber under a shaft of hard sunlight: a monumental golden balance weighs a feather against a skull and dark relics, beside an obelisk and a star-filled doorway." -->
+        <!-- @art slug="duat" sizes="(min-width: 720px) 34vw, 82vw" class="worlds__img" alt="A colossal jackal-headed guardian statue looms over a hall of judgement, where a monumental golden balance weighs a single white feather against a heap of dark relics. A lone armoured warrior stands far below on a red carpet." -->
         <figcaption class="worlds__caption">Duat · The Weighing Floor</figcaption>
       </figure>
       <figure class="worlds__panel">
-        <!-- @art slug="niflheim" sizes="(min-width: 720px) 34vw, 100vw" class="worlds__img worlds__img--niflheim" alt="A frozen longship driven through black basalt columns, its motionless oarsmen sealed under ice, lit by pale corpse-light." -->
+        <!-- @art slug="niflheim" sizes="(min-width: 720px) 34vw, 82vw" class="worlds__img" alt="A frozen longship's carved prow rises through black basalt columns, its skeletal oarsmen sealed under blue-white ice. A lone warrior stands beneath it holding the only warm light in the hall." -->
         <figcaption class="worlds__caption">Niflheim · The Rime Court</figcaption>
       </figure>
       <figure class="worlds__panel">
-        <!-- @art slug="mictlan" sizes="(min-width: 720px) 34vw, 100vw" class="worlds__img worlds__img--mictlan" alt="Stepped obsidian terraces where glowing turquoise floor channels telegraph a sweeping wall of blades closing on a lone warrior." -->
+        <!-- @art slug="mictlan" sizes="(min-width: 720px) 34vw, 82vw" class="worlds__img" alt="Stepped obsidian terraces climb into the void, edged with carved skulls and glowing turquoise channels. A sweeping wall of blades crosses the stair, leaving one dark gap; a lone warrior waits below beside a brazier." -->
         <figcaption class="worlds__caption">Mictlan · The Wind of Knives</figcaption>
       </figure>
     </div>
@@ -117,7 +134,7 @@
 
   <section class="feature feature--town" aria-labelledby="town-h">
     <div class="feature__media" aria-hidden="true">
-      <!-- @art slug="town" sizes="100vw" class="feature__img feature__img--town" alt="" -->
+      <!-- @art slug="town" sizes="max(100vw, 185vh)" class="feature__img feature__img--town" alt="" -->
     </div>
     <div class="feature__scrim feature__scrim--right" aria-hidden="true"></div>
     <div class="section-copy feature__copy feature__copy--right">
@@ -126,35 +143,33 @@
     </div>
   </section>
 
-  <section class="gallery" aria-labelledby="gallery-h">
-    <h2 id="gallery-h" class="gallery__title">Gameplay</h2>
-    <div class="gallery__grid">
-      <!-- GALLERY_SLOT_1: replace this placeholder frame with a real 16:9 gameplay
-           capture, e.g. <img src="img/capture-01.avif" alt="..."> -->
-      <div class="gallery__slot"><span>Capture pending</span></div>
-      <!-- GALLERY_SLOT_2 -->
-      <div class="gallery__slot"><span>Capture pending</span></div>
-      <!-- GALLERY_SLOT_3 -->
-      <div class="gallery__slot"><span>Capture pending</span></div>
-    </div>
-  </section>
+  <!-- A deliberate band of pure void: the only breath between five full-bleed sections. -->
+  <div class="breath" aria-hidden="true">
+    <canvas class="stars breath__stars"></canvas>
+  </div>
 
   <section class="threshold" id="threshold" aria-labelledby="threshold-h">
     <div class="threshold__media" aria-hidden="true">
-      <!-- @art slug="rebirth" sizes="100vw" class="threshold__img" alt="" -->
+      <!-- @art slug="rebirth" sizes="max(100vw, 185vh)" class="threshold__img" alt="" -->
     </div>
     <canvas class="stars threshold__stars" aria-hidden="true"></canvas>
     <div class="threshold__scrim" aria-hidden="true"></div>
-    <div class="section-copy threshold__copy">
-      <h2 id="threshold-h">The way out is through.</h2>
-      <a class="cta" href="ENTER_THE_BARDO_URL"><span>Enter the Bardo</span></a>
+    <div class="threshold__copy">
+      <p class="threshold__emblem" aria-hidden="true">
+        <!-- @art slug="emblem" sizes="96px" alt="" -->
+      </p>
+      <h2 id="threshold-h" class="threshold__title">The way out is through.</h2>
+      <a class="cta cta--large" href="ENTER_THE_BARDO_URL"><span>Enter the Bardo</span></a>
     </div>
   </section>
 
 </main>
 
 <footer class="footer">
-  <p class="footer__mark" aria-hidden="true">Bardo</p>
+  <p class="footer__seal" aria-hidden="true">
+    <!-- @art slug="seal" sizes="44px" alt="" -->
+  </p>
+  <p class="footer__mark">Bardo</p>
   <p class="footer__legal">© 2026 PlayBardo</p>
   <!-- PLACEHOLDER: press kit / community links go here when they exist -->
 </footer>

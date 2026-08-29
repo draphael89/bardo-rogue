@@ -170,40 +170,37 @@ h1, h2 { text-wrap: balance; font-weight: 400; }
 }
 
 /* ---- CTA ---- */
+/* A solid gold slab: the one object on the page that is meant to be pressed. */
 .cta {
   position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 52px;
-  margin-top: 2.2rem;
-  padding: 0 30px;
+  min-height: 60px;
+  margin-top: 2.4rem;
+  padding: 0 38px;
   background: var(--gold);
   clip-path: var(--clip-steps);
-  color: var(--gold);
-  font: 700 0.85rem/1 var(--font-display);
+  color: var(--void);
+  font: 700 0.88rem/1 var(--font-display);
   letter-spacing: 0.24em;
   text-indent: 0.24em; /* optically re-center tracked caps */
   text-transform: uppercase;
   text-decoration: none;
-  transition: transform var(--dur-fast) var(--ease-out), color var(--dur-base) ease;
-}
-.cta::before {
-  content: '';
-  position: absolute;
-  inset: 2px;
-  background: var(--void);
-  clip-path: var(--clip-steps);
-  transition: opacity var(--dur-base) ease;
+  box-shadow: 0 6px 30px rgba(8, 7, 14, 0.6);
+  transition: transform var(--dur-fast) var(--ease-out), background-color var(--dur-base) ease;
 }
 .cta span { position: relative; }
+.cta--large {
+  min-height: 68px;
+  padding: 0 46px;
+  font-size: 0.98rem;
+}
 @media (hover: hover) and (pointer: fine) {
-  .cta:hover { color: var(--void); }
-  .cta:hover::before { opacity: 0; }
+  .cta:hover { background: var(--gold-hot); }
 }
 .cta:active { transform: scale(0.96); }
-.cta:focus-visible { color: var(--void); }
-.cta:focus-visible::before { opacity: 0; }
+.cta:focus-visible { background: var(--gold-hot); }
 
 /* ---- hero ---- */
 .hero {
@@ -223,19 +220,18 @@ h1, h2 { text-wrap: balance; font-weight: 400; }
 .hero__copy {
   position: relative;
   align-self: start;
-  padding: clamp(5rem, 13vh, 9rem) clamp(1.4rem, 6vw, 7rem) 0;
+  padding: clamp(3.4rem, 9vh, 6rem) clamp(1.4rem, 6vw, 7rem) 0;
   max-width: 46rem;
 }
-.hero__title {
-  font-family: var(--font-display);
-  font-size: clamp(3.4rem, 2rem + 7.5vw, 7.5rem);
-  line-height: 1;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--bone);
+.hero__title { line-height: 0; }
+.hero__logo {
+  width: min(460px, 74vw);
+  height: auto;
+  /* the carved letters are dark slate: lift them off the art with the gate's own light */
+  filter: drop-shadow(0 3px 0 rgba(8, 7, 14, 0.9)) drop-shadow(0 0 34px rgba(212, 176, 96, 0.28));
 }
 .hero__headline {
-  margin-top: 1.6rem;
+  margin-top: 1.9rem;
   font-family: var(--font-display);
   font-size: clamp(1.15rem, 1rem + 1.1vw, 1.7rem);
   line-height: 1.35;
@@ -256,8 +252,10 @@ h1, h2 { text-wrap: balance; font-weight: 400; }
   display: grid;
   justify-items: center;
   gap: 8px;
-  padding: 12px;
-  color: var(--gold-dim);
+  padding: 12px 18px;
+  /* it sits on lit paving: give it its own ground or it vanishes */
+  background: radial-gradient(ellipse 130% 130% at 50% 50%, rgba(8, 7, 14, 0.82), transparent 72%);
+  color: var(--bone-dim);
   text-decoration: none;
   transition: color var(--dur-base) ease;
 }
@@ -275,9 +273,19 @@ h1, h2 { text-wrap: balance; font-weight: 400; }
 /* ---- prologue ---- */
 .prologue {
   position: relative;
-  min-height: 88svh;
+  min-height: 100svh;
   display: grid;
   align-items: end;
+}
+/* the page's thesis: it gets its own scale, not the shared heading rule */
+.prologue__copy h2 {
+  font-size: clamp(2.5rem, 1.5rem + 5vw, 5.2rem);
+  letter-spacing: 0.055em;
+  line-height: 1.05;
+}
+.prologue__copy p {
+  margin-top: 1.4rem;
+  max-width: 38ch;
 }
 .prologue__media img { object-position: 52% 58%; }
 .prologue__scrim {
@@ -295,77 +303,73 @@ h1, h2 { text-wrap: balance; font-weight: 400; }
 /* ---- journey ---- */
 .journey {
   position: relative;
-  min-height: 82svh;
+  min-height: 92svh;
   display: grid;
-  place-items: center;
+  align-items: center;
 }
-.journey__media img { object-position: 50% 38%; }
+/* the altar and the cosmic hand live centre-right; hold them clear and put the rail
+   in the painting's dead left third, where it descends like the passage it describes */
+.journey__media img { object-position: 62% 38%; }
 .journey__scrim {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(to bottom, var(--void) 1%, rgba(8, 7, 14, 0.42) 26%, rgba(8, 7, 14, 0.42) 72%, var(--void) 99%);
+    linear-gradient(to bottom, var(--void), transparent 16%),
+    linear-gradient(100deg, rgba(8, 7, 14, 0.93) 10%, rgba(8, 7, 14, 0.55) 40%, transparent 62%),
+    linear-gradient(to top, var(--void), transparent 16%);
 }
 .journey__inner {
   position: relative;
-  padding: clamp(5rem, 12vh, 8rem) clamp(1.4rem, 5vw, 4rem);
-  text-align: center;
+  width: min(34rem, 100%);
+  padding: clamp(4rem, 10vh, 6rem) clamp(1.4rem, 6vw, 7rem);
 }
 .journey__title {
   font-family: var(--font-display);
-  font-size: clamp(1.3rem, 1.1rem + 1vw, 1.8rem);
+  font-size: clamp(1.2rem, 1.05rem + 0.8vw, 1.6rem);
   letter-spacing: 0.3em;
   text-indent: 0.3em;
   text-transform: uppercase;
-  color: var(--bone);
+  color: var(--bone-dim);
+  text-shadow: 0 1px 6px rgba(8, 7, 14, 0.9);
 }
+/* a vertical descent: five stations strung on one gold rule */
 .journey__rail {
   list-style: none;
-  margin-top: clamp(2.4rem, 6vh, 4rem);
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  align-items: baseline;
-  column-gap: clamp(1.6rem, 4vw, 3.6rem);
-  row-gap: 2rem;
+  margin-top: clamp(1.8rem, 4vh, 2.8rem);
+  display: grid;
+  gap: clamp(1.1rem, 2.4vh, 1.7rem);
 }
 .journey__step {
   position: relative;
   display: grid;
-  justify-items: center;
-  gap: 0.7rem;
+  grid-template-columns: 44px 1fr;
+  align-items: center;
+  gap: 1.1rem;
   font-family: var(--font-display);
-  font-size: clamp(0.95rem, 0.85rem + 0.5vw, 1.2rem);
-  letter-spacing: 0.14em;
+  font-size: clamp(1rem, 0.9rem + 0.5vw, 1.25rem);
+  letter-spacing: 0.13em;
   color: var(--bone);
-  white-space: nowrap;
 }
-.journey__num {
-  font-size: 0.72em;
-  color: var(--gold-dim);
-  letter-spacing: 0.2em;
+.journey__glyph {
+  display: grid;
+  place-items: center;
+  height: 40px;
 }
-/* stepped gold gate glyph between stations */
+.journey__glyph img {
+  width: auto;
+  height: clamp(30px, 2.6vw, 38px);
+  filter: drop-shadow(0 2px 6px rgba(8, 7, 14, 0.95));
+}
+.journey__label { text-shadow: 0 1px 5px rgba(8, 7, 14, 0.95); }
+/* the rule runs between glyph centres, threading the stations together */
 .journey__step:not(:last-child)::after {
   content: '';
   position: absolute;
-  right: calc(-0.5 * clamp(1.6rem, 4vw, 3.6rem) - 6px);
-  bottom: 0.35em;
-  width: 12px;
-  height: 12px;
-  background: var(--gold-dim);
-  clip-path: polygon(0 100%, 0 33%, 25% 33%, 25% 15%, 42% 15%, 42% 0, 58% 0, 58% 15%, 75% 15%, 75% 33%, 100% 33%, 100% 100%, 72% 100%, 72% 55%, 28% 55%, 28% 100%);
-}
-@media (max-width: 719px) {
-  .journey__rail { flex-direction: column; align-items: center; row-gap: 1.7rem; }
-  .journey__step:not(:last-child)::after {
-    right: auto;
-    left: 50%;
-    bottom: -1.25rem;
-    transform: translateX(-50%);
-    width: 10px;
-    height: 10px;
-  }
+  left: 22px;
+  top: calc(50% + 20px);
+  width: 1px;
+  height: clamp(1.1rem, 2.4vh, 1.7rem);
+  background: linear-gradient(180deg, var(--gold-dim), rgba(140, 112, 64, 0.15));
 }
 
 /* ---- feature sections ---- */
@@ -392,7 +396,7 @@ h1, h2 { text-wrap: balance; font-weight: 400; }
 }
 .feature__copy {
   position: relative;
-  width: min(34rem, 100%);
+  width: min(40rem, 100%);
   padding: clamp(4rem, 10vh, 6rem) clamp(1.4rem, 6vw, 7rem);
 }
 .feature__copy--right { margin-left: auto; }
@@ -442,7 +446,8 @@ h1, h2 { text-wrap: balance; font-weight: 400; }
 }
 .worlds__panel {
   position: relative;
-  height: min(78svh, 44rem);
+  /* the art is authored portrait: the panel takes ITS aspect so nothing is cropped */
+  aspect-ratio: /*@panel-aspect*/;
   overflow: hidden;
 }
 .worlds__panel img {
@@ -452,9 +457,6 @@ h1, h2 { text-wrap: balance; font-weight: 400; }
   outline: 1px solid rgba(255, 255, 255, 0.07);
   outline-offset: -1px;
 }
-.worlds__img--duat { object-position: 40% 50%; }
-.worlds__img--niflheim { object-position: 58% 45%; }
-.worlds__img--mictlan { object-position: 44% 55%; }
 .worlds__caption {
   position: absolute;
   inset: auto 0 0 0;
@@ -472,64 +474,13 @@ h1, h2 { text-wrap: balance; font-weight: 400; }
     overflow-x: auto;
     scroll-snap-type: x mandatory;
     scrollbar-width: none;
+    padding-inline: 9vw;
+    gap: 10px;
   }
   .worlds__panel {
-    flex: 0 0 80vw;
-    height: min(64svh, 30rem);
+    flex: 0 0 82vw;
     scroll-snap-align: center;
   }
-}
-
-/* ---- gallery ---- */
-.gallery {
-  max-width: 74rem;
-  margin-inline: auto;
-  padding: clamp(6rem, 14vh, 9rem) clamp(1.4rem, 5vw, 3rem);
-}
-.gallery__title {
-  font-family: var(--font-display);
-  font-size: clamp(1.1rem, 1rem + 0.6vw, 1.4rem);
-  letter-spacing: 0.3em;
-  text-indent: 0.3em;
-  text-transform: uppercase;
-  text-align: center;
-  color: var(--bone-dim);
-}
-.gallery__grid {
-  margin-top: clamp(2rem, 5vh, 3.4rem);
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: clamp(0.8rem, 2vw, 1.4rem);
-}
-@media (max-width: 719px) {
-  .gallery__grid { grid-template-columns: 1fr; }
-}
-.gallery__slot {
-  position: relative;
-  aspect-ratio: 16 / 9;
-  display: grid;
-  place-items: center;
-  background: var(--sky);
-  clip-path: var(--clip-steps);
-  box-shadow: inset 0 0 0 1px rgba(212, 176, 96, 0.18);
-}
-.gallery__slot::before, .gallery__slot::after {
-  content: '';
-  position: absolute;
-  width: 10px;
-  height: 10px;
-  background:
-    linear-gradient(var(--gold-dim), var(--gold-dim)) top left / 10px 2px no-repeat,
-    linear-gradient(var(--gold-dim), var(--gold-dim)) top left / 2px 10px no-repeat;
-}
-.gallery__slot::before { top: 10px; left: 10px; }
-.gallery__slot::after { bottom: 10px; right: 10px; rotate: 180deg; }
-.gallery__slot span {
-  font: 600 0.62rem/1 var(--font-body);
-  letter-spacing: 0.28em;
-  text-indent: 0.28em;
-  text-transform: uppercase;
-  color: var(--slate-3);
 }
 
 /* ---- threshold (final CTA) ---- */
@@ -540,6 +491,24 @@ h1, h2 { text-wrap: balance; font-weight: 400; }
   align-items: center;
 }
 .threshold__media img { object-position: 72% 45%; }
+.threshold__emblem { margin-bottom: 1.6rem; }
+.threshold__emblem img {
+  width: 96px;
+  height: auto;
+  filter: drop-shadow(0 0 26px rgba(212, 176, 96, 0.24));
+}
+/* the finale gets the loudest type on the page */
+.threshold__title {
+  font-family: var(--font-display);
+  font-size: clamp(2.5rem, 1.6rem + 4.4vw, 4.6rem);
+  line-height: 1.06;
+  letter-spacing: 0.05em;
+  color: var(--bone);
+  text-wrap: balance;
+  text-shadow: 0 2px 10px rgba(8, 7, 14, 0.9);
+}
+
+
 .threshold__scrim {
   position: absolute;
   inset: 0;
@@ -550,8 +519,33 @@ h1, h2 { text-wrap: balance; font-weight: 400; }
 }
 .threshold__copy {
   position: relative;
-  width: min(34rem, 100%);
+  width: min(42rem, 100%);
   padding: clamp(4rem, 10vh, 6rem) clamp(1.4rem, 6vw, 7rem);
+}
+
+/* ---- breath: a band of pure void between the last two full-bleeds ---- */
+.breath {
+  position: relative;
+  height: clamp(16rem, 34vh, 26rem);
+}
+/* Narrow viewports crop hard: retarget each scene so it keeps its own subject, and
+   move the scrim weight to the TOP, where the copy actually lands once stacked. */
+@media (max-width: 899px) {
+  .feature__img--trial { object-position: 55% 68%; }
+  .feature__img--town { object-position: 30% 62%; }
+  .threshold__media img { object-position: 64% 52%; }
+  .prologue__media img { object-position: 50% 50%; }
+  .journey__media img { object-position: 62% 58%; }
+
+  .hero__scrim {
+    background:
+      linear-gradient(to bottom, rgba(8, 7, 14, 0.93) 0%, rgba(8, 7, 14, 0.74) 36%, rgba(8, 7, 14, 0.2) 60%, transparent 76%),
+      linear-gradient(to top, var(--void), transparent 22%);
+  }
+  .journey__scrim {
+    background:
+      linear-gradient(to bottom, var(--void) 1%, rgba(8, 7, 14, 0.9) 40%, rgba(8, 7, 14, 0.5) 68%, var(--void) 99%);
+  }
 }
 @media (max-width: 899px) {
   .threshold__scrim {
@@ -578,19 +572,27 @@ h1, h2 { text-wrap: balance; font-weight: 400; }
   height: 1px;
   background: linear-gradient(90deg, transparent, var(--gold-dim) 30%, var(--gold-dim) 70%, transparent);
 }
+.footer__seal { margin-bottom: 1.2rem; }
+.footer__seal img {
+  width: 44px;
+  height: auto;
+  margin-inline: auto;
+  opacity: 0.85;
+}
 .footer__mark {
   font-family: var(--font-display);
-  font-size: 1rem;
-  letter-spacing: 0.3em;
-  text-indent: 0.3em;
+  font-size: clamp(1.8rem, 1.4rem + 1.4vw, 2.7rem);
+  letter-spacing: 0.35em;
+  text-indent: 0.35em;
   text-transform: uppercase;
   color: var(--bone-dim);
 }
 .footer__legal {
-  margin-top: 0.8rem;
+  margin-top: 1rem;
   font-size: 0.75rem;
   letter-spacing: 0.06em;
-  color: var(--slate-3);
+  /* warm dim bone, not the cool slate that read as cyan under the gold rule */
+  color: #7C7062;
 }
 
 /* =====================================================================
@@ -663,13 +665,13 @@ h1, h2 { text-wrap: balance; font-weight: 400; }
       from { opacity: 0; transform: translateY(16px); }
       to { opacity: 1; transform: translateY(0); }
     }
-    .section-copy > *, .journey__title, .journey__step, .gallery__title, .gallery__slot, .worlds__panel {
+    .section-copy > *, .journey__title, .journey__step, .worlds__panel {
       animation: rise-in linear both;
       animation-timeline: view();
       animation-range: entry 8% entry 42%;
     }
-    .section-copy > :nth-child(2), .journey__step:nth-child(2), .gallery__slot:nth-child(2), .worlds__panel:nth-child(2) { animation-range: entry 16% entry 50%; }
-    .section-copy > :nth-child(3), .journey__step:nth-child(3), .gallery__slot:nth-child(3), .worlds__panel:nth-child(3) { animation-range: entry 24% entry 58%; }
+    .section-copy > :nth-child(2), .journey__step:nth-child(2), .worlds__panel:nth-child(2) { animation-range: entry 16% entry 50%; }
+    .section-copy > :nth-child(3), .journey__step:nth-child(3), .worlds__panel:nth-child(3) { animation-range: entry 24% entry 58%; }
     .journey__step:nth-child(4) { animation-range: entry 32% entry 66%; }
     .journey__step:nth-child(5) { animation-range: entry 40% entry 74%; }
   }

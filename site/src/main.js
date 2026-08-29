@@ -29,15 +29,18 @@
     canvas.width = field.w * dpr
     canvas.height = field.h * dpr
     field.ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-    // stars live in the upper band, where the art is open void
-    const count = Math.round((field.w * field.h) / 32000)
+    // Over a painting the stars sit in the open void at the top; over a bare
+    // void band they fill it. Density has to be high enough to actually read.
+    const full = canvas.classList.contains('breath__stars')
+    const band = full ? 1 : 0.55
+    const count = Math.round((field.w * field.h * band) / 5200)
     field.stars = Array.from({ length: count }, () => ({
       x: Math.random() * field.w,
-      y: Math.random() * field.h * 0.55,
-      size: Math.random() < 0.75 ? 1 : 2,
+      y: Math.random() * field.h * band,
+      size: Math.random() < 0.7 ? 1 : 2,
       warm: Math.random() < 0.33,
-      base: 0.25 + Math.random() * 0.4,
-      amp: Math.random() * 0.25,
+      base: 0.3 + Math.random() * 0.45,
+      amp: Math.random() * 0.28,
       phase: Math.random() * Math.PI * 2,
       speed: 0.3 + Math.random() * 0.7,
     }))

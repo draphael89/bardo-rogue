@@ -129,6 +129,12 @@ export const tuning = {
     offeringHp: 1,        // extra max life, and a heal of the same
     rackRadius: 18,       // px: generous enough to read as a physical pickup, not pixel hunting
     transitionTicks: 8,   // 133 ms: enough for a threshold blink, never enough to break momentum
+    // 400 ms before a modal will take an answer. The offer opens on the tick the last enemy
+    // dies, so without this the attack you were already mashing claimed a vow you never saw.
+    // Long enough to notice a screen arrived, short enough that a player who knows what they
+    // want is never made to wait for a second press. Moving the SELECTION stays live throughout,
+    // so the wait costs a practised player nothing.
+    modalArmTicks: 24,
   },
 
   // THE TOLL. The run's one non-combat beat, and the only place a permanent cost is on the table.

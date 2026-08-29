@@ -5,7 +5,7 @@ export const HELL_CORE = 0xff2410
 
 export const EMPUSA = {
   track: 0x6a2038,
-  trackHot: 0xd8b0b8,
+  trackHot: 0xc07080,
   commit: 0x9e4658,
   commitHot: 0xc07080,
   wakeHead: 0xc07080,
@@ -14,8 +14,8 @@ export const EMPUSA = {
   edge: 0x08070e,
   glowTrack: 0x6a2038,
   glowLock: 0x9e4658,
-  coil: 0xd8b0b8,
-  ghosts: [0xd8b0b8, 0xc07080, 0x6a2038] as const,
+  coil: 0xc07080,
+  ghosts: [0xc07080, 0x9e4658, 0x6a2038] as const,
   white: 0xffffff,
 } as const
 

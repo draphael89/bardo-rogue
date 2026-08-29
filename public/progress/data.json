@@ -1,10 +1,14 @@
 {
   "title": "Bardo Rogue",
   "subtitle": "First Gate: rooms-as-data, a generated route, a town that remembers",
-  "updated": "2026-08-29T08:21:00-04:00",
-  "now": "return-home-keep",
+  "updated": "2026-08-29T08:26:00-04:00",
+  "now": "pause-no-export",
   "round": 3,
   "timeline": [
+    {
+      "t": "08:26",
+      "text": "BETWEEN BREATHS no longer advertises E EXPORT · I IMPORT. The keys stay in the harness."
+    },
     {
       "t": "08:21",
       "text": "Coming home names 2 KEPT, not THE BARDO over the footer. After the type ramp the map, the death stone, and DESCEND AGAIN still read."

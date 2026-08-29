@@ -8,7 +8,7 @@ import { MYSTERY_COPY, canAffordMystery } from '@/sim/mystery'
 import { canAbandon } from '@/sim/return'
 import type { MysteryOffer, RewardOffer, ShopOffer } from '@/sim/session'
 import { tuning } from '@/tuning'
-import { backPause, duoFooter, meetingVeil, offerAct, offerSpoken, pauseNudge, resolvePause, shopAct, shopSpoken, showBuildStrip, townTally, victoryKeptLine, wrapPauseFocus, type PauseAct, type PausePage, type TitleNudge } from './titleMenu'
+import { backPause, duoFooter, meetingVeil, offerAct, offerSpoken, pauseFooter, pauseNudge, resolvePause, shopAct, shopSpoken, showBuildStrip, townTally, victoryKeptLine, wrapPauseFocus, type PauseAct, type PausePage, type TitleNudge } from './titleMenu'
 import { label, placeCentered, placeLeft, placeRight, wrappedCentered, P } from './ui'
 import { clamp01 } from './anim'
 
@@ -496,7 +496,8 @@ export class RewardOverlay {
     this.scrim.rect(0, 0, W, tuning.view.height).fill({ color: P.void, alpha: 0.76 })
     const settings = this.pausePage === 'settings'
     const rows = settings ? 4 : leaving ? 3 : 2
-    const cardH = 56 + rows * 22 + 28
+    const foot = pauseFooter()
+    const cardH = 56 + rows * 22 + (foot ? 28 : 16)
     const cardY = Math.round((tuning.view.height - cardH) / 2)
     this.g.roundRect(W / 2 - 130, cardY, 260, cardH, 3).fill({ color: P.face, alpha: 0.98 }).stroke({ color: P.gold, width: 2 })
     const title = label('BETWEEN BREATHS', 'head', P.gold)
@@ -509,18 +510,20 @@ export class RewardOverlay {
       this.paintPauseMeter(W / 2, rowY + 22, 'MUSIC', this.music, this.pauseFocus === 1)
       this.paintPauseMeter(W / 2, rowY + 44, 'SOUND', this.sfx, this.pauseFocus === 2)
       this.paintPauseRow(W / 2, rowY + 66, 'RISE', this.pauseFocus === 3)
-      return
-    }
-    this.paintPauseRow(W / 2, rowY, 'RISE', this.pauseFocus === 0)
-    if (leaving) {
-      const give = this.abandonArmed ? 'THE BARDO WILL TAKE YOU' : 'GIVE THE DESCENT BACK'
-      this.paintPauseRow(W / 2, rowY + 22, give, this.pauseFocus === 1, this.abandonArmed)
-      this.paintPauseRow(W / 2, rowY + 44, 'SETTINGS', this.pauseFocus === 2)
     } else {
-      this.paintPauseRow(W / 2, rowY + 22, 'SETTINGS', this.pauseFocus === 1)
+      this.paintPauseRow(W / 2, rowY, 'RISE', this.pauseFocus === 0)
+      if (leaving) {
+        const give = this.abandonArmed ? 'THE BARDO WILL TAKE YOU' : 'GIVE THE DESCENT BACK'
+        this.paintPauseRow(W / 2, rowY + 22, give, this.pauseFocus === 1, this.abandonArmed)
+        this.paintPauseRow(W / 2, rowY + 44, 'SETTINGS', this.pauseFocus === 2)
+      } else {
+        this.paintPauseRow(W / 2, rowY + 22, 'SETTINGS', this.pauseFocus === 1)
+      }
     }
-    const saves = label('E EXPORT  ·  I IMPORT', 'meta', P.dim)
-    placeCentered(saves, W / 2, cardY + cardH - 14); this.add(saves)
+    if (foot) {
+      const saves = label(foot, 'meta', P.dim)
+      placeCentered(saves, W / 2, cardY + cardH - 14); this.add(saves)
+    }
   }
 
   private paintPauseMeter(cx: number, y: number, name: string, value: number, selected: boolean): void {

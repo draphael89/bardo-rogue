@@ -99,6 +99,11 @@ export function backPause(page: PausePage, canAbandon: boolean): { page: PausePa
   }
 }
 
+/** The pause is a breath. E / I stay in the harness, not on the card. */
+export function pauseFooter(): string | null {
+  return null
+}
+
 export function backTitle(page: TitlePage): { page: TitlePage; focus: number } {
   switch (page) {
     case 'menu': return { page: 'menu', focus: 0 }

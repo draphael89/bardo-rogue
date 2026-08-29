@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { arrivalBanner, backPause, backTitle, confirmTitle, deathCarriedLine, deathClose, deathReachedLine, deathSentLine, deathTakenLine, duoFooter, hideFightChrome, hidePlaceCaption, homeBanner, keptLabel, meetingVeil, offerAct, offerSpoken, pauseNudge, pauseRows, resolvePause, runStartBanner, shopAct, shopSpoken, showBuildStrip, titleDescend, titleNudge, titleRows, townTally, victoryKeptLine, wrapPauseFocus, wrapTitleFocus } from '@/render/titleMenu'
+import { arrivalBanner, backPause, backTitle, confirmTitle, deathCarriedLine, deathClose, deathReachedLine, deathSentLine, deathTakenLine, duoFooter, hideFightChrome, hidePlaceCaption, homeBanner, keptLabel, meetingVeil, offerAct, offerSpoken, pauseFooter, pauseNudge, pauseRows, resolvePause, runStartBanner, shopAct, shopSpoken, showBuildStrip, titleDescend, titleNudge, titleRows, townTally, victoryKeptLine, wrapPauseFocus, wrapTitleFocus } from '@/render/titleMenu'
 import { SHOP_COPY } from '@/sim/economy'
 import { clampSlider, nudgeSlider } from '@/sim/storage'
 
@@ -160,6 +160,7 @@ describe('title menu', () => {
     expect(pauseNudge('settings', 2)).toBe('sfx')
     expect(backPause('settings', true)).toEqual({ page: 'menu', focus: 2 })
     expect(backPause('menu', true)).toEqual({ page: 'menu', focus: 0 })
+    expect(pauseFooter()).toBeNull()
   })
 
   it('Escape on a page returns to the verb that opened it, and does nothing on the gate', () => {

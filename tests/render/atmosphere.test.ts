@@ -51,3 +51,56 @@ describe('per-layout air', () => {
     expect(brazierFlame(atmosphereFor('landing')).tint).toBe(GOLD)
   })
 })
+
+describe('a realm is a surface, not only a name', () => {
+  // Measured before these two fields existed (`pnpm realm-air`): the median pair of rooms differed
+  // by 2.3 of 255, and not one room in the game read warm -- THE HALL OF MINOS and CHARON'S LANDING
+  // both came out bluer than they were red. The floor was one untinted tilesheet everywhere and the
+  // ambient was one global indigo, so `dress.ts` swapping tile indices could never change a colour.
+  // These assertions pin the ledger's own words to numbers a browser run then confirms end to end.
+  const WARM = ['landing', 'minos', 'minos-east', 'phlegethon', 'antechamber'] as const
+  const COLD = ['threshold', 'lethe', 'crossing', 'shore', 'cocytus'] as const
+  const R = (c: number) => (c >> 16) & 255
+  const G = (c: number) => (c >> 8) & 255
+  const B = (c: number) => c & 255
+
+  it('gives every layout a floor and a darkness of its own', () => {
+    for (const id of Object.keys(LAYOUTS) as LayoutId[]) {
+      const air = atmosphereFor(id)
+      expect(air.floorTint, id).toBeTypeOf('number')
+      expect(air.ambientTint, id).toBeTypeOf('number')
+    }
+  })
+
+  it('lets a warm realm read warm and a cold one read cold', () => {
+    for (const id of WARM) {
+      expect(R(atmosphereFor(id).floorTint), `${id} floor`).toBeGreaterThan(B(atmosphereFor(id).floorTint))
+      expect(R(atmosphereFor(id).ambientTint), `${id} dark`).toBeGreaterThan(B(atmosphereFor(id).ambientTint))
+    }
+    for (const id of COLD) {
+      expect(B(atmosphereFor(id).floorTint), `${id} floor`).toBeGreaterThan(R(atmosphereFor(id).floorTint))
+      expect(B(atmosphereFor(id).ambientTint), `${id} dark`).toBeGreaterThan(R(atmosphereFor(id).ambientTint))
+    }
+  })
+
+  it('keeps green high, so a floor changes hue without going dark', () => {
+    // Green carries 0.715 of Rec.709 luminance. Letting it fall is how a coloured room becomes an
+    // unreadable one, and it is what the authored sheets' figure/ground gate assumes about the floor.
+    for (const id of Object.keys(LAYOUTS) as LayoutId[]) {
+      expect(G(atmosphereFor(id).floorTint), `${id} floor green`).toBeGreaterThanOrEqual(168)
+    }
+  })
+
+  it('leaves the Bardo as the reference floor', () => {
+    // Every other realm is read against it, so it is the one floor that must not be tinted.
+    expect(atmosphereFor('bardo').floorTint).toBe(0xffffff)
+  })
+
+  it('never lets the floor become the walkable signal', () => {
+    // The open door is gold and nothing else may be. The floor is a separate sprite from the door
+    // cluster for exactly this reason; a floor tint that matched would make the door stop reading.
+    for (const id of Object.keys(LAYOUTS) as LayoutId[]) {
+      expect(atmosphereFor(id).floorTint, id).not.toBe(atmosphereFor(id).doorOpenTint)
+    }
+  })
+})

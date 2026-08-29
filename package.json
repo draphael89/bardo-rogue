@@ -31,6 +31,7 @@
     "record-bots": "tsx tools/record-bot.ts --all",
     "smoke": "tsx tools/smoke.ts",
     "matrix": "tsx tools/matrix.ts",
+    "realm-air": "tsx tools/realm-air.ts",
     "art": "tsx tools/art.ts",
     "site:build": "tsx tools/build-site.ts",
     "palette": "tsx tools/art.ts palette",

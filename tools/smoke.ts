@@ -27,9 +27,8 @@ function usage(msg: string): never {
 }
 if (!Number.isInteger(seed)) usage(`--seed must be an integer, got "${args.seed}"`)
 
-// The two paths deliberately run different seeds. The slice bot answers the toll off the seed's
-// second bit, so one seed only ever exercises one side of a permanent choice; splitting them means
-// the browser drives PAY and SWIM, and both consequences, on every smoke run.
+// The two policies deliberately answer the toll differently: the skilled path pays and the mash
+// path swims, so the browser drives both consequences on every smoke run.
 interface PathSpec { name: string; bot: string; expect: 'won' | 'lost'; seed: number; toll: 'paid' | 'refused' }
 const PATHS: PathSpec[] = [
   { name: 'victory', bot: 'slice-kite', expect: 'won', seed, toll: 'paid' },
@@ -69,7 +68,7 @@ async function play(page: Page, spec: PathSpec): Promise<void> {
   page.on('console', onConsole)
   page.on('pageerror', onError)
 
-  await page.goto(`${url}/?scenario=loop&seed=${spec.seed}&mute=1&bot=${spec.bot}`)
+  await page.goto(`${url}/?scenario=loop&seed=${spec.seed}&mute=1&save=off&bot=${spec.bot}`)
   await page.waitForFunction(() => !!(window as unknown as { __game?: unknown }).__game, null, { timeout: 30000 })
 
   // Step the sim by hand so the smoke does not depend on wall-clock frame pacing in CI.
@@ -189,7 +188,7 @@ async function bootTitle(page: Page): Promise<void> {
   page.on('console', onConsole)
   page.on('pageerror', onError)
 
-  await page.goto(`${url}/?scenario=loop&seed=${seed}&mute=1`)
+  await page.goto(`${url}/?scenario=loop&seed=${seed}&mute=1&save=off`)
   await page.waitForFunction(() => !!(window as unknown as { __game?: unknown }).__game, null, { timeout: 30000 })
   const held = await page.evaluate(() => {
     const g = (window as any).__game

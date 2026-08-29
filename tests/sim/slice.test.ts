@@ -495,17 +495,19 @@ describe('statuses', () => {
     const e = w.spawnEnemy('brute', 200, 120)!
     e.state = 'chase'
     e.hp = 1
-    applyBurn(w, e, 1, 43)
-    let hits = 0, kills = 0
+    const burnActionId = 43
+    applyBurn(w, e, 1, burnActionId)
+    let hits = 0, kills = 0, killActionId = -1
     for (let i = 0; i < tuning.status.burn.interval + 2; i++) {
       stepWorld(w, emptyInput())
       for (const ev of w.events) {
         if (ev.type === 'hit') hits++
-        if (ev.type === 'kill') kills++
+        if (ev.type === 'kill') { kills++; killActionId = ev.actionId }
       }
       w.events.length = 0
     }
     expect(kills).toBe(1)
+    expect(killActionId).toBe(burnActionId)
     expect(hits).toBe(0)
     expect(w.freeze).toBe(0)
   })
@@ -580,6 +582,19 @@ describe('the vows of the Kindly One and Hecate', () => {
     const chasingResult = damageEnemyForTest(w, chasing, 1, 0, 0, true, 0, 71)
     resolveWeaponOnHit(w, chasing, true, 0, 0, 71, chasingResult)
     expect(chasing.hp).toBe(before - 1)
+  })
+
+  it('does not call an armored Minos wind-up unanswered when the blow cannot interrupt it', () => {
+    const w = armed()
+    grantBoon(w, 'unanswered')
+    const minos = w.spawnEnemy('warden', 200, 120)!
+    minos.hp = 99
+    minos.state = 'windup'
+    const before = minos.hp
+    const result = damageEnemyForTest(w, minos, 4, 0, 0, true, 0, 69)
+    expect(result.interrupted).toBe(false)
+    resolveWeaponOnHit(w, minos, true, 0, 0, 69, result)
+    expect(before - minos.hp).toBe(result.resolvedDamage)
   })
 
   it('Unanswered reads the state the target was in, not the one the blow left it in', () => {

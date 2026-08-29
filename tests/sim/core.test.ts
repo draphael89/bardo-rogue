@@ -972,7 +972,7 @@ describe('the Oath-Bound Hoplite', () => {
     expect(ticks).toBeGreaterThan(light.startup + light.active + light.recovery)
   })
 
-  it('names which case Minos is delivering, so only the gavel draws an impact', () => {
+  it('names which Warden pattern Minos is delivering so each release keeps its own presentation', () => {
     const w = createWorld(5, 'boss')
     w.player.god = true
     const seen = new Set<string>()

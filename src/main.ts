@@ -233,6 +233,10 @@ async function boot() {
       god: rep.god,
       ...(rep.scenario === 'loop' ? { meta: rep.meta ?? defaultMetaState() } : {}),
     })
+    // A replay is a measurement, even when it is installed through the live debug API after boot.
+    // Do not leave the first-impression title intercepting F/V/E/I while the replay owns input.
+    presenter.title.setSoundGate(false)
+    presenter.title.setShown(false)
     replayFrames = rep.frames.length ? rep.frames : null
     replayIdx = 0
   }
@@ -418,6 +422,10 @@ async function boot() {
   window.addEventListener('mousedown', () => { void dismissTitle(true) })
 
   window.addEventListener('keydown', e => {
+    // F belongs to the host even while the title is holding the sim. Treating every title key as
+    // "descend" swallowed the desktop app's first fullscreen press and made the advertised window
+    // control appear broken until the player pressed it twice.
+    if (e.code === 'KeyF' && !e.repeat) { e.preventDefault(); void platform.fullscreen(); return }
     if (presenter.title.visible) {
       if (e.repeat) return
       e.preventDefault()
@@ -434,7 +442,6 @@ async function boot() {
     if (e.code === 'F1') { e.preventDefault(); overlay.toggle() }
     if (e.code === 'F2') { e.preventDefault(); record() }
     if (e.code === 'F3') { e.preventDefault(); if (recorder.recording) stopRecord(); recorder.download() }
-    if (e.code === 'KeyF' && !e.repeat) { e.preventDefault(); void platform.fullscreen() }
     // Save management is reachable only from the pause screen, so it can never fire mid-fight.
     if (userPaused && !importing && e.code === 'KeyE' && !e.repeat) { e.preventDefault(); void exportSave() }
     if (userPaused && !importing && e.code === 'KeyI' && !e.repeat) { e.preventDefault(); void importSave() }

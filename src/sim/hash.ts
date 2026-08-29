@@ -27,7 +27,7 @@ const RITE: Record<RiteId, number> = { toll: 0 }
 // EVERY field is written unconditionally, at a fixed offset in its record. This file used to guard
 // "usually zero" fields with `if (x) write(x)` to keep old pinned hashes stable when a new feature
 // went unused — and that guard is an aliasing machine: two adjacent conditionals of the same width
-// let (phase=1, attackId=0) and (phase=0, attackId=1) feed the digest identical bytes, so two
+// let (phase=1, actionPhase=0) and (phase=0, actionPhase=1) feed the digest identical bytes, so two
 // different worlds hashed the same and a replay of one "verified" against the other. An audit
 // reproduced three such collisions. Variable-length data (strings, lists) is always length-prefixed
 // for the same reason. If a change here is intended, re-record the fixtures (`pnpm record-bots`);

@@ -54,7 +54,7 @@ export type SimEvent =
   | HitEvent
   | { type: 'kill'; x: number; y: number; angle: number; kind: EnemyKind; id: number; actionId: number }
   // `damage` is what was actually taken — zero under god mode — so metrics can count vessels lost
-  // rather than times touched: a gavel takes two, and the difference is the balance signal.
+  // rather than times touched: the Warden's slam takes two, and the difference is the balance signal.
   | { type: 'playerHurt'; x: number; y: number; angle: number; hp: number; maxHp: number; damage: number }
   // The sim names the killer. Presentation used to guess it from the nearest living body, which was
   // wrong exactly when it mattered most: a charger that dashed past, a bolt whose caster was already

@@ -16,8 +16,8 @@ export function makeBot(name: BotName): Bot {
     case 'idle': return () => emptyInput()
     case 'naive-melee': return naiveMelee
     case 'kite': return kite
-    case 'slice-naive': return makeSliceBot(naiveMelee)
-    case 'slice-kite': return makeSliceBot(kite)
+    case 'slice-naive': return makeSliceBot(naiveMelee, 'refused')
+    case 'slice-kite': return makeSliceBot(kite, 'paid')
   }
 }
 
@@ -57,7 +57,7 @@ function blocked(world: World, x: number, y: number): boolean {
 // Full-loop regression driver. It obeys the same physical rack, reward input, and door overlaps as a
 // player; combat delegates to the requested policy. It is intentionally stateful so one invocation
 // means one attempt, which makes pacing regressions easy to compare across seeds.
-function makeSliceBot(combat: Bot): Bot {
+function makeSliceBot(combat: Bot, toll: 'paid' | 'refused'): Bot {
   let finished = false
   let lastX = NaN, lastY = NaN, stuck = 0, orbit: 1 | -1 = 1
   return world => {
@@ -69,12 +69,26 @@ function makeSliceBot(combat: Bot): Bot {
     }
     if (world.session.run?.result === 'won') { inp.confirm = true; finished = true; return inp }
     if (world.roomPhase === 'transitioning') return inp
-    if (world.roomPhase === 'reward') { inp.confirm = true; return inp }
-    // The toll. Half the seeds pay and half swim, so a matrix run exercises both consequences: the
-    // fourth vow and the smaller life bar, or the debt that wades into the Hall of Minos.
+    if (world.roomPhase === 'reward') {
+      const reward = world.session.run?.pendingReward
+      // The skilled proof follows the projectile/dodge vocabulary it actually demonstrates at the
+      // Warden. A random first card can make a sound policy look weak simply by offering its
+      // defensive build in another slot; the naive proof deliberately keeps mashing the default.
+      const curatesBuild = toll === 'paid'
+      const mirror = reward?.options.indexOf('mirrorSteel') ?? -1
+      const torchlight = reward?.options.indexOf('torchlight') ?? -1
+      const betweenStep = reward?.options.indexOf('betweenStep') ?? -1
+      const preferred = curatesBuild ? (mirror >= 0 ? mirror : torchlight >= 0 ? torchlight : betweenStep) : -1
+      if (reward && preferred >= 0 && reward.focus !== preferred) inp.choiceDelta = preferred > reward.focus ? 1 : -1
+      else inp.confirm = true
+      return inp
+    }
+    // The two acceptance policies take opposite answers, so every matrix and browser smoke covers
+    // both consequences: the skilled run pays for a fourth vow and the mash run carries its debt
+    // into the Hall of Minos.
     if (world.roomPhase === 'entering') {
       const rite = world.session.run?.pendingRite
-      if (rite && (world.seed & 1) === 0 && rite.focus === 0) inp.choiceDelta = 1
+      if (rite && toll === 'refused' && rite.focus === 0) inp.choiceDelta = 1
       else inp.confirm = true
       return inp
     }
@@ -194,8 +208,18 @@ function kite(world: World): InputFrame {
     return x.stateTick > late
   })
   const incomingBolt = world.projectiles.find(b => b.active && b.team === 0
-    && Math.hypot(b.x - p.x, b.y - p.y) < 30
+    && Math.hypot(b.x - p.x, b.y - p.y) < 22
     && (p.x - b.x) * b.vx + (p.y - b.y) * b.vy > 0)
+  const cuttableBolt = e.kind === 'warden' ? world.projectiles.find(b => b.active && b.team === 0
+    && Math.hypot(b.x - p.x, b.y - p.y) < 50
+    && (p.x - b.x) * b.vx + (p.y - b.y) * b.vy > 0) : undefined
+  if (cuttableBolt && p.state === 'free') {
+    const dx = cuttableBolt.x - p.x, dy = cuttableBolt.y - p.y
+    const bd = Math.hypot(dx, dy) || 1
+    inp.aimX = dx / bd; inp.aimY = dy / bd
+    inp.attack = true
+    return inp
+  }
   if ((threat || incomingBolt) && p.state !== 'dodge') {
     inp.dodge = true
     // Prefer the old left-hand sidestep, but do not ask the collision regression probe to roll into

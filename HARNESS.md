@@ -36,7 +36,7 @@ per tick: `stepWorld(world, inputFrame)`.
 
 `pnpm sim -- --scenario wave3 --bot naive-melee --seeds 1-20 --ticks 10800` prints one row per seed:
 swings, hitsLanded, whiffSwings, kills, dodges, successfulDodges, boltsFired, boltsCut, enemyAttacks, damageTaken
-(HP actually lost — a gavel counts 2, god mode counts 0), hitsTaken (times touched, god mode included),
+(HP actually lost — the Warden's slam counts 2, god mode counts 0), hitsTaken (times touched, god mode included),
 deaths, wavesCleared, roomsEntered, boonsChosen, runResult, runSeconds, clear/death time, final room/phase, and timing.
 A stock combat scenario stops 2 s after clear or death; the production `loop` stops after its return to the Bardo.
 

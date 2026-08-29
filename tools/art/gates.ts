@@ -64,6 +64,12 @@ export interface GateContext {
  * Re-measure with:
  *   pnpm shot -- --scenario empty --ticks 60 --stepwise 1 --out /tmp/floor.png
  * then take the mean luminance of the central playable region.
+ *
+ * CAUTION since realms got their own floors. `--scenario empty` renders the THRESHOLD layout, whose
+ * `floorTint` is 0.828 of the hub's, so a naive re-measure reads low and would LOOSEN this gate for
+ * every sheet. The number below is the reference floor -- the Bardo, the one realm left untinted --
+ * and a re-measure has to be taken there. Realm floors only ever darken (0.718 at worst,
+ * `src/render/atmospherePresets.ts`), so grading against the reference stays the safe direction.
  */
 const RENDERED_FLOOR_LUMINANCE = 0.1297
 

@@ -178,7 +178,18 @@ bus, and PR #13's three checkpoint holes (reward re-farm on reload, unlimited ro
 restore guard that could never return false). What the audit found and the merge did NOT close,
 ranked by what a sitting player would notice first. Each is evidenced; none is a hunch.
 
-1. **The realm dress does not change the room.** Seven rooms the ledger describes as river / ash /
+1. **The realm dress does not change the room.** — **CLOSED** (`claude/realm-dress-registers`).
+   The cause was one layer deeper than this entry says. `dress.ts` swaps tile INDICES out of a
+   single sheet and retints braziers; the floor sprite was never tinted at all, and
+   `juice.light.ambientTint` put one indigo over the whole world layer in every room. So no fog
+   value could have fixed it: a wine hall lit by indigo is an indigo hall. `AtmospherePreset` now
+   carries `floorTint` and `ambientTint`, green held high so a floor changes hue without going
+   dark. Measured with the new `pnpm realm-air` across four spines — median pair separation
+   2.0–2.8/255 before, **9.5–9.7 after**, and where every room previously read blue (including the
+   wine Hall and the gold Landing), **no realm now reads the wrong temperature**. The original text
+   is kept below because its evidence still reads true from the outside.
+
+   ~~Original entry.~~ Seven rooms the ledger describes as river / ash /
    ice / iron / bronze / wine-fire / wine-hall render as the same blue-grey masonry — measured mean
    RGB across the play area differs by under 4/255 between Acheron and the Hall. `fogAlpha` 0.10 and
    `rayAlpha` 0.06 (`tuning.ts:473-474`) are too low for the presets in

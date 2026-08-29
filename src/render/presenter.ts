@@ -33,9 +33,12 @@ import { OATH } from './oathMetal'
 import { MINOS } from './minosInk'
 import { LAMPAD } from './lampadInk'
 import { SPAWN, debtCoin, spawnInk, spawnPad } from './spawnInk'
-import { arrivalFlash, VEIL_FLASH } from './atmospherePresets'
+import { arrivalFlash, atmosphereFor, VEIL_FLASH } from './atmospherePresets'
 
 // Reads sim state + events every frame and drives everything visible. Never mutates the sim.
+/** The realm's stone for the room we are standing in. One expression, so both build sites agree. */
+const floorTintFor = (world: World) => atmosphereFor(world.rooms[world.roomIndex]?.layout ?? 'threshold').floorTint
+
 export class Presenter {
   playerView: EntityView
   enemyViews = new Map<number, EntityView>()
@@ -98,7 +101,7 @@ export class Presenter {
   constructor(public ra: RenderApp, public atlas: Atlas, public world: World) {
     seedFx(world.seed)
     const L = ra.layers
-    this.tilemap = buildTilemap(ra.app.renderer, atlas, world.arena, ra.arenaOffset)
+    this.tilemap = buildTilemap(ra.app.renderer, atlas, world.arena, ra.arenaOffset, floorTintFor(world))
     L.floor.addChild(this.tilemap.voidLayer, this.tilemap.sprite, this.tilemap.door)
     for (const p of world.arena.props) {
       const s = makePropSprite(atlas, p)
@@ -971,7 +974,7 @@ export class Presenter {
     this.tilemap.voidLayer.destroy()
     for (const s of this.propSprites) s.destroy()
     this.propSprites = []
-    this.tilemap = buildTilemap(this.ra.app.renderer, this.atlas, this.world.arena, this.ra.arenaOffset)
+    this.tilemap = buildTilemap(this.ra.app.renderer, this.atlas, this.world.arena, this.ra.arenaOffset, floorTintFor(this.world))
     L.floor.addChild(this.tilemap.voidLayer, this.tilemap.sprite, this.tilemap.door)
     for (const p of this.world.arena.props) {
       const s = makePropSprite(this.atlas, p)

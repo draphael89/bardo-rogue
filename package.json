@@ -24,7 +24,10 @@
     "smoke:desktop": "tsx tools/desktop-smoke.ts",
     "strip": "tsx tools/strip.ts",
     "record-bot": "tsx tools/record-bot.ts",
-    "record-bots": "tsx tools/record-bot.ts --all"
+    "record-bots": "tsx tools/record-bot.ts --all",
+    "art": "tsx tools/art.ts",
+    "palette": "tsx tools/art.ts palette",
+    "fx": "tsx tools/make-bardo-fx.ts"
   },
   "dependencies": {
     "pixi.js": "^8.20.1"

@@ -16,5 +16,8 @@ export function tryCollectOffering(world: World): void {
   world.player.hp = Math.min(world.player.maxHp, world.player.hp + gain)
   const run = world.session.run
   if (run) { run.hp = world.player.hp; run.maxHp = world.player.maxHp }
-  world.emit({ type: 'offeringTaken', kind: o.kind, x: o.x, y: o.y })
+  world.emit({
+    type: 'offeringTaken', kind: o.kind, x: o.x, y: o.y,
+    hp: world.player.hp, maxHp: world.player.maxHp,
+  })
 }

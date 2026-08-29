@@ -25,5 +25,29 @@ Standing directive for agents working here: `GAUNTLET.md` (build/critic loop, co
 The browser is the development target and stays first-class; `desktop/` is a thin Electron host around the same build. `src/sim/` and `src/render/` never learn which host they are in — everything host-specific goes behind `src/platform/`. Saves are one versioned JSON envelope (`src/sim/save.ts`), stored in localStorage on the web and in `userData/saves` on the desktop. The full rationale, phases and the Steam path: `PLATFORM_STRATEGY.md`.
 
 ## Assets
-`public/assets/` is committed. A release build copies ONLY `public/assets` (publicDir is off for `command === 'build'`), so anything else added under `public/` will not ship; `tools/check-build.ts` fails the build if a required file or a manifest-named asset is missing, or if evidence, a video or an oversized payload got in. Two generators write it and both rewrite `manifest.json`: `pnpm assets` (Kenney subset, needs `KENNEY_DIR` + `unzip`) then `pnpm tiles` (original `bardo_room.png`/`bardo_props.png`). Running `assets` after `tiles` drops the bardo sprites from the manifest. Never edit generated files; change the tool.
-Room tile indices: `src/sim/arena.ts` (bardo_room sheet). Character/weapon indices (still Kenney Tiny Dungeon): `src/render/views.ts` (`SPRITE`, `WEAPON`).
+`public/assets/` is committed and holds **compiled output only**. Never edit a generated file; change the tool.
+A release build copies ONLY `public/assets` (publicDir is off for `command === 'build'`), so anything else added under `public/` will not ship; `tools/check-build.ts` fails the build if a required file or a manifest-named asset is missing, or if evidence, a video or an oversized payload got in.
+
+The art pipeline (`docs/ART_PIPELINE_AUDIT.md` for why, `ART_DIRECTION.md` §12 for how):
+
+| Command | Lane |
+| --- | --- |
+| `pnpm palette` | canon palette -> `art/palette/canon.{png,gpl}` + swatch. `canon.json` is the single source of truth for every colour. |
+| `pnpm art generate <gen-spec>` | provider -> candidates in `.art-cache/`. `--dry-run` prints the prompt and request without a key. |
+| `pnpm art compile <spec>` | source image -> sheet PNG + JSON sidecar, then gates. Exits non-zero on a hard gate failure. |
+| `pnpm art gate` / `pnpm art preview` | re-check or eyeball a compiled sheet at 1x on the room's floor value. |
+| `pnpm tiles` | code-authored room + prop sheets. |
+| `pnpm fx` | code-authored particles and ground decals. |
+| `pnpm assets` | the shrinking Kenney subset (needs `KENNEY_DIR` + `unzip`). |
+
+Asset lifecycle: `art/specs/` (versioned specs) -> `.art-cache/` (disposable candidates, gitignored)
+-> `art/approved/` (human-approved masters, the style reference pool) -> `public/assets/` (compiled).
+Candidates never write into `public/assets`.
+
+Authored sheets are addressed by **semantic frame name**, not cell index: `atlas.sheet('bardo_hero').frame('light1Contact')`
+returns the texture, its white silhouette, its foot pivot and its sockets from the sidecar. Combat
+clips carry no timing of their own — the renderer derives the frame from `stateTick` against
+`tuning.ts`, which is what stops art desyncing from a hitbox. Do not reintroduce pivot tables in view files.
+
+Only `tiles`/`fx`/`assets` touch `manifest.json`, and each rewrites just the keys it owns.
+Room tile indices: `src/sim/arena.ts`. Remaining Kenney actor indices (caster, charger, warden, dummy): `src/render/views/shared.ts` (`SPRITE`, `WEAPON`).

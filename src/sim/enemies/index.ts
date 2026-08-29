@@ -8,6 +8,7 @@ import { applyEnemyKnockback } from './common'
 export function updateEnemies(world: World): void {
   for (const e of world.enemies) {
     if (!e.active) continue
+    e.poseTick++
     e.stateTick++
     if (e.flash > 0) e.flash--
     if (e.brandTicks > 0 && --e.brandTicks === 0) e.brand = 0

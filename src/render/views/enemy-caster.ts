@@ -2,7 +2,10 @@ import { Graphics as GraphicsCtor } from 'pixi.js'
 import type { Container, Graphics } from 'pixi.js'
 import type { Atlas } from '../atlas'
 import type { Enemy } from '@/sim/world'
+import type { Arena } from '@/sim/arena'
+import { raycastSolidDistance } from '@/sim/collision'
 import { tuning } from '@/tuning'
+import { isDangerPointVisible } from '../terrain'
 import { lerp, clamp01, easeOutCubic, easeOutBack, lerpAngle } from '../anim'
 import { casterLockTick } from '@/sim/enemies/caster'
 import { EntityView, HALF_PI, type EnemyFrame, type Pose } from './shared'
@@ -29,7 +32,13 @@ const TINT_LOCK = 0xff70ff     // it has committed: a chromatic wash, not the ol
 const TINT_SEVER = 0xff00ff    // the sever runs back up the staff for the first beats of the backlash
 const TINT_SEVER_2 = 0xff70ff  // one flat step out of it, not a fade
 
-export function updateCasterView(v: EntityView, e: Enemy, f: EnemyFrame, out: Pose): void {
+// drawAimLine is dispatched later by the shared presenter, which deliberately owns only the enemy.
+// Remember the authoritative arena supplied by updateEnemyView without broadening that hot API or
+// duplicating room bounds in presentation.
+const casterArena = new WeakMap<Enemy, Arena>()
+
+export function updateCasterView(v: EntityView, e: Enemy, f: EnemyFrame, out: Pose, arena: Arena): void {
+  casterArena.set(e, arena)
   const { time, tk } = f
   let sx = 1, sy = 1, rot = 0, hop = 0, tint = 0xffffff
   const C = tuning.caster
@@ -487,7 +496,11 @@ export function drawAimLine(g: Graphics, e: Enemy, alpha: number): void {
   const left = C.aimTicks - tk
   // e.targetY is centre-to-centre. Subtract the muzzle so the bracket sits on you, not through you.
   const toYou = e.targetY > 8 ? e.targetY : FALLBACK_LEN
-  const full = Math.max(12, toYou - (e.radius + 4) + OVERSHOOT)
+  const wanted = Math.max(12, toYou - (e.radius + 4) + OVERSHOOT)
+  const arena = casterArena.get(e)
+  // The projectile is a point for terrain collision in the simulation. Its sight therefore ends at
+  // this exact same first solid contact, even when its recorded target lies behind a pillar.
+  const full = arena ? raycastSolidDistance(arena, ox, oy, e.aimAngle, wanted) : wanted
 
   if (tk < lockTick) {
     // SEARCHING: two dashed rails converge onto the ray as it finds you. Dark and chromatic, so it
@@ -505,12 +518,14 @@ export function drawAimLine(g: Graphics, e: Enemy, alpha: number): void {
       if (t > 0.45 && (n & 1)) continue
       if (s < 0.34 && (n % 3) === 2) continue
       const drift = Math.sin(d * 0.14 + tk * 0.26) * spread
-      for (const side of [1, -1]) {
+      for (let sideIndex = 0; sideIndex < 2; sideIndex++) {
+        const side = sideIndex === 0 ? 1 : -1
         const px = Math.round(ox + ca * d + nx * drift * side)
         const py = Math.round(oy + sa * d + ny * drift * side)
+        if (arena && !isDangerPointVisible(arena, ox, oy, px, py)) continue
         // hi over lo: a lit pixel over a dark one, so a dark telegraph still reads as energy rather
         // than as a speck of dirt on the floor. One pixel each, not a 2x1 bar over a 2x2 shadow.
-        g.rect(px, py + 1, 1, 1).fill({ color: COL_UNDER })
+        if (!arena || isDangerPointVisible(arena, ox, oy, px, py + 1)) g.rect(px, py + 1, 1, 1).fill({ color: COL_UNDER })
         // the pips only light in the last third of the search, as the rails close: the telegraph
         // gets BRIGHTER as it finds you, and the middle of the aim - when nothing is happening yet -
         // is the quietest the lane ever gets. It used to carry white pips from tick one, which is
@@ -535,30 +550,35 @@ export function drawAimLine(g: Graphics, e: Enemy, alpha: number): void {
     if (gather > 0.34 && ((n + beat) & 1)) continue                   // thinning as it charges
     if (gather > 0.7 && ((n + beat) % 3) !== 0) continue              // and thinner still
     const px = Math.round(ox + ca * d), py = Math.round(oy + sa * d)
+    if (arena && !isDangerPointVisible(arena, ox, oy, px, py)) continue
     const hot = clamp01(1 - Math.abs(d - flashD) / FLASH_WIDTH)
     // A sight, not a shot: 1px chromatic lock over a floor bite. The racing flash is the only
     // white on the ray — a filled core the whole length reads as already hitting.
-    g.rect(px, py + 1, 1, 1).fill({ color: COL_UNDER })
+    if (!arena || isDangerPointVisible(arena, ox, oy, px, py + 1)) g.rect(px, py + 1, 1, 1).fill({ color: COL_UNDER })
     g.rect(px, py, 1, 1).fill({ color: hot > 0.28 ? COL_HOT : COL_SIGHT })
   }
   for (let d = NODE_STEP; d < reach; d += NODE_STEP) {
     const px = Math.round(ox + ca * d), py = Math.round(oy + sa * d)
+    if (arena && !isDangerPointVisible(arena, ox, oy, px, py)) continue
     const hot = clamp01(1 - Math.abs(d - flashD) / FLASH_WIDTH)
     // the beads are WHITE, one pixel each. They used to be 2x3 blocks of chroma-120 every 9px, which
     // on its own was more saturated area than the live bolt carried. White pips cost the line four
     // pixels of area and read further than the blocks did.
-    g.rect(px, py + 1, 1, 1).fill({ color: COL_UNDER })
-    g.rect(px, py - 1, 1, 1).fill({ color: COL_UNDER })
+    if (!arena || isDangerPointVisible(arena, ox, oy, px, py + 1)) g.rect(px, py + 1, 1, 1).fill({ color: COL_UNDER })
+    if (!arena || isDangerPointVisible(arena, ox, oy, px, py - 1)) g.rect(px, py - 1, 1, 1).fill({ color: COL_UNDER })
     g.rect(px, py, 1, 1).fill({ color: hot > 0.35 ? COL_HOT : COL_NODE })
   }
   // the far end: a white bracket that says the ray stops ON you. It CLOSES on the gather, from three
   // pixels out to one, so the last beat of the warning is a pinch rather than a bloom.
   const ex = Math.round(ox + ca * reach), ey = Math.round(oy + sa * reach)
   const bl = 4 - Math.round(gather * 2)
-  for (const side of [1, -1]) {
+  for (let sideIndex = 0; sideIndex < 2; sideIndex++) {
+    const side = sideIndex === 0 ? 1 : -1
     const bx = Math.round(ex + nx * bl * side), by = Math.round(ey + ny * bl * side)
-    g.rect(bx - 1, by, 3, 1).fill({ color: COL_UNDER })
-    g.rect(bx, by, 1, 1).fill({ color: COL_HOT })
+    for (let dx = -1; dx <= 1; dx++) {
+      if (!arena || isDangerPointVisible(arena, ox, oy, bx + dx, by)) g.rect(bx + dx, by, 1, 1).fill({ color: COL_UNDER })
+    }
+    if (!arena || isDangerPointVisible(arena, ox, oy, bx, by)) g.rect(bx, by, 1, 1).fill({ color: COL_HOT })
   }
   muzzleCharge(g, ox, oy, 2 - Math.round(gather), true)
 }

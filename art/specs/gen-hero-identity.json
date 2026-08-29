@@ -1,0 +1,10 @@
+{
+  "subject": "the hero of a bardo: a lean warrior in worn iron plate over wine-dark cloth, a split helm crest breaking the top of the silhouette, muted gold trim marking the plate's edges, bone-pale wrappings at the forearms, carrying an oversized greatsword physically held in both hands. Facing the viewer, standing at rest.",
+  "size": 32,
+  "kind": "character",
+  "view": "high top-down",
+  "count": 8,
+  "palette": ["mortar","purple0","purple1","purple2","purple3","iron","ironHi","slate3","slateHi","brick","cope","goldDim","gold","goldHot","boneDim","bone"],
+  "references": ["art/approved/"],
+  "note": "The identity sheet: ONE south-facing master pose, generated as 8 candidates, gated, and then approved by a human. This is the single deliberate human checkpoint in the pipeline. Nothing downstream — directions, swing chain, hurt, death — may be generated until a master from this batch is approved into art/approved/, because everything after it is conditioned on the master and would inherit its faults."
+}

@@ -8,6 +8,8 @@ export interface AimSources {
   arrowX: number; arrowY: number      // arrow keys, 8-way; 0,0 when none held
   mouseX: number; mouseY: number      // unit vector player -> cursor; 0,0 until the pointer has moved
   lockX: number; lockY: number        // hold-to-lock: unit vector to the locked target; 0,0 when unused
+  retainedX: number; retainedY: number // released arrow/stick direction while prior movement continues
+  retainedSoft: boolean               // arrows stay assistable; an authored analog direction stays exact
   moveX: number; moveY: number        // current movement intent
   lastAimX: number; lastAimY: number  // whatever we resolved last tick
 }
@@ -28,6 +30,7 @@ export function resolveAim(s: AimSources): Aim {
   // simulation's short-range assist silently replace a retained long-range lock with a nearby body.
   if (s.lockX || s.lockY) return unit(s.lockX, s.lockY, false)
   if (s.mouseX || s.mouseY) return unit(s.mouseX, s.mouseY, false)
+  if (s.retainedX || s.retainedY) return unit(s.retainedX, s.retainedY, s.retainedSoft)
   if (s.moveX || s.moveY) return unit(s.moveX, s.moveY, true)
   return { x: s.lastAimX, y: s.lastAimY, soft: true }
 }

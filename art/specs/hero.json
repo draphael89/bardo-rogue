@@ -1,0 +1,245 @@
+{
+  "id": "actor.hero",
+  "kind": "character",
+  "input": "art/approved/bardo_hero_alpha_v1.png",
+  "output": "public/assets/sprites/bardo_hero.png",
+  "sidecar": "public/assets/sprites/bardo_hero.json",
+  "cell": 32,
+  "cols": 4,
+  "rows": 4,
+  "maxColors": 16,
+  "palette": [
+    "mortar",
+    "purple0",
+    "purple1",
+    "purple2",
+    "purple3",
+    "iron",
+    "ironHi",
+    "slate3",
+    "slateHi",
+    "brick",
+    "cope",
+    "goldDim",
+    "gold",
+    "goldHot",
+    "boneDim",
+    "bone"
+  ],
+  "paletteNote": "Sixteen canon colours, not forty. SS1.3.1 caps a character at 16 including the outline; the cap is a quality lever, not a filesize one - a small deliberate ramp is what separates authored art from a gradient. Spans B0 (mortar, the outline: darkest value of the material, never pure black) through B5 (cope on the blade edge, goldHot on the trim), so SS1.3.3 three-band minimum holds in every frame. Wine carries the body, steel the plate and greatsword, gold the threshold trim, bone the cloth.\ncope and goldHot were briefly cut to chase a highlight budget, and the sheet got worse: with no bright steel the blade mapped into bone instead, which is both brighter AND the wrong material. SS3.2.5 ranks the player weapon specular second only to the hit flash, so a bright blade is correct. See the b5-mass gate note in tools/art/gates.ts.",
+  "facing": "east",
+  "mirror": true,
+  "fit": "grid",
+  "chromaKey": true,
+  "coverage": 0.5,
+  "valueLift": {
+    "targetMean": 0.31
+  },
+  "valueLiftNote": "A light touch. The hero already cleared ground separation sheet-wide at Weber 1.22; this only pulls the coiled heavy wind-up - the frame a player most needs to read - up out of the floor band.",
+  "salience": {
+    "minShare": 0.22,
+    "minDelta": 0.16
+  },
+  "note": "Pivots are the values that shipped in views/player.ts HERO_PIVOT_Y. Source cells carry poses with very different silhouettes, so their logical feet are not all at row 32; the horizontal dodge especially. Declared rather than detected so this compile is a pixel-for-pixel migration of an already-judged registration.",
+  "frames": [
+    {
+      "name": "idle",
+      "i": 0,
+      "pivot": [
+        16,
+        28
+      ]
+    },
+    {
+      "name": "runA",
+      "i": 1,
+      "pivot": [
+        16,
+        28
+      ]
+    },
+    {
+      "name": "runB",
+      "i": 2,
+      "pivot": [
+        16,
+        28
+      ]
+    },
+    {
+      "name": "hurt",
+      "i": 3,
+      "pivot": [
+        16,
+        28
+      ]
+    },
+    {
+      "name": "light1Start",
+      "i": 4,
+      "pivot": [
+        16,
+        26
+      ]
+    },
+    {
+      "name": "light1Contact",
+      "i": 5,
+      "pivot": [
+        16,
+        26
+      ]
+    },
+    {
+      "name": "light1Recover",
+      "i": 6,
+      "pivot": [
+        16,
+        32
+      ]
+    },
+    {
+      "name": "light2Start",
+      "i": 7,
+      "pivot": [
+        16,
+        26
+      ]
+    },
+    {
+      "name": "light2Contact",
+      "i": 8,
+      "pivot": [
+        16,
+        25
+      ]
+    },
+    {
+      "name": "light2Recover",
+      "i": 9,
+      "pivot": [
+        16,
+        25
+      ]
+    },
+    {
+      "name": "heavyStart",
+      "i": 10,
+      "pivot": [
+        16,
+        25
+      ]
+    },
+    {
+      "name": "heavyContact",
+      "i": 11,
+      "pivot": [
+        16,
+        25
+      ]
+    },
+    {
+      "name": "dodgeStart",
+      "i": 12,
+      "pivot": [
+        16,
+        21
+      ]
+    },
+    {
+      "name": "dodgeTravel",
+      "i": 13,
+      "pivot": [
+        16,
+        14
+      ]
+    },
+    {
+      "name": "dodgeLand",
+      "i": 14,
+      "pivot": [
+        16,
+        21
+      ]
+    },
+    {
+      "name": "dead",
+      "i": 15,
+      "pivot": [
+        16,
+        23
+      ]
+    }
+  ],
+  "aliases": {
+    "heavyRecover": "heavyStart"
+  },
+  "clips": {
+    "run": {
+      "frames": [
+        "runA",
+        "runB"
+      ],
+      "timing": "ticks",
+      "ticks": [
+        7,
+        7
+      ],
+      "loop": true
+    },
+    "light1": {
+      "frames": [
+        "light1Start",
+        "light1Contact",
+        "light1Recover"
+      ],
+      "timing": "sim",
+      "sim": {
+        "ref": "player.attack.swings.0",
+        "contact": "light1Contact"
+      }
+    },
+    "light2": {
+      "frames": [
+        "light2Start",
+        "light2Contact",
+        "light2Recover"
+      ],
+      "timing": "sim",
+      "sim": {
+        "ref": "player.attack.swings.1",
+        "contact": "light2Contact"
+      }
+    },
+    "heavy": {
+      "frames": [
+        "heavyStart",
+        "heavyContact",
+        "heavyRecover"
+      ],
+      "timing": "sim",
+      "sim": {
+        "ref": "player.attack.swings.2",
+        "contact": "heavyContact"
+      }
+    },
+    "dodge": {
+      "frames": [
+        "dodgeStart",
+        "dodgeTravel",
+        "dodgeLand"
+      ],
+      "timing": "sim",
+      "sim": {
+        "ref": "player.dodge"
+      }
+    }
+  },
+  "provenance": {
+    "provider": "openai",
+    "model": "gpt-image (built-in tool)",
+    "approvedSource": "art/approved/bardo_hero_alpha_v1.png",
+    "promptFile": "art/bardo-combat-sprites.md",
+    "promptHash": "48e838b1f87f62c86c89db1bef18c85e063581a64d9e41fae853fb1787ff0bb1"
+  }
+}

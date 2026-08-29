@@ -1,0 +1,557 @@
+{
+  "$schema": "./canon.schema.json",
+  "name": "bardo.canon",
+  "version": 1,
+  "note": "Single source of truth for every colour in Bardo Rogue. ART_DIRECTION.md SS1 is the prose; this is the machine form. Bands are COMPUTED from relative luminance (0.2126R+0.7152G+0.0722B), never hand-typed. Never edit generated consumers; edit this file and re-run pnpm palette.",
+  "bands": {
+    "B0": "0-8% Void",
+    "B1": "8-20% Ground",
+    "B2": "20-35% Form",
+    "B3": "35-52% Edge",
+    "B4": "52-72% Trim",
+    "B5": "72-95% Light"
+  },
+  "budgets": {
+    "tile": 10,
+    "prop": 12,
+    "character": 16,
+    "boss": 24,
+    "effect": 6
+  },
+  "colors": {
+    "void": {
+      "hex": "#08070E",
+      "rgb": [
+        8,
+        7,
+        14
+      ],
+      "band": "B0",
+      "luminance": 0.0303,
+      "family": "shadow",
+      "role": "Space outside the room. Deepest crevice."
+    },
+    "mortar": {
+      "hex": "#0A0C12",
+      "rgb": [
+        10,
+        12,
+        18
+      ],
+      "band": "B0",
+      "luminance": 0.0471,
+      "family": "shadow",
+      "role": "Wall joints, hard occlusion."
+    },
+    "grout": {
+      "hex": "#0C0E16",
+      "rgb": [
+        12,
+        14,
+        22
+      ],
+      "band": "B0",
+      "luminance": 0.0555,
+      "family": "shadow",
+      "role": "Floor joints."
+    },
+    "seal0": {
+      "hex": "#12141C",
+      "rgb": [
+        18,
+        20,
+        28
+      ],
+      "band": "B0",
+      "luminance": 0.079,
+      "family": "shadow",
+      "role": "UI panel fill, dark inlay."
+    },
+    "slate0": {
+      "hex": "#1C2434",
+      "rgb": [
+        28,
+        36,
+        52
+      ],
+      "band": "B1",
+      "luminance": 0.139,
+      "family": "stone",
+      "role": "Floor body, contact shadow."
+    },
+    "slate1": {
+      "hex": "#2E3A4E",
+      "rgb": [
+        46,
+        58,
+        78
+      ],
+      "band": "B2",
+      "luminance": 0.2231,
+      "family": "stone",
+      "role": "Floor slab body."
+    },
+    "slate2": {
+      "hex": "#425066",
+      "rgb": [
+        66,
+        80,
+        102
+      ],
+      "band": "B2",
+      "luminance": 0.3083,
+      "family": "stone",
+      "role": "Lit slab face."
+    },
+    "slate3": {
+      "hex": "#58667C",
+      "rgb": [
+        88,
+        102,
+        124
+      ],
+      "band": "B3",
+      "luminance": 0.3946,
+      "family": "stone",
+      "role": "Slab north edge."
+    },
+    "slateHi": {
+      "hex": "#76849A",
+      "rgb": [
+        118,
+        132,
+        154
+      ],
+      "band": "B3",
+      "luminance": 0.5122,
+      "family": "stone",
+      "role": "Chip, specular on wet stone. Under 2% of a tile."
+    },
+    "nave0": {
+      "hex": "#343C4C",
+      "rgb": [
+        52,
+        60,
+        76
+      ],
+      "band": "B2",
+      "luminance": 0.2332,
+      "family": "stone",
+      "role": "Second stone family."
+    },
+    "nave1": {
+      "hex": "#485262",
+      "rgb": [
+        72,
+        82,
+        98
+      ],
+      "band": "B2",
+      "luminance": 0.3178,
+      "family": "stone",
+      "role": "Second stone family, lit."
+    },
+    "nave2": {
+      "hex": "#5E6876",
+      "rgb": [
+        94,
+        104,
+        118
+      ],
+      "band": "B3",
+      "luminance": 0.4035,
+      "family": "stone",
+      "role": "Second stone family, edge."
+    },
+    "naveWarm": {
+      "hex": "#5C503A",
+      "rgb": [
+        92,
+        80,
+        58
+      ],
+      "band": "B2",
+      "luminance": 0.3175,
+      "family": "stone",
+      "role": "Warm stain in stone. The only warm in the floor."
+    },
+    "brickLo": {
+      "hex": "#767E8E",
+      "rgb": [
+        118,
+        126,
+        142
+      ],
+      "band": "B3",
+      "luminance": 0.492,
+      "family": "wall",
+      "role": "Wall face body. Ceiling value for a wall face."
+    },
+    "brick": {
+      "hex": "#949CAC",
+      "rgb": [
+        148,
+        156,
+        172
+      ],
+      "band": "B4",
+      "luminance": 0.6096,
+      "family": "wall",
+      "role": "Wall course highlight. 1px runs only."
+    },
+    "brickHi": {
+      "hex": "#BCC2D0",
+      "rgb": [
+        188,
+        194,
+        208
+      ],
+      "band": "B5",
+      "luminance": 0.7597,
+      "family": "wall",
+      "role": "Cope underside."
+    },
+    "cope": {
+      "hex": "#D2D8E2",
+      "rgb": [
+        210,
+        216,
+        226
+      ],
+      "band": "B5",
+      "luminance": 0.8449,
+      "family": "wall",
+      "role": "Wall top cap, 1-2px."
+    },
+    "copeHi": {
+      "hex": "#ECF0F6",
+      "rgb": [
+        236,
+        240,
+        246
+      ],
+      "band": "B5",
+      "luminance": 0.9395,
+      "family": "wall",
+      "role": "Cope specular, 1px, key-light side only."
+    },
+    "iron": {
+      "hex": "#26262E",
+      "rgb": [
+        38,
+        38,
+        46
+      ],
+      "band": "B1",
+      "luminance": 0.1513,
+      "family": "metal",
+      "role": "Iron body."
+    },
+    "ironHi": {
+      "hex": "#4C4C56",
+      "rgb": [
+        76,
+        76,
+        86
+      ],
+      "band": "B2",
+      "luminance": 0.3009,
+      "family": "metal",
+      "role": "Iron lit face."
+    },
+    "goldDim": {
+      "hex": "#8C7040",
+      "rgb": [
+        140,
+        112,
+        64
+      ],
+      "band": "B3",
+      "luminance": 0.449,
+      "family": "metal",
+      "role": "Gold shadow. Panel borders."
+    },
+    "gold": {
+      "hex": "#D4B060",
+      "rgb": [
+        212,
+        176,
+        96
+      ],
+      "band": "B4",
+      "luminance": 0.6976,
+      "family": "metal",
+      "role": "Gold body. The threshold colour."
+    },
+    "goldHot": {
+      "hex": "#F0D080",
+      "rgb": [
+        240,
+        208,
+        128
+      ],
+      "band": "B5",
+      "luminance": 0.8197,
+      "family": "metal",
+      "role": "Gold specular. 1-2px."
+    },
+    "sky": {
+      "hex": "#0E122C",
+      "rgb": [
+        14,
+        18,
+        44
+      ],
+      "band": "B0",
+      "luminance": 0.0746,
+      "family": "supernatural",
+      "role": "Inside every window, door, and well. Star-sky."
+    },
+    "star": {
+      "hex": "#B0C4FF",
+      "rgb": [
+        176,
+        196,
+        255
+      ],
+      "band": "B5",
+      "luminance": 0.7687,
+      "family": "supernatural",
+      "role": "Star pixel, cold."
+    },
+    "goldStar": {
+      "hex": "#FFE2A0",
+      "rgb": [
+        255,
+        226,
+        160
+      ],
+      "band": "B5",
+      "luminance": 0.8918,
+      "family": "supernatural",
+      "role": "Star pixel, warm. 1 in 3 stars."
+    },
+    "ember": {
+      "hex": "#FF7A18",
+      "rgb": [
+        255,
+        122,
+        24
+      ],
+      "band": "B4",
+      "luminance": 0.5616,
+      "family": "supernatural",
+      "role": "Flame body."
+    },
+    "emberHi": {
+      "hex": "#FFCC56",
+      "rgb": [
+        255,
+        204,
+        86
+      ],
+      "band": "B5",
+      "luminance": 0.8091,
+      "family": "supernatural",
+      "role": "Flame core."
+    },
+    "emberLo": {
+      "hex": "#B03010",
+      "rgb": [
+        176,
+        48,
+        16
+      ],
+      "band": "B2",
+      "luminance": 0.2859,
+      "family": "supernatural",
+      "role": "Flame shadow, scorch."
+    },
+    "purple0": {
+      "hex": "#2A0E1C",
+      "rgb": [
+        42,
+        14,
+        28
+      ],
+      "band": "B1",
+      "luminance": 0.0822,
+      "family": "cloth",
+      "role": "Wine cloth shadow."
+    },
+    "purple1": {
+      "hex": "#4E1C2E",
+      "rgb": [
+        78,
+        28,
+        46
+      ],
+      "band": "B1",
+      "luminance": 0.1566,
+      "family": "cloth",
+      "role": "Wine cloth body."
+    },
+    "purple2": {
+      "hex": "#762E40",
+      "rgb": [
+        118,
+        46,
+        64
+      ],
+      "band": "B2",
+      "luminance": 0.2455,
+      "family": "cloth",
+      "role": "Wine cloth lit."
+    },
+    "purple3": {
+      "hex": "#9E4658",
+      "rgb": [
+        158,
+        70,
+        88
+      ],
+      "band": "B3",
+      "luminance": 0.353,
+      "family": "cloth",
+      "role": "Wine cloth highlight."
+    },
+    "boneLo": {
+      "hex": "#5A4E42",
+      "rgb": [
+        90,
+        78,
+        66
+      ],
+      "band": "B2",
+      "luminance": 0.3125,
+      "family": "organic",
+      "role": "Bone hollow. Warm, never grey."
+    },
+    "boneDim": {
+      "hex": "#90806C",
+      "rgb": [
+        144,
+        128,
+        108
+      ],
+      "band": "B3",
+      "luminance": 0.5096,
+      "family": "organic",
+      "role": "Bone shadow face."
+    },
+    "bone": {
+      "hex": "#D0C0A8",
+      "rgb": [
+        208,
+        192,
+        168
+      ],
+      "band": "B5",
+      "luminance": 0.7595,
+      "family": "organic",
+      "role": "Bone body. The eye second stop."
+    },
+    "woodLo": {
+      "hex": "#261A16",
+      "rgb": [
+        38,
+        26,
+        22
+      ],
+      "band": "B1",
+      "luminance": 0.1108,
+      "family": "organic",
+      "role": "Wood shadow."
+    },
+    "wood": {
+      "hex": "#3C2A22",
+      "rgb": [
+        60,
+        42,
+        34
+      ],
+      "band": "B1",
+      "luminance": 0.1774,
+      "family": "organic",
+      "role": "Wood body."
+    },
+    "woodHi": {
+      "hex": "#5C4230",
+      "rgb": [
+        92,
+        66,
+        48
+      ],
+      "band": "B2",
+      "luminance": 0.2754,
+      "family": "organic",
+      "role": "Wood lit face, plank end."
+    },
+    "well": {
+      "hex": "#04030A",
+      "rgb": [
+        4,
+        3,
+        10
+      ],
+      "band": "B0",
+      "luminance": 0.0146,
+      "family": "supernatural",
+      "role": "Open doorway interior: a hole you walk through."
+    },
+    "wellHi": {
+      "hex": "#0C0816",
+      "rgb": [
+        12,
+        8,
+        22
+      ],
+      "band": "B0",
+      "luminance": 0.0387,
+      "family": "supernatural",
+      "role": "Open doorway, inner lip."
+    },
+    "sill": {
+      "hex": "#FFBA60",
+      "rgb": [
+        255,
+        186,
+        96
+      ],
+      "band": "B5",
+      "luminance": 0.7615,
+      "family": "supernatural",
+      "role": "Doorway sill light."
+    },
+    "hurt": {
+      "hex": "#FF2A2A",
+      "rgb": [
+        255,
+        42,
+        42
+      ],
+      "band": "B2",
+      "luminance": 0.3423,
+      "family": "feedback",
+      "role": "Player-damage vignette and shockwave. The reserved damage hue: SS6.7 reserves hostile hues, and this is the one the player wears. No static asset may use it."
+    },
+    "hurtHi": {
+      "hex": "#FF6A3A",
+      "rgb": [
+        255,
+        106,
+        58
+      ],
+      "band": "B4",
+      "luminance": 0.5263,
+      "family": "feedback",
+      "role": "Player-damage shockwave, second ring."
+    }
+  },
+  "notes": [
+    "ART_DIRECTION SS1.2 hand-types bone as B4; its measured luminance is 0.7595, which is B5 by SS1.1 own definition. The computed band is authoritative here, and the SS11.1 highlight-budget gate (<=8% of static-art pixels above 72%) must therefore count bone. That is intended: bone is the eye second stop and is meant to be scarce.",
+    "ART_DIRECTION SS1.2 hand-types slateHi as B4; measured 0.5083 puts it at the top of B3.",
+    "well/wellHi/sill are the open-doorway family from tools/make-bardo-tiles.ts. They are canon: the run lane depends on them.",
+    "hurt/hurtHi are the player-damage feedback hue. They were inline literals in hud.ts, which made SS1.3.2 unenforceable exactly where the player looks most. They are canon so the rule can be checked, and they are reserved: a sprite spec must never name them, and the compiler only uses the ramp a spec names."
+  ]
+}

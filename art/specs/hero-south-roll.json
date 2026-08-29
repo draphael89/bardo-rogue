@@ -1,0 +1,37 @@
+{
+  "id": "actor.hero.south.roll",
+  "kind": "character",
+  "input": "art/approved/bardo_hero_south_roll_alpha_v3.png",
+  "output": "public/assets/sprites/bardo_hero_south_roll.png",
+  "sidecar": "public/assets/sprites/bardo_hero_south_roll.json",
+  "cell": 32,
+  "cols": 2,
+  "rows": 2,
+  "maxColors": 16,
+  "palette": [
+    "mortar", "purple0", "purple1", "purple2", "purple3", "iron", "ironHi", "slate3",
+    "slateHi", "brick", "cope", "goldDim", "gold", "goldHot", "boneDim", "bone"
+  ],
+  "facing": "south",
+  "mirror": false,
+  "fit": "pose",
+  "margin": 5,
+  "chromaKey": true,
+  "coverage": 0.5,
+  "valueLift": { "targetMean": 0.31 },
+  "salience": { "minShare": 0.22, "minDelta": 0.16 },
+  "frames": [
+    { "name": "dive", "i": 0, "pivot": [16, 28] },
+    { "name": "tuck", "i": 1, "pivot": [16, 16] },
+    { "name": "apex", "i": 2, "pivot": [16, 16] },
+    { "name": "extend", "i": 3, "pivot": [16, 28] }
+  ],
+  "clips": { "roll": { "frames": ["dive", "tuck", "apex", "extend"], "timing": "sim", "sim": { "ref": "player.dodge" }, "grounded": false } },
+  "provenance": {
+    "provider": "openai",
+    "model": "gpt-image (built-in tool)",
+    "approvedSource": "art/approved/bardo_hero_south_roll_alpha_v3.png",
+    "promptFile": "art/bardo-combat-sprites.md",
+    "promptHash": "48e838b1f87f62c86c89db1bef18c85e063581a64d9e41fae853fb1787ff0bb1"
+  }
+}

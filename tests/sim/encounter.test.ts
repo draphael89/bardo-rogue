@@ -4,13 +4,13 @@ import { makeBot } from '@/sim/bots'
 import { stepWorld } from '@/sim/step'
 
 describe('control-proof encounter', () => {
-  it('runs a fair 60–90 second curriculum across seeded formations', () => {
+  it('runs a fair 55–75 second high-tempo curriculum across seeded formations', () => {
     let totalCuts = 0
     for (let seed = 1; seed <= 8; seed++) {
-      const w = createWorld(seed, 'full', { god: true })
+      const w = createWorld(seed, 'full')
       const bot = makeBot('kite')
       let kills = 0
-      while (w.tick < 5400 && w.wave.state !== 'done') {
+      while (w.tick < 5400 && w.wave.state !== 'done' && w.player.state !== 'dead') {
         stepWorld(w, bot(w))
         for (const ev of w.events) {
           if (ev.type === 'kill') kills++
@@ -18,6 +18,8 @@ describe('control-proof encounter', () => {
         }
         w.events.length = 0
       }
+      expect(w.player.state, `seed ${seed} killed the skilled policy`).not.toBe('dead')
+      expect(w.player.hp, `seed ${seed} did not survive the curriculum`).toBeGreaterThan(0)
       expect(w.wave.state, `seed ${seed} did not finish`).toBe('done')
       expect(kills).toBe(30)
       expect(w.roomClearTick / 60, `seed ${seed} duration`).toBeGreaterThanOrEqual(55)

@@ -17,3 +17,6 @@ gauntlet/evidence/.thumbs/
 
 # one-off measurement scratch dropped by builders mid-round
 tools/.*.mjs
+
+# Generated art candidates and compile reports. Only compiled, approved assets live in public/assets.
+.art-cache/

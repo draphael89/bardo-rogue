@@ -23,11 +23,31 @@ pnpm art compile art/specs/hero-south-roll.json
 pnpm art compile art/specs/brute.json
 ```
 
-Each spec records its own grid, palette ramp, pivots, sockets, clips and provenance; the compiler
-(`tools/art/compile.ts`) reduces the source by voting in canon-palette space, and the gates
-(`tools/art/gates.ts`) reject the result if it drifts. The Brute uses `fit: "pose"` because its square
-generated sheet has tall 4x2 cells. Those crops all use one sheet-wide source scale, so a crouched pose
-cannot be enlarged independently; pivots and sockets still own each frame's placement.
+Every master carries a hash-verified approval receipt beside it (`<name>.approval.json`), recording
+who approved it and when; compiling into `public/assets/` verifies that receipt against the file, so
+a master edited after approval stops the build until a human re-approves or restores it.
+
+Each spec records its own grid, palette ramp, registration, sockets, clips, waivers and provenance;
+the compiler (`tools/art/compile.ts`) reduces the source by voting in canon-palette space, and the
+gates (`tools/art/gates.ts`) reject the result if it drifts. Provenance is derived, never typed: a
+spec names its prompt file and its approved anchor, and the compiler hashes both.
+
+Three fit modes, one per registration problem:
+
+- `grid` — the source cell as authored. With `register`, each frame's content and pivot translate
+  together onto one canonical anchor, so screen placement is unchanged while cell registration
+  becomes uniform (what lets the 2 px planted-feet gate hold). A declared `nudge` is a 1 px seam
+  concession, visible in the spec rather than buried in a formula. The east hero registers to
+  `[16,30]`; the north and south sheets keep their judged per-frame pivots, because translation to a
+  single anchor measurably clips their art, and each carries a written waiver saying so.
+- `pose` — every silhouette is cropped and padded into ONE shared source-space square, so a crouched
+  pose cannot compile larger than a tall one while pivots stay judged per frame. This is the rolls'
+  mode: their airborne pivots ARE the lift, and their clips declare `grounded: false` so the
+  planted-feet gate does not read that lift as foot-sliding.
+- `shared` — one scale placed against the canonical anchor, pivots stamped, sockets carried as bbox
+  fractions. The Brute's mode, at a 64 px cell: the measured motion envelope cannot hold a ~36 px
+  body and a maul raised overhead in 48 px at one scale, and at 64 the committed wind-up finally
+  reads TALLER than the idle, which is what a tell should do.
 
 The accepted editable masters live under `art/approved/` and are the direct compiler inputs, recorded
 as `approvedSource`. The compiler rejects an `approvedSource` outside that custody boundary. A separate

@@ -33,15 +33,21 @@ The art pipeline (`docs/ART_PIPELINE_AUDIT.md` for why, `ART_DIRECTION.md` §12 
 | Command | Lane |
 | --- | --- |
 | `pnpm palette` | canon palette -> `art/palette/canon.{png,gpl}` + swatch. `canon.json` is the single source of truth for every colour. |
-| `pnpm art generate <gen-spec>` | provider -> candidates in `.art-cache/`. `--dry-run` prints the prompt and request without a key. |
+| `pnpm art generate <gen-spec>` | provider -> candidates in `.art-cache/`. Dry-run by DEFAULT: it prints the prompt and the exact request, and only `--live` spends. |
 | `pnpm art compile <spec>` | source image -> sheet PNG + JSON sidecar, then gates. Exits non-zero on a hard gate failure. |
 | `pnpm art gate` / `pnpm art preview` | re-check or eyeball a compiled sheet at 1x on the room's floor value. |
+| `pnpm art approve <master>` | record a HUMAN approval decision as a hash-verified receipt. Never run on an agent's own initiative. |
 | `pnpm tiles` | code-authored room + prop sheets. |
 | `pnpm fx` | code-authored particles and ground decals. |
 | `pnpm assets` | the shrinking Kenney subset (needs `KENNEY_DIR` + `unzip`). |
 
 Asset lifecycle: `art/specs/` (versioned specs) -> `.art-cache/` (disposable candidates, gitignored)
 -> `art/approved/` (human-approved masters, the style reference pool) -> `public/assets/` (compiled).
+A master enters `art/approved/` only with a receipt beside it (`<name>.approval.json`, written by
+`pnpm art approve`) whose sha256 still matches the file; compiling into `public/assets/` verifies
+that receipt and stops when the master is missing, unreceipted, or edited since approval. Gate
+findings come in two tiers: objective failures never pass, and judged findings block promotion
+unless the spec carries a waiver naming the exact gate id and the reason.
 Candidates never write into `public/assets`.
 
 Authored sheets are addressed by **semantic frame name**, not cell index: `atlas.sheet('bardo_hero').frame('light1Contact')`

@@ -49,7 +49,7 @@ export interface SheetProvenance {
   modelVersion?: string
   jobId?: string
   seed?: number
-  /** SHA-256 (or a 16+ digit prefix) of promptFile, verified by the compiler. */
+  /** SHA-256 (or a 16+ digit prefix) of the source-specific immutable promptFile. */
   promptHash?: string
   promptFile?: string
   referenceHashes?: string[]

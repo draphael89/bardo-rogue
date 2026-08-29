@@ -115,19 +115,28 @@ export async function palettePng(names?: string[]): Promise<string> {
  * `references` may name files or directories; `art/approved/` is a directory by design, because the
  * approved pool IS the style reference and it grows. Without this the field was inert and adding an
  * approved master conditioned nothing — the pipeline's advertised consistency mechanism was a
- * comment. Newest first, capped, since both providers take only a handful.
+ * comment. Selection is path-sorted rather than timestamp-sorted, so copying or checking out the
+ * same pool cannot change a paid request. Retro Diffusion accepts four references; PixelLab accepts
+ * one style image, so both select from the same stable four-image prefix and PixelLab uses its first.
  */
-export async function referenceImages(refs: readonly string[] | undefined, max = 4): Promise<string[]> {
+export const REFERENCE_IMAGE_LIMIT = 4
+
+export async function referenceImages(refs: readonly string[] | undefined, max = REFERENCE_IMAGE_LIMIT): Promise<string[]> {
   if (!refs?.length) return []
   const files: string[] = []
   for (const r of refs) {
-    if (!existsSync(r)) continue
+    if (!existsSync(r)) throw new Error(`generate: requested reference does not exist: ${r}`)
     if (statSync(r).isDirectory()) {
-      for (const f of readdirSync(r)) if (/\.png$/i.test(f)) files.push(join(r, f))
-    } else if (/\.png$/i.test(r)) files.push(r)
+      const pngs = readdirSync(r).filter(f => /\.png$/i.test(f))
+      if (!pngs.length) throw new Error(`generate: requested reference directory contains no PNG images: ${r}`)
+      for (const f of pngs) files.push(join(r, f))
+    } else {
+      if (!/\.png$/i.test(r)) throw new Error(`generate: requested reference is not a PNG image: ${r}`)
+      files.push(r)
+    }
   }
-  files.sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs)
-  return files.slice(0, max).map(f => readFileSync(f).toString('base64'))
+  const stable = [...new Set(files)].sort((a, b) => a < b ? -1 : a > b ? 1 : 0)
+  return stable.slice(0, max).map(f => readFileSync(f).toString('base64'))
 }
 
 export interface ProviderRequest {

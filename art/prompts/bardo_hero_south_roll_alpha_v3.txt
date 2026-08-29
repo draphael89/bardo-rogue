@@ -1,0 +1,6 @@
+Create a supplemental four-key 2x2 body-only sheet for the front-view southward dodge. The held
+sequence is dive, compact tuck, visibly inverted boots-over-head apex, and extension/brake. Remove the
+integrated silver blade. Make the apex a narrow, asymmetric boots-over-head silhouette with
+high-contrast sole bars and exposed horn tips. Preserve the accepted south-view identity, scale,
+palette, and uniform #00ff00 chroma background. The sequence must read as rotation even with
+translation, shadow, weapon, and effects removed. No interpolation or synthetic squash.

@@ -58,8 +58,8 @@
     "provider": "openai",
     "model": "gpt-image (built-in tool)",
     "approvedSource": "art/approved/bardo_hero_south_roll_alpha_v3.png",
-    "promptFile": "art/bardo-combat-sprites.md",
-    "promptHash": "f70ecf61cb640ee8d9f2913ed17defd0aa1af875b06d357474ebd2b2473b5b99",
+    "promptFile": "art/prompts/bardo_hero_south_roll_alpha_v3.txt",
+    "promptHash": "1fdca102ecd40da4cabcf5df8759a2434a091dc83fd29318463107cc95c8dbcf",
     "compiler": "bardo-art/1",
     "sourceFile": "art/approved/bardo_hero_south_roll_alpha_v3.png",
     "sourceHash": "234287fd9911bdbf"

@@ -394,7 +394,7 @@ export async function compileSheet(spec: CompileSpec, specPath = '<inline>'): Pr
   const fit = spec.fit ?? 'grid'
   const margin = spec.margin ?? 0
   const pal = subset(spec.palette)
-  const maxColors = spec.maxColors ?? canon().budgets[spec.kind === 'character' ? 'character' : spec.kind === 'prop' ? 'prop' : 'effect'] ?? 16
+  const maxColors = spec.maxColors ?? canon().budgets[spec.kind] ?? 16
   if (!Array.isArray(spec.frames) || spec.frames.length === 0) throw new Error('compile: spec must declare at least one frame')
   const cells = spec.cols * spec.rows
   for (const f of spec.frames) {

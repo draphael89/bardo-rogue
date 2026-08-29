@@ -32,16 +32,19 @@ cannot be enlarged independently; pivots and sockets still own each frame's plac
 The accepted editable masters live under `art/approved/` and are the direct compiler inputs, recorded
 as `approvedSource`. The compiler rejects an `approvedSource` outside that custody boundary. A separate
 `approvedReference` is reserved for an accepted style reference used to condition another generation.
-`promptFile` names this retained prompt record, and `promptHash` is its compiler-verified SHA-256 rather
-than an instruction to “see” a document. Human approval remains explicit: automated gates reject
-objective contract failures, but they do not substitute for judging identity, pose readability, or
-taste at 1x.
+`promptFile` names the source-specific immutable instruction record under `art/prompts/`, and
+`promptHash` is its compiler-verified SHA-256. The aggregate notes in this document can therefore
+evolve without rewriting generation provenance. Human approval remains explicit: automated gates
+reject objective contract failures, but they do not substitute for judging identity, pose
+readability, or taste at 1x.
 
 The original normalizer (`tools/process-sprite-sheet.mjs`) is gone. It sampled one source point per
 output pixel, which at ~39 source pixels per output pixel is a coin flip at every edge — that is why
 the first sheets shipped with dissolved blades. Its metrics sidecar reported `pass: true` for both.
 
 ## Hero generation prompt
+
+Immutable record: [`prompts/bardo_hero_alpha_v1.txt`](prompts/bardo_hero_alpha_v1.txt).
 
 Create one original dark-mythic pixel-art warrior sprite sheet, not based on any existing character.
 Use a strict 4x4 grid of equal square cells, a 32-logical-pixel frame, no overlap, a split helm crest,
@@ -62,6 +65,9 @@ fifteen poses. Earlier directional sheets are iteration provenance, not producti
 
 North/back variant:
 
+Immutable record, including the accepted cell-13 refinement:
+[`prompts/bardo_hero_north_alpha_v7.txt`](prompts/bardo_hero_north_alpha_v7.txt).
+
 > Create an original dark-mythic pixel-art warrior sprite sheet on a uniform #00ff00 chroma
 > background. Strict 4x4 equal square grid, one centered non-overlapping character per cell, viewed
 > clearly from behind and facing north/up in every standing pose. Match one identity throughout: a
@@ -75,6 +81,9 @@ North/back variant:
 > northward axis. Dodge travel must be a compact rear-view vertical tumble, not a rotated side pose.
 
 South/front variant:
+
+Immutable record, including the accepted cell-13 refinement:
+[`prompts/bardo_hero_south_alpha_v4.txt`](prompts/bardo_hero_south_alpha_v4.txt).
 
 > Create an original dark-mythic pixel-art warrior sprite sheet on a uniform #00ff00 chroma
 > background. Strict 4x4 equal square grid, one centered non-overlapping character per cell, viewed
@@ -123,7 +132,13 @@ helm, torso, and boots and keeps the narrow apex from collapsing into an upright
 scale. No interpolation or synthetic squash manufactures an extra pose. The generated sources were
 constrained to read as the same sequence even with translation, shadow, and effects removed.
 
+Immutable roll records:
+[`prompts/bardo_hero_north_roll_alpha_v3.txt`](prompts/bardo_hero_north_roll_alpha_v3.txt) and
+[`prompts/bardo_hero_south_roll_alpha_v3.txt`](prompts/bardo_hero_south_roll_alpha_v3.txt).
+
 ## Brute generation prompt
+
+Immutable record: [`prompts/bardo_brute_alpha_v1.txt`](prompts/bardo_brute_alpha_v1.txt).
 
 Create one original dark-mythic pixel-art forge-brute sprite sheet, not based on any existing
 character. Use a strict 4x2 grid of equal square cells, a 48-logical-pixel large-enemy frame, stable

@@ -239,7 +239,7 @@
     "provider": "openai",
     "model": "gpt-image (built-in tool)",
     "approvedSource": "art/approved/bardo_hero_alpha_v1.png",
-    "promptFile": "art/bardo-combat-sprites.md",
-    "promptHash": "f70ecf61cb640ee8d9f2913ed17defd0aa1af875b06d357474ebd2b2473b5b99"
+    "promptFile": "art/prompts/bardo_hero_alpha_v1.txt",
+    "promptHash": "b8c0ca894e710f079777f9348024f1c91d5980e98989cc722baea2fcc0f2820b"
   }
 }

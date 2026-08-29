@@ -253,6 +253,24 @@ describe('enemy cadence and projectile authority', () => {
     expect(p.hp).toBe(tuning.player.hp - 3)
     expect(world.events.some(x => x.type === 'playerHurt' && x.hp === tuning.player.hp - 3)).toBe(true)
   })
+
+  it('spends a tangent friendly shot on the first live enemy in pool order', () => {
+    const world = createWorld(1, 'empty')
+    world.arena.solid.fill(0)
+    const dead = world.spawnEnemy('dummy', 100, 100)!
+    const first = world.spawnEnemy('dummy', 100, 100)!
+    const later = world.spawnEnemy('dummy', 100, 100)!
+    dead.state = 'dead'
+    const shot = world.fireProjectile(100 - first.radius - 3, 100, 0, 0, 3, 20, 1, 1)!
+    world.events.length = 0
+
+    updateProjectiles(world)
+
+    expect(shot.active).toBe(false)
+    expect(first.hp).toBe(first.maxHp - 1)
+    expect(later.hp).toBe(later.maxHp)
+    expect(world.events.filter(event => event.type === 'hit')).toHaveLength(1)
+  })
 })
 
 describe('Minos death sentences', () => {

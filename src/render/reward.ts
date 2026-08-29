@@ -7,7 +7,7 @@ import { obolsLabel, SHOP_COPY, shopCost } from '@/sim/economy'
 import { MYSTERY_COPY, canAffordMystery } from '@/sim/mystery'
 import type { MysteryOffer, RewardOffer, ShopOffer } from '@/sim/session'
 import { tuning } from '@/tuning'
-import { backPause, duoFooter, meetingVeil, offerAct, offerSpoken, pauseFooter, pauseNudge, pauseRows, resolvePause, shopAct, shopSpoken, showBuildStrip, townTally, victoryKeptLine, wrapPauseFocus, type PauseAct, type PausePage, type TitleNudge } from './titleMenu'
+import { backPause, clampPauseFocus, duoFooter, meetingVeil, offerAct, offerSpoken, pauseFooter, pauseNudge, resolvePause, shopAct, shopSpoken, showBuildStrip, townTally, victoryKeptLine, wrapPauseFocus, type PauseAct, type PausePage, type TitleNudge } from './titleMenu'
 import { label, placeCentered, placeLeft, placeRight, wrappedCentered, P } from './ui'
 import { clamp01 } from './anim'
 
@@ -125,8 +125,7 @@ export class RewardOverlay {
   setLeaving(leaving: boolean): void {
     if (this.leaving === leaving) return
     this.leaving = leaving
-    const rows = pauseRows(this.pausePage, leaving)
-    if (this.pauseFocus >= rows) this.pauseFocus = rows - 1
+    this.pauseFocus = clampPauseFocus(this.pausePage, this.pauseFocus, leaving)
     this.abandonArmed = false
     this.key = ''
   }

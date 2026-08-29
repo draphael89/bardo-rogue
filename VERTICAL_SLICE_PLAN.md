@@ -135,8 +135,41 @@ test, each now covered by a test that goes red without its fix.
   hash 3380115452 baseline against 272518353 no-dash, and `--playtest baseline` reproduces the
   baseline hash exactly from the no-dash bundle.
 
-Gates after the round: 799 tests / 62 files, matrix 100/100 (kite 88%, naive 0%, unchanged from
-before the round), build ok, smoke both endings, pinned replay hashes untouched.
+A second round on the same PR then closed nine more, all of them the same shape — something real
+happened and the checkpoint beside it did not know:
+
+- **A refused toll became nothing.** `enterRoom` runs `beginRoomFight` — which clears `riteDebt`
+  into a 150-tick delayed spawn — BEFORE it emits the `roomEnter` the checkpoint rides on, so the
+  snapshot stored `false` with the shade in a queue no checkpoint carries. Reload in the Hall and
+  Minos came alone, permanently. Same for the Unburied's hunt.
+- **The Unburied went to the wrong room entirely.** `collectDebt` was gated on the boss room and
+  `collectHunt` was not, so the hunt was spent in whichever fight came next. LEAVE HIM promises
+  "He follows you to the judge"; it never did.
+- **A resumed attempt restarted its own clock**, so a nine-minute descent reloaded once reported
+  ninety seconds.
+- **The memory option charged for a vessel a reload took back** — the one mid-run debit of
+  permanent currency, persisted against a checkpoint captured before the purchase.
+- **An imported descent existed only on disk**, and the next descent's first room overwrote it.
+- **A checkpoint could outlive the route it named.** A content update that moves doors while
+  keeping the room id would have walked the player down a route their snapshot never generated.
+- **The Smith forgot the answer he had not spoken to yet** (`lastMystery` is session state that no
+  document carried; the mid-run half is fixed, the town half needs `MetaStateV2`).
+- **A playtest session resumed a saved descent**, arming a recorder at tick 0 of a world that was
+  already mid-run — producing a well-formed bundle that replays into a run that never happened.
+  A playtest now never resumes, which is the fourth session interlock.
+- **The death stele could not hold its own build line.** Measured against the shipped font: two vow
+  names is 240px in a 164px row, and the counted form the three-vow case has always used is
+  171-173px — so the abbreviation never fit either. The renderer now walks a ladder and stops at
+  the first form that measures inside the row.
+
+Gates after both rounds: 816 tests / 62 files, matrix 100/100 (kite 88%, naive 0%, unchanged from
+before either round), build ok, browser smoke both endings, desktop smoke clean, pinned replay
+hashes untouched. Every fix was confirmed red with itself reverted.
+
+Known flake, not a regression: `pnpm smoke:desktop` failed once on the corrupt-save check
+("browser has been closed") and once on the import banner check (it sampled a transient ROOM
+CLEARED). Both passed on re-run, and three consecutive clean runs followed. The suite has a timing
+weakness worth its own pass.
 
 ### Open after the merge (audited 2026-08-29, eleven agents over PR #13)
 

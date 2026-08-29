@@ -37,9 +37,11 @@ async function boot() {
   const mute = q.get('mute') === '1'
   const botName = q.get('bot') as BotName | null
   // `?playtest=<condition>` arms a playtest session: the whole session records itself from tick 0,
-  // the named verb condition filters LIVE input only (bots and replays bypass it, and the filtered
-  // frames are what gets recorded, so an exported bundle replays exactly as the tester played), and
-  // F4 downloads the session bundle. Conditions and protocol: PLAYTEST.md.
+  // the condition applies to LIVE play only (bots bypass it), and F4 downloads the session bundle.
+  // The two conditions are not the same kind of thing. no-heavy is a frame filter, so it is baked
+  // into the recording; no-dash closes the cancel WINDOW, which is not in the frames, so the bundle
+  // carries the condition and every replay path re-applies it (src/playtest.ts). Protocol and the
+  // session interlocks that keep a bundle honest: PLAYTEST.md.
   const playtestRaw = q.get('playtest')
   const playtest = asPlaytestCondition(playtestRaw)
   if (playtestRaw && !playtest) console.log(`[playtest] unknown condition "${playtestRaw}"; expected ${PLAYTEST_CONDITIONS.join(' | ')}`)
@@ -101,14 +103,28 @@ async function boot() {
   let storedSfx = savedSave.settings.sfx
   let reducedEffects = q.has('reduced') ? q.get('reduced') !== '0' : storedReducedEffects
   let world: World = createWorld(seed, scenario, { god, ...(scenario === 'loop' ? { meta: savedSave.meta } : {}) })
-  const resumed = scenario === 'loop' && !!savedSave.checkpoint && restoreCheckpoint(world, savedSave.checkpoint)
+  // A playtest session never resumes. The recorder's header says (seed, scenario, meta) and nothing
+  // else, so replaying a bundle rebuilds a FRESH Bardo -- but a resumed world starts mid-descent at
+  // the saved node. Arming a recording on one produces a bundle that is well-formed, carries the
+  // right condition, passes the organizer's check, and replays frames from the Cistern into an
+  // empty hub: a run that never happened, reported without a warning. The other three interlocks
+  // (abandon hidden, F2/F3 locked, import refused) exist for exactly this reason; a reload mid-run
+  // is the fourth. The tester loses that run, which is the outcome PLAYTEST.md already prescribes
+  // for one that ended early, and the checkpoint is consumed below either way.
+  const resumed = scenario === 'loop' && !playtest && !!savedSave.checkpoint
+    && restoreCheckpoint(world, savedSave.checkpoint)
   // Set only for the roomEnter that the resume itself emits; cleared by the first arrival.
   let resumeEntryPending = resumed
+  // Raised by a mid-run debit of PERMANENT currency, lowered by the next write that also stores a
+  // checkpoint. See flushEvents: the debit and the checkpoint carrying what it bought must land
+  // together, or the player pays and a reload takes the purchase back.
+  let metaDebtPending = false
   if (scenario === 'loop' && savedSave.checkpoint) {
     // Consumed either way. A resumed checkpoint must not outlive its own load, or the same room can
     // be retried from its entry HP without limit; a refused one must not be retried every boot.
     savedSave = { ...savedSave, checkpoint: null }
-    if (!resumed) console.log('[save] checkpoint could not be restored; starting in the Bardo')
+    if (playtest) console.log('[playtest] a session is armed, so the saved descent was NOT resumed — that run is over, note it and discard its bundle')
+    else if (!resumed) console.log('[save] checkpoint could not be restored; starting in the Bardo')
   }
   // Spatial audio starts with the player's actual spawn, before the first enemy tell can arrive.
   audio.setListener(world.player.x, world.player.y)
@@ -148,7 +164,18 @@ async function boot() {
   const reset = (s = cur.seed, sc = cur.scenario, opts: { god?: boolean; meta?: MetaStateV1 } = { god: cur.god }) => {
     cur = { seed: s, scenario: sc, god: !!opts.god }
     const suppliedMeta = Object.prototype.hasOwnProperty.call(opts, 'meta')
-    const meta = sc === 'loop' ? (suppliedMeta ? opts.meta : world.scenario === 'loop' ? world.session.meta : undefined) : undefined
+    // A reset throws the run away, and with it whatever that run bought and never wrote down.
+    // metaDebtPending means a permanent debit is live in memory and deliberately unpersisted (see
+    // flushEvents). Carrying it across F2 or __game.reset() would keep the spend while the vessel
+    // it paid for leaves with the run -- and worse, the latch would stay raised with no room
+    // arrival left to lower it, so the NEXT thing to change meta (the Smith's reroll, bought and
+    // confirmed on screen back in the Bardo) would be dropped from the envelope. savedSave.meta is
+    // the last durable truth, which is exactly what a reload would have restored.
+    const rolledBack = metaDebtPending && !suppliedMeta
+    if (rolledBack) console.log('[save] the run was discarded before its purchase was written; the spend went with it')
+    metaDebtPending = false
+    const carried = rolledBack ? savedSave.meta : world.scenario === 'loop' ? world.session.meta : undefined
+    const meta = sc === 'loop' ? (suppliedMeta ? opts.meta : carried) : undefined
     world = createWorld(s, sc, { ...opts, ...(meta ? { meta } : {}) })
     audio.setListener(world.player.x, world.player.y)
     audio.setLayout(world.rooms[world.roomIndex]?.layout ?? 'bardo')
@@ -249,12 +276,21 @@ async function boot() {
       // written straight back on the first tick, and the fight can be reloaded from entry HP forever.
       const fromResume = arrived && resumeEntryPending
       if (arrived) resumeEntryPending = false
+      const writesCheckpoint = terminal || (arrived && !fromResume)
       const checkpointWrite = terminal ? { checkpoint: null }
         : arrived && !fromResume ? { checkpoint: captureCheckpoint(world) }
         : {}
+      // The Unburied's memory option is the game's only mid-run change to permanent meta: it spends
+      // Remembrances for max HP that lives in the RUN. The checkpoint beside it was captured at this
+      // room's entry and knows nothing about the purchase, so persisting the debit on its own
+      // charged the player for a vessel that the next reload handed straight back. Hold the debit
+      // until a write that also stores a checkpoint, and the two halves move together: reload
+      // before then and both roll back; die or win and the terminal write banks it as spent.
+      if (!terminal && world.events.some(ev => ev.type === 'mysteryChosen')) metaDebtPending = true
+      if (writesCheckpoint) metaDebtPending = false
       savedSave = {
         ...savedSave,
-        meta: { ...world.session.meta, unlockedWeapons: [...world.session.meta.unlockedWeapons] },
+        ...(metaDebtPending ? {} : { meta: { ...world.session.meta, unlockedWeapons: [...world.session.meta.unlockedWeapons] } }),
         ...checkpointWrite,
       }
       void persist()
@@ -553,8 +589,27 @@ async function boot() {
       // reset() rebuilds the world with the imported meta and rebinds the presenter. Deliberately not a
       // reload: that would drop ?bot=/?seed=, destroy window.__game mid-evaluate and break an attached
       // Playwright page.
-      if (world.scenario === 'loop') reset(cur.seed, cur.scenario, { god: cur.god, meta: savedSave.meta })
-      presenter.hud.showBanner('SAVE IMPORTED', townTally(savedSave.meta.attempts, savedSave.meta.victories, savedSave.meta.remembrances), 2.2)
+      let resumedImport = false
+      if (world.scenario === 'loop') {
+        reset(cur.seed, cur.scenario, { god: cur.god, meta: savedSave.meta })
+        // An imported document can carry a live descent. Without this the run existed only on disk:
+        // the player stood in the Bardo with no sign of it, and the first room of their NEXT descent
+        // overwrote the checkpoint, so the imported run was gone before they could reload into it.
+        if (savedSave.checkpoint) {
+          resumedImport = restoreCheckpoint(world, savedSave.checkpoint)
+          resumeEntryPending = resumedImport
+          // Consumed either way, exactly as at boot: a restored checkpoint must not outlive its own
+          // load, or the room can be retried from entry HP forever; a refused one must not be
+          // retried on every later import.
+          savedSave = { ...savedSave, checkpoint: null }
+          void persist()
+        }
+      }
+      presenter.hud.showBanner(
+        resumedImport ? 'DESCENT RESUMED' : 'SAVE IMPORTED',
+        resumedImport ? 'the imported run continues here' : townTally(savedSave.meta.attempts, savedSave.meta.victories, savedSave.meta.remembrances),
+        2.2,
+      )
     } finally { importing = false }
   }
 

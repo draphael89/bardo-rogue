@@ -32,8 +32,12 @@ explain mid-playtest. The build stays pinned until the last tester finishes.
   run was which — but do check that the printed `playtest` field matches the file's name.
 - **Ending a run.** Runs end by dying or by beating Minos — there is no giving up. The pause card's
   abandon row is deliberately hidden during a playtest session, because abandoning would break the
-  bundle's promise to replay exactly what the tester played. F2 and F3 are locked out for the same
-  reason. If a tester must stop early, note it and discard that run's bundle.
+  bundle's promise to replay exactly what the tester played. F2, F3 and save import are locked out
+  for the same reason. If a tester must stop early, note it and discard that run's bundle.
+- **If the page reloads mid-run**, the game does NOT pick that descent back up during a playtest —
+  it starts fresh in the Bardo and says so in the console. A resumed world begins mid-descent, and
+  a bundle recorded in one replays into a run that never happened. Treat the reload as a run that
+  ended early: note it, discard that bundle, and start the run again.
 - **Session shape.** Per tester: intro → run 1 → micro-questions → run 2 → run 3 → micro-questions →
   survey. Budget 45–60 minutes. Three runs minimum; more runs are welcome and also get bundles.
 

@@ -1,8 +1,7 @@
-# CONFIGURATION ONLY -- nothing here runs yet. electron-builder is deliberately NOT a devDependency:
-# producing or validating a real .app, and any signing or notarisation, requires macOS. This file is
-# what `pnpm desktop:dist` will use on an Apple Silicon Mac once that dependency is added.
 appId: com.bardorogue.game
 productName: Bardo Rogue
+artifactName: 'Bardo-Rogue-${version}-mac-${arch}.${ext}'
+forceCodeSigning: true
 directories:
   output: release
   buildResources: build
@@ -18,20 +17,21 @@ files:
 asar: true      # safe because the protocol handler reads with fs.promises.readFile, which is asar-aware
 mac:
   category: public.app-category.games
+  icon: build/icon.png
+  # electron-builder chooses the Developer ID Application certificate type for this target; its
+  # identity setting accepts the certificate's common name without the type prefix.
+  identity: 'Infinity Growth Digital, Inc. (YF9662K2Y4)'
   target:
     - target: dmg
       arch: [arm64]
     - target: zip
       arch: [arm64]      # zip is the Steam- and updater-friendly artifact; dmg is what a tester double-clicks
-  # No `icon:` key on purpose. An explicitly configured resource must exist or electron-builder
-  # aborts; with buildResources: build it auto-discovers build/icon.icns once that is authored, and
-  # falls back to the stock Electron icon until then.
   hardenedRuntime: true
   gatekeeperAssess: false
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
   darkModeSupport: true
-  notarize: false        # flip on once a Developer ID certificate and the Apple credentials exist
+  notarize: true
   extendInfo:
     NSHighResolutionCapable: true
 dmg:

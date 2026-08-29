@@ -318,9 +318,14 @@ export class Hud {
     this.cardAct = new Text({ text: 'BEGIN AGAIN', style: { fontFamily: 'Kenney Mini', fontSize: 8, fill: C.bone, letterSpacing: 1 }, resolution: 1 })
     this.cardAct.anchor.set(0, 0)
 
-    layer.addChild(this.markG, this.crownG, this.hurtG, this.bandG, this.banner, this.sub,
+    // Order is z. `markG` is under everything by design (it is floor paint under the sprite's feet).
+    // `crownG` is deliberately near the END: it is the primary survival read and the corner plate is
+    // documented as its redundant copy, so a crown that loses z to that copy — and to the wave box
+    // and the judge's plate — is the readout being hidden by the thing it replaces. It still sits
+    // below the scrim and the death card, which are allowed to cover the whole frame.
+    layer.addChild(this.markG, this.hurtG, this.bandG, this.banner, this.sub,
       this.plateG, this.rig, this.waveG, this.waveText, this.bossG, this.bossName,
-      this.footG, this.place, this.hintRow,
+      this.footG, this.place, this.hintRow, this.crownG,
       this.scrimG, this.cardG, this.cardTitle, this.cardSub, this.cardKey, this.cardAct)
     for (const r of this.cardRows) layer.addChild(r.label, r.value)
     this.hideDeathCard()

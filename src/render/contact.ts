@@ -53,7 +53,11 @@ export function enemyReactionTransform(input: {
       : input.hitClass === 'edge' ? 1.12
         : input.hitClass === 'pierce' ? 0.72
           : input.hitClass === 'burst' ? 0.92 : 0.82
-  const bodyScale = input.hitKind === 'brute' ? 0.72
+  // How far the struck body is shoved off the blade, per kind. The Oath-Bound shares the brute's
+  // value because it IS the brute's drawing under a bronze cast; it used to fall off the end of this
+  // chain to 0, alongside the training dummy, so the one body in the game built to resist you was
+  // also the only one that never visibly moved when you finally got through it.
+  const bodyScale = input.hitKind === 'brute' || input.hitKind === 'oathbound' ? 0.72
     : input.hitKind === 'warden' ? 0.78
       : input.hitKind === 'charger' ? 1.18
         : input.hitKind === 'caster' ? 1.08 : 0

@@ -35,6 +35,18 @@ import { LAMPAD } from './lampadInk'
 import { SPAWN, debtCoin, spawnInk, spawnPad } from './spawnInk'
 import { arrivalFlash, atmosphereFor, VEIL_FLASH } from './atmospherePresets'
 
+/**
+ * The heavy's promise, expressed in the stateTick a RENDER FRAME is showing.
+ *
+ * Not the same number as tuning's `heavyCommitTick`, and the difference is one frame the player
+ * feels. `capturePlayerInput` runs before `updatePlayer`, which increments stateTick BEFORE testing
+ * `stateTick < heavyCommitTick` — so a dodge pressed on the frame that displays stateTick N is
+ * judged at N+1. Measured, not derived: with heavyCommitTick 4, presses on displayed ticks 0-2
+ * cancel and presses on 3-10 are silently dropped. The frame that shows 3 is therefore the first
+ * frame on which leaving has already stopped working, and it is the frame the plant belongs on.
+ */
+const heavyPromiseFrame = (): number => tuning.player.attack.heavyCommitTick - 1
+
 // Reads sim state + events every frame and drives everything visible. Never mutates the sim.
 /** The realm's stone for the room we are standing in. One expression, so both build sites agree. */
 const floorTintFor = (world: World) => atmosphereFor(world.rooms[world.roomIndex]?.layout ?? 'threshold').floorTint
@@ -337,7 +349,11 @@ export class Presenter {
           const S = J.stagger
           // only the heavy breaks a brute's poise, so only that break is worth the camera
           const big = this.world.enemies.find(e => e.id === ev.id)?.kind === 'brute'
-          this.particles.poiseBreak(ev.x, ev.y, big)
+          // ...and the shockwave is the same promise as the camera. Caster, charger and Oath-Bound
+          // stagger on ANY landed hit, so firing the break sentence unconditionally spent it on the
+          // most routine event in the game and left nothing louder for the moment a tell actually
+          // died. It plays for a body that only yields to the heavy, or for a commitment taken away.
+          if (big || ev.interrupted) this.particles.poiseBreak(ev.x, ev.y, big)
           this.camera.addTrauma(big ? S.bruteTrauma : S.trauma)
           if (big) { this.camera.punchZoom(S.bruteZoom); this.flash(S.bruteFlash, 0xffffff); this.postfx.pulse() }
           break
@@ -438,6 +454,10 @@ export class Presenter {
           break
         case 'roomEnter':
           this.rebuildRoom()
+          // The decal target is a single persistent render texture, and rebuildRoom only rebuilds
+          // the tilemap. Without this the blood and wound stamps of the last fight are still on the
+          // floor of the next room, on a different layout, under enemies that did not bleed there.
+          this.particles.clear()
           this.flash(0.4, arrivalFlash(this.world.rooms[this.world.roomIndex]?.layout ?? 'threshold'))
           this.camera.addTrauma(0.16)
           this.camera.punchZoom(J.zoom.roomClear)
@@ -822,15 +842,16 @@ export class Presenter {
     const s = tuning.player.attack.swings[p.swingIndex]
     if (p.state !== 'attack' || !s.heavy || p.stateTick >= s.startup) { this.emberAcc = 0; return }
     this.camera.lean(p.swingAngle + Math.PI, J.swing.heavyWindKick)
-    if (p.stateTick >= tuning.player.attack.heavyCommitTick && this.heavyPlantedSwing !== p.swingId) {
+    const promise = heavyPromiseFrame()
+    if (p.stateTick >= promise && this.heavyPlantedSwing !== p.swingId) {
       this.heavyPlantedSwing = p.swingId
-      this.camera.addTrauma(J.swing.heavyWindTrauma)
+      this.camera.kick(Math.PI / 2, J.swing.heavyPlantKick)
       this.particles.dust(p.x, p.y + 5, p.swingAngle + Math.PI, J.swing.heavyPlantDust)
     }
-    if (p.stateTick < tuning.player.attack.heavyChargeTicks) return
+    if (p.stateTick < promise) return
     const w = this.playerView.weapon
     if (!w) return
-    const u = (p.stateTick - tuning.player.attack.heavyChargeTicks) / (s.startup - tuning.player.attack.heavyChargeTicks)
+    const u = (p.stateTick - promise) / (s.startup - promise)
     this.particles.chargeGlow(w.position.x, w.position.y, 7 + 13 * Math.max(0, Math.min(1, u)))
     this.emberAcc += J.swing.heavyEmberRate * dtSec
     while (this.emberAcc >= 1) { this.emberAcc -= 1; this.particles.ember(w.position.x, w.position.y) }

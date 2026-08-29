@@ -86,7 +86,7 @@ export type SimEvent =
   | { type: 'footstep'; x: number; y: number }
   | EnemyWindupEvent
   | EnemyAttackEvent
-  | { type: 'enemyStagger'; id: number; x: number; y: number }
+  | { type: 'enemyStagger'; id: number; x: number; y: number; interrupted: boolean }
   | { type: 'enemyWallSlam'; id: number; kind: EnemyKind; x: number; y: number; angle: number; actionId: number }
   | { type: 'enemyPhase'; id: number; kind: EnemyKind; x: number; y: number; phase: number }
   | { type: 'boltFired'; x: number; y: number; angle: number }

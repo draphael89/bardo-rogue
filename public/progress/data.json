@@ -1,10 +1,14 @@
 {
   "title": "Bardo Rogue",
   "subtitle": "First Gate: rooms-as-data, a generated route, a town that remembers",
-  "updated": "2026-08-29T13:30:00-04:00",
+  "updated": "2026-08-29T15:25:00-04:00",
   "now": "hall-plate-wine",
   "round": 3,
   "timeline": [
+    {
+      "t": "15:25",
+      "text": "The elite keeps its shield. A flank light used to stagger the Oath-Bound, and staggerTicks outran the light chain, so one hit put the guard down and MEASURED 0% uptime for the rest of the fight. It now inherits the line shade's poise: 85%. COMMIT, FLANK and BURN are three answers again."
+    },
     {
       "t": "13:30",
       "text": "A refused toll still meets you in the Hall after a reload. The Unburied waits for the judge instead of the next fight. The death stele holds its own build line."

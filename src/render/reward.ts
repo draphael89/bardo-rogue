@@ -6,11 +6,37 @@ import type { World } from '@/sim/world'
 import type { RewardOffer } from '@/sim/session'
 import { tuning } from '@/tuning'
 import { label, placeCentered, placeLeft, placeRight, wrappedCentered, P } from './ui'
+import { clamp01 } from './anim'
+
+/**
+ * Fade by TINT, never by alpha, for anything holding type.
+ *
+ * `crispText` thresholds coverage at `step(0.5, alpha)`, so a filtered label at 35% opacity does not
+ * come out faint — it disappears outright, and at 60% it is fully opaque. Measured: dropping the
+ * filter instead costs the boon card 28 distinct colours and 5.7% intermediate pixels against 9 and
+ * 0.7%, which at a 4x upscale is visible fringing, so the filter stays and the fade goes elsewhere.
+ * Multiplying toward black leaves alpha at 1, reads as an arrival against these near-black plates,
+ * and propagates through a Container to every child at once.
+ */
+function fadeToBlack(t: number): number {
+  const v = Math.round(clamp01(t) * 255)
+  return (v << 16) | (v << 8) | v
+}
 
 export class RewardOverlay {
   root = new Container()
+  // The veil is its own layer so it can thicken over the room while the cards are still arriving.
+  private scrim = new Graphics()
+  // The plate, its portrait and its type fade as one thing; the cards on top of it do not.
+  private body = new Container()
   private g = new Graphics()
   private texts: Text[] = []
+  // One container per card, so each can land on its own beat. They used to be drawn straight into
+  // `this.g` with everything else, which is why the whole screen could only pop at once.
+  private cards: Container[] = []
+  private act: Text | null = null
+  private armed = false
+  private animates = false
   private key = ''
   private build = new Container()
   private buildG = new Graphics()
@@ -24,6 +50,8 @@ export class RewardOverlay {
 
   constructor(layer: Container) {
     this.root.visible = false
+    this.body.addChild(this.g)
+    this.root.addChild(this.scrim, this.body)
     this.build.addChild(this.buildG, this.buildText)
     this.meta.addChild(this.metaG, this.metaText)
     layer.addChild(this.build, this.meta, this.root)
@@ -61,13 +89,58 @@ export class RewardOverlay {
       : victory
         ? `won|${world.session.run?.depth}|${world.session.run?.boons.map(b => b.id).join('|')}|${tuning.view.width}`
         : ''
-    if (nextKey === this.key) return
-    this.key = nextKey
-    this.clear()
-    if (rite) this.paintRite(RITES[rite.id], rite.focus)
-    else if (offer) this.paintOffer(offer)
-    else if (victory) this.paintVictory(world)
-    else this.paintPause()
+    if (nextKey !== this.key) {
+      this.key = nextKey
+      this.clear()
+      // Only the two screens that hold an irreversible answer arrive; the pause card and the run
+      // summary are answers to something the player already did and should be there at once.
+      this.animates = !!rite || !!offer
+      if (rite) this.paintRite(RITES[rite.id], rite.focus)
+      else if (offer) this.paintOffer(offer)
+      else if (victory) this.paintVictory(world)
+      else this.paintPause()
+    }
+    this.reveal(world)
+  }
+
+  /**
+   * The arrival. Built from `world.tick - world.phaseTick` rather than a local clock so it cannot
+   * drift from the window `rewards.ts` is actually enforcing, and so a repaint mid-reveal (a focus
+   * change is one) picks up exactly where it was rather than starting again.
+   *
+   * The point is not decoration. The offer opens on the tick the last enemy dies and refuses an
+   * answer for 400 ms; without something visibly still arriving, that refusal reads as the game
+   * dropping the input rather than as a screen that is not ready yet.
+   */
+  private reveal(world: World): void {
+    const R = tuning.juice.modalReveal
+    if (!this.animates || this.reducedEffects) {
+      this.scrim.alpha = 1; this.body.tint = 0xffffff
+      for (const c of this.cards) { c.tint = 0xffffff; c.y = 0 }
+      this.setArmed(true)
+      return
+    }
+    const age = world.tick - world.phaseTick
+    // The room you just cleared stays legible under the veil for the first beat, so the kill lands
+    // on the room rather than on a scrim that was already there.
+    this.scrim.alpha = clamp01(age / R.scrimTicks)
+    this.body.tint = fadeToBlack(clamp01(age / R.scrimTicks))
+    this.cards.forEach((card, i) => {
+      const t = clamp01((age - R.scrimTicks - i * R.cardStagger) / R.cardTicks)
+      card.tint = fadeToBlack(t)
+      // Whole pixels only: a card easing through a fraction of a row drags every glyph on it
+      // off the grid, which is the whole reason the type in here reads at all.
+      card.y = Math.round((1 - t) * R.cardRise)
+    })
+    this.setArmed(age >= tuning.run.modalArmTicks)
+  }
+
+  // The prompt is the only thing on screen that says whether an answer will be taken, so it is dim
+  // until the sim will actually take one. A press before that is then plainly early, not ignored.
+  private setArmed(armed: boolean): void {
+    if (this.armed === armed) return
+    this.armed = armed
+    if (this.act) this.act.tint = armed ? 0xffffff : 0x5c5c5c
   }
 
   private updateMeta(world: World): void {
@@ -94,14 +167,32 @@ export class RewardOverlay {
 
   private clear(): void {
     this.g.destroy()
+    this.scrim.destroy()
     for (const t of this.texts) t.destroy()
+    for (const c of this.cards) c.destroy({ children: true })
     this.texts = []
+    this.cards = []
+    this.act = null
+    this.armed = true          // forced to disagree on the first reveal, so the prompt gets set
     this.root.removeChildren()
+    this.body.removeChildren()
+    this.scrim = new Graphics()
     this.g = new Graphics()
-    this.root.addChild(this.g)
+    this.body.addChild(this.g)
+    this.root.addChild(this.scrim, this.body)
   }
 
-  private add(t: Text): void { this.texts.push(t); this.root.addChild(t) }
+  /** A card that lands on its own beat: its own graphics, its own labels, its own alpha. */
+  private card(): { box: Container; g: Graphics; add: (t: Text) => void } {
+    const box = new Container()
+    const g = new Graphics()
+    box.addChild(g)
+    this.cards.push(box)
+    this.root.addChild(box)
+    return { box, g, add: (t: Text) => { this.texts.push(t); box.addChild(t) } }
+  }
+
+  private add(t: Text): void { this.texts.push(t); this.body.addChild(t) }
 
   /**
    * The plate every speaker stands on: a niche, a portrait, a name, an epithet, and one line beneath.
@@ -111,8 +202,8 @@ export class RewardOverlay {
    */
   private paintSpeaker(who: PortraitId, name: string, epithet: string, accent: number, line: string, lineTone = P.dim): number {
     const W = tuning.view.width, H = tuning.view.height
-    this.g.rect(0, 0, W, H).fill({ color: P.void, alpha: 0.92 })
-    this.g.rect(0, 0, W, 3).fill({ color: accent })
+    this.scrim.rect(0, 0, W, H).fill({ color: P.void, alpha: 0.92 })
+    this.scrim.rect(0, 0, W, 3).fill({ color: accent })
 
     const plateH = 56
     const plateY = 12
@@ -160,21 +251,23 @@ export class RewardOverlay {
       // the price you pay now is red, the one you defer is his gold.
       const tone = i === 0 ? P.red : accent
       const edge = selected ? tone : 0x4c4658
-      this.g.roundRect(x, y, cardW, cardH, 3).fill({ color: selected ? P.faceHi : P.face, alpha: 1 })
-      this.g.roundRect(x, y, cardW, cardH, 3).stroke({ color: edge, width: selected ? 3 : 1 })
-      this.g.rect(x + 12, y + 30, cardW - 24, 2).fill({ color: edge })
+      const { g, add } = this.card()
+      g.roundRect(x, y, cardW, cardH, 3).fill({ color: selected ? P.faceHi : P.face, alpha: 1 })
+      g.roundRect(x, y, cardW, cardH, 3).stroke({ color: edge, width: selected ? 3 : 1 })
+      g.rect(x + 12, y + 30, cardW - 24, 2).fill({ color: edge })
       if (selected) {
-        this.g.rect(x + 3, y + 3, cardW - 6, 2).fill({ color: edge })
-        this.g.rect(x + 3, y + cardH - 5, cardW - 6, 2).fill({ color: edge })
+        g.rect(x + 3, y + 3, cardW - 6, 2).fill({ color: edge })
+        g.rect(x + 3, y + cardH - 5, cardW - 6, 2).fill({ color: edge })
       }
       const n = label(choice.label, 'head', selected ? P.bone : P.dim)
-      placeCentered(n, x + cardW / 2, y + 17); this.add(n)
+      placeCentered(n, x + cardW / 2, y + 17); add(n)
       const cost = label(choice.cost, 'meta', tone)
-      placeCentered(cost, x + cardW / 2, y + 43); this.add(cost)
-      for (const line of wrappedCentered(choice.detail, 'body', selected ? P.bone : P.dim, cardW - 28, x + cardW / 2, y + 56)) this.add(line)
+      placeCentered(cost, x + cardW / 2, y + 43); add(cost)
+      for (const line of wrappedCentered(choice.detail, 'body', selected ? P.bone : P.dim, cardW - 28, x + cardW / 2, y + 56)) add(line)
     })
     const act = label('A / D OR ARROWS TO CHOOSE   ·   ENTER / ATTACK TO ANSWER', 'meta', accent)
     placeCentered(act, W / 2, H - 16); this.add(act)
+    this.act = act
   }
 
   // The offer is a meeting, not a menu. Someone specific is standing there, they are named, and they
@@ -204,41 +297,43 @@ export class RewardOverlay {
       const selected = i === focus
       const tone = def.deity === 'fury' ? P.ember : P.veil
       const edge = selected ? tone : 0x4c4658
-      this.g.roundRect(x, y, cardW, cardH, 3).fill({ color: selected ? P.faceHi : P.face, alpha: 1 })
-      this.g.roundRect(x, y, cardW, cardH, 3).stroke({ color: edge, width: selected ? 3 : 1 })
-      this.g.rect(x + 10, y + 24, cardW - 20, 2).fill({ color: edge })
+      const { g, add } = this.card()
+      g.roundRect(x, y, cardW, cardH, 3).fill({ color: selected ? P.faceHi : P.face, alpha: 1 })
+      g.roundRect(x, y, cardW, cardH, 3).stroke({ color: edge, width: selected ? 3 : 1 })
+      g.rect(x + 10, y + 24, cardW - 20, 2).fill({ color: edge })
       if (selected) {
-        this.g.rect(x + 3, y + 3, cardW - 6, 2).fill({ color: edge })
-        this.g.rect(x + 3, y + cardH - 5, cardW - 6, 2).fill({ color: edge })
+        g.rect(x + 3, y + 3, cardW - 6, 2).fill({ color: edge })
+        g.rect(x + 3, y + cardH - 5, cardW - 6, 2).fill({ color: edge })
       }
       const n = label(def.name, 'meta', selected ? P.bone : P.dim)
-      placeCentered(n, x + cardW / 2, y + 14); this.add(n)
+      placeCentered(n, x + cardW / 2, y + 14); add(n)
       const vow = label(def.vow, 'body', tone)
-      placeCentered(vow, x + cardW / 2, y + 37); this.add(vow)
+      placeCentered(vow, x + cardW / 2, y + 37); add(vow)
       // Anchored to its TOP, not its middle: a three-line detail and a one-line detail must both
       // leave the card's footer alone, and a centred block grows into it.
-      for (const line of wrappedCentered(def.detail, 'body', selected ? P.bone : P.dim, cardW - 24, x + cardW / 2, y + 51)) this.add(line)
+      for (const line of wrappedCentered(def.detail, 'body', selected ? P.bone : P.dim, cardW - 24, x + cardW / 2, y + 51)) add(line)
       // One footer line, never two. A duo is itself the most interesting thing that can be said
       // about a card, so it speaks instead of the attribution rather than under it.
       if (def.requires?.length) {
-        this.g.rect(x + 3, y + 3, cardW - 6, 2).fill({ color: P.gold })
+        g.rect(x + 3, y + 3, cardW - 6, 2).fill({ color: P.gold })
         const duo = label('A PACT BETWEEN POWERS', 'meta', P.gold)
-        placeCentered(duo, x + cardW / 2, y + cardH - 10); this.add(duo)
+        placeCentered(duo, x + cardW / 2, y + cardH - 10); add(duo)
       } else if (def.deity !== deity) {
         // The only signal that the run is being offered something from across the crossroads.
         const from = label(DEITIES[def.deity].name, 'meta', tone)
-        placeCentered(from, x + cardW / 2, y + cardH - 10); this.add(from)
+        placeCentered(from, x + cardW / 2, y + cardH - 10); add(from)
       }
     })
     const act = label('A / D OR ARROWS TO CHOOSE   ·   ENTER / ATTACK TO CLAIM', 'meta', P.gold)
     placeCentered(act, W / 2, H - 16); this.add(act)
+    this.act = act
   }
 
   private paintVictory(world: World): void {
     const W = tuning.view.width, H = tuning.view.height
     const run = world.session.run!
-    this.g.rect(0, 0, W, H).fill({ color: P.void, alpha: 0.91 })
-    this.g.rect(0, 0, W, 4).fill({ color: P.gold })
+    this.scrim.rect(0, 0, W, H).fill({ color: P.void, alpha: 0.91 })
+    this.scrim.rect(0, 0, W, 4).fill({ color: P.gold })
     this.g.roundRect(W / 2 - 150, 34, 300, 190, 3).fill({ color: P.face, alpha: 1 }).stroke({ color: P.gold, width: 2 })
     const over = label('MINOS HAS GIVEN HIS VERDICT', 'meta', P.gold)
     placeCentered(over, W / 2, 58); this.add(over)
@@ -255,7 +350,7 @@ export class RewardOverlay {
 
   private paintPause(): void {
     const W = tuning.view.width, H = tuning.view.height
-    this.g.rect(0, 0, W, H).fill({ color: P.void, alpha: 0.76 })
+    this.scrim.rect(0, 0, W, H).fill({ color: P.void, alpha: 0.76 })
     // The card grew 134 -> 152 and moved up 6 to seat the save line, keeping the 28/21 top and bottom
     // padding it already had. The new line is static, so the repaint key above needs no new input.
     this.g.roundRect(W / 2 - 120, 62, 240, 152, 3).fill({ color: P.face, alpha: 0.98 }).stroke({ color: P.gold, width: 2 })

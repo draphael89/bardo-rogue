@@ -785,6 +785,11 @@ export class Hud {
       return
     }
     this.hideDeathCard()
+    // A god or the ferryman standing on the screen owns it outright: their overlay paints a
+    // 92%-opacity scrim over the whole room, so anything here is a ghost behind it. The clear slab
+    // was the worst of them — it read 'CHOOSE A DOOR' while the door was shut and the only thing on
+    // offer was a vow.
+    if (world.session.run?.pendingReward || world.session.run?.pendingRite) { this.hideBanner(); return }
     let text = '', sub = '', tone: Tone = 'wave', age = 0, ttl = Infinity
     if (w.state === 'done' && world.roomClearTick >= 0) {
       text = 'ROOM CLEARED'
@@ -804,8 +809,11 @@ export class Hud {
     if (this.sub.text !== sub) this.sub.text = sub
     if (this.shownTone !== tone) { this.shownTone = tone; this.banner.tint = t.text; this.sub.tint = C.bone }
 
-    // stepped pop: pixel UI snaps between whole poses, it does not ease smoothly like a web page
-    const scale = age < 3 ? 1.5 : age < 6 ? 1.25 : 1
+    // The pop used to run 1.5 -> 1.25 -> 1, which is exactly the fractional transform the type ramp
+    // exists to prevent: a 14px cap through 1.25 puts every stem on a quarter pixel and the word
+    // came out smeared for its first six ticks. The band's own open/shut below already carries the
+    // entrance, and a whole-number pop large enough to read (2x) would overflow the 28px band.
+    const scale = 1
     const fade = ttl < 8 ? Math.max(0, ttl / 8) : 1
     const open = Math.min(1, (age + 1) / OPEN)
     const shut = ttl < CLOSE ? Math.max(0, ttl / CLOSE) : 1

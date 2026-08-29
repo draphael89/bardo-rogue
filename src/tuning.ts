@@ -247,6 +247,17 @@ export const tuning = {
   },
 
   juice: {
+    // How a god's offer arrives. The simulation is parked the whole time (step.ts returns on the
+    // 'reward' phase), so this costs nothing and is purely what the eye is given: the room stays
+    // visible for a beat under a thickening veil, the cards land one after another, and the prompt
+    // only lights when the sim will actually take an answer. Everything must finish inside
+    // run.modalArmTicks, or the screen invites a press it is still refusing.
+    modalReveal: {
+      scrimTicks: 8,     // the veil closing over the kill you just made
+      cardStagger: 4,    // between one card landing and the next
+      cardTicks: 6,      // each card's own fade and 3px settle
+      cardRise: 3,       // px it drops from
+    },
     shakeMax: 4, shakeRotMaxDeg: 0.5, shakeDecay: 1.6,
     traumaLight: 0.40, traumaHeavy: 0.58, traumaHurt: 0.6, traumaKill: 0.22,
     flashTicks: 4, squashTicks: 6,

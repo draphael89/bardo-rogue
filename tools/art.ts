@@ -121,8 +121,12 @@ async function cmdCompile(): Promise<void> {
     console.error(`The candidate is at ${stage} for inspection. ${destPng} is untouched.`)
     process.exit(2)
   }
-  // Both halves were fully prepared in staging before either destination is touched.
+  // Both halves were fully prepared in staging before either destination is touched — and BOTH
+  // destination directories exist before either copy runs. Creating only the PNG's parent left a
+  // spec whose sidecar lives elsewhere landing its image and then throwing on the sidecar: exactly
+  // the half-promoted asset this staging dance exists to prevent.
   mkdirSync(dirname(destPng), { recursive: true })
+  mkdirSync(dirname(destSidecar), { recursive: true })
   copyFileSync(stage, destPng)
   copyFileSync(stageSidecar, destSidecar)
   console.log(`  promoted -> ${destPng} + ${destSidecar}`)
@@ -164,10 +168,20 @@ async function cmdGate(): Promise<void> {
     distinct.add('#' + [data[i], data[i + 1], data[i + 2]].map(v => v.toString(16).padStart(2, '0')).join('').toUpperCase())
   }
   // Enforce the SELECTED ramp when the sidecar records one: a colour from someone else's ramp is
-  // palette drift even though it is canonical.
+  // palette drift even though it is canonical. A sidecar is untrusted input here, so a ramp naming
+  // a colour canon no longer has is REPORTED as the drift it is — dereferencing it blind crashed
+  // the one command whose job is to detect exactly that.
+  const colors = canon().colors
+  if (def.ramp) {
+    const unknown = def.ramp.filter(n => !colors[n])
+    if (unknown.length) {
+      console.error(`  FAIL  ramp — ${sidecarPath} names ${unknown.map(n => `"${n}"`).join(', ')}, which canon no longer defines. The palette moved under this sheet; recompile it.`)
+      process.exit(2)
+    }
+  }
   const allowed = def.ramp
-    ? new Set(def.ramp.map(n => canon().colors[n].hex))
-    : new Set(Object.values(canon().colors).map(c => c.hex))
+    ? new Set(def.ramp.map(n => colors[n].hex))
+    : new Set(Object.values(colors).map(c => c.hex))
   const report = {
     spec: sidecarPath, input: png, output: png, sidecar: sidecarPath,
     source: { width, height, hash: '' },

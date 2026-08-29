@@ -25,10 +25,14 @@ beforeAll(async () => {
     const o = (y * 32 + x) * 4
     raw[o] = rgb[0]; raw[o + 1] = rgb[1]; raw[o + 2] = rgb[2]; raw[o + 3] = 255
   }
-  for (let y = 8; y < 28; y++) for (let x = 10; x < 22; x++) put(x, y, c.iron.rgb)
-  for (let x = 10; x < 22; x++) { put(x, 8, c.ironHi.rgb); put(x, 27, c.slate0.rgb) }
-  for (let x = 13; x < 19; x++) put(x, 6, c.bone.rgb)
-  for (let y = 6; y < 8; y++) { put(13, y, c.bone.rgb); put(18, y, c.bone.rgb) }
+  // A connected figure, not a filled block: the gates reject a rectangle (94% bbox fill) and reject
+  // a perforated one (disconnected islands), so a fixture that must survive a real CLI compile has
+  // to be a legible silhouette — narrow head over a wider torso, ~65% fill, one 4-connected mass.
+  for (let y = 18; y < 28; y++) for (let x = 10; x < 22; x++) put(x, y, c.iron.rgb)
+  for (let y = 8; y < 18; y++) for (let x = 14; x < 18; x++) put(x, y, c.iron.rgb)
+  for (let x = 14; x < 18; x++) put(x, 8, c.ironHi.rgb)
+  for (let x = 10; x < 22; x++) put(x, 27, c.slate0.rgb)
+  for (let y = 6; y < 8; y++) for (let x = 13; x < 19; x++) put(x, y, c.bone.rgb)
   srcPng = join(dir, 'src.png')
   await sharp(raw, { raw: { width: 32, height: 32, channels: 4 } }).png().toFile(srcPng)
 })
@@ -107,6 +111,25 @@ describe('computed provenance', () => {
     const receipt = JSON.parse(readFileSync('art/approved/bardo_hero_alpha_v1.approval.json', 'utf8'))
     expect(a.def.source?.referenceHashes).toEqual([receipt.sha256])
   })
+})
+
+describe('promotion writes both halves or neither', () => {
+  it('creates the sidecar directory too, so a sidecar living elsewhere cannot half-promote', async () => {
+    // The PNG's parent was created and the sidecar's was not, so a spec that parks its sidecar in a
+    // different directory landed the image and then threw — the exact half-promoted state staging
+    // exists to prevent.
+    const png = join(dir, 'promote', 'sheets', 'x.png')
+    const sidecar = join(dir, 'promote', 'meta', 'x.json')
+    const specPath = join(dir, 'split-dest.json')
+    writeFileSync(specPath, JSON.stringify(spec({ output: png, sidecar })))
+    const r = spawnSync('pnpm', ['exec', 'tsx', 'tools/art.ts', 'compile', specPath], { encoding: 'utf8', timeout: 120000 })
+    const out = String(r.stderr) + String(r.stdout)
+    // ENOENT is the bug's signature: the PNG lands, then the sidecar copy dies on a missing parent.
+    expect(out, out).not.toMatch(/ENOENT/)
+    expect(out, out).toMatch(/promoted ->/)
+    expect(existsSync(png)).toBe(true)
+    expect(existsSync(sidecar)).toBe(true)
+  }, 130000)
 })
 
 describe('production promotion (CLI)', () => {

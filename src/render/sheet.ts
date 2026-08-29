@@ -144,6 +144,13 @@ export function validateSheetDef(def: SheetDef, where: string): void {
   // Mirroring serves the opposite side by flipping east-drawn art; flipping a south/north/facing-less
   // sheet is a meaningless combination that hides a spec mistake.
   if (def.mirror && def.facing !== 'east') fail(`mirror requires facing "east", not "${def.facing}"`)
+  // Shape only: this file is game code and cannot reach the build-time palette. Membership in canon
+  // is checked where canon lives (tools/art.ts), so the two halves of the check sit on the right
+  // side of the seam.
+  if (def.ramp !== undefined) {
+    if (!Array.isArray(def.ramp) || def.ramp.length === 0) fail('ramp must be a non-empty array of canon colour names')
+    for (const n of def.ramp) if (typeof n !== 'string' || !n) fail('ramp contains a non-string entry')
+  }
   if (!def.frames || Object.keys(def.frames).length === 0) fail('frames is empty')
   const cells = def.cols * def.rows
   const seen = new Set<number>()

@@ -68,6 +68,8 @@ describe('validateSheetDef (strengthened)', () => {
     expect(() => validateSheetDef(goodDef(), 't')).not.toThrow()
   })
   const cases: Array<[string, (d: SheetDef) => void, RegExp]> = [
+    ['an empty ramp', d => { d.ramp = [] }, /ramp must be a non-empty array/],
+    ['a non-string ramp entry', d => { (d as { ramp: unknown[] }).ramp = ['iron', 7] }, /ramp contains a non-string entry/],
     ['an unsupported contract version', d => { (d as { version: number }).version = 2 }, /unsupported contract version/],
     ['a missing palette name', d => { (d as { palette: string }).palette = '' }, /palette/],
     ['a non-integer maxColors', d => { (d as { maxColors: number }).maxColors = 0 }, /maxColors/],

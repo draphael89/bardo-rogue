@@ -4,7 +4,7 @@
 **Audited revision:** `6852aa0` (`cursor/43111337`) — *Greek gate: rites, deities, Minos, and the Oath-Bound elite*
 **Interactive scorecard:** open `bardo-vertical-slice-plan.canvas.tsx` beside the chat.
 
-**Revision 3 — overnight audit.** Re-verified against this worktree, not against earlier write-ups. `pnpm typecheck` green. `pnpm test` **648 / 51 files**. Fresh `slice-kite` seeds 1–8 after the loop-lead fix: **7 wins**, 48.4–54.4 s, seed 6 lost at 56 s; every run home in the Bardo. `slice-naive` seeds 1–8: 0 wins, death at 16.1–34.2 s, two to four chambers, all home. Playwright stills: title over the living Bardo (unarmed body and rack readable), unarmed hub, rack pickup (`THE BLADE REMEMBERS`, door open), Kindly One offer, Charon's Landing toll. Gauntlet wave 2 parked nine pieces on authored art; wave 3 is an asset-kit wave, not another critique grind. C.1 / C.2 are a live re-grade of what a player sits in now (overall loop foundation **76**). The scorecard canvas matches.
+**Revision 3 — overnight audit.** Re-verified against this worktree, not against earlier write-ups. `pnpm typecheck` green. `pnpm test` **655 / 52 files**. Fresh `slice-kite` seeds 1–8 after the loop-lead fix: **7 wins**, 48.4–54.4 s, seed 6 lost at 56 s; every run home in the Bardo. `slice-naive` seeds 1–8: 0 wins, death at 16.1–34.2 s, two to four chambers, all home. Playwright stills: title over the living Bardo (unarmed body and rack readable), unarmed hub, rack pickup (`THE BLADE REMEMBERS`, door open), Kindly One offer, Charon's Landing toll. Gauntlet wave 2 parked nine pieces on authored art; wave 3 is an asset-kit wave, not another critique grind. C.1 / C.2 are a live re-grade of what a player sits in now (overall loop foundation **76**). The scorecard canvas matches.
 
 ---
 
@@ -178,7 +178,7 @@ Live re-grade 2026-08-29 against the sitting game, not the architecture.
 | Audio | **76** | Pause owns the clock; Settings steps MUSIC / SOUND; the one bed retunes with the floor. Still one synthesized bed, never heard by a sitting player. |
 | UI/UX | **80** | Title / Settings / Credits / pause mix / abandon / map / death stone. The Hall's plate is Minos's life — wine, like the sentences, not a gold door-bar. Pad glyphs later. The verbs sit left so the rack and the body read. |
 | Persistence | **78** | Attempt-keyed seeds, Remembrances, unlocks, node-boundary resume. CI workflow still parked. |
-| Agent/developer tooling | **90** | 648 tests, shot / strip / sim, pinned hashes. CI template is one `git mv` from live. |
+| Agent/developer tooling | **90** | 655 tests, shot / strip / sim, pinned hashes. CI template is one `git mv` from live. |
 
 ### C.2 Game-loop dimensions (from the loop audit)
 

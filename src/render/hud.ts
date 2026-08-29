@@ -235,7 +235,6 @@ export class Hud {
   banner: Text
   sub: Text
   place: Text
-  hint: Text                          // kept for compatibility; the live hint is hintRow
 
   // timed banner (fired from sim events); persistent banners anchor to sim ticks the world already stores
   private bannerStart = -1
@@ -258,7 +257,7 @@ export class Hud {
     this.rig.scale.set(2)
     this.rig.addChild(this.rigG)
 
-    this.waveText = new Text({ text: '', style: { fontFamily: 'Kenney Pixel', fontSize: 16, fill: C.bone }, resolution: 1 })
+    this.waveText = new Text({ text: '', style: { fontFamily: 'Kenney Mini', fontSize: 16, fill: C.bone }, resolution: 1 })
     this.waveText.anchor.set(1, 0); this.waveText.position.set(V.width - 12, 2)
     this.bossName = new Text({
       text: 'MINOS',
@@ -269,20 +268,18 @@ export class Hud {
     this.bossName.position.set(Math.round(V.width / 2), 4)
     this.bossName.visible = false
 
-    this.banner = new Text({ text: '', style: { fontFamily: 'Kenney Blocks', fontSize: 24, fill: 0xffffff, stroke: { color: C.void, width: 3 } }, resolution: 1 })
+    this.banner = new Text({ text: '', style: { fontFamily: 'Kenney Blocks', fontSize: 16, fill: 0xffffff, stroke: { color: C.void, width: 3 } }, resolution: 1 })
     this.banner.anchor.set(0.5); this.banner.position.set(V.width / 2, BANNER_Y)
     this.sub = new Text({ text: '', style: { fontFamily: 'Kenney Mini', fontSize: 8, fill: 0xffffff, letterSpacing: 2 }, resolution: 1 })
     this.sub.anchor.set(0.5); this.sub.position.set(V.width / 2, 48)
 
     this.place = new Text({
       text: 'THE THRESHOLD',
-      style: { fontFamily: 'Kenney Mini', fontSize: 10, fill: C.boneDim, letterSpacing: 3, dropShadow: drop },
+      style: { fontFamily: 'Kenney Mini', fontSize: 8, fill: C.boneDim, letterSpacing: 3, dropShadow: drop },
       resolution: 1,
     })
     this.place.anchor.set(0.5, 1); this.place.position.set(V.width / 2, V.height - 6)
 
-    this.hint = new Text({ text: '', style: { fontFamily: 'Kenney Pixel', fontSize: 8, fill: C.boneDim }, resolution: 1 })
-    this.hint.visible = false
     this.hintRow.addChild(this.hintG)
     this.hintRow.position.set(0, V.height - 34)
 
@@ -317,7 +314,7 @@ export class Hud {
 
     layer.addChild(this.markG, this.crownG, this.hurtG, this.bandG, this.banner, this.sub,
       this.plateG, this.rig, this.waveG, this.waveText, this.bossG, this.bossName,
-      this.footG, this.place, this.hintRow, this.hint,
+      this.footG, this.place, this.hintRow,
       this.scrimG, this.cardG, this.cardTitle, this.cardSub, this.cardKey, this.cardAct)
     for (const r of this.cardRows) layer.addChild(r.label, r.value)
     this.hideDeathCard()
@@ -817,6 +814,11 @@ export class Hud {
       return
     }
     this.hideDeathCard()
+    // A god or the ferryman standing on the screen owns it outright: their overlay paints a
+    // 92%-opacity scrim over the whole room, so anything here is a ghost behind it. The clear slab
+    // was the worst of them — it read 'CHOOSE A DOOR' while the door was shut and the only thing on
+    // offer was a vow.
+    if (world.session.run?.pendingReward || world.session.run?.pendingRite) { this.hideBanner(); return }
     let text = '', sub = '', tone: Tone = 'wave', age = 0, ttl = Infinity
     // The production loop's exits strip is the instruction. A second slab saying ROOM CLEARED /
     // WALK NORTH is developer text sitting on the plan.
@@ -838,8 +840,11 @@ export class Hud {
     if (this.sub.text !== sub) this.sub.text = sub
     if (this.shownTone !== tone) { this.shownTone = tone; this.banner.tint = t.text; this.sub.tint = C.bone }
 
-    // stepped pop: pixel UI snaps between whole poses, it does not ease smoothly like a web page
-    const scale = age < 3 ? 1.5 : age < 6 ? 1.25 : 1
+    // The pop used to run 1.5 -> 1.25 -> 1, which is exactly the fractional transform the type ramp
+    // exists to prevent: a 14px cap through 1.25 puts every stem on a quarter pixel and the word
+    // came out smeared for its first six ticks. The band's own open/shut below already carries the
+    // entrance, and a whole-number pop large enough to read (2x) would overflow the 28px band.
+    const scale = 1
     const fade = ttl < 8 ? Math.max(0, ttl / 8) : 1
     const open = Math.min(1, (age + 1) / OPEN)
     const shut = ttl < CLOSE ? Math.max(0, ttl / CLOSE) : 1
@@ -1320,15 +1325,15 @@ export class Hud {
     // Every label below sits on its own plate, so none of them needed the drop shadow that was
     // stopping it being snapped to the pixel grid. `place` keeps its shadow: it is the only label
     // drawn straight over the room with nothing behind it.
-    this.banner.filters = [crispText]
-    this.sub.filters = [crispText]
-    this.waveText.filters = [crispText]
-    this.bossName.filters = [crispText]
-    this.cardTitle.filters = [crispText]
-    this.cardSub.filters = [crispText]
-    this.cardKey.filters = [crispText]
-    this.cardAct.filters = [crispText]
-    for (const r of this.cardRows) { r.label.filters = [crispText]; r.value.filters = [crispText] }
+    for (const t of [this.banner, this.sub, this.waveText, this.bossName,
+      this.cardTitle, this.cardSub, this.cardKey, this.cardAct]) {
+      t.filters = [crispText]
+      t.roundPixels = true
+    }
+    for (const r of this.cardRows) {
+      r.label.filters = [crispText]; r.label.roundPixels = true
+      r.value.filters = [crispText]; r.value.roundPixels = true
+    }
   }
 
   relayout(): void {

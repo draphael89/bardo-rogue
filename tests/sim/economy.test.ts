@@ -18,6 +18,11 @@ function beginRun(seed = 11) {
   return world
 }
 
+function armThenConfirm(world: ReturnType<typeof createWorld>, extra: Record<string, unknown> = {}): void {
+  while (world.tick - world.phaseTick < tuning.run.modalArmTicks) stepWorld(world, emptyInput())
+  stepWorld(world, { ...emptyInput(), ...extra, confirm: true })
+}
+
 function atLanding(seed = 7) {
   const world = createWorld(seed, 'loop')
   prepareWeapon(world, 'blade')
@@ -26,7 +31,7 @@ function atLanding(seed = 7) {
   pinUtility(world, 'shop')
   enterRoomById(world, 'black-step')
   stepWorld(world, { ...emptyInput(), choiceDelta: 1 })
-  stepWorld(world, { ...emptyInput(), confirm: true })
+  armThenConfirm(world)
   return world
 }
 
@@ -88,7 +93,7 @@ describe("Charon's stall", () => {
     world.player.hp = 1
     forceClear(world)
     world.session.run!.obols = shopCost('heal')
-    stepWorld(world, { ...emptyInput(), confirm: true })
+    armThenConfirm(world)
     expect(world.session.run!.pendingShop).toBeNull()
     expect(world.session.run!.obols).toBe(0)
     expect(world.player.hp).toBe(1 + tuning.economy.shop.healAmount)
@@ -101,7 +106,7 @@ describe("Charon's stall", () => {
     forceClear(world)
     world.session.run!.obols = shopCost('heal') - 1
     const purse = world.session.run!.obols
-    stepWorld(world, { ...emptyInput(), confirm: true })
+    armThenConfirm(world)
     expect(world.session.run!.pendingShop).not.toBeNull()
     expect(world.session.run!.obols).toBe(purse)
     expect(world.roomPhase).toBe('reward')
@@ -114,7 +119,7 @@ describe("Charon's stall", () => {
     stepWorld(world, { ...emptyInput(), choiceDelta: 1 })
     stepWorld(world, { ...emptyInput(), choiceDelta: 1 })
     expect(world.session.run!.pendingShop!.focus).toBe(2)
-    stepWorld(world, { ...emptyInput(), confirm: true })
+    armThenConfirm(world)
     expect(world.session.run!.pendingShop).toBeNull()
     expect(world.session.run!.pendingReward?.family).toBe('veil')
     expect(world.roomPhase).toBe('reward')

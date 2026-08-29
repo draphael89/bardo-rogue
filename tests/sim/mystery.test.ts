@@ -11,6 +11,11 @@ import { prepareWeapon, startRun } from '@/sim/session'
 import { stepWorld } from '@/sim/step'
 import { tuning } from '@/tuning'
 
+function armThenConfirm(world: ReturnType<typeof createWorld>, extra: Record<string, unknown> = {}): void {
+  while (world.tick - world.phaseTick < tuning.run.modalArmTicks) stepWorld(world, emptyInput())
+  stepWorld(world, { ...emptyInput(), ...extra, confirm: true })
+}
+
 function atMooring(seed = 7) {
   const world = createWorld(seed, 'loop')
   prepareWeapon(world, 'blade')
@@ -19,7 +24,7 @@ function atMooring(seed = 7) {
   pinUtility(world, 'mystery')
   enterRoomById(world, 'black-step')
   stepWorld(world, { ...emptyInput(), choiceDelta: 1 })
-  stepWorld(world, { ...emptyInput(), confirm: true })
+  armThenConfirm(world)
   return world
 }
 
@@ -53,7 +58,7 @@ describe("the Unburied's mooring", () => {
     const price = mysteryCost('coin')
     expect(price.kind).toBe('obols')
     world.session.run!.obols = price.amount
-    stepWorld(world, { ...emptyInput(), confirm: true })
+    armThenConfirm(world)
     expect(world.session.run!.pendingMystery).toBeNull()
     expect(world.session.run!.obols).toBe(0)
     expect(world.player.hp).toBe(1 + tuning.economy.mystery.coinHeal)
@@ -74,7 +79,7 @@ describe("the Unburied's mooring", () => {
     forceClear(world)
     stepWorld(world, { ...emptyInput(), choiceDelta: 1 })
     expect(world.session.run!.pendingMystery!.focus).toBe(1)
-    stepWorld(world, { ...emptyInput(), confirm: true })
+    armThenConfirm(world)
     expect(world.session.meta.remembrances).toBe(0)
     expect(world.player.maxHp).toBe(tuning.player.hp + tuning.economy.mystery.memoryVessel)
     expect(world.player.hp).toBe(tuning.player.hp + tuning.economy.mystery.memoryVessel)
@@ -87,7 +92,7 @@ describe("the Unburied's mooring", () => {
     forceClear(world)
     world.session.run!.obols = mysteryCost('coin').amount - 1
     const purse = world.session.run!.obols
-    stepWorld(world, { ...emptyInput(), confirm: true })
+    armThenConfirm(world)
     expect(world.session.run!.pendingMystery).not.toBeNull()
     expect(world.session.run!.obols).toBe(purse)
     expect(world.roomPhase).toBe('reward')
@@ -98,7 +103,7 @@ describe("the Unburied's mooring", () => {
     world.session.meta.remembrances = 0
     forceClear(world)
     stepWorld(world, { ...emptyInput(), choiceDelta: 1 })
-    stepWorld(world, { ...emptyInput(), confirm: true })
+    armThenConfirm(world)
     expect(world.session.run!.pendingMystery).not.toBeNull()
     expect(world.player.maxHp).toBe(tuning.player.hp)
     expect(world.roomPhase).toBe('reward')
@@ -110,7 +115,7 @@ describe("the Unburied's mooring", () => {
     stepWorld(world, { ...emptyInput(), choiceDelta: 1 })
     stepWorld(world, { ...emptyInput(), choiceDelta: 1 })
     expect(world.session.run!.pendingMystery!.focus).toBe(2)
-    stepWorld(world, { ...emptyInput(), confirm: true })
+    armThenConfirm(world)
     expect(world.session.run!.pendingMystery).toBeNull()
     expect(world.session.run!.mysteryHunt).toBe(true)
     expect(world.roomPhase).toBe('exits')
@@ -145,10 +150,10 @@ describe("the Unburied's mooring", () => {
     ensureUtility(world)
     pinUtility(world, 'mystery')
     enterRoomById(world, 'black-step')
-    stepWorld(world, { ...emptyInput(), confirm: true })
+    armThenConfirm(world)
     world.session.run!.obols = mysteryCost('coin').amount
     forceClear(world)
-    stepWorld(world, { ...emptyInput(), confirm: true })
+    armThenConfirm(world)
     expect(world.session.run!.pendingMystery).toBeNull()
     expect(world.session.run!.pendingReward?.family).toBe('blade')
     expect(world.session.run!.pendingReward?.fromRite).toBe(true)

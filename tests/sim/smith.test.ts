@@ -23,6 +23,11 @@ function walkToSmith(world: ReturnType<typeof createWorld>): void {
   stepWorld(world, emptyInput())
 }
 
+function armThenConfirm(world: ReturnType<typeof createWorld>, extra: Record<string, unknown> = {}): void {
+  while (world.tick - world.phaseTick < tuning.run.modalArmTicks) stepWorld(world, emptyInput())
+  stepWorld(world, { ...emptyInput(), ...extra, confirm: true })
+}
+
 function beginOffer(seed = 4) {
   const world = createWorld(seed, 'loop', {
     meta: { version: 1, attempts: 0, victories: 0, remembrances: 0, rerollUnlocked: true, vesselUnlocked: false, unlockedWeapons: ['blade'] },
@@ -103,7 +108,7 @@ describe('the Smith', () => {
     pinUtility(world, 'mystery')
     enterRoomById(world, 'black-step')
     stepWorld(world, { ...emptyInput(), choiceDelta: 1 })
-    stepWorld(world, { ...emptyInput(), confirm: true })
+    armThenConfirm(world)
     for (const e of world.enemies) e.active = false
     world.spawnQueue.length = 0
     const defs = world.waveDefs!
@@ -113,7 +118,7 @@ describe('the Smith', () => {
     stepWorld(world, emptyInput())
     stepWorld(world, { ...emptyInput(), choiceDelta: 1 })
     stepWorld(world, { ...emptyInput(), choiceDelta: 1 })
-    stepWorld(world, { ...emptyInput(), confirm: true })
+    armThenConfirm(world)
     expect(world.session.lastMystery).toBe('leave')
     expect(abandonRun(world)).toBe(true)
     walkToSmith(world)
@@ -135,7 +140,7 @@ describe('the Smith', () => {
     pinUtility(world, 'mystery')
     enterRoomById(world, 'black-step')
     stepWorld(world, { ...emptyInput(), choiceDelta: 1 })
-    stepWorld(world, { ...emptyInput(), confirm: true })
+    armThenConfirm(world)
     for (const e of world.enemies) e.active = false
     world.spawnQueue.length = 0
     const defs = world.waveDefs!
@@ -145,7 +150,7 @@ describe('the Smith', () => {
     stepWorld(world, emptyInput())
     stepWorld(world, { ...emptyInput(), choiceDelta: 1 })
     stepWorld(world, { ...emptyInput(), choiceDelta: 1 })
-    stepWorld(world, { ...emptyInput(), confirm: true })
+    armThenConfirm(world)
     expect(abandonRun(world)).toBe(true)
     world.session.meta.rerollUnlocked = true
     world.session.meta.remembrances = tuning.economy.smith.vesselCost
@@ -179,6 +184,7 @@ describe('offer reforging', () => {
     const world = beginOffer()
     expect(world.session.run!.rerolls).toBe(1)
     const first = world.session.run!.pendingReward!.options.slice()
+    while (world.tick - world.phaseTick < tuning.run.modalArmTicks) stepWorld(world, emptyInput())
     stepWorld(world, { ...emptyInput(), reroll: true })
     expect(world.session.run!.rerolls).toBe(0)
     expect(world.events.some(e => e.type === 'rewardRerolled')).toBe(true)

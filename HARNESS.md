@@ -33,6 +33,7 @@ per tick: `stepWorld(world, inputFrame)`.
 | `pnpm desktop:start` | Runs the PACKAGED code path (`app://bardo/`) against the local `dist/`, without packaging anything |
 | `pnpm smoke:desktop` | Tier-3: drives the real Electron app under Playwright and checks hosting, incl. replay-hash parity with `pnpm sim` |
 | `pnpm desktop:dist` | Phase 7: electron-builder arm64 dmg+zip. Needs macOS and the electron-builder devDependency (not installed). |
+| `pnpm site:build` | PlayBardo.com landing page: `site/src` + `site/art-src` -> static `site/dist` (responsive AVIF/WebP, hashed assets; `tools/build-site.ts`). Separate from the game build. |
 
 `pnpm sim -- --scenario wave3 --bot naive-melee --seeds 1-20 --ticks 10800` prints one row per seed:
 swings, hitsLanded, whiffSwings, kills, dodges, successfulDodges, boltsFired, boltsCut, enemyAttacks, damageTaken

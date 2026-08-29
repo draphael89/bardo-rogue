@@ -97,10 +97,19 @@ export class PostFx {
   private reducedEffects = false
 
   constructor(private ra: RenderApp) {
+    // Both of these run on the UPSCALED quad, and Pixi allocates a filter's intermediate buffer at
+    // the filter's own resolution, which defaults to 1 -- CSS pixels. app.ts is careful to pick a
+    // scale that is a whole number of PHYSICAL pixels, which on a 2x display legitimately means a
+    // fractional CSS scale (a 16-inch MBP at default scaling lands on 3.5). Resolved into a
+    // CSS-resolution buffer, that 3.5 becomes alternating 3px and 4px columns and every one-pixel
+    // stem in the game comes out uneven. Allocating at the renderer's resolution keeps the whole
+    // chain on the integer physical grid app.ts went to the trouble of finding.
+    const resolution = ra.app.renderer.resolution
     this.uniforms = new UniformGroup({ uOffset: { value: new Float32Array([0, 0]), type: 'vec2<f32>' } })
     this.filter = new Filter({
       glProgram: GlProgram.from({ vertex, fragment, name: 'aberration-filter' }),
       resources: { aberrationUniforms: this.uniforms },
+      resolution,
     })
     const G = tuning.juice.grade
     const gradeUniforms = new UniformGroup({
@@ -113,6 +122,7 @@ export class PostFx {
     this.grade = new Filter({
       glProgram: GlProgram.from({ vertex, fragment: gradeFragment, name: 'grade-filter' }),
       resources: { gradeUniforms },
+      resolution,
     })
     this.ra.screen.filters = [this.grade]
   }

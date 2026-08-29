@@ -119,6 +119,7 @@ export function updateMystery(world: World, input: { choiceDelta?: -1 | 0 | 1; c
     world.emit({ type: 'mysteryFocus', focus: offer.focus })
     return
   }
+  if (world.tick - world.phaseTick < tuning.run.modalArmTicks) return
   if (!input.confirm) return
   const choice = offer.choices[offer.focus]
   if (!canAffordMystery(world, choice)) return

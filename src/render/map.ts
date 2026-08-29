@@ -3,7 +3,7 @@ import type { DoorMark } from '@/sim/arena'
 import { mapPlan, type MapPlan } from '@/sim/route'
 import type { World } from '@/sim/world'
 import { tuning } from '@/tuning'
-import { label, P } from './ui'
+import { label, placeLeft, P } from './ui'
 import { OATH } from './oathMetal'
 
 function markColor(mark: DoorMark): number {
@@ -80,21 +80,18 @@ export class RouteMap {
     plan.doors.forEach((ex, i) => {
       const y = boxY + pad + rowH * i + rowH / 2
       // The doors already face the room. NORTH / EAST on this strip was a compass sitting on the plan.
-      const mark = label(ex.markLabel, 9, markColor(ex.mark))
-      mark.anchor.set(0, 0.5)
-      mark.position.set(boxX + 10, y)
+      const mark = label(ex.markLabel, 'meta', markColor(ex.mark))
+      placeLeft(mark, boxX + 10, y)
       this.add(mark)
-      const name = label(ex.dest, 9, P.bone)
-      name.anchor.set(0, 0.5)
-      name.position.set(boxX + 52, y)
+      const name = label(ex.dest, 'meta', P.bone)
+      placeLeft(name, boxX + 52, y)
       this.add(name)
     })
 
     if (plan.then) {
       const y = boxY + pad + rowH * plan.doors.length + rowH / 2
-      const then = label(plan.then, 9, P.dim)
-      then.anchor.set(0, 0.5)
-      then.position.set(boxX + 10, y)
+      const then = label(plan.then, 'meta', P.dim)
+      placeLeft(then, boxX + 10, y)
       this.add(then)
     }
   }

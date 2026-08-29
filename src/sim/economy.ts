@@ -109,6 +109,7 @@ export function updateShop(world: World, input: { choiceDelta?: -1 | 0 | 1; conf
     world.emit({ type: 'shopFocus', focus: offer.focus })
     return
   }
+  if (world.tick - world.phaseTick < tuning.run.modalArmTicks) return
   if (!input.confirm) return
   const good = offer.goods[offer.focus]
   const cost = shopCost(good)

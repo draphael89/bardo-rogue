@@ -26,7 +26,17 @@ function atLanding(seed = 7): W {
 
 function answer(world: W, choice: 'pay' | 'swim'): void {
   if (choice === 'swim') stepWorld(world, { ...emptyInput(), choiceDelta: 1 })
-  stepWorld(world, { ...emptyInput(), confirm: true })
+  armThenConfirm(world)
+}
+
+/**
+ * Sit through a modal's arming window, then answer it. Every modal now refuses `confirm` for
+ * `tuning.run.modalArmTicks` after it opens, because the toll used to be answerable on the tick it
+ * appeared — while you were still holding attack from the room you walked out of.
+ */
+function armThenConfirm(world: W, extra: Record<string, unknown> = {}): void {
+  while (world.tick - world.phaseTick < tuning.run.modalArmTicks) stepWorld(world, emptyInput())
+  stepWorld(world, { ...emptyInput(), ...extra, confirm: true })
 }
 
 function clearRoom(world: W): void {
@@ -83,14 +93,14 @@ describe('the toll', () => {
     clearRoom(world)
     expect(world.session.run!.pendingShop).not.toBeNull()
     expect(world.session.run!.pendingReward).toBeNull()
-    stepWorld(world, { ...emptyInput(), confirm: true })
+    armThenConfirm(world)
     // The stall took a sip. The ferryman still owes the blade he was paid with.
     expect(world.roomPhase).toBe('reward')
     const payout = world.session.run!.pendingReward!
     expect(payout.family).toBe('blade')
     expect(payout.fromRite).toBe(true)
     expect(world.session.run?.riteBoonOwed).toBe(false)
-    stepWorld(world, { ...emptyInput(), confirm: true })
+    armThenConfirm(world)
     expect(world.roomPhase).toBe('exits')
     expect(activeBoons(world)).toHaveLength(1)
     expect(world.doorOpen).toBe(true)
@@ -104,7 +114,7 @@ describe('the toll', () => {
     answer(world, 'pay')
     world.session.run!.obols = 20
     clearRoom(world)
-    stepWorld(world, { ...emptyInput(), confirm: true })
+    armThenConfirm(world)
     const payout = world.session.run!.pendingReward!
     expect(payout.family).toBe('blade')
     expect(payout.fromRite).toBe(true)
@@ -191,7 +201,7 @@ describe('the toll', () => {
     stepWorld(world, { ...emptyInput(), choiceDelta: 1, confirm: true })
     expect(world.roomPhase).toBe('entering')
     expect(world.session.run?.pendingRite?.focus).toBe(1)
-    stepWorld(world, { ...emptyInput(), confirm: true })
+    armThenConfirm(world)
     expect(world.session.run?.riteAnswer).toBe('refused')
   })
 

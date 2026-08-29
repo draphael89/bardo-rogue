@@ -5,7 +5,7 @@ import {
   backTitle, confirmTitle, titleDescend, townTally, wrapTitleFocus,
   type TitleAct, type TitlePage,
 } from './titleMenu'
-import { label, P } from './ui'
+import { label, placeCentered, placeLeft, P, type TypeTier } from './ui'
 
 // The title is held OVER the living hub rather than staged as a separate scene. The Bardo is already
 // the most authored thing the game owns — its braziers gutter, its motes drift, its lightmap breathes
@@ -137,8 +137,8 @@ export class TitleOverlay {
     g.rect(inset, 40, W - inset * 2, 1).fill({ color: P.gold, alpha: 0.5 })
     g.rect(inset, H - 52, W - inset * 2, 1).fill({ color: P.gold, alpha: 0.5 })
 
-    const epigraph = label('THE SPACE BETWEEN DEATH AND WHAT COMES NEXT', 9, P.dim)
-    epigraph.position.set(W / 2, 54); this.add(epigraph)
+    const epigraph = label('THE SPACE BETWEEN DEATH AND WHAT COMES NEXT', 'meta', P.dim)
+    placeCentered(epigraph, W / 2, 54); this.add(epigraph)
 
     // The name, letterspaced by hand: one Text per glyph so the tracking lands on whole pixels
     // instead of asking the font for a fractional advance.
@@ -162,9 +162,9 @@ export class TitleOverlay {
     // Same column as the menu: the first frame a browser shows is this gate, and a centered
     // second line used to sit on the rack.
     this.paintPremise(36)
-    const prompt = label('WAKE THE ROOM', 11, 0xffffff)
+    const prompt = label('WAKE THE ROOM', 'head', 0xffffff)
     prompt.tint = this.beat ? P.gold : P.bone
-    prompt.position.set(W / 2, H - 74); this.add(prompt)
+    placeCentered(prompt, W / 2, H - 74); this.add(prompt)
     this.prompt = prompt
   }
 
@@ -181,7 +181,7 @@ export class TitleOverlay {
 
     // Left with the verbs. A centered tally sat on the body; DAMNED was a score sitting on a name.
     const foot = returning ? townTally(attempts, victories, remembrances) : 'THE GATE IS OPEN'
-    this.paintLineLeft(col, H - 38, foot, 9, P.dim)
+    this.paintLineLeft(col, H - 38, foot, 'meta', P.dim)
   }
 
   private paintSettings(W: number, H: number): void {
@@ -190,21 +190,20 @@ export class TitleOverlay {
     this.paintMeter(W / 2, 166, 'MUSIC', this.music, this.focus === 1)
     this.paintMeter(W / 2, 184, 'SOUND', this.sfx, this.focus === 2)
     this.paintRow(W / 2, 204, 'RISE', this.focus === 3)
-    const foot = label('THE ROOM LISTENS', 9, P.dim)
-    foot.position.set(W / 2, H - 38); this.add(foot)
+    const foot = label('THE ROOM LISTENS', 'meta', P.dim)
+    placeCentered(foot, W / 2, H - 38); this.add(foot)
   }
 
   private paintMeter(cx: number, y: number, name: string, value: number, selected: boolean): void {
     const steps = 8
     const pip = 5
     const gap = 3
-    const nameT = label(name, 11, selected ? P.bone : P.dim)
+    const nameT = label(name, 'head', selected ? P.bone : P.dim)
     const nameW = Math.round(nameT.width)
     const barW = steps * pip + (steps - 1) * gap
     const total = nameW + 12 + barW
     const x0 = Math.round(cx - total / 2)
-    nameT.anchor.set(0, 0.5)
-    nameT.position.set(x0, y)
+    placeLeft(nameT, x0, y)
     this.add(nameT)
     const filled = Math.round(value * steps)
     const bx = x0 + nameW + 12
@@ -216,40 +215,38 @@ export class TitleOverlay {
   }
 
   private paintCredits(W: number, H: number): void {
-    const lines: Array<[string, number]> = [
-      ['REMEMBERED HERE', 9],
-      ['THE SMITH  ·  THE FERRYMAN', 10],
-      ['THE UNBURIED  ·  THE JUDGE', 10],
-      ['AND YOU', 10],
+    const lines: Array<[string, TypeTier, number]> = [
+      ['REMEMBERED HERE', 'meta', P.gold],
+      ['THE SMITH  ·  THE FERRYMAN', 'body', P.bone],
+      ['THE UNBURIED  ·  THE JUDGE', 'body', P.bone],
+      ['AND YOU', 'body', P.bone],
     ]
     let y = 142
-    for (const [text, size] of lines) {
-      const row = label(text, size, size === 9 ? P.gold : P.bone)
-      row.position.set(W / 2, y); this.add(row)
-      y += size === 9 ? 18 : 16
+    for (const [text, tier, color] of lines) {
+      const row = label(text, tier, color)
+      placeCentered(row, W / 2, y); this.add(row)
+      y += tier === 'meta' ? 18 : 16
     }
     this.paintRow(W / 2, 204, 'RISE', true)
-    const foot = label('THE FIRST GATE', 9, P.dim)
-    foot.position.set(W / 2, H - 38); this.add(foot)
+    const foot = label('THE FIRST GATE', 'meta', P.dim)
+    placeCentered(foot, W / 2, H - 38); this.add(foot)
   }
 
   private paintPremise(col: number): void {
-    this.paintLineLeft(col, 128, 'You fell in wars that were never yours.', 10, P.bone)
-    this.paintLineLeft(col, 142, 'Every underworld you filled', 10, P.bone)
-    this.paintLineLeft(col, 156, 'is waiting its turn.', 10, P.bone)
+    this.paintLineLeft(col, 128, 'You fell in wars that were never yours.', 'body', P.bone)
+    this.paintLineLeft(col, 142, 'Every underworld you filled', 'body', P.bone)
+    this.paintLineLeft(col, 156, 'is waiting its turn.', 'body', P.bone)
   }
 
-  private paintLineLeft(x: number, y: number, text: string, size: number, color: number): void {
-    const t = label(text, size, color)
-    t.anchor.set(0, 0.5)
-    t.position.set(x, y)
+  private paintLineLeft(x: number, y: number, text: string, tier: TypeTier, color: number): void {
+    const t = label(text, tier, color)
+    placeLeft(t, x, y)
     this.add(t)
   }
 
   private paintRowLeft(x: number, y: number, text: string, selected: boolean): void {
-    const row = label(text, 11, selected ? P.bone : P.dim)
-    row.anchor.set(0, 0.5)
-    row.position.set(x, y)
+    const row = label(text, 'head', selected ? P.bone : P.dim)
+    placeLeft(row, x, y)
     this.add(row)
     if (selected) {
       const w = Math.min(220, Math.round(row.width) + 8)
@@ -258,28 +255,30 @@ export class TitleOverlay {
   }
 
   private paintRow(cx: number, y: number, text: string, selected: boolean): void {
-    const row = label(text, 11, selected ? P.bone : P.dim)
-    row.position.set(cx, y)
+    const row = label(text, 'head', selected ? P.bone : P.dim)
+    placeCentered(row, cx, y)
     this.add(row)
     if (selected) {
-      const w = Math.min(220, row.width + 20)
-      this.g.rect(cx - w / 2, y + 7, w, 1).fill({ color: P.gold, alpha: 0.7 })
+      const w = Math.min(220, Math.round(row.width) + 20)
+      this.g.rect(Math.round(cx - w / 2), y + 7, w, 1).fill({ color: P.gold, alpha: 0.7 })
     }
   }
 
   // BARDO, hand-tracked. At this size the display face's own spacing is too tight for the word to
-  // read as a monument rather than a label.
+  // read as a monument rather than a label. The tracking came down with the size (34 -> 32, the
+  // nearest size Kenney Pixel is actually drawn for) so the word keeps the same open rhythm.
   private drawName(cx: number, y: number): void {
     const letters = [...'BARDO']
-    const size = 34
-    const track = 11
-    const glyphs = letters.map(ch => label(ch, size, P.bone))
+    const track = 10
+    const glyphs = letters.map(ch => label(ch, 'monument', P.bone))
     const widths = glyphs.map(t => Math.round(t.width))
     const total = widths.reduce((a, b) => a + b, 0) + track * (letters.length - 1)
     let x = Math.round(cx - total / 2)
+    // The x is already whole; the y has to be too, so the anchor is left at the corner and the
+    // middling done here. A 0.5 anchor on an odd glyph box puts the whole word on a half row.
     glyphs.forEach((t, i) => {
-      t.anchor.set(0, 0.5)
-      t.position.set(x, y)
+      t.anchor.set(0, 0)
+      t.position.set(x, Math.round(y - t.height / 2))
       this.add(t)
       x += widths[i] + track
     })

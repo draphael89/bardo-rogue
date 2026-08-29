@@ -184,6 +184,40 @@ describe('dodge stays edge-triggered', () => {
 })
 
 describe('modal input', () => {
+  it('does not let a keypress buffered during the killing blow claim the offer', () => {
+    const h = harness()
+    const w = createWorld(1, 'empty')
+    h.input.sample(w)                                   // one live tick, so the boundary has a prior state
+
+    // The offer opens on the SAME tick the last enemy dies, so a mash landing in that 16.7 ms window
+    // is still latched when the modal's first sample runs. It used to become `confirm` immediately
+    // and take options[0] before a frame of the screen had been drawn.
+    h.win.fire('keydown', key('KeyJ'))
+    w.roomPhase = 'reward'
+    expect(h.input.sample(w).confirm).toBe(false)
+
+    // A press the player makes once the screen is up is still accepted at once.
+    h.win.fire('keydown', key('KeyJ'))
+    expect(h.input.sample(w).confirm).toBe(true)
+  })
+
+  it('re-guards on a second offer opened in the same modal run', () => {
+    const h = harness()
+    const w = createWorld(1, 'empty')
+    h.input.sample(w)
+    w.roomPhase = 'reward'
+    w.phaseTick = 100
+    h.input.sample(w)
+    h.win.fire('keydown', key('Enter'))
+    expect(h.input.sample(w).confirm).toBe(true)         // the first vow is claimed
+
+    // The ferryman's payout opens a second offer without ever leaving `reward`, so a boolean
+    // boundary saw no edge at all. The stamped phaseTick is what makes it one.
+    h.win.fire('keydown', key('Enter'))
+    w.phaseTick = 101
+    expect(h.input.sample(w).confirm).toBe(false)
+  })
+
   it('accepts a fresh gamepad attack press but never inherits a held combat attack', () => {
     const pad: FakePad = { axes: [0, 0, 0, 0], buttons: Array.from({ length: 16 }, () => ({ pressed: false })) }
     const h = harness(pad)

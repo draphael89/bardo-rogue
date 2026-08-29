@@ -413,9 +413,15 @@ export class Presenter {
         case 'roomClear':
           this.camera.addTrauma(0.3); this.flash(0.45, VEIL_FLASH)
           // The loop's offer, stall, or exits strip is the next beat. A second slab saying
-          // ROOM CLEARED is developer text sitting on the plan.
+          // ROOM CLEARED is developer text sitting on the plan. Stock arenas still teach the door.
+          // No subtitle when a god is about to speak: the overlay's own prompt is on top of the
+          // veil, and a line drawn under it never once read.
           if (this.world.scenario !== 'loop') {
-            this.hud.showBanner(ev.victory ? 'THE JUDGE FALLS' : 'ROOM CLEARED', ev.mystery ? 'a shade begs passage' : ev.shop ? 'the ferryman keeps a stall' : ev.reward ? 'choose what the sword remembers' : ev.hasNext ? 'the door is open' : '', 3)
+            this.hud.showBanner(
+              ev.victory ? 'THE JUDGE FALLS' : 'ROOM CLEARED',
+              ev.reward ? '' : ev.mystery ? 'a shade begs passage' : ev.shop ? 'the ferryman keeps a stall' : ev.hasNext ? 'the door is open' : '',
+              3,
+            )
           } else if (ev.victory) {
             this.hud.showBanner('THE JUDGE FALLS', '', 2)
           }

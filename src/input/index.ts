@@ -26,6 +26,14 @@ function modalInput(world: World): boolean {
     || (world.roomPhase === 'resolved' && !!world.session.run && world.session.run.result !== 'active')
 }
 
+// A boolean could only see the FIRST modal of a run of them. After the ferryman's toll, rewards.ts
+// opens a second offer on the same tick the first is confirmed, so `modalInput` never goes false in
+// between and the boundary below never fired: one mash claimed both vows. `phaseTick` is stamped on
+// every one of those transitions, so keying on it makes each new modal its own boundary.
+function modalKey(world: World): string {
+  return modalInput(world) ? `modal:${world.phaseTick}` : 'live'
+}
+
 // Keyboard + mouse + gamepad -> one InputFrame per sim tick. Presses between ticks are latched so nothing is dropped.
 export class InputSystem {
   private down = new Set<string>()
@@ -39,7 +47,7 @@ export class InputSystem {
   private padPrev: boolean[] = []
   private controllerRearm = new ControllerRearm(16)
   private retainedExplicitAim = new RetainedExplicitAim()
-  private lastModal: boolean | null = null
+  private lastModal: string | null = null
   private cursorScreen = new Point()
   private cursorWorld = new Point()
   override: InputFrame | null = null   // debug API can force a frame
@@ -82,15 +90,24 @@ export class InputSystem {
 
   sample(world: World): InputFrame {
     const modal = modalInput(world)
-    if (this.lastModal === null) this.lastModal = modal
-    else if (modal !== this.lastModal) {
-      // Only controls already active before the boundary need a physical release. A genuinely fresh
-      // press on the first reward/death tick must still be allowed to confirm.
+    // The boundary is keyed, not merely flagged: `modal` itself still gates aim and the menu branch
+    // below, and must stay a boolean.
+    const boundaryKey = modalKey(world)
+    if (this.lastModal === null) this.lastModal = boundaryKey
+    else if (boundaryKey !== this.lastModal) {
+      // Everything physically down at the boundary has to be released before it drives the menu.
       this.controllerRearm.disarmActive()
+      // ...and so does anything merely LATCHED. `pressed` holds keydowns that arrived since the last
+      // sample, and the offer opens on the very tick the last enemy dies — so the attack you were
+      // mashing through the killing blow was still sitting here, became `confirm` on the modal's
+      // first tick, and took options[0] before a single frame of the screen had been shown. Only the
+      // gamepad was ever guarded; the keyboard and the mouse were not.
+      this.down.clear(); this.pressed.clear()
+      this.mousePressed = false; this.mouseHeld = false; this.mouseHeavyPressed = false
       this.retainedExplicitAim.clear()
       this.mouseOwnsAim = false
       this.lockedTargetId = null
-      this.lastModal = modal
+      this.lastModal = boundaryKey
     }
     if (this.override) {
       const f = { ...this.override }

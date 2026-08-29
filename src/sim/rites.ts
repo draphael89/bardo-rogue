@@ -91,6 +91,9 @@ export function updateRite(world: World, input: InputFrame): void {
     // never saw highlighted, so a frame that moves the selection cannot also take it.
     return
   }
+  // The toll costs a vessel for the rest of the descent, so it earns the same arming window the
+  // offer gets — you walk into this room still holding attack from the last one.
+  if (world.tick - world.phaseTick < tuning.run.modalArmTicks) return
   if (!input.confirm) return
 
   const paid = rite.focus === 0

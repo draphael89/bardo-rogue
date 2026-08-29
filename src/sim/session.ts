@@ -9,7 +9,10 @@ import { Rng, STREAM, streamSeed } from './rng'
 import { buildSliceRooms, installRoute, templateForSeed, type RunMap } from './route'
 import { tuning } from '@/tuning'
 
-export type RoomPhase = 'town' | 'entering' | 'fighting' | 'reward' | 'exits' | 'transitioning' | 'resolved'
+// 'claiming' is the beat between the last body dropping and a god standing on the screen: the room
+// is yours, the door is still shut, and what the room owes you is standing in it waiting to be
+// walked into. See `shrine.ts` — it is the reason the offer is no longer a thing that happens TO you.
+export type RoomPhase = 'town' | 'entering' | 'fighting' | 'claiming' | 'reward' | 'exits' | 'transitioning' | 'resolved'
 export type RunResult = 'active' | 'won' | 'lost'
 export type RewardFamily = 'blade' | 'veil'
 export type RoomReward = RewardFamily | 'shop' | 'mystery'

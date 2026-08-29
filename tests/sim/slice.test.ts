@@ -17,6 +17,7 @@ import { offerReward } from '@/sim/rewards'
 import { quantizeFrame, runReplay, type Replay } from '@/sim/replay'
 import { tryCollectOffering } from '@/sim/offering'
 import { guardUp } from '@/sim/enemies/oathbound'
+import { claimShrine } from './claim'
 
 const landed = (interrupted = false): DamageResult => ({
   outcome: 'landed', landed: true, killed: false, guarded: false, interrupted, resolvedDamage: 1,
@@ -46,7 +47,8 @@ function armThenConfirm(world: ReturnType<typeof createWorld>, extra: Record<str
   stepWorld(world, { ...emptyInput(), ...extra, confirm: true })
 }
 
-function forceRoomClear(world: ReturnType<typeof createWorld>): void {
+/** Clear the fight, then take what the room lit. See `claim.ts` for why the second half exists. */
+function clearAndClaim(world: ReturnType<typeof createWorld>): void {
   for (const e of world.enemies) e.active = false
   world.spawnQueue.length = 0
   const defs = world.waveDefs!
@@ -54,6 +56,7 @@ function forceRoomClear(world: ReturnType<typeof createWorld>): void {
   world.wave.index = defs.length - 1
   world.wave.groupIndex = defs[world.wave.index].groups.length
   stepWorld(world, emptyInput())
+  claimShrine(world)
 }
 
 /** Answer the room's rite. `pay` takes the left card, `swim` the right. */
@@ -146,7 +149,7 @@ describe('production vertical slice', () => {
 
   it("the next chamber's tell is down when that door flash dies", () => {
     const world = prepareAndDescend()
-    forceRoomClear(world)
+    clearAndClaim(world)
     if (world.roomPhase === 'reward') chooseFocusedReward(world)
     expect(world.roomPhase).toBe('exits')
     const north = world.rooms[world.roomIndex].exits?.find(e => e.dir === 'north')
@@ -181,7 +184,7 @@ describe('production vertical slice', () => {
 
   it('refuses an answer until the offer has been on screen, but steers throughout', () => {
     const world = prepareAndDescend(createWorld(21, 'loop'))
-    forceRoomClear(world)
+    clearAndClaim(world)
     expect(world.roomPhase).toBe('reward')
     const opened = world.phaseTick
 
@@ -207,7 +210,7 @@ describe('production vertical slice', () => {
   it('offers three deterministic unique boons and opens exits only after a choice', () => {
     const a = prepareAndDescend(createWorld(12, 'loop'))
     const b = prepareAndDescend(createWorld(12, 'loop'))
-    forceRoomClear(a); forceRoomClear(b)
+    clearAndClaim(a); clearAndClaim(b)
     const ao = a.session.run?.pendingReward
     const bo = b.session.run?.pendingReward
     expect(ao?.options).toEqual(bo?.options)
@@ -234,9 +237,9 @@ describe('production vertical slice', () => {
 
   it('opens only the doors that are exits: blade-path keeps its dead east doorway shut', () => {
     const world = descendOn(FIRST_GATE.id)
-    forceRoomClear(world); chooseFocusedReward(world); takeDoor(world, 'east')
+    clearAndClaim(world); chooseFocusedReward(world); takeDoor(world, 'east')
     expect(world.rooms[world.roomIndex].id).toBe('blade-path')
-    forceRoomClear(world); chooseFocusedReward(world)
+    clearAndClaim(world); chooseFocusedReward(world)
     expect(world.doorOpen).toBe(true)
     const a = world.arena
     const north = a.doors.find(d => d.dir === 'north')!
@@ -263,31 +266,31 @@ describe('production vertical slice', () => {
     [ASH_MARCH.id, 'east'],
   ] as const)('connects %s via %s through six chambers to victory', (template, dir) => {
     const world = descendOn(template)
-    forceRoomClear(world); chooseFocusedReward(world)
+    clearAndClaim(world); chooseFocusedReward(world)
     if (template === FIELD_FORK.id) {
       takeDoor(world, 'north')
       expect(world.rooms[world.roomIndex].id).toBe('blade-path')
-      forceRoomClear(world); chooseFocusedReward(world)
+      clearAndClaim(world); chooseFocusedReward(world)
       takeDoor(world, dir)
       expect(['veil-path', 'cocytus']).toContain(world.rooms[world.roomIndex].id)
-      forceRoomClear(world); chooseFocusedReward(world); takeDoor(world, 'north')
+      clearAndClaim(world); chooseFocusedReward(world); takeDoor(world, 'north')
       expect(world.rooms[world.roomIndex].id).toBe('black-step')
       answerRite(world, 'swim')
-      forceRoomClear(world); chooseFocusedReward(world); takeDoor(world, 'north')
+      clearAndClaim(world); chooseFocusedReward(world); takeDoor(world, 'north')
     } else {
       takeDoor(world, dir)
       expect(['veil-path', 'blade-path']).toContain(world.rooms[world.roomIndex].id)
-      forceRoomClear(world); chooseFocusedReward(world); takeDoor(world, 'north')
+      clearAndClaim(world); chooseFocusedReward(world); takeDoor(world, 'north')
       // Early shop / fire-ford: landing then the river. Late shop: Cocytus then landing.
       const mid = world.rooms[world.roomIndex].id
       expect(['black-step', 'cocytus', 'phlegethon']).toContain(mid)
       if (mid === 'black-step') answerRite(world, 'swim')
-      forceRoomClear(world); chooseFocusedReward(world); takeDoor(world, 'north')
+      clearAndClaim(world); chooseFocusedReward(world); takeDoor(world, 'north')
       const mid2 = world.rooms[world.roomIndex].id
       expect(['black-step', 'cocytus', 'phlegethon']).toContain(mid2)
       expect(mid2).not.toBe(mid)
       if (mid2 === 'black-step') answerRite(world, 'swim')
-      forceRoomClear(world); chooseFocusedReward(world); takeDoor(world, 'north')
+      clearAndClaim(world); chooseFocusedReward(world); takeDoor(world, 'north')
     }
     expect(world.rooms[world.roomIndex].id).toBe('antechamber')
     if (template === FIELD_FORK.id) {
@@ -311,12 +314,12 @@ describe('production vertical slice', () => {
       expect(seen).toContain('cocytus')
       expect(seen).not.toContain('black-step')
     }
-    forceRoomClear(world); takeDoor(world, 'north')
+    clearAndClaim(world); takeDoor(world, 'north')
     expect(world.rooms[world.roomIndex].id).toBe('warden')
     const owed = template !== ASH_MARCH.id
     expect(world.spawnQueue.some(s => s.kind === tuning.rites.toll.debtKind)).toBe(owed)
     expect(world.session.run?.riteDebt).toBe(false)
-    forceRoomClear(world)
+    clearAndClaim(world)
     expect(world.session.run?.result).toBe('won')
     expect(world.roomPhase).toBe('resolved')
     expect(world.session.meta.victories).toBe(1)

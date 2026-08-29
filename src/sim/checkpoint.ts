@@ -270,7 +270,7 @@ const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object
 const isArm = (v: unknown): v is ArmId => typeof v === 'string' && Object.prototype.hasOwnProperty.call(ARM, v)
 const isBoon = (v: unknown): v is BoonId => typeof v === 'string' && Object.prototype.hasOwnProperty.call(BOON, v)
 const PHASE: Record<RoomPhase, 1> = {
-  town: 1, entering: 1, fighting: 1, reward: 1, exits: 1, transitioning: 1, resolved: 1,
+  town: 1, entering: 1, fighting: 1, claiming: 1, reward: 1, exits: 1, transitioning: 1, resolved: 1,
 }
 const MARK: Record<DoorMark, 1> = { combat: 1, gift: 1, blade: 1, veil: 1, hard: 1, elite: 1, boss: 1 }
 const DIR: Record<DoorDir, 1> = { north: 1, east: 1 }

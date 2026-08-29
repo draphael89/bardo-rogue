@@ -140,6 +140,30 @@ export function hidePlaceCaption(s: { offer: boolean; shop: boolean; mystery: bo
   return s.offer || s.shop || s.mystery || s.rite || s.won
 }
 
+/**
+ * The fight strip, progressively shorter, for a row that cannot wrap.
+ *
+ * `updateBuild` clamped its PLATE to the view and never its text, which is placed at x=13 and grew
+ * right without limit. Measured against the shipped font at 480px: four vows already reach x=449,
+ * one past the room's right wall, and the run's real ceiling of five reaches 534 — 54px off the side
+ * of the screen, taking the purse with it. This is the death card's `deathCarriedLadder` problem in
+ * a different row, so it is the same shape of answer: hand the renderer every legal form longest
+ * first and let it stop at the one that measures inside the space it actually has.
+ *
+ * Names are dropped from the END, keeping the earliest, so the strip never reshuffles under a player
+ * who has learned to read the left of it. The last form is a bare count, which is a real loss and
+ * the honest one to take while the row is a single unwrapped line.
+ */
+export function buildStripLadder(names: readonly string[]): string[] {
+  if (names.length === 0) return ['']
+  const forms = [names.join('  ·  ')]
+  for (let k = names.length - 1; k >= 1; k--) {
+    forms.push(`${names.slice(0, k).join('  ·  ')}  ·  +${names.length - k}`)
+  }
+  forms.push(names.length === 1 ? '1 VOW' : `${names.length} VOWS`)
+  return forms
+}
+
 /** The fight strip names what you carry. An empty first fight does not wear UNMARKED BLADE. */
 export function showBuildStrip(s: {
   hasRun: boolean
@@ -290,4 +314,20 @@ export function townTally(attempts: number, victories: number, remembrances = 0)
   const named = victories === 0 ? 'UNNAMED' : victories === 1 ? '1 NAMED' : `${victories} NAMED`
   if (remembrances <= 0) return `${descents}  ·  ${named}`
   return `${descents}  ·  ${named}  ·  ${keptLabel(remembrances)}`
+}
+
+/**
+ * How tall the three offer cards have to be to hold the tallest of their three detail blocks.
+ *
+ * The height was pinned at 88, which fits a two-line detail and its attribution footer with 11px
+ * between them. Two vows wrap to three lines at the card's width and both are Hecate's, so both can
+ * appear as the cross-crossroads card in a Fury offer — where the footer IS drawn — and that third
+ * line came within 2px of it. The footer sits at `cardH - 10`, so keeping the same 11px gap is
+ * `detailTop + block + 11 + 10`, and a two-line block still lands on exactly 88.
+ *
+ * Three cards in a row must stay the same height, so the caller passes the tallest block and every
+ * card grows together or not at all.
+ */
+export function offerCardHeight(detailTop: number, tallestBlockPx: number): number {
+  return Math.max(88, detailTop + tallestBlockPx + 21)
 }

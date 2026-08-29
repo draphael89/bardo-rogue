@@ -9,6 +9,7 @@ import { createWorld } from '@/sim/scenarios'
 import { prepareWeapon, startRun } from '@/sim/session'
 import { stepWorld } from '@/sim/step'
 import { tuning } from '@/tuning'
+import { claimShrine } from './claim'
 
 function beginRun(seed = 11) {
   const world = createWorld(seed, 'loop')
@@ -35,7 +36,8 @@ function atLanding(seed = 7) {
   return world
 }
 
-function forceClear(world: ReturnType<typeof createWorld>): void {
+/** Clear the fight, then take what the room lit. See `claim.ts` for why the second half exists. */
+function clearAndClaim(world: ReturnType<typeof createWorld>): void {
   for (const e of world.enemies) e.active = false
   world.spawnQueue.length = 0
   const defs = world.waveDefs!
@@ -43,6 +45,7 @@ function forceClear(world: ReturnType<typeof createWorld>): void {
   world.wave.index = defs.length - 1
   world.wave.groupIndex = defs[world.wave.index].groups.length
   stepWorld(world, emptyInput())
+  claimShrine(world)
 }
 
 describe('obols', () => {
@@ -68,7 +71,7 @@ describe('obols', () => {
     damageEnemyForTest(world, brute, 1, 0, 0, false, 0)
     expect(world.session.run!.obols).toBe(tuning.economy.obolsPerKill.brute)
     world.freeze = 0
-    forceClear(world)
+    clearAndClaim(world)
     expect(world.session.run!.obols).toBe(tuning.economy.obolsPerKill.brute + tuning.economy.obolsPerClear)
     world.player.hp = 1
     hurtPlayer(world, 0, 1)
@@ -81,7 +84,7 @@ describe("Charon's stall", () => {
   it('opens at the landing instead of a third veil vow', () => {
     const world = atLanding()
     world.session.run!.obols = 20
-    forceClear(world)
+    clearAndClaim(world)
     expect(world.roomPhase).toBe('reward')
     expect(world.session.run!.pendingShop?.goods).toEqual(['heal', 'vessel', 'vow'])
     expect(world.session.run!.pendingReward).toBeNull()
@@ -91,7 +94,7 @@ describe("Charon's stall", () => {
   it('sells a sip and opens the door', () => {
     const world = atLanding()
     world.player.hp = 1
-    forceClear(world)
+    clearAndClaim(world)
     world.session.run!.obols = shopCost('heal')
     armThenConfirm(world)
     expect(world.session.run!.pendingShop).toBeNull()
@@ -103,7 +106,7 @@ describe("Charon's stall", () => {
 
   it('refuses a confirm the purse cannot cover', () => {
     const world = atLanding()
-    forceClear(world)
+    clearAndClaim(world)
     world.session.run!.obols = shopCost('heal') - 1
     const purse = world.session.run!.obols
     armThenConfirm(world)
@@ -114,7 +117,7 @@ describe("Charon's stall", () => {
 
   it('sells a word and opens a veil offer', () => {
     const world = atLanding()
-    forceClear(world)
+    clearAndClaim(world)
     world.session.run!.obols = shopCost('vow')
     stepWorld(world, { ...emptyInput(), choiceDelta: 1 })
     stepWorld(world, { ...emptyInput(), choiceDelta: 1 })

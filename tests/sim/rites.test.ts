@@ -10,6 +10,7 @@ import { hashWorld } from '@/sim/hash'
 import { hurtPlayer } from '@/sim/combat'
 import { takenBy } from '@/render/shadeNames'
 import { tuning } from '@/tuning'
+import { claimShrine } from './claim'
 
 type W = ReturnType<typeof createWorld>
 
@@ -39,6 +40,7 @@ function armThenConfirm(world: W, extra: Record<string, unknown> = {}): void {
   stepWorld(world, { ...emptyInput(), ...extra, confirm: true })
 }
 
+/** Clear the fight, then take what the room lit. See `claim.ts` for why the second half exists. */
 function clearRoom(world: W): void {
   for (const e of world.enemies) e.active = false
   world.spawnQueue.length = 0
@@ -47,6 +49,7 @@ function clearRoom(world: W): void {
   world.wave.index = defs.length - 1
   world.wave.groupIndex = defs[world.wave.index].groups.length
   stepWorld(world, emptyInput())
+  claimShrine(world)
 }
 
 describe('the toll', () => {

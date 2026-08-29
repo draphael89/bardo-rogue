@@ -7,24 +7,12 @@ import { obolsLabel, SHOP_COPY, shopCost } from '@/sim/economy'
 import { MYSTERY_COPY, canAffordMystery } from '@/sim/mystery'
 import type { MysteryOffer, RewardOffer, ShopOffer } from '@/sim/session'
 import { tuning } from '@/tuning'
-import { backPause, clampPauseFocus, duoFooter, meetingVeil, offerAct, offerSpoken, pauseFooter, pauseNudge, resolvePause, shopAct, shopSpoken, showBuildStrip, townTally, victoryKeptLine, wrapPauseFocus, type PauseAct, type PausePage, type TitleNudge } from './titleMenu'
-import { label, placeCentered, placeLeft, placeRight, wrappedCentered, P } from './ui'
+import { backPause, buildStripLadder, clampPauseFocus, duoFooter, meetingVeil, offerAct, offerCardHeight, offerSpoken, pauseFooter, pauseNudge, resolvePause, shopAct, shopSpoken, showBuildStrip, townTally, victoryKeptLine, wrapPauseFocus, type PauseAct, type PausePage, type TitleNudge } from './titleMenu'
+import { fadeToBlack, label, placeCentered, placeLeft, placeRight, typeBehindPlate, wrappedCentered, wrappedExtent, P } from './ui'
 import { clamp01 } from './anim'
 
-/**
- * Fade by TINT, never by alpha, for anything holding type.
- *
- * `crispText` thresholds coverage at `step(0.5, alpha)`, so a filtered label at 35% opacity does not
- * come out faint — it disappears outright, and at 60% it is fully opaque. Measured: dropping the
- * filter instead costs the boon card 28 distinct colours and 5.7% intermediate pixels against 9 and
- * 0.7%, which at a 4x upscale is visible fringing, so the filter stays and the fade goes elsewhere.
- * Multiplying toward black leaves alpha at 1, reads as an arrival against these near-black plates,
- * and propagates through a Container to every child at once.
- */
-function fadeToBlack(t: number): number {
-  const v = Math.round(clamp01(t) * 255)
-  return (v << 16) | (v << 8) | v
-}
+// The fight band's own row: under the life plate (y 2..28), above the play area's own business.
+const STRIP_Y = 30
 
 export class RewardOverlay {
   root = new Container()
@@ -35,8 +23,9 @@ export class RewardOverlay {
   private g = new Graphics()
   private texts: Text[] = []
   // One container per card, so each can land on its own beat. They used to be drawn straight into
-  // `this.g` with everything else, which is why the whole screen could only pop at once.
-  private cards: Container[] = []
+  // `this.g` with everything else, which is why the whole screen could only pop at once. The plate
+  // is held alongside the box because the two halves of a card fade by different means — see reveal.
+  private cards: { box: Container; plate: Graphics }[] = []
   private act: Text | null = null
   private armed = false
   private animates = false
@@ -44,6 +33,13 @@ export class RewardOverlay {
   private build = new Container()
   private buildG = new Graphics()
   private buildText = label('', 'meta', P.bone)
+  // The purse is its own right-anchored chip. On the strip it was the LAST thing on a row that grew
+  // off the side of the screen, so the number a player checks before a stall was the first thing to
+  // be clipped. Anchored to the other edge it cannot be crowded out by a fifth vow.
+  private purseText = label('', 'meta', P.gold)
+  // Text metrics are the expensive half of this and neither string changes per frame; `updateBuild`
+  // used to re-measure both on every one of them while walking nothing at all.
+  private buildKey = ''
   private meta = new Container()
   private metaG = new Graphics()
   private metaText = label('', 'meta', P.dim)
@@ -67,12 +63,12 @@ export class RewardOverlay {
     this.root.visible = false
     this.body.addChild(this.g)
     this.root.addChild(this.scrim, this.body)
-    this.build.addChild(this.buildG, this.buildText)
+    this.build.addChild(this.buildG, this.buildText, this.purseText)
     this.meta.addChild(this.metaG, this.metaText)
     layer.addChild(this.build, this.meta, this.root)
   }
 
-  relayout(): void { this.key = '' }
+  relayout(): void { this.key = ''; this.buildKey = '' }
   setPaused(paused: boolean): void {
     if (this.paused === paused) return
     this.paused = paused
@@ -204,22 +200,30 @@ export class RewardOverlay {
   private reveal(world: World): void {
     const R = tuning.juice.modalReveal
     if (!this.animates || this.reducedEffects) {
-      this.scrim.alpha = 1; this.body.tint = 0xffffff
-      for (const c of this.cards) { c.tint = 0xffffff; c.y = 0 }
+      this.scrim.alpha = 1; this.body.tint = 0xffffff; this.g.alpha = 1
+      for (const c of this.cards) { c.box.tint = 0xffffff; c.box.y = 0; c.plate.alpha = 1 }
       this.setArmed(true)
       return
     }
     const age = world.tick - world.phaseTick
-    // The room you just cleared stays legible under the veil for the first beat, so the kill lands
-    // on the room rather than on a scrim that was already there.
-    this.scrim.alpha = clamp01(age / R.scrimTicks)
-    this.body.tint = fadeToBlack(clamp01(age / R.scrimTicks))
-    this.cards.forEach((card, i) => {
+    // The room you just walked up to stays legible under the veil for the first beat, so the arrival
+    // lands on the room rather than on a scrim that was already there.
+    const t0 = clamp01(age / R.scrimTicks)
+    this.scrim.alpha = t0
+    this.body.tint = fadeToBlack(typeBehindPlate(t0))
+    // Tint alone was never a fade for a PLATE. A Graphics multiplied to black is a black rectangle at
+    // full opacity, so the old reveal punched three solid holes in the room on frame zero — 29% of a
+    // 480x270 frame gone instantly — and then coloured them in. Coverage has to be alpha, and alpha is
+    // safe here precisely because a Graphics carries no `crispText` filter to threshold: only the
+    // TYPE has to keep fading by tint.
+    this.g.alpha = t0
+    this.cards.forEach(({ box, plate }, i) => {
       const t = clamp01((age - R.scrimTicks - i * R.cardStagger) / R.cardTicks)
-      card.tint = fadeToBlack(t)
+      box.tint = fadeToBlack(typeBehindPlate(t))
+      plate.alpha = t
       // Whole pixels only: a card easing through a fraction of a row drags every glyph on it
       // off the grid, which is the whole reason the type in here reads at all.
-      card.y = Math.round((1 - t) * R.cardRise)
+      box.y = Math.round((1 - t) * R.cardRise)
     })
     this.setArmed(age >= tuning.run.modalArmTicks)
   }
@@ -243,23 +247,59 @@ export class RewardOverlay {
     this.metaG.rect(tuning.view.width - 10, 6, 2, 18).fill({ color: P.gold })
   }
 
+  /**
+   * What you carry, on the left; what you can spend, on the right; both on the same plate the
+   * meetings use.
+   *
+   * Two things were wrong here. The plate was clamped to the view and the TEXT was not, so it grew
+   * off the right of the screen — measured, four vows reach x=449 against a 448px room wall and the
+   * run's ceiling of five reaches 534 in a 480px frame. And the plate was `P.void` at 0.84, which
+   * sampled (5,4,7) against a floor of (2,1,5): no plate at all, so the row read as bare text with
+   * an unexplained gold tick floating on the room. Both strips now wear the overlay face.
+   */
   private updateBuild(world: World): void {
     if (!this.build.visible) return
     const ids = world.session.run?.boons.map(b => b.id) ?? []
     const purse = world.session.run?.obols ?? 0
-    const vows = ids.map(id => BOONS[id].name).join('  ·  ')
-    this.buildText.text = vows ? `${vows}   ·   ${obolsLabel(purse)}` : obolsLabel(purse)
-    placeLeft(this.buildText, 13, 39)
-    const w = Math.min(tuning.view.width - 26, this.buildText.width + 14)
-    this.buildG.clear().roundRect(8, 30, w, 18, 2).fill({ color: P.void, alpha: 0.84 })
-    this.buildG.rect(8, 30, 2, 18).fill({ color: ids.length || purse ? P.gold : 0x4c4c56 })
+    const nextKey = `${ids.join('|')}|${purse}|${tuning.view.width}`
+    if (nextKey === this.buildKey) return
+    this.buildKey = nextKey
+    const W = tuning.view.width
+    const g = this.buildG.clear()
+
+    // right first: the purse owns its edge, and what is left over is the vows' budget
+    this.purseText.visible = purse > 0
+    let rightEdge = W - 8
+    if (purse > 0) {
+      this.purseText.text = obolsLabel(purse)
+      placeRight(this.purseText, W - 13, STRIP_Y + 9)
+      const pw = Math.round(this.purseText.width) + 12
+      g.roundRect(W - 8 - pw, STRIP_Y, pw, 18, 2).fill({ color: P.face, alpha: 0.92 })
+      g.rect(W - 10, STRIP_Y, 2, 18).fill({ color: P.gold })
+      rightEdge = W - 8 - pw - 6
+    }
+
+    this.buildText.visible = ids.length > 0
+    if (!ids.length) return
+    const budget = rightEdge - 13 - 6
+    const names = ids.map(id => BOONS[id].name)
+    // Longest legal form that measures inside what is left. The ladder is authored in titleMenu.ts;
+    // only this side knows what the glyphs actually came to, which is why the walk lives here.
+    for (const form of buildStripLadder(names)) {
+      this.buildText.text = form
+      if (this.buildText.width <= budget) break
+    }
+    placeLeft(this.buildText, 13, STRIP_Y + 9)
+    const w = Math.round(this.buildText.width) + 14
+    g.roundRect(8, STRIP_Y, w, 18, 2).fill({ color: P.face, alpha: 0.92 })
+    g.rect(8, STRIP_Y, 2, 18).fill({ color: P.gold })
   }
 
   private clear(): void {
     this.g.destroy()
     this.scrim.destroy()
     for (const t of this.texts) t.destroy()
-    for (const c of this.cards) c.destroy({ children: true })
+    for (const c of this.cards) c.box.destroy({ children: true })
     this.texts = []
     this.cards = []
     this.act = null
@@ -277,7 +317,7 @@ export class RewardOverlay {
     const box = new Container()
     const g = new Graphics()
     box.addChild(g)
-    this.cards.push(box)
+    this.cards.push({ box, plate: g })
     this.root.addChild(box)
     return { box, g, add: (t: Text) => { this.texts.push(t); box.addChild(t) } }
   }
@@ -452,7 +492,17 @@ export class RewardOverlay {
     // --- the terms ---------------------------------------------------------------------------
     const gap = 8
     const cardW = Math.min(142, Math.floor((W - 32 - gap * 2) / 3))
-    const cardH = 88
+    // The card is as tall as the WIDEST of its three, never taller. Two vows wrap to three lines at
+    // this width (BETWEEN-STEP and CROSSROADS) and both are Hecate's, so both can turn up as the
+    // cross-crossroads card in a Fury offer — where an attribution footer is drawn as well. Pinned
+    // at 88 that third line came within 2px of the footer where a two-line card gets 8, and the
+    // comment above claiming the footer was safe was simply measuring the two-line case. Three
+    // cards in a row must stay the same height, so the row grows together or not at all.
+    const detailTop = 51
+    // Only the renderer knows what the glyphs actually came to, so it measures; `offerCardHeight`
+    // owns the arithmetic and is tested in node beside the death card's own row ladder.
+    const extent = options.map(id => wrappedExtent(BOONS[id].detail, 'body', cardW - 24))
+    const cardH = offerCardHeight(detailTop, Math.max(...extent.map(e => e.lines * e.step)))
     const total = cardW * 3 + gap * 2
     const x0 = Math.floor((W - total) / 2)
     options.forEach((id, i) => {
@@ -475,7 +525,7 @@ export class RewardOverlay {
       placeCentered(vow, x + cardW / 2, y + 37); add(vow)
       // Anchored to its TOP, not its middle: a three-line detail and a one-line detail must both
       // leave the card's footer alone, and a centred block grows into it.
-      for (const line of wrappedCentered(def.detail, 'body', selected ? P.bone : P.dim, cardW - 24, x + cardW / 2, y + 51)) add(line)
+      for (const line of wrappedCentered(def.detail, 'body', selected ? P.bone : P.dim, cardW - 24, x + cardW / 2, y + detailTop)) add(line)
       // One footer line, never two. A duo is itself the most interesting thing that can be said
       // about a card, so it speaks instead of the attribution rather than under it.
       if (def.requires?.length) {

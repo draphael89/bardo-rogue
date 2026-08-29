@@ -150,12 +150,25 @@ export const tuning = {
     offeringRadius: 16,   // px: walk into the vessel to take it
     offeringHp: 1,        // extra max life, and a heal of the same
     rackRadius: 18,       // px: generous enough to read as a physical pickup, not pixel hunting
+    // The cleared room's payout, standing in the room (src/sim/shrine.ts). Same generosity as the
+    // rack — this is a pickup, not pixel hunting.
+    shrineRadius: 18,     // px: walk into the vessel to open what the room owes you
+    // Ticks the lit shrine refuses a claim. It covers the clear slow-motion (roomClearSlowmoTicks
+    // at roomClearSlowmo, ~1 s of wall clock) plus a beat, so the ignite is always SEEN before it
+    // can be taken -- including the case where the room cleared with the body already on the focal.
+    shrineArmTicks: 20,
+    // The exits-phase route strip (src/render/map.ts). It is a summary of a plan the doors already
+    // wear, so it holds long enough to be read and then leaves the play area rather than sitting
+    // across the upper third of it until the player picks a door.
+    routeStrip: { holdTicks: 300, fadeTicks: 30 },
     transitionTicks: 8,   // 133 ms: enough for a threshold blink, never enough to break momentum
-    // 400 ms before a modal will take an answer. The offer opens on the tick the last enemy
-    // dies, so without this the attack you were already mashing claimed a vow you never saw.
-    // Long enough to notice a screen arrived, short enough that a player who knows what they
-    // want is never made to wait for a second press. Moving the SELECTION stays live throughout,
-    // so the wait costs a practised player nothing.
+    // 400 ms before a modal will take an answer. The room's own offer no longer opens on the kill
+    // tick -- it opens when you walk into what the room lit (shrineArmTicks above) -- but three
+    // modals still arrive without a step of their own: the rite on arrival, the ferryman's payout
+    // chained onto a claim, and a reroll of a live offer. This is their beat. Long enough to notice
+    // a screen arrived, short enough that a player who knows what they want is never made to wait
+    // for a second press. Moving the SELECTION stays live throughout, so it costs a practised
+    // player nothing.
     modalArmTicks: 24,
   },
 
@@ -319,6 +332,9 @@ export const tuning = {
       cardTicks: 6,      // each card's own fade and 3px settle
       cardRise: 3,       // px it drops from
     },
+    // Particles per second off a lit shrine (src/sim/shrine.ts). Enough for the vessel to read as
+    // burning rather than stamped; the flame itself is authored in the tilemap cluster.
+    shrineFlameRate: 14,
     shakeMax: 4, shakeRotMaxDeg: 0.5, shakeDecay: 1.6,
     traumaLight: 0.40, traumaHeavy: 0.58, traumaHurt: 0.6, traumaKill: 0.22,
     flashTicks: 4, squashTicks: 6,

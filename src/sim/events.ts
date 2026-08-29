@@ -8,7 +8,7 @@ export type DeathKind = EnemyKind | 'none'
 import type { ArmId } from './weapons'
 import type { BoonId, Deity } from './boons'
 import type { RiteId } from './rites'
-import type { MysteryChoice, ShopGood } from './session'
+import type { MysteryChoice, RoomReward, ShopGood } from './session'
 import type { SmithBeat } from './smith'
 
 // Presentation must be able to render a contact after the player has moved, changed weapon, or
@@ -103,6 +103,9 @@ export type SimEvent =
   | { type: 'roomTransition'; from: string; to: string }
   | { type: 'returned'; name: string; x: number; y: number; kept: number; remembrances: number; smithWaiting: boolean }
   | { type: 'offeringTaken'; kind: 'life'; x: number; y: number; hp: number; maxHp: number }
+  // The cleared room's payout, lit where the eye already is and then walked into (src/sim/shrine.ts).
+  | { type: 'shrineLit'; kind: RoomReward; x: number; y: number }
+  | { type: 'shrineTaken'; kind: RoomReward; x: number; y: number }
   | { type: 'weaponPrepared'; weapon: ArmId; x: number; y: number }
   | { type: 'runStarted'; weapon: ArmId }
   | { type: 'rewardOffered'; options: [BoonId, BoonId, BoonId]; deity: Deity }

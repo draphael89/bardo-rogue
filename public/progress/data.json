@@ -1,10 +1,18 @@
 {
   "title": "Bardo Rogue",
   "subtitle": "First Gate: rooms-as-data, a generated route, a town that remembers",
-  "updated": "2026-08-29T16:20:00-04:00",
-  "now": "hall-plate-wine",
+  "updated": "2026-08-29T22:30:00-04:00",
+  "now": "the-vow-is-taken",
   "round": 3,
   "timeline": [
+    {
+      "t": "22:31",
+      "text": "The top band stops drawing over itself. The fight strip clipped 54px off the screen at five vows and took the purse with it; the purse now owns its own edge and the names walk a ladder. Two of the three panels had no plate at all - measured (2,1,5) against a floor of (2,1,5). The banner naming a claimed vow was drawn underneath the strip that named it again."
+    },
+    {
+      "t": "22:30",
+      "text": "The vow is taken, not handed. The offer used to open on the tick the last enemy died - and its own parkForModal cancelled the clear slow-motion on that same tick, so a room WITH a reward never played its kill-punch and a room without one did. What the room owes now stands in the room and is walked into, the way the rack and the shore's vessel already were. 200/200 seeds still resolve."
+    },
     {
       "t": "16:20",
       "text": "Review round on PR 20: three P2s, all real. The Oath-Bound and the Warden had their heavy poise breaks suppressed by a rule that only knew the brute — the sim now says which bodies do not yield to a light. The plant latch resets where swing ids restart, and one shared promiseFrame() keeps the drawing on the same frame as the dust."

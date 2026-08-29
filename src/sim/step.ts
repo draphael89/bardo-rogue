@@ -6,6 +6,7 @@ import { updateProjectiles } from './projectiles'
 import { updateSpawnQueue, updateWaves } from './waves'
 import { tryEnterDoor, updateRoomTransition } from './rooms'
 import { tryCollectOffering } from './offering'
+import { tryClaimShrine } from './shrine'
 import { tryPrepareWeapon } from './preparation'
 import { tryTalkSmith } from './smith'
 import { canReturn, returnToHub } from './return'
@@ -73,6 +74,9 @@ export function stepWorld(world: World, input: InputFrame): void {
   tryTalkSmith(world)
   tryEnterDoor(world)
   tryCollectOffering(world)
+  // The 'claiming' phase falls through to here on purpose: the room is cleared and yours, so the
+  // body stays free, and the only thing that changed is that something is standing in it.
+  tryClaimShrine(world)
 
   // Combat slow-motion lives here and nowhere else. The player and the input frame above already ran
   // at a full 60 Hz; only the world on the other side of the sword is stretched. Integer per-mille,

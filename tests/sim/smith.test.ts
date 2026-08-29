@@ -11,6 +11,7 @@ import { createWorld } from '@/sim/scenarios'
 import { prepareWeapon, smithWaiting, startRun } from '@/sim/session'
 import { stepWorld } from '@/sim/step'
 import { tuning } from '@/tuning'
+import { claimShrine } from './claim'
 
 function inTown(seed = 2) {
   return createWorld(seed, 'loop')
@@ -116,6 +117,7 @@ describe('the Smith', () => {
     world.wave.index = defs.length - 1
     world.wave.groupIndex = defs[world.wave.index].groups.length
     stepWorld(world, emptyInput())
+    claimShrine(world)
     stepWorld(world, { ...emptyInput(), choiceDelta: 1 })
     stepWorld(world, { ...emptyInput(), choiceDelta: 1 })
     armThenConfirm(world)
@@ -148,6 +150,7 @@ describe('the Smith', () => {
     world.wave.index = defs.length - 1
     world.wave.groupIndex = defs[world.wave.index].groups.length
     stepWorld(world, emptyInput())
+    claimShrine(world)
     stepWorld(world, { ...emptyInput(), choiceDelta: 1 })
     stepWorld(world, { ...emptyInput(), choiceDelta: 1 })
     armThenConfirm(world)

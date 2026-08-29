@@ -100,6 +100,17 @@ function makeSliceBot(combat: Bot, toll: 'paid' | 'refused'): Bot {
       else inp.confirm = true
       return inp
     }
+    // What the room owes is standing in the room now. The proof walks into it exactly as a player
+    // does -- this is the branch that turns "the offer is reachable" from a claim into a gate.
+    if (world.roomPhase === 'claiming') {
+      const shrine = world.arena.shrine
+      if (shrine) routeToward(inp, world, shrine.x, shrine.y, orbit)
+      const movedNow = Number.isFinite(lastX) ? Math.hypot(world.player.x - lastX, world.player.y - lastY) : 1
+      lastX = world.player.x; lastY = world.player.y
+      if (movedNow < 0.08) { if (++stuck > 60) { stuck = 0; orbit = orbit === 1 ? -1 : 1 } }
+      else stuck = 0
+      return inp
+    }
     if (world.roomPhase === 'town') {
       if (!world.session.preparedWeapon && world.arena.rack) routeToward(inp, world, world.arena.rack.x, world.arena.rack.y, orbit)
       else {

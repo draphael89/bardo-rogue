@@ -1,5 +1,5 @@
 import { Container, Sprite, RenderTexture, Graphics, type DestroyOptions, type Renderer } from 'pixi.js'
-import { TILE, T, type Arena, type ArenaDoor, type DoorMark, type ArenaOffering, type ArenaRack, doorOpens } from '@/sim/arena'
+import { TILE, T, type Arena, type ArenaDoor, type ArenaShrine, type DoorMark, type ArenaOffering, type ArenaRack, doorOpens } from '@/sim/arena'
 import type { Atlas } from './atlas'
 import { tuning } from '@/tuning'
 import { OATH } from './oathMetal'
@@ -7,7 +7,18 @@ import { OATH } from './oathMetal'
 // Static floor/walls baked into one texture; door clusters (sprites + marks) change with open state.
 // `door` is a Container so every exit rides with presenter addChild / destroy. destroy() always
 // takes children — presenter does not pass { children: true }.
-export interface TilemapView { sprite: Sprite; door: Container; setDoorOpen(open: boolean): void; voidLayer: Sprite }
+export interface TilemapView {
+  sprite: Sprite
+  door: Container
+  setDoorOpen(open: boolean): void
+  voidLayer: Sprite
+  /**
+   * The cleared room's payout, which does not exist when the room is built — `shrine.ts` lights it
+   * on the clear. Reads `arena.shrine` off the same arena object this view was built from, so the
+   * caller only has to say WHEN, never what or where.
+   */
+  lightShrine(): void
+}
 
 const MARK = {
   combat: 0xff6a18, combatCore: 0xffcc56, combatEdge: 0x3a1008,
@@ -252,6 +263,126 @@ function makeRackCluster(rack: ArenaRack): { root: Container; sync(taken: boolea
   }
   paint(false)
   return { root, sync: paint }
+}
+
+/**
+ * What the cleared room owes you, standing in it (`src/sim/shrine.ts`).
+ *
+ * ART_DIRECTION §8.2.5: shrines are always SINGLE — so this is one vessel, never a pair, and it is
+ * authored rather than borrowed from the room's furniture, because a second brazier at the focal
+ * would read as decor the player has already learned to walk past.
+ *
+ * The flame wears the speaker, not the game: the Kindly One's fire, Hecate's veil, the ferryman's
+ * gold, and — for the Unburied, who has no fire — the wine of a shade that was never burned. The
+ * ring on the floor is the whole affordance: it is drawn at the sim's own claim radius, so what the
+ * player reads and what `tryClaimShrine` measures are the same circle.
+ */
+export const SHRINE_INK: Record<ArenaShrine['kind'], { flame: number; hot: number; ring: number }> = {
+  blade: { flame: 0xff7a30, hot: 0xffcc56, ring: 0xff7a30 },
+  veil: { flame: 0xa878ff, hot: 0xd8b8ff, ring: 0xa878ff },
+  shop: { flame: 0xd4b060, hot: 0xf0d080, ring: 0xd4b060 },
+  mystery: { flame: 0x9e4658, hot: 0xc07080, ring: 0x9e4658 },
+}
+
+/**
+ * The vessel, as a stamp rather than a pile of rectangles — the same way the shore's heart is
+ * authored above. 13 x 12, drawn from its FOOT, so the spot the sim measures is the spot it stands
+ * on. Legend: H hot core, W white wick, F flame body, R bowl rim, I bowl, S stem, B base.
+ *
+ * `.` is nothing, and the flame rows are simply skipped once it has been paid: a spent vessel is
+ * the same silhouette with a cold well, which is how the shore's offering reads too.
+ */
+const SHRINE_ART = [
+  '......H......',
+  '.....HWH.....',
+  '....HHWHH....',
+  '....FHWHF....',
+  '....FFWFF....',
+  '.....FFF.....',
+  '..RRRRRRRRR..',
+  '..IIIIIIIII..',
+  '...IIIIIII...',
+  '.....SSS.....',
+  '....BBBBB....',
+  '...BBBBBBB...',
+] as const
+const SHRINE_W = 13, SHRINE_H = SHRINE_ART.length
+const SHRINE_FLAME_ROWS = 6      // rows 0..5 are fire and leave with it
+const SHRINE_FOOT = 4            // px below the spot the base's last row lands
+
+function makeShrineCluster(atlas: Atlas, s: ArenaShrine): { root: Container; sync: (taken: boolean) => void } {
+  const ink = SHRINE_INK[s.kind]
+  const root = new Container()
+  root.position.set(Math.round(s.x), Math.round(s.y))
+  const glow = new Sprite(atlas.light('circle'))
+  glow.anchor.set(0.5)
+  glow.blendMode = 'add'
+  glow.tint = ink.hot
+  glow.position.set(0, -8)
+  const body = new Graphics()
+  root.addChild(glow, body)
+  const paint = (taken: boolean) => {
+    body.clear()
+    // The ring first and underneath: the claim radius, as a stepped circle on the floor (§2.1 Law 5
+    // — whole-pixel rects, never a stroked curve). It IS the instruction, it is drawn at the number
+    // `tryClaimShrine` actually measures, and it leaves with the flame so a spent vessel never
+    // invites a second walk.
+    if (!taken) {
+      const r = tuning.run.shrineRadius
+      let prev = -1
+      for (let dy = -r; dy <= r; dy++) {
+        const span = Math.round(Math.sqrt(Math.max(0, r * r - dy * dy)))
+        if (span < 1) continue
+        if (Math.abs(dy) > r - 2) {
+          markPx(body, -span, dy + 3, span * 2, 1, ink.ring)
+        } else {
+          // Close the horizontal gap where the circle is turning fast, or the arc comes out as a
+          // row of unconnected dots at 4x upscale.
+          const w = prev < 0 ? 1 : Math.max(1, prev - span + 1)
+          markPx(body, -span, dy + 3, w, 1, ink.ring)
+          markPx(body, span - w, dy + 3, w, 1, ink.ring)
+        }
+        prev = span
+      }
+    }
+    // hard 1px contact shadow, straight down: the only offset that stays on the pixel grid
+    markPx(body, -5, SHRINE_FOOT + 1, 10, 1, VESSEL.shadow)
+    const ox = -Math.floor(SHRINE_W / 2)
+    const oy = SHRINE_FOOT - SHRINE_H + 1
+    for (let row = 0; row < SHRINE_H; row++) {
+      if (taken && row < SHRINE_FLAME_ROWS) continue
+      const line = SHRINE_ART[row]
+      for (let col = 0; col < SHRINE_W; col++) {
+        const ch = line[col]
+        if (ch === '.') continue
+        let color: number
+        switch (ch) {
+          case 'H': color = ink.hot; break
+          case 'W': color = VESSEL.wickWhite; break
+          case 'F': color = ink.flame; break
+          case 'R': color = taken ? VESSEL.boneLo : VESSEL.cope; break
+          case 'I': color = taken ? VESSEL.void : VESSEL.iron; break
+          case 'S': color = VESSEL.stone1; break
+          default: color = VESSEL.stone0
+        }
+        markPx(body, ox + col, oy + row, 1, 1, color)
+      }
+    }
+  }
+  paint(false)
+  glow.alpha = 0.18
+  glow.scale.set(0.26)
+  return {
+    root,
+    sync(taken) {
+      // Measured against the shore's vessel (0.20 / 0.10): anything stronger stops being a pool and
+      // becomes a headlight — ART_DIRECTION §3.2.3, light pools, it does not wash.
+      glow.visible = true
+      glow.alpha = taken ? 0.05 : 0.18
+      glow.scale.set(taken ? 0.12 : 0.26)
+      paint(taken)
+    },
+  }
 }
 
 function makeSmithCluster(smith: { x: number; y: number }): Container {
@@ -508,6 +639,10 @@ export function buildTilemap(renderer: Renderer, atlas: Atlas, arena: Arena, are
   const rack = arena.rack ? makeRackCluster(arena.rack) : null
   if (rack) door.addChild(rack.root)
   if (arena.smith) door.addChild(makeSmithCluster(arena.smith))
+  // Normally absent at build time and added by lightShrine() on the clear. Built here too so a
+  // re-dress or a rebuild that lands while the vessel is already lit does not lose it.
+  let shrine = arena.shrine ? makeShrineCluster(atlas, arena.shrine) : null
+  if (shrine) door.addChild(shrine.root)
   const nativeDestroy = door.destroy.bind(door)
   door.destroy = (options?: boolean | DestroyOptions) => {
     nativeDestroy(typeof options === 'boolean' ? { children: true } : { children: true, ...options })
@@ -527,6 +662,12 @@ export function buildTilemap(renderer: Renderer, atlas: Atlas, arena: Arena, are
       for (const c of clusters) c.setOpen(open)
       gift?.sync(!!arena.offeringTaken)
       rack?.sync(!!arena.rackTaken)
+      shrine?.sync(!!arena.shrineTaken)
+    },
+    lightShrine() {
+      if (shrine || !arena.shrine) return
+      shrine = makeShrineCluster(atlas, arena.shrine)
+      door.addChild(shrine.root)
     },
   }
 }

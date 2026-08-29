@@ -10,6 +10,7 @@ import { createWorld } from '@/sim/scenarios'
 import { prepareWeapon, startRun } from '@/sim/session'
 import { stepWorld } from '@/sim/step'
 import { tuning } from '@/tuning'
+import { claimShrine } from './claim'
 
 function armThenConfirm(world: ReturnType<typeof createWorld>, extra: Record<string, unknown> = {}): void {
   while (world.tick - world.phaseTick < tuning.run.modalArmTicks) stepWorld(world, emptyInput())
@@ -28,7 +29,8 @@ function atMooring(seed = 7) {
   return world
 }
 
-function forceClear(world: ReturnType<typeof createWorld>): void {
+/** Clear the fight, then walk into the shade on the bank. See `claim.ts`. */
+function clearAndClaim(world: ReturnType<typeof createWorld>): void {
   for (const e of world.enemies) e.active = false
   world.spawnQueue.length = 0
   const defs = world.waveDefs!
@@ -36,13 +38,14 @@ function forceClear(world: ReturnType<typeof createWorld>): void {
   world.wave.index = defs.length - 1
   world.wave.groupIndex = defs[world.wave.index].groups.length
   stepWorld(world, emptyInput())
+  claimShrine(world)
 }
 
 describe("the Unburied's mooring", () => {
   it('opens after the fight instead of the stall', () => {
     const world = atMooring()
     world.session.run!.obols = 20
-    forceClear(world)
+    clearAndClaim(world)
     expect(world.roomPhase).toBe('reward')
     expect(world.rooms[world.roomIndex]!.name).toBe("THE UNBURIED'S MOORING")
     expect(world.session.run!.pendingMystery?.choices).toEqual(['coin', 'memory', 'leave'])
@@ -54,7 +57,7 @@ describe("the Unburied's mooring", () => {
   it('takes a coin and opens the door', () => {
     const world = atMooring()
     world.player.hp = 1
-    forceClear(world)
+    clearAndClaim(world)
     const price = mysteryCost('coin')
     expect(price.kind).toBe('obols')
     world.session.run!.obols = price.amount
@@ -76,7 +79,7 @@ describe("the Unburied's mooring", () => {
   it('takes a memory the town kept and lengthens the vessel', () => {
     const world = atMooring()
     world.session.meta.remembrances = tuning.economy.mystery.memoryCost
-    forceClear(world)
+    clearAndClaim(world)
     stepWorld(world, { ...emptyInput(), choiceDelta: 1 })
     expect(world.session.run!.pendingMystery!.focus).toBe(1)
     armThenConfirm(world)
@@ -89,7 +92,7 @@ describe("the Unburied's mooring", () => {
 
   it('refuses a confirm the purse cannot cover', () => {
     const world = atMooring()
-    forceClear(world)
+    clearAndClaim(world)
     world.session.run!.obols = mysteryCost('coin').amount - 1
     const purse = world.session.run!.obols
     armThenConfirm(world)
@@ -101,7 +104,7 @@ describe("the Unburied's mooring", () => {
   it('refuses a memory the town has not kept', () => {
     const world = atMooring()
     world.session.meta.remembrances = 0
-    forceClear(world)
+    clearAndClaim(world)
     stepWorld(world, { ...emptyInput(), choiceDelta: 1 })
     armThenConfirm(world)
     expect(world.session.run!.pendingMystery).not.toBeNull()
@@ -111,7 +114,7 @@ describe("the Unburied's mooring", () => {
 
   it('follows into the Hall when left on the bank', () => {
     const world = atMooring()
-    forceClear(world)
+    clearAndClaim(world)
     stepWorld(world, { ...emptyInput(), choiceDelta: 1 })
     stepWorld(world, { ...emptyInput(), choiceDelta: 1 })
     expect(world.session.run!.pendingMystery!.focus).toBe(2)
@@ -152,7 +155,7 @@ describe("the Unburied's mooring", () => {
     enterRoomById(world, 'black-step')
     armThenConfirm(world)
     world.session.run!.obols = mysteryCost('coin').amount
-    forceClear(world)
+    clearAndClaim(world)
     armThenConfirm(world)
     expect(world.session.run!.pendingMystery).toBeNull()
     expect(world.session.run!.pendingReward?.family).toBe('blade')
@@ -164,8 +167,8 @@ describe("the Unburied's mooring", () => {
   it('hashes the offer and the hunt flag', () => {
     const a = atMooring(3)
     const b = atMooring(3)
-    forceClear(a)
-    forceClear(b)
+    clearAndClaim(a)
+    clearAndClaim(b)
     expect(hashWorld(a)).toBe(hashWorld(b))
     stepWorld(a, { ...emptyInput(), choiceDelta: 1 })
     expect(hashWorld(a)).not.toBe(hashWorld(b))

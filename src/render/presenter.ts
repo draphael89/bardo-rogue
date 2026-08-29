@@ -10,7 +10,7 @@ import { EntityView, createPlayerView, createEnemyView, updatePlayerView, update
 import { updatePlayerRim } from './views/player'
 import { promiseFrame } from './clipSelect'
 import { ARM, armOf } from '@/sim/weapons'
-import { buildTilemap, type TilemapView } from './tilemap'
+import { buildTilemap, SHRINE_INK, type TilemapView } from './tilemap'
 import { Camera } from './camera'
 import { Hud } from './hud'
 import { Particles } from './particles'
@@ -68,6 +68,7 @@ export class Presenter {
   title: TitleOverlay
   private lastHurtAngle = 0
   private emberAcc = 0
+  private shrineAcc = 0
   // The swingId whose commitment beat has already fired. This is ACTION-ID state, so it resets
   // wherever action ids restart — bindWorld and the `returned` handler, next to reversalActions —
   // because returnToHub sets world.swingCounter back to 0 without replacing this Presenter, and a
@@ -490,6 +491,24 @@ export class Presenter {
           this.hud.place.text = ev.name
           break
         }
+        // The room owes you something and it is now standing in it. The ignite is a beat of its own:
+        // roomClear's own bells and slow-motion are still landing, so this leads with light rather
+        // than another screen event.
+        case 'shrineLit':
+          this.tilemap.lightShrine()
+          this.flash(0.22, SHRINE_INK[ev.kind].flame)
+          this.particles.ring(ev.x, ev.y, SHRINE_INK[ev.kind].flame)
+          this.particles.flame(ev.x, ev.y - 6, SHRINE_INK[ev.kind].hot, SHRINE_INK[ev.kind].flame)
+          break
+        case 'shrineTaken':
+          // sync() repaints the vessel spent; the meeting's own overlay opens on the next tick.
+          this.tilemap.setDoorOpen(this.world.doorOpen)
+          this.flash(0.34, SHRINE_INK[ev.kind].flame)
+          this.camera.punchZoom(J.zoom.roomClear)
+          this.particles.ring(ev.x, ev.y, SHRINE_INK[ev.kind].flame)
+          this.particles.puff(ev.x, ev.y, 5, SHRINE_INK[ev.kind].flame)
+          this.postfx.pulse()
+          break
         case 'offeringTaken':
           this.flash(0.5, 0xfff0c0)
           this.camera.addTrauma(0.16)
@@ -855,6 +874,21 @@ export class Presenter {
     while (this.emberAcc >= 1) { this.emberAcc -= 1; this.particles.ember(w.position.x, w.position.y) }
   }
 
+  /**
+   * A lit vessel has to keep burning or it reads as a decal. Emitted from the render clock rather
+   * than the sim's, because it is decoration: the sim already said everything that matters about
+   * this object when it emitted `shrineLit`.
+   */
+  private updateShrineFlame(w: World, dtSec: number) {
+    const s = w.arena.shrine
+    if (!s || w.arena.shrineTaken || w.roomPhase !== 'claiming' || this.reducedEffects) { this.shrineAcc = 0; return }
+    this.shrineAcc += tuning.juice.shrineFlameRate * dtSec
+    while (this.shrineAcc >= 1) {
+      this.shrineAcc -= 1
+      this.particles.flame(s.x, s.y - 8, SHRINE_INK[s.kind].hot, SHRINE_INK[s.kind].flame)
+    }
+  }
+
   private addRecoil(angle: number, strength: number) {
     this.recoilX -= Math.cos(angle) * strength
     this.recoilY -= Math.sin(angle) * strength * 0.7
@@ -1158,6 +1192,7 @@ export class Presenter {
     const DG = tuning.juice.dodged
     updatePlayerRim(this.playerView, this.dodgedStep >= 0 && this.dodgedStep < DG.rimTicks, this.dodgedStep === 0 ? DG.rim : DG.rimTint)
 
+    this.updateShrineFlame(w, dtSec)
     this.particles.setThreatPriority(hasHostileFloorThreat(w))
     this.particles.update(dtSec)
     this.atmosphere.update(w, dtSec)

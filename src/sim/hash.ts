@@ -1,7 +1,7 @@
 import type { World, PlayerState, EnemyState, ProjectileKind } from './world'
 import type { EnemyKind } from './events'
 import type { WaveState } from './world'
-import type { MysteryChoice, RoomPhase, ShopGood } from './session'
+import type { MysteryChoice, RoomPhase, RoomReward, ShopGood } from './session'
 import type { RiteId } from './rites'
 import { ARM } from './weapons'
 import { BOON } from './boons'
@@ -14,11 +14,12 @@ const ENEMY_STATE: Record<EnemyState, number> = {
 }
 const ENEMY_KIND: Record<EnemyKind, number> = { brute: 0, caster: 1, charger: 2, dummy: 3, warden: 4, oathbound: 5 }
 const WAVE_STATE: Record<WaveState, number> = { idle: 0, pending: 1, active: 2, done: 3 }
-const ROOM_PHASE: Record<RoomPhase, number> = { town: 0, entering: 1, fighting: 2, reward: 3, exits: 4, transitioning: 5, resolved: 6 }
+const ROOM_PHASE: Record<RoomPhase, number> = { town: 0, entering: 1, fighting: 2, reward: 3, exits: 4, transitioning: 5, resolved: 6, claiming: 7 }
 const PROJECTILE_KIND: Record<ProjectileKind, number> = { bolt: 0, arrow: 1, mirror: 2, echo: 3 }
 const RITE: Record<RiteId, number> = { toll: 0 }
 const SHOP: Record<ShopGood, number> = { heal: 0, vessel: 1, vow: 2 }
 const MYSTERY: Record<MysteryChoice, number> = { coin: 0, memory: 1, leave: 2 }
+const SHRINE: Record<RoomReward, number> = { blade: 0, veil: 1, shop: 2, mystery: 3 }
 
 // FNV-1a over a canonical snapshot of everything the sim's outcome depends on.
 // Deliberately NOT hashed: world.visualRng (cosmetic-only stream) and the arena's DECORATION, so
@@ -160,6 +161,13 @@ export function hashWorld(world: World): number {
     runVal = v; runLen = 1
   }
   int(runLen); byte(runVal)
+
+  // The cleared room's payout is a place the player has to reach, so it is geometry the outcome
+  // depends on -- not decoration. Flag-then-body, the one legal shape for optional data here.
+  const shrine = world.arena.shrine
+  flag(!!shrine)
+  if (shrine) { num(shrine.x); num(shrine.y); byte(SHRINE[shrine.kind]) }
+  flag(!!world.arena.shrineTaken)
 
   const w = world.wave
   int(w.index); byte(WAVE_STATE[w.state]); int(w.groupIndex); int(w.timer); int(w.total)

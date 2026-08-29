@@ -1,0 +1,16 @@
+{
+  "run_id": "20260829T225124Z-66c3382",
+  "exact_head": "66c3382",
+  "control_head": "4f4d4df",
+  "interleaved_same_host_batches": 5,
+  "raw_samples_retained": true,
+  "golden_outputs_match_baseline": true,
+  "variance_and_contention_reported": true,
+  "rejected_experiments_reverted": 4,
+  "accepted_single_lever_commits": 6,
+  "os_tuning_applied": false,
+  "physical_gpu_claim": false,
+  "full_suite_single_invocation_green": false,
+  "full_suite_exception": "unchanged art CLI test timed out at 5 seconds under host load and passed 12/12 in isolation",
+  "gate": "PASS_WITH_DECLARED_ENVIRONMENT_LIMITATIONS"
+}

@@ -1,7 +1,7 @@
 {
   "title": "Bardo Rogue",
   "subtitle": "The Greek gate: two powers, twelve vows, fire, an elite that turns a light blade, a ferryman who is owed, and Minos",
-  "updated": "2026-08-28T23:14-04:00",
+  "updated": "2026-08-28T23:39-04:00",
   "now": "phase-0",
   "round": 2,
   "timeline": [
@@ -560,6 +560,10 @@
     {
       "t": "23:14",
       "text": "Plan of record refreshed at 6852aa0 (Revision 3): the PR loop is the standing directive, the gauntlet is retired with a disposition on every parked piece, the PixelLab cycle deliberately lapses, and the remainder runs as PRs 1-7. Phase 0 begins: death-card build + beat, volume sliders, abandon, pad pause, reward prompt fixes, playtest build."
+    },
+    {
+      "t": "23:39",
+      "text": "Phase 0 shipped in four commits: the pause card is an operable pad-ready menu (volume sliders on a schema-3 save, held abandon), the death stele carries the weapon and vows behind a minimum reveal beat, and ?playtest= arms recorded sessions with verb conditions and an F4 bundle that replays headlessly. 524 tests, hashes byte-identical, matrix 100/100 (kite 70%, naive 0%), smoke both endings, build 2.0 MB."
     }
   ],
   "pieces": [
@@ -927,6 +931,12 @@
       "id": "review-fixes",
       "status": "done",
       "title": "Adversarial review: unhashed fire, a boss/caster scratch-field collision, an unreachable duo, a swingable hub",
+      "rounds": 1
+    },
+    {
+      "id": "phase-0",
+      "status": "done",
+      "title": "Phase 0: pause menu, death-card build, reveal beat, playtest kit",
       "rounds": 1
     }
   ]

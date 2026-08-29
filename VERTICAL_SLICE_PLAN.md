@@ -39,7 +39,8 @@ one `git mv` away from being live.
 A fresh three-track audit (sim, presentation, tooling) re-verified this block against `main` and locked
 four decisions with the user. The suite at `6852aa0` measures **512 passing tests in 32 files**
 (`pnpm test`, 2026-08-28 — the "275 passing" above was already stale when written); `pnpm matrix`
-holds the hard no-strand gate at 100/100 seeds (kite 93% wins, naive 0%).
+holds the hard no-strand gate at 100/100 seeds (measured 2026-08-28 post-recalibration: kite 70%
+wins, 37.5–49.8 s clears; naive 0% — both inside the soft band).
 
 **Fresh findings, queued into the revised ordering below:** the death card omits the build the victory
 card shows, and both cards accept confirm on tick 1 before the staged reveal (no minimum beat); the

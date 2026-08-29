@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { META_KEY, SETTINGS_KEY, type StorageLike } from '@/sim/storage'
 import { defaultSave, serializeSave, type BardoSave } from '@/sim/save'
-import { backupKey, claimProfileLock, createStorageSaveStore, createWebSaveStore, lockKey, migrateLegacyKeys, saveKey } from '@/platform/web'
+import { backupKey, claimProfileLock, createStorageSaveStore, createWebSaveStore, invalidatesSaveOwnership, lockKey, saveKey } from '@/platform/web'
 import { createDesktopPlatform, type DesktopBridge } from '@/platform/desktop'
 import { loadSave, saveFilename } from '@/platform/saveFile'
 
@@ -224,6 +224,13 @@ describe('profile ownership lock', () => {
     const throwing = { request: () => { throw new Error('locks disabled') } }
     expect(await claimProfileLock(throwing, ID, Promise.resolve())).toBe('unavailable')
   })
+
+  it('invalidates ownership for a foreign set, remove, or clear but not unrelated storage', () => {
+    expect(invalidatesSaveOwnership(ID, saveKey(ID))).toBe(true) // set or remove: newValue is irrelevant
+    expect(invalidatesSaveOwnership(ID, null)).toBe(true)        // localStorage.clear()
+    expect(invalidatesSaveOwnership(ID, backupKey(ID))).toBe(true)
+    expect(invalidatesSaveOwnership(ID, 'unrelated')).toBe(false)
+  })
 })
 
 describe('a read that failed is not a read that found nothing', () => {
@@ -297,75 +304,6 @@ describe('legacy read fallback', () => {
   })
 })
 
-describe('legacy key migration', () => {
-  const seedLegacy = (storage: MemoryStorage) => {
-    storage.setItem(META_KEY, JSON.stringify({ version: 1, attempts: 7, victories: 2, unlockedWeapons: ['blade'] }))
-    storage.setItem(SETTINGS_KEY, JSON.stringify({ version: 1, reducedEffects: true }))
-  }
-
-  it('upgrades a returning player and leaves the old keys in place', async () => {
-    const storage = new MemoryStorage()
-    seedLegacy(storage)
-    migrateLegacyKeys(storage, ID)
-    const loaded = await loadSave(createStorageSaveStore(storage), ID)
-    expect(loaded.save.meta.attempts).toBe(7)
-    expect(loaded.save.settings.reducedEffects).toBe(true)
-    expect(storage.getItem(META_KEY)).not.toBeNull()      // a rollback still finds them
-  })
-
-  it('is a no-op on a second boot', () => {
-    const storage = new MemoryStorage()
-    seedLegacy(storage)
-    migrateLegacyKeys(storage, ID)
-    const first = storage.getItem(saveKey(ID))
-    migrateLegacyKeys(storage, ID)
-    expect(storage.getItem(saveKey(ID))).toBe(first)
-    expect(storage.getItem(backupKey(ID))).toBeNull()     // and never rotates a phantom backup in
-  })
-
-  it('never overwrites an envelope that already exists', () => {
-    const storage = new MemoryStorage()
-    seedLegacy(storage)
-    const existing = serializeSave(withMeta(99))
-    storage.setItem(saveKey(ID), existing)
-    migrateLegacyKeys(storage, ID)
-    expect(storage.getItem(saveKey(ID))).toBe(existing)
-  })
-
-  it('carries the system reduced-motion preference through the upgrade', () => {
-    // A returning player with meta progress but no settings key never chose a value. Writing an
-    // explicit `false` would shadow the OS preference from then on, because an explicit value wins.
-    const storage = new MemoryStorage()
-    storage.setItem(META_KEY, JSON.stringify({ version: 1, attempts: 7, victories: 2, unlockedWeapons: ['blade'] }))
-    migrateLegacyKeys(storage, ID, true)
-    expect(JSON.parse(storage.getItem(saveKey(ID))!).settings.reducedEffects).toBe(true)
-  })
-
-  it('keeps an explicit legacy setting over the system preference', () => {
-    const storage = new MemoryStorage()
-    storage.setItem(META_KEY, JSON.stringify({ version: 1, attempts: 1, victories: 0, unlockedWeapons: ['blade'] }))
-    storage.setItem(SETTINGS_KEY, JSON.stringify({ version: 1, reducedEffects: false }))
-    migrateLegacyKeys(storage, ID, true)
-    expect(JSON.parse(storage.getItem(saveKey(ID))!).settings.reducedEffects).toBe(false)
-  })
-
-  it('does nothing for a fresh player', () => {
-    const storage = new MemoryStorage()
-    migrateLegacyKeys(storage, ID)
-    expect(storage.getItem(saveKey(ID))).toBeNull()
-  })
-
-  it('cannot throw when storage is missing or refuses the write', () => {
-    expect(() => migrateLegacyKeys(undefined, ID)).not.toThrow()
-    const hostile = new HostileStorage()
-    // Seeded through the map: this storage reads back fine and throws only on write, which is what a
-    // full quota looks like from here.
-    hostile.data.set(META_KEY, JSON.stringify({ version: 1, attempts: 7, victories: 2, unlockedWeapons: ['blade'] }))
-    expect(() => migrateLegacyKeys(hostile, ID)).not.toThrow()
-    expect(hostile.getItem(saveKey(ID))).toBeNull()
-  })
-})
-
 describe('desktop adapter', () => {
   // Only the save methods matter here; the rest of the bridge is never called by these tests.
   const bridge = (overrides: Partial<DesktopBridge['saves']>): DesktopBridge => ({
@@ -416,12 +354,36 @@ describe('desktop adapter', () => {
 
   it('propagates backup corruption so two damaged slots never look like first boot', async () => {
     const platform = createDesktopPlatform(bridge({
-      read: async () => ({ ok: true, data: null, corrupt: true }),
+      read: async () => ({ ok: true, data: null, corrupt: true, preserved: '/saves/default~corrupt.json' }),
       readBackup: async () => ({ ok: true, data: null, corrupt: true, preserved: '/saves/default~corrupt-1.json' }),
     }))
     const loaded = await loadSave(platform.saves, ID, { repair: false })
     expect(loaded.source).toBe('damaged')
     expect(loaded.writable).toBe(true)
+  })
+
+  it('keeps a recovered backup read-only when corrupt live evidence could not be preserved', async () => {
+    const good = serializeSave(withMeta(8, 2))
+    let writes = 0
+    const platform = createDesktopPlatform(bridge({
+      read: async () => ({ ok: true, data: null, corrupt: true, preserved: false }),
+      readBackup: async () => ({ ok: true, data: good }),
+      write: async () => { writes++; return { ok: true, bytes: good.length } },
+    }))
+    await expect(platform.saves.read(ID)).resolves.toEqual({ corrupt: true, preserved: false })
+    const loaded = await loadSave(platform.saves, ID)
+    expect(loaded).toMatchObject({ source: 'backup', writable: false, preservationFailed: true })
+    expect(loaded.save.meta.attempts).toBe(8)
+    expect(writes).toBe(0)
+  })
+
+  it('keeps a damaged profile read-only when corrupt backup evidence could not be preserved', async () => {
+    const platform = createDesktopPlatform(bridge({
+      read: async () => ({ ok: true, data: null }),
+      readBackup: async () => ({ ok: true, data: null, corrupt: true, preserved: false }),
+    }))
+    const loaded = await loadSave(platform.saves, ID)
+    expect(loaded).toMatchObject({ source: 'damaged', writable: false, preservationFailed: true })
   })
 })
 

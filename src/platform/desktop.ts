@@ -4,7 +4,12 @@ import type { Platform, SaveRead, SaveStore } from './index'
 import { prefersReducedMotion } from './dom'
 
 // Structural types only: src/ never imports from desktop/.
-type ReadReply = { ok: true; data: string | null; corrupt?: true; preserved?: string } | { ok: false; error: string }
+type ReadReply = {
+  ok: true
+  data: string | null
+  corrupt?: true
+  preserved?: string | false
+} | { ok: false; error: string }
 type WriteReply = { ok: true; bytes: number } | { ok: false; error: string }
 type PlainReply = { ok: true } | { ok: false; error: string }
 
@@ -45,8 +50,8 @@ function desktopSaveStore(bridge: DesktopBridge): SaveStore {
   const readVia = async (fn: (id: string) => Promise<ReadReply>, id: string): Promise<SaveRead> => {
     const r = await fn(id)
     if (!r.ok) throw new Error(`save read refused: ${r.error}`)
-    if (r.preserved) console.log(`[save] a damaged save was moved aside: ${r.preserved}`)
-    return r.corrupt ? { corrupt: true } : r.data
+    if (typeof r.preserved === 'string') console.log(`[save] a damaged save was moved aside: ${r.preserved}`)
+    return r.corrupt ? { corrupt: true, preserved: typeof r.preserved === 'string' } : r.data
   }
   return {
     read: id => readVia(bridge.saves.read.bind(bridge.saves), id),

@@ -74,24 +74,36 @@ async function syncDir(d: string): Promise<void> {
 // very evidence this step exists to keep, so the move is link() (fails EEXIST atomically) + unlink(),
 // with a probe-then-rename fallback for filesystems without hard links. No clock is involved, so the
 // resulting filename is stable enough for the smoke test to assert.
-async function preserveCorrupt(current: string, corrupt: (n: number) => string): Promise<string | undefined> {
+type Preservation = { kind: 'preserved'; path: string } | { kind: 'missing' } | { kind: 'failed' }
+
+async function preserveCorrupt(current: string, corrupt: (n: number) => string): Promise<Preservation> {
   for (let n = 0; n <= 9; n++) {
     const target = corrupt(n)
-    try { await link(current, target); await unlink(current); return target } catch (e) {
+    try {
+      await link(current, target)
+      // The hard link is already an independent directory entry preserving the bytes. If removing
+      // the live name fails, keep both rather than report failure and let a later write destroy the
+      // only copy the recovery layer knows about.
+      await unlink(current).catch(() => undefined)
+      return { kind: 'preserved', path: target }
+    } catch (e) {
       if (code(e) === 'EEXIST') continue                  // that slot already holds older evidence
-      if (code(e) === 'ENOENT') return undefined          // nothing to preserve
+      if (code(e) === 'ENOENT') return { kind: 'missing' } // it disappeared after the probe: absent, not damaged
       try { await stat(target); continue } catch { /* the slot is free; fall through to rename */ }
-      try { await rename(current, target); return target } catch { return undefined }
+      try { await rename(current, target); return { kind: 'preserved', path: target } }
+      catch (renameError) { return code(renameError) === 'ENOENT' ? { kind: 'missing' } : { kind: 'failed' } }
     }
   }
-  return undefined   // ten damaged copies already kept: stop, and leave this one exactly where it is
+  return { kind: 'failed' }   // ten damaged copies already kept: stop, and leave this one exactly where it is
 }
 
 export interface SaveStoreOptions {
   verify?: boolean            // read back and compare; on in debug and test builds
   testWriteDelayMs?: number   // test lever: makes the quit-race smoke actually race the write
 }
-export interface ReadResult { data: string | null; corrupt?: true; preserved?: string }
+export type ReadResult =
+  | { data: string | null; corrupt?: undefined; preserved?: undefined }
+  | { data: null; corrupt: true; preserved: string | false }
 
 export function createSaveStore(dir: string, opts: SaveStoreOptions = {}) {
   let seq = 0
@@ -157,7 +169,8 @@ export function createSaveStore(dir: string, opts: SaveStoreOptions = {}) {
     if (cur.state === 'unreadable') throw new Error(`save file could not be read: ${p.current}`)
     if (cur.state === 'missing') return { data: null }
     const preserved = await preserveCorrupt(p.current, p.corrupt)
-    return { data: null, corrupt: true, ...(preserved ? { preserved } : {}) }
+    if (preserved.kind === 'missing') return { data: null }
+    return { data: null, corrupt: true, preserved: preserved.kind === 'preserved' ? preserved.path : false }
   }
 
   async function readBackupNow(id: string): Promise<ReadResult> {
@@ -167,7 +180,8 @@ export function createSaveStore(dir: string, opts: SaveStoreOptions = {}) {
     if (bak.state === 'ok') return { data: bak.data }
     if (bak.state === 'missing') return { data: null }
     const preserved = await preserveCorrupt(p.backup, p.corrupt)
-    return { data: null, corrupt: true, ...(preserved ? { preserved } : {}) }
+    if (preserved.kind === 'missing') return { data: null }
+    return { data: null, corrupt: true, preserved: preserved.kind === 'preserved' ? preserved.path : false }
   }
 
   async function deleteNow(id: string): Promise<void> {

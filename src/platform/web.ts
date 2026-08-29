@@ -5,6 +5,8 @@ import { downloadText, pickTextFile, prefersReducedMotion } from './dom'
 
 export const saveKey = (profileId: string) => `bardo-rogue.save.${profileId}`
 export const backupKey = (profileId: string) => `${saveKey(profileId)}.bak`
+export const invalidatesSaveOwnership = (profileId: string, key: string | null): boolean =>
+  key === null || key === saveKey(profileId) || key === backupKey(profileId)
 
 // Exported and parameterised on StorageLike on purpose: this is the half of the web adapter that can
 // be tested in node, with the same kind of in-memory storage the sim tests already use.
@@ -41,11 +43,8 @@ export function createStorageSaveStore(storage: StorageLike | undefined): SaveSt
 }
 
 // The store the web platform actually uses: the raw storage store, plus an in-memory legacy
-// fallback on the read path. The write-through upgrade in migrateLegacyKeys is an optimisation;
-// this is the guarantee. If that one-time envelope write failed (quota), the envelope key stays
-// absent -- and without this fallback the session would boot on zeroed defaults while the player's
-// real attempts and victories sat readable in the two legacy keys, shadowed forever by the first
-// successful write of those defaults.
+// fallback on the read path. No eager write-through happens here: ownership is claimed above this
+// layer before the first normal persist writes the migrated envelope.
 export function createWebSaveStore(storage: StorageLike | undefined, preferredReducedEffects = false): SaveStore {
   const raw = createStorageSaveStore(storage)
   return {
@@ -57,23 +56,6 @@ export function createWebSaveStore(storage: StorageLike | undefined, preferredRe
       return legacy ? serializeSave(legacy) : null
     },
   }
-}
-
-// A one-time, in-place upgrade of this host's own storage layout: a returning player's two
-// pre-envelope keys become the first envelope. That the browser used to store saves differently is
-// the web adapter's business and nobody else's, so it happens here rather than in the boot path.
-// The legacy keys are never written again and never deleted -- a rollback to an older build still
-// finds a player's attempts and victories exactly where it left them.
-export function migrateLegacyKeys(storage: StorageLike | undefined, profileId: string, preferredReducedEffects = false): void {
-  if (!storage) return
-  try {
-    if (storage.getItem(saveKey(profileId)) !== null) return           // already on the envelope
-    // The OS preference has to come along: a returning player with meta progress but no settings key
-    // would otherwise have `reducedEffects: false` written down as an explicit choice they never made,
-    // and an explicit value shadows the system preference from then on.
-    const save = migrateLegacySave(storage.getItem(META_KEY), storage.getItem(SETTINGS_KEY), { profileId, preferredReducedEffects })
-    if (save) storage.setItem(saveKey(profileId), serializeSave(save))
-  } catch { /* nothing to recover; boot proceeds on defaults */ }
 }
 
 // Reading `localStorage` can THROW, not merely be undefined: Chromium raises SecurityError when site
@@ -125,6 +107,14 @@ export function createWebPlatform(): Platform {
   const storage = safeLocalStorage()
   let invalidated = false
   let invalidate: () => void = () => {}
+  let releaseOwnership: () => void = () => {}
+  let watchedProfileId = PROFILE_ID
+  const revokeOwnership = (): void => {
+    if (invalidated) return
+    invalidated = true
+    releaseOwnership()
+    invalidate()
+  }
   return {
     kind: 'web',
     saves: createWebSaveStore(storage, prefersReducedMotion()),
@@ -133,13 +123,16 @@ export function createWebPlatform(): Platform {
       const hold = new Promise<void>(resolve => { release = resolve })
       const status = await claimProfileLock(safeLockManager(), profileId, hold)
       if (status === 'acquired') {
+        watchedProfileId = profileId
+        let released = false
+        releaseOwnership = () => {
+          if (released) return
+          released = true
+          release()
+        }
         // A page in the back/forward cache is not allowed to keep authority over bytes it can no
         // longer observe. If it returns, it stays read-only; reclaiming would authorise stale state.
-        window.addEventListener('pagehide', () => {
-          invalidated = true
-          release()
-          invalidate()
-        }, { once: true })
+        window.addEventListener('pagehide', revokeOwnership, { once: true })
       }
       return status
     },
@@ -162,14 +155,16 @@ export function createWebPlatform(): Platform {
       } catch { /* the browser refused; nothing to recover, the game keeps running windowed */ }
     },
     setRunActive: () => { /* a browser tab has no quit to guard */ },
-    // The storage event fires only in the OTHER tabs, so this is how a session learns that a second
-    // copy of the game is now the one writing. It cannot merge -- each tab holds a whole document in
-    // memory -- so the honest move is to stop writing and say so, rather than overwrite silently.
+    // A foreign set, delete, or clear all invalidate this tab's in-memory whole document. Stop
+    // writing and release the lock: otherwise deleting a save in another tab is silently undone by
+    // this tab's next autosave, and no other tab can safely become the new owner.
     watchForeignWrites: cb => {
       if (typeof window === 'undefined') return
       invalidate = cb
       if (invalidated) cb()
-      window.addEventListener('storage', e => { if (e.key === saveKey(PROFILE_ID) && e.newValue !== null) cb() })
+      window.addEventListener('storage', e => {
+        if (invalidatesSaveOwnership(watchedProfileId, e.key)) revokeOwnership()
+      })
     },
     exportFile: downloadText,
     importFile: pickTextFile,

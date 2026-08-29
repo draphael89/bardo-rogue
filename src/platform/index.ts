@@ -8,7 +8,7 @@ import { createDesktopPlatform, isDesktopBridge } from './desktop'
 export const PROFILE_ID = 'default'
 
 export type SaveOwnership = 'acquired' | 'busy' | 'unavailable'
-export type SaveRead = string | null | { corrupt: true }
+export type SaveRead = string | null | { corrupt: true; preserved: boolean }
 
 // Async because the desktop adapter is a filesystem. Payloads are opaque strings to an adapter:
 // validation, migration and corruption recovery all live above it, in saveFile.ts and @/sim/save.

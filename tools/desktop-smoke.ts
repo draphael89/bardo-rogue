@@ -27,12 +27,26 @@ if (process.platform === 'linux' && !process.env.DISPLAY && !process.env.BARDO_S
 const require_ = createRequire(import.meta.url)
 const ELECTRON = require_('electron') as unknown as string      // the binary path, not the API namespace
 const MAIN = fileURLToPath(new URL('../desktop/out/main.cjs', import.meta.url))
+const DESKTOP_STORE = fileURLToPath(new URL('../desktop/out/save-store.cjs', import.meta.url))
 const DIST = fileURLToPath(new URL('../dist', import.meta.url))
 const REPLAY = args.replay ?? 'replays/naive-wave1-s3.json'     // non-loop: its hash cannot depend on meta
 const DEADLINE = +(args.deadline ?? 180_000)
 
-for (const [what, p] of [['desktop main (run `pnpm desktop:build`)', MAIN], ['dist/index.html (run `pnpm build`)', join(DIST, 'index.html')]] as const) {
+for (const [what, p] of [
+  ['desktop main (run `pnpm desktop:build`)', MAIN],
+  ['desktop save store (run `pnpm desktop:build`)', DESKTOP_STORE],
+  ['dist/index.html (run `pnpm build`)', join(DIST, 'index.html')],
+] as const) {
   if (!existsSync(p)) { console.error(JSON.stringify({ ok: false, error: `missing ${what}: ${p}` }, null, 2)); process.exit(1) }
+}
+
+interface DirectStore {
+  read(id: string): Promise<{ data: string | null; corrupt?: true; preserved?: string | false }>
+  readBackup(id: string): Promise<{ data: string | null; corrupt?: true; preserved?: string | false }>
+}
+const directStoreModule = require_(DESKTOP_STORE) as {
+  createSaveStore(dir: string): DirectStore
+  savePaths(dir: string, id: string): { current: string; backup: string; corrupt(n: number): string }
 }
 
 const baseEnv: Record<string, string> = {}
@@ -132,6 +146,22 @@ let surface: unknown = null
 
 try {
   writeFileSync(importFile, importedSave, 'utf8')
+  await check('desktop store distinguishes absence from unpreserved live and backup corruption', 10_000, async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'bardo-store-contract-'))
+    try {
+      const store = directStoreModule.createSaveStore(dir)
+      const paths = directStoreModule.savePaths(dir, 'default')
+      assert(JSON.stringify(await store.read('default')) === JSON.stringify({ data: null }), 'absent live slot was not reported as absence')
+      for (let n = 0; n <= 9; n++) writeFileSync(paths.corrupt(n), `older-${n}`, 'utf8')
+      writeFileSync(paths.current, CORRUPT, 'utf8')
+      writeFileSync(paths.backup, CORRUPT_BACKUP, 'utf8')
+      const live = await store.read('default')
+      const backup = await store.readBackup('default')
+      assert(live.corrupt === true && live.preserved === false && readFileSync(paths.current, 'utf8') === CORRUPT, `live preservation failure collapsed: ${JSON.stringify(live)}`)
+      assert(backup.corrupt === true && backup.preserved === false && readFileSync(paths.backup, 'utf8') === CORRUPT_BACKUP, `backup preservation failure collapsed: ${JSON.stringify(backup)}`)
+      return 'absent != corrupt; saturated live and backup both returned preserved:false'
+    } finally { rmSync(dir, { recursive: true, force: true }) }
+  })
   const l1 = await launch()
   const page = l1.page
 
@@ -419,12 +449,57 @@ try {
   })
   await close(l4.app)
 
-  // The error array collects renderer warnings and page errors across ALL FOUR launches, but until
+  // Exercise the LIVE read IPC path by itself. With no backup corruption to carry the signal, a
+  // dropped `corrupt` field would make this boot look exactly like a new player.
+  rmSync(join(savesDir, 'default.json'), { force: true })
+  rmSync(join(savesDir, 'default~bak.json'), { force: true })
+  writeFileSync(join(savesDir, 'default.json'), CORRUPT, 'utf8')
+  const l5 = await launch()
+  await check('live corruption survives the IPC seam without a backup signal', 40_000, async () => {
+    await l5.page.waitForFunction(() => !!(window as unknown as { __game?: unknown }).__game, null, { timeout: 40_000 })
+    const banner = await l5.page.evaluate(() => {
+      const hud = (window as unknown as { __game: { presenter: { hud: { bannerText: string } } } }).__game.presenter.hud
+      return hud.bannerText
+    })
+    assert(banner === 'SAVE WAS DAMAGED', `live corruption was collapsed to first boot: ${banner}`)
+    const kept = join(savesDir, 'default~corrupt-3.json')
+    assert(existsSync(kept) && readFileSync(kept, 'utf8') === CORRUPT, 'live-only corruption was not preserved')
+    return `live IPC reported damage and preserved ${kept}`
+  })
+  await close(l5.app)
+
+  // Saturate every evidence name. Preservation must fail closed: the bridge carries false, loadSave
+  // marks the profile read-only, and an ordinary settings save cannot replace the damaged bytes.
+  rmSync(join(savesDir, 'default.json'), { force: true })
+  rmSync(join(savesDir, 'default~bak.json'), { force: true })
+  for (let n = 0; n <= 9; n++) writeFileSync(join(savesDir, `default~corrupt${n ? `-${n}` : ''}.json`), `older-${n}`, 'utf8')
+  writeFileSync(join(savesDir, 'default.json'), CORRUPT_BACKUP, 'utf8')
+  const l6 = await launch()
+  await check('failed corruption preservation is explicit and forces read-only play', 40_000, async () => {
+    await l6.page.waitForFunction(() => !!(window as unknown as { __game?: unknown }).__game, null, { timeout: 40_000 })
+    const state = await l6.page.evaluate(async () => {
+      const w = window as unknown as {
+        __game: { presenter: { hud: { bannerText: string; bannerSub: string } } }
+        bardoDesktop: { saves: { read(id: string): Promise<unknown> } }
+      }
+      const hud = w.__game.presenter.hud
+      return { hud: { bannerText: hud.bannerText, bannerSub: hud.bannerSub }, ipc: await w.bardoDesktop.saves.read('default') }
+    }) as { hud: { bannerText: string; bannerSub: string }; ipc: { ok: boolean; corrupt?: boolean; preserved?: string | false } }
+    assert(state.hud.bannerText === 'SAVE WAS DAMAGED' && /read-only/.test(state.hud.bannerSub), `preservation failure was not shown honestly: ${JSON.stringify(state.hud)}`)
+    assert(state.ipc.ok && state.ipc.corrupt === true && state.ipc.preserved === false, `IPC lost preservation failure: ${JSON.stringify(state.ipc)}`)
+    await l6.page.evaluate(() => { window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyV' })) })
+    await new Promise(r => setTimeout(r, 500))
+    assert(readFileSync(join(savesDir, 'default.json'), 'utf8') === CORRUPT_BACKUP, 'read-only session overwrote unpreserved corrupt bytes')
+    return 'preserved:false crossed IPC and the damaged live file stayed byte-identical'
+  })
+  await close(l6.app)
+
+  // The error array collects renderer warnings and page errors across ALL SIX launches, but until
   // here it was only asserted during the first boot -- a throw during recovery or relaunch would ride
   // along in the JSON under ok:true. Nothing after boot may log an error and still pass.
   await check('no errors across any launch', 5_000, async () => {
     assert(errors.length === 0, `late errors: ${errors.slice(0, 3).join(' | ')}`)
-    return 'clean across 4 launches'
+    return 'clean across 6 launches'
   })
 
   clearTimeout(watchdog)

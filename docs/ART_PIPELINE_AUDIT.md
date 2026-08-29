@@ -120,7 +120,7 @@ gold-as-threshold. The environment problem is *solved in principle* — it needs
 different pipeline.
 
 **The GPT-image experiment (2026-08-28) half-worked, and the failure is measurable.**
-`art/source/bardo_hero_alpha_v1.png` (1254² source, 16 poses) is genuinely good: consistent
+`art/approved/bardo_hero_alpha_v1.png` (1254² source, 16 poses) is genuinely good: consistent
 character, dramatic silhouettes, correct palette family. The shipped 32 px derivative is muddy —
 silhouettes collapse, limbs dissolve into noise. Root cause: the source's fake "pixels" are
 ~9.8 px and not aligned to the 4×4 grid (313.5 px cells), and the normalizer samples **one point

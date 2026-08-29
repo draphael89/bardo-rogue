@@ -49,6 +49,11 @@ describe('asset contract', () => {
     expect(() => validateSheetDef(def, 'x')).toThrow(/outside 0\.\.3/)
   })
 
+  it('rejects a sidecar with no frames', () => {
+    const def = { id: 'x', version: 1, kind: 'character', cell: 32, cols: 1, rows: 1, palette: 'p', maxColors: 16, frames: {} } as SheetDef
+    expect(() => validateSheetDef(def, 'x')).toThrow(/at least one frame/)
+  })
+
   it('rejects two frames sharing a cell, but allows a declared alias', () => {
     const base = { id: 'x', version: 1, kind: 'character' as const, cell: 32, cols: 2, rows: 2, palette: 'p', maxColors: 16 }
     expect(() => validateSheetDef({ ...base, frames: { a: { i: 0, pivot: [16, 30] }, b: { i: 0, pivot: [16, 30] } } } as SheetDef, 'x'))
@@ -151,6 +156,34 @@ describe('compiler', () => {
       cell: 16, cols: 2, rows: 1, palette: ['mortar', 'purple1'],
       frames: [{ name: 'first', i: 0 }, { name: 'second', i: 0 }],
     }, 'test')).rejects.toThrow(/both use cell 0/)
+  })
+
+  it('rejects zero frames and out-of-grid indices before every fit mode', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'bardo-compile-structure-'))
+    const src = join(dir, 'src.png')
+    await sharp({ create: { width: 8, height: 8, channels: 4, background: '#66334d' } }).png().toFile(src)
+    const base = {
+      id: 'test.structure', kind: 'character' as const, input: src, output: join(dir, 'out.png'),
+      cell: 8, cols: 1, rows: 1, palette: ['mortar', 'purple1'],
+    }
+    await expect(compileSheet({ ...base, frames: [] }, 'test')).rejects.toThrow(/at least one frame/)
+    for (const fit of ['grid', 'pose'] as const) {
+      await expect(compileSheet({ ...base, fit, frames: [{ name: 'outside', i: 1 }] }, 'test'))
+        .rejects.toThrow(/index 1 outside 0\.\.0/)
+    }
+  })
+
+  it('keeps a transparent 1x1 source transparent when enlarging it', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'bardo-tiny-transparent-'))
+    const src = join(dir, 'src.png'), output = join(dir, 'out.png')
+    await sharp({ create: { width: 1, height: 1, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).png().toFile(src)
+    const { report } = await compileSheet({
+      id: 'test.tiny-transparent', kind: 'effect', input: src, output,
+      cell: 8, cols: 1, rows: 1, palette: ['mortar'], frames: [{ name: 'empty', i: 0 }],
+    }, 'test')
+    const { data } = await sharp(output).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+    expect(report.frames[0].opaque).toBe(0)
+    expect([...data].filter((_v, i) => i % 4 === 3)).toEqual(Array(64).fill(0))
   })
 })
 

@@ -5,12 +5,12 @@ built-in image generation tool. The base hero and Brute used no external referen
 iterations referenced only the original sheets made for this repository. The retained editable inputs
 are alpha-matted sources, not shipped browser assets:
 
-- `source/bardo_hero_alpha_v1.png` — 4x4, 16 semantic hero poses.
-- `source/bardo_hero_north_alpha_v7.png` — the same 16-pose contract, viewed from behind / north.
-- `source/bardo_hero_north_roll_alpha_v3.png` — 2x2, four-key northward tumble progression.
-- `source/bardo_hero_south_alpha_v4.png` — the same 16-pose contract, viewed from the front / south.
-- `source/bardo_hero_south_roll_alpha_v3.png` — 2x2, four-key southward tumble progression.
-- `source/bardo_brute_alpha_v1.png` — 4x2, 8 semantic Brute poses.
+- `approved/bardo_hero_alpha_v1.png` — 4x4, 16 semantic hero poses.
+- `approved/bardo_hero_north_alpha_v7.png` — the same 16-pose contract, viewed from behind / north.
+- `approved/bardo_hero_north_roll_alpha_v3.png` — 2x2, four-key northward tumble progression.
+- `approved/bardo_hero_south_alpha_v4.png` — the same 16-pose contract, viewed from the front / south.
+- `approved/bardo_hero_south_roll_alpha_v3.png` — 2x2, four-key southward tumble progression.
+- `approved/bardo_brute_alpha_v1.png` — 4x2, 8 semantic Brute poses.
 
 The production sheets are deterministic derivatives, compiled from these sources by specs:
 

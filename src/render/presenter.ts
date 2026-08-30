@@ -23,7 +23,7 @@ import { PostFx } from './postfx'
 import { DamageNumbers } from './damageNumbers'
 import { Atmosphere } from './atmosphere'
 import { seedFx } from './fxRng'
-import { BOONS } from '@/sim/boons'
+import { BOONS, swingReach } from '@/sim/boons'
 import { ActionFeedbackGate, applyActionFeedbackLifecycle, crowdScreenMultiplier, guardedHitScreenScale, hasHostileFloorThreat, wardenAttackFeedback } from './feedback'
 import { guardUp } from '@/sim/enemies/oathbound'
 import { RewardOverlay } from './reward'
@@ -889,12 +889,18 @@ export class Presenter {
       this.particles.dust(p.x, p.y + 5, p.swingAngle + Math.PI, J.swing.heavyPlantDust)
     }
     if (p.stateTick < promise) return
-    const w = this.playerView.weapon
-    if (!w) return
+    // The blade is IN the authored drawing on every armed cell, so no sprite is positioned for it:
+    // reading `playerView.weapon.position` put the whole cue at world (0,0) — the room's top-left
+    // corner — and let contactReaction's recoil random-walk that point for the rest of the session.
+    // Derive it from the swing the plant is committing to instead: the hilt sits at the arc's hole,
+    // the tip at this swing's reach, both on the swing line, so the glow gathers mid-blade.
+    const mid = (tuning.juice.arc.hole + swingReach(this.world, s).radius) / 2
+    const bx = p.x + Math.cos(p.swingAngle) * mid
+    const by = p.y + Math.sin(p.swingAngle) * mid * 0.9   // the arc's own floor-plane squash
     const u = (p.stateTick - promise) / (s.startup - promise)
-    this.particles.chargeGlow(w.position.x, w.position.y, 7 + 13 * Math.max(0, Math.min(1, u)))
+    this.particles.chargeGlow(bx, by, 7 + 13 * Math.max(0, Math.min(1, u)))
     this.emberAcc += J.swing.heavyEmberRate * dtSec
-    while (this.emberAcc >= 1) { this.emberAcc -= 1; this.particles.ember(w.position.x, w.position.y) }
+    while (this.emberAcc >= 1) { this.emberAcc -= 1; this.particles.ember(bx, by) }
   }
 
   /**
@@ -934,7 +940,11 @@ export class Presenter {
       // is 1.5 target px, so an odd jolt left the sprite on a half target pixel and put the crawling
       // outline back for exactly the frames after a landed hit.
       v.body.position.set(snapToTarget(v.body.position.x + rx), snapToTarget(v.body.position.y + ry))
-      if (v.weapon) v.weapon.position.set(v.weapon.position.x + rx, v.weapon.position.y + ry)
+      // Only while something is drawing that sprite. The blade lives in the authored cells, so with
+      // it equipped updatePlayerView only hides the weapon and never places it — and a recoil added
+      // to a position nobody rewrites walks away from the origin for the rest of the session. The
+      // bow assigns an absolute position every frame it is visible, which is where this belongs.
+      if (v.weapon?.visible) v.weapon.position.set(v.weapon.position.x + rx, v.weapon.position.y + ry)
     }
   }
 

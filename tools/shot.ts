@@ -2,6 +2,7 @@
 // usage: pnpm shot -- --scenario wave1 --seed 3 --ticks 600 --bot kite --out shots/wave1.png [--debug 1] [--stepwise 1]
 //        pnpm shot -- --replay replays/naive-wave1-s3.json --ticks 300 --stepwise 1   (replay sets its own seed/scenario)
 //        pnpm shot -- --scenario loop --ticks 0 --oneX 1 --visualMs 0               (byte-stable presentation clock)
+//        pnpm shot -- --replay replays/run.json --ticks 400 --stepwise 1 --visualMs 500 (pin both clocks)
 import { chromium } from '@playwright/test'
 import { mkdirSync, readFileSync } from 'node:fs'
 import sharp from 'sharp'
@@ -27,7 +28,6 @@ const postEvalJs = args.postEval ?? ''
 const postWaitMs = Math.max(0, +(args.postWaitMs ?? 0))
 const replay = args.replay ? JSON.parse(readFileSync(args.replay, 'utf8')) : null
 if (visualMs !== null && (!Number.isFinite(visualMs) || visualMs < 0)) throw new Error('--visualMs must be a non-negative number')
-if (visualMs !== null && stepwise) throw new Error('--visualMs and --stepwise are separate deterministic lanes')
 if (visualMs !== null && waitMs) throw new Error('--visualMs replaces --waitMs')
 mkdirSync('shots', { recursive: true })
 

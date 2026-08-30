@@ -7,7 +7,7 @@
   "timeline": [
     {
       "t": "03:29",
-      "text": "The evidence now obeys the same determinism discipline as the simulation. The ordinary screenshot harness let atmosphere, lighting, idle poses, and the title descent advance by however many live frames happened before capture, so two tick-zero PNGs were not byte-identical. A narrow --visualMs lane freezes browser time at boot and advances it in fixed 50 ms quanta. Independent title boots pinned at 500 ms now produce the same SHA-256; the exact title, arrival, and four descent phases are tracked in the progress gallery instead of living only in ignored scratch shots."
+      "text": "The evidence now obeys the same determinism discipline as the simulation. The ordinary screenshot harness let atmosphere, lighting, idle poses, and the title descent advance by however many live frames happened before capture, so two tick-zero PNGs were not byte-identical. A narrow --visualMs lane freezes browser time at boot and advances it in fixed 50 ms quanta. Independent title boots pinned at 500 ms now produce the same SHA-256; pinning replay tick 400 and visual time 500 ms does the same for the active first fight. The exact title, arrival, four descent phases, and first-fight teaching frame are tracked in the progress gallery instead of living only in ignored scratch shots."
     },
     {
       "t": "03:14",

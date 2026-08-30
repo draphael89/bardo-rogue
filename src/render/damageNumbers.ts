@@ -60,9 +60,10 @@ export class DamageNumbers {
       const rise = Math.round(easeOutCubic(u) * (d.heavy ? 16 : 11))
       d.t.position.set(d.x, d.y - rise)
       // stepped pop and stepped fade: pixel type snaps between whole poses, it never eases like a web page
-      // Whole steps only: 1.5 resamples a pixel face onto half its own grid, which is the same
-      // defect the type ramp in ui.ts exists to prevent. The pop reads as well at 2 -> 1.
-      d.t.scale.set(age < 3 ? 2 : 1)
+      // Whole TARGET-pixel steps only. This Text lives under the world's 1.5x parent; assigning
+      // raw 2 -> 1 here would overwrite show()'s counter-scale and present at 3x -> 1.5x. Keep the
+      // authored pop at a crisp 2x -> 1x on the render target instead.
+      d.t.scale.set((age < 3 ? 2 : 1) / tuning.view.worldScale)
       d.t.alpha = u < 0.6 ? 1 : u < 0.78 ? 0.75 : u < 0.9 ? 0.45 : 0.2
     }
   }

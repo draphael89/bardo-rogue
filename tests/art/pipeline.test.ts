@@ -3,8 +3,9 @@ import { readFileSync, existsSync, mkdtempSync, readdirSync, writeFileSync, utim
 import { createHash } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { Texture } from 'pixi.js'
 import sharp from 'sharp'
-import { validateSheetDef, type SheetDef } from '../../src/render/sheet'
+import { bindSheet, validateSheetDef, type SheetDef } from '../../src/render/sheet'
 import { compileSheet, validateClipRefs, type CompileReport, type CompileSpec } from '../../tools/art/compile'
 import { makeContext, runGates, summarise } from '../../tools/art/gates'
 import { canon, rgbToHex, type RGB } from '../../tools/art/palette'
@@ -13,6 +14,7 @@ import { authoredFxFrame, quantizeFxAlpha, quantizeFxRotation } from '../../src/
 import { heroFrameName } from '../../src/render/views/player'
 import { createWorld } from '../../src/sim/scenarios'
 import { ARM } from '../../src/sim/weapons'
+import { tuning } from '../../src/tuning'
 
 const SHEETS = [
   'bardo_veteran_unarmed_east',
@@ -44,6 +46,20 @@ describe('asset contract', () => {
       const meta = await sharp(sheetPath(n)).metadata()
       expect(meta.width, n).toBe(def.cols * def.cell)
       expect(meta.height, n).toBe(def.rows * def.cell)
+    }
+  })
+
+  it('renders every shipped sheet at one source pixel per target pixel', () => {
+    for (const n of SHEETS) {
+      const def = JSON.parse(readFileSync(sidecarPath(n), 'utf8')) as SheetDef
+      const sheet = bindSheet(def, Texture.EMPTY, Texture.EMPTY)
+      for (const name of sheet.names()) {
+        const texture = sheet.frame(name).texture
+        expect(texture.frame.width, `${n}/${name} source width`).toBe(def.cell)
+        expect(texture.frame.height, `${n}/${name} source height`).toBe(def.cell)
+        expect(texture.orig.width * tuning.view.worldScale, `${n}/${name} target width`).toBe(texture.frame.width)
+        expect(texture.orig.height * tuning.view.worldScale, `${n}/${name} target height`).toBe(texture.frame.height)
+      }
     }
   })
 

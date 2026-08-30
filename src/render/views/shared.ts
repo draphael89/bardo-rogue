@@ -18,7 +18,7 @@ export const snapToTarget = (v: number): number => Math.round(v * tuning.view.wo
 // Kenney Tiny Dungeon indices (atlas.tile / atlas.white, 12 columns).
 // The Oath-Bound shares the Fallen Hoplite's body on purpose: it is the same shade, still under
 // its oath. What separates them is the guard it holds and the bronze it is cast in, not a new sprite.
-export const SPRITE = { player: 96, brute: 109, caster: 84, charger: 122, dummy: 54, warden: 109, oathbound: 109 } as const
+export const SPRITE = { brute: 109, caster: 84, charger: 122, dummy: 54, warden: 109, oathbound: 109 } as const
 export const WEAPON = { player: 106, brute: 118, caster: 129, oathbound: 118 } as const
 export const HALF_PI = Math.PI / 2
 

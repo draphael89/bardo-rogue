@@ -367,7 +367,7 @@ describe('code-generated sheets', () => {
   it('locks the native 24px room and 48px prop source contracts', async () => {
     const room = await sharp('public/assets/sprites/bardo_room.png').metadata()
     const props = await sharp('public/assets/sprites/bardo_props.png').metadata()
-    expect([room.width, room.height]).toEqual([8 * 24, 11 * 24])
+    expect([room.width, room.height]).toEqual([8 * 24, 12 * 24])
     expect([props.width, props.height]).toEqual([4 * 48, 4 * 48])
   })
 

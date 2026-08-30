@@ -24,7 +24,7 @@ export const T = {
   doorClosed: 71, doorOpen: 72, windowL: 73, windowR: 74, relief: 75,
   pillarTop: 76, pillarBase: 77,
   crackA: 78, crackB: 79, pit: 80,
-  silt: 81, water: 82, grate: 83, reed: 84, poppy: 85, coin: 86, beam: 87,
+  silt: 81, water: 82, grate: 83, reed: 84, poppy: 85, coin: 86, beam: 87, verdict: 88,
 } as const
 
 // Indices into the bardo_props sheet (4 columns, 48×48 source / 32×32 logical). The first four
@@ -34,6 +34,7 @@ export const PROP = {
   brazier: 4, ossuary: 5, shard: 6, pew: 7,
   reed: 8, prow: 9, pole: 10, pan: 11,
   keeperLamp: 12, brazierCold: 13, veteranRelic: 14,
+  verdictStele: 15,
 } as const
 
 export type RoomKind = 'bardo' | 'threshold' | 'crossing' | 'shore'

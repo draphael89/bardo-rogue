@@ -559,6 +559,24 @@ function beamTile(): Uint8Array {
   return t.d
 }
 
+// The sentence beneath Minos: a narrow wax-red rule, not a carpet and not a glowing hazard. It is
+// transparent over the floor and broken at a deliberate cadence, so five cells read as one ritual
+// mark without becoming a UI divider. Wine carries the verdict; iron pins keep it archaeological.
+function verdictTile(): Uint8Array {
+  const t = makeTile()
+  t.fill(P.void, 0)
+  for (let x = 0; x < ROOM_CELL; x++) {
+    if ((x >= 6 && x <= 8) || (x >= 18 && x <= 20)) continue
+    t.pixel(x, 13, P.purple1)
+    if (x % 6 >= 2 && x % 6 <= 4) t.pixel(x, 12, P.poppy)
+  }
+  for (const x of [2, 15, 23]) {
+    t.pixel(x, 11, P.ironHi); t.pixel(x, 12, P.iron); t.pixel(x, 13, P.mortar)
+  }
+  t.pixel(11, 12, P.poppyHot)
+  return t.d
+}
+
 // TRANSPARENT (ADR 0001): the screen-space starfield underlay is the sky between an island
 // room's masses, and an opaque baked void tile would freeze a second one. The sheet carries
 // the invariant, so the renderer bakes every base cell with no per-tile branch.
@@ -585,6 +603,7 @@ tiles.push(
   /* 78 */ crackTile(0), /* 79 */ crackTile(1), /* 80 */ pitTile(),
   /* 81 */ siltTile(), /* 82 */ waterTile(), /* 83 */ grateTile(),
   /* 84 */ reedTile(), /* 85 */ poppyTile(), /* 86 */ coinTile(), /* 87 */ beamTile(),
+  /* 88 */ verdictTile(),
 )
 
 const ROWS = Math.ceil(tiles.length / COLS)
@@ -1099,6 +1118,49 @@ function veteranRelic32(): Uint8Array {
   return d
 }
 
+// A broken verdict tablet in the Hall of Minos. It is evidence, not decoration: an austere stone
+// stele whose incised balance has been struck through in wine wax. The asymmetric crown and one
+// missing corner keep it archaeological instead of heraldic; no gold, because judgment is not a
+// crossing or a reward. The tablet stays dark enough to sit behind the fight.
+function verdictStele32(): Uint8Array {
+  const { d, set, pixel } = make32()
+  for (let x = 6; x <= 27; x++) set(x, 30, P.grout)
+  for (let x = 8; x <= 25; x++) set(x, 29, P.mortar)
+  // Two-step foot, with the north/left key and east/south terminator kept explicit.
+  for (let y = 25; y <= 28; y++) for (let x = 7; x <= 25; x++) {
+    let col: C = P.slate0
+    if (y === 25 || x <= 8) col = P.slate2
+    if (y === 28 || x >= 24) col = P.mortar
+    set(x, y, col)
+  }
+  // The slab: broken higher at west, bitten away at the north-east corner.
+  for (let y = 5; y <= 24; y++) {
+    const left = y < 7 ? 11 : y < 9 ? 9 : 8
+    const right = y < 6 ? 17 : y < 8 ? 21 : y < 11 ? 23 : 24
+    for (let x = left; x <= right; x++) {
+      let col: C = P.slate1
+      if (x === left || y === 5) col = P.slate2
+      if (x >= right - 1 || y === 24) col = P.slate0
+      if ((x === 10 && y >= 17) || (x === 20 && y >= 8 && y <= 10)) col = P.mortar
+      set(x, y, col)
+    }
+  }
+  // An incised balance: iron shadow under a cold worn edge, deliberately incomplete.
+  for (let y = 10; y <= 20; y++) { set(15, y, P.ironHi); set(16, y, P.iron) }
+  for (let x = 10; x <= 21; x++) { set(x, 12, P.ironHi); set(x, 13, P.iron) }
+  for (const x of [10, 21]) {
+    set(x, 14, P.iron); set(x, 15, P.iron)
+    for (let dx = -2; dx <= 2; dx++) set(x + dx, 17, dx === -2 ? P.ironHi : P.iron)
+  }
+  // The surviving verdict: one wax strike, warm enough to read but never as bright as combat.
+  for (let i = 0; i < 6; i++) { set(17 + i, 19 + Math.floor(i / 2), P.poppy); set(17 + i, 20 + Math.floor(i / 2), P.purple1) }
+  set(20, 20, P.poppyHot)
+  // Native-source fractures keep the face from reading as a UI icon.
+  pixel(18, 14, P.slate3); pixel(19, 15, P.slate3)
+  pixel(34, 34, P.mortar); pixel(35, 35, P.mortar); pixel(34, 36, P.slate0)
+  return d
+}
+
 function pan32(): Uint8Array {
   const { d, set } = make32()
   for (let x = 6; x < 26; x++) set(x, 28, P.grout)
@@ -1118,6 +1180,7 @@ const props32 = [
   brazier32(), ossuary32(), shard32(), pew32(),
   reed32(), prow32(), pole32(), pan32(),
   keeperLamp32(), brazierCold32(), veteranRelic32(),
+  verdictStele32(),
 ]
 const pRows = Math.ceil(props32.length / PCOLS)
 const pSheet = Buffer.alloc(PCOLS * PROP_CELL * pRows * PROP_CELL * 4)

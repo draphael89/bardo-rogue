@@ -43,7 +43,9 @@ Shipping art in this branch is code-authored and reproducible. The dagger and he
 unapproved pipeline candidates, not player identity. ImageGen was used aggressively for composition,
 material, control-strip, procession, and fallen-relic studies; no generated pixels were promoted to
 `public/` or the approved catalogue. The admitted relic was redrawn through `tools/make-bardo-tiles.ts`
-using 10 canonical colours, binary alpha, and a 12-colour cap. `pnpm art approve` was not run.
+using 10 canonical colours, binary alpha, and a 12-colour cap. The Hall of Minos study likewise
+stayed reference-only: its admitted result is one code-authored verdict stele and one transparent
+wax-red sentencing rule in the native sheets. `pnpm art approve` was not run.
 
 The candidate constraints are in `docs/CHARACTER_HARD_CONSTRAINTS.md`. Dagger and heavy armor each
 render 42 frames across south/north/east, six compiled sheets in total, computed sockets, 1× floor
@@ -54,7 +56,7 @@ pipeline and silhouette constraints, not the final identity or Look.
 
 The curated exact-head title, arrival, descent, first-fight, and viewport frames are tracked in
 `public/progress/shots/` as `title-menu.png`, `bardo-arrival-r7.png`, `descent-r7-*.png`, and
-`first-fight-r7.png`, `acheron-shore-r7.png`, `cocytus-weep-r7.png`, plus `viewport-390x844-*.png` and
+`first-fight-r7.png`, `acheron-shore-r7.png`, `cocytus-weep-r7.png`, `minos-verdict-r7.png`, plus `viewport-390x844-*.png` and
 `viewport-900x506-title-r7.png`. The broader scratch study remains local and intentionally ignored under
 `shots/attended/`:
 
@@ -65,6 +67,7 @@ The curated exact-head title, arrival, descent, first-fight, and viewport frames
 - `combat-*.png` and `replay-contact-strip.png`: Acheron, Lethe, Asphodel, Phlegethon, the
   Antechamber, Minos, and contact cadence.
 - `viewport-*`: 390×844 portrait, 900×506, 1280×720, 1920×1080, and fullscreen.
+- `ui/`: title Settings/Credits and pause menu/Settings at native, portrait, and wide desktop sizes.
 - `exact-head-room-gates/`: exact room composites and numeric gate results.
 
 Objective observations: the causeway centre now measures roughly twice the perimeter value; the
@@ -82,9 +85,14 @@ byte-identical across independent boots at SHA-256
 At Cocytus, a single cold reflection now belongs to the west-edge weep and expires before the dry
 fight circle; its floor and dark are paler and more cyan than Acheron's indigo river. The deterministic
 realm-air pass moves Acheron/Cocytus from distance 1.09 to 3.36 and outside the closest pair; median
-room separation rises from 10.54 to 11.32 with no wrong-temperature rooms. The exact
+room separation rose from 10.54 to 11.32; after the final Minos dress the exact-head median is
+11.31, still with no wrong-temperature rooms. The exact
 combat exhibit is byte-identical at SHA-256
 `519384bda07ee327f77a42a855bddb82ae5161c96c7e46c5c759d02c94823902`.
+At Minos, the existing unequal scale now answers a broken verdict stele and a narrow wax-red sentence
+beneath the Judge. Both are non-solid dress behind the fight lanes; the stele spends no gold and the
+circle at `(13, 8)` remains bare. The exact tick-3,000 combat exhibit is byte-identical across clean
+boots at SHA-256 `2041adda274fce80d0c9dd1ebd22a62df9688dbfbd81a9c284f9aa3f926f704d`.
 
 Subjective questions left deliberately open: whether the causeway has the desired emotional weight,
 whether the Veteran relic is poignant rather than merely legible, whether combat reads as satisfying
@@ -103,8 +111,8 @@ user-only gates.** No agent or automated play awarded them.
 | Browser smoke | `pnpm smoke -- --url http://localhost:5201` green, real keyboard and both endings |
 | Viewport transitions | `pnpm smoke:viewport -- --url http://localhost:5201` green through 640×360 → 1400×600 → 390×844 → 1920×700 → 900×506 → 640×360 for both title and game HUD; target and UI bounds remain contained, tick stays 0 |
 | Room art | `pnpm room:gate` green, including dimensions, alpha, palette, material spans, negative space, value, highlights, and focality |
-| Realm separation | `pnpm realm-air -- --url http://localhost:5201` owns every render; three clean-room outputs are byte-identical. Median RGB distance 11.32, closest 2.95, widest 16.91, zero temperature violations; no arbitrary pass threshold invented |
-| Regeneration | `pnpm palette` and `pnpm tiles` deterministic; no unexplained drift |
+| Realm separation | `pnpm realm-air -- --url http://localhost:5201` owns every render; three clean-room outputs are byte-identical. Median RGB distance 11.31, closest 2.95, widest 16.91, zero temperature violations; no arbitrary pass threshold invented |
+| Regeneration | `pnpm palette` and `pnpm tiles` deterministic; the 192×288 room sheet and 192×192 prop sheet regenerate byte-identically with no unexplained drift |
 | Shipping sprite gates | 78/3 waived general, 144/2 hero, 144/4 north, 40/1 north roll, 145/2 south, 40/1 south roll; zero blocking |
 | Candidate stress | `pnpm art:stress-hero` green for dagger and heavy; candidate-only |
 | Desktop | `pnpm desktop:build` green; isolated `pnpm smoke:desktop` green across 23 checks and 6 launches |

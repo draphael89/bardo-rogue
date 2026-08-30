@@ -42,8 +42,10 @@ contracts, while ImageGen studies remain reference-only. Acheron's lower lane no
 art bible's promised shore as one silt lip over a two-tile dark-water body without changing any
 solid. Cocytus now gives its west-edge weep one cold reflection that expires before the dry fight
 circle, and a paler cyan surface distinct from Acheron's indigo. The deterministic measured median
-realm separation is 11.32 with no wrong-temperature rooms. Look and Fun
+realm separation is 11.31 with no wrong-temperature rooms. Look and Fun
 remain human gates. The
+Hall of Minos now keeps its unequal scale but gains a broken, goldless verdict stele and a narrow
+wax-red sentence behind the boss, without marking the fight circle or changing collision. The
 letterbox and target sky now enter the shared frame grade from identical authored colours; exact
 390×844 and 900×506 probes keep all four target boundaries continuous. The attended evidence and
 exact-head ledger are recorded in `MORNING_REPORT.md`.

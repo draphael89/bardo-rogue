@@ -79,8 +79,10 @@ function dressMinos(a: Arena): void {
   // A scale, not a stripe. Short beam north-west of the circle; two pans at
   // different heights. Wine light, not hell-orange. (13, 8) stays bare.
   for (let c = 6; c <= 12; c++) stamp(a, c, 6, T.beam)
+  for (let c = 11; c <= 15; c++) stamp(a, c, 5, T.verdict)
   prop(a, 4, 11, PROP.pan)
   prop(a, 22, 12, PROP.pan)
+  prop(a, 18, 4, PROP.verdictStele)
   stamp(a, 21, 11, T.poppy)
   if (a.windows[0]) { a.windows[0].strength = 0.4; a.windows[0].tint = 0xb03010 }
   if (a.braziers[0]) { a.braziers[0].strength = 1.15; a.braziers[0].tint = 0xb03010 }
@@ -91,8 +93,10 @@ function dressMinosEast(a: Arena): void {
   // The same Hall, the beam sitting the other way. One poppy still, on the west pan.
   // (13, 8) stays bare.
   for (let c = 14; c <= 20; c++) stamp(a, c, 6, T.beam)
+  for (let c = 11; c <= 15; c++) stamp(a, c, 5, T.verdict)
   prop(a, 22, 11, PROP.pan)
   prop(a, 4, 12, PROP.pan)
+  prop(a, 8, 4, PROP.verdictStele)
   stamp(a, 5, 11, T.poppy)
   if (a.windows[0]) { a.windows[0].strength = 0.4; a.windows[0].tint = 0xb03010 }
   if (a.braziers[0]) { a.braziers[0].strength = 0.18; a.braziers[0].tint = 0x4a2018 }

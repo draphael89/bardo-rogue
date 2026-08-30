@@ -46,7 +46,9 @@ function assertEncodedReplay(value: unknown): asserts value is EncodedReplay {
     }
     const [mx, my, ax, ay, flags, count] = value as number[]
     if ([mx, my, ax, ay].some(axis => Math.abs(axis) > Q)) throw new Error(`encoded replay run ${index} has an axis outside -${Q}..${Q}`)
-    if (flags < 0 || (flags & ~FLAG_MASK) !== 0) throw new Error(`encoded replay run ${index} has unknown flags`)
+    // Bitwise operators truncate to 32 bits, so reject values above the complete v1 mask before the
+    // bitwise subset check. Otherwise 2 ** 32 is accepted and silently decodes as an empty frame.
+    if (flags < 0 || flags > FLAG_MASK || (flags & ~FLAG_MASK) !== 0) throw new Error(`encoded replay run ${index} has unknown flags`)
     if (count <= 0) throw new Error(`encoded replay run ${index} count must be a positive integer`)
     if (count > MAX_REPLAY_FRAMES - total) throw new Error(`replay exceeds the ${MAX_REPLAY_FRAMES}-frame limit`)
     total += count

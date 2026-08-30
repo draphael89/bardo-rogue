@@ -83,6 +83,11 @@ describe('replay format', () => {
       expect(() => decodeReplay(replay(count))).toThrow()
     }
   })
+  it('rejects encoded flag bits above the 32-bit range instead of truncating them', () => {
+    expect(() => decodeReplay({
+      v: 1, seed: 1, scenario: 'empty', runs: [[0, 0, 10000, 0, 2 ** 32, 1]],
+    })).toThrow(/unknown flags/)
+  })
   it('rejects malformed raw frames instead of passing them to the sim', () => {
     expect(() => replayFromJson(JSON.stringify({
       v: 1, seed: 1, scenario: 'empty',

@@ -39,8 +39,11 @@ export function moveToward(world: World, e: Enemy, tx: number, ty: number, speed
 export function moveAlong(world: World, e: Enemy, angle: number, speed: number, distance = speed * DT): { hitX: boolean; hitY: boolean; moved: number } {
   const x = e.x, y = e.y
   e.vx = Math.cos(angle) * speed; e.vy = Math.sin(angle) * speed
-  const hit = moveWithWalls(world.arena, e, Math.cos(angle) * distance, Math.sin(angle) * distance, e.radius)
-  return { ...hit, moved: Math.hypot(e.x - x, e.y - y) }
+  const hit = moveWithWalls(world.arena, e, Math.cos(angle) * distance, Math.sin(angle) * distance, e.radius) as {
+    hitX: boolean; hitY: boolean; moved: number
+  }
+  hit.moved = Math.hypot(e.x - x, e.y - y)
+  return hit
 }
 
 export function applyEnemyKnockback(world: World, e: Enemy): void {

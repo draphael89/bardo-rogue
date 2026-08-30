@@ -191,7 +191,6 @@ export function updatePlayerRim(v: EntityView, on: boolean, color: number): void
   }
 }
 
-
 export function updatePlayerView(v: EntityView, p: Player, world: World, alpha: number, time: number): void {
   const P = tuning.player
   const x = lerp(p.px, p.x, alpha), y = lerp(p.py, p.y, alpha)

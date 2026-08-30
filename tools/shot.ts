@@ -3,6 +3,7 @@
 //        pnpm shot -- --replay replays/naive-wave1-s3.json --ticks 300 --stepwise 1   (replay sets its own seed/scenario)
 import { chromium } from '@playwright/test'
 import { mkdirSync, readFileSync } from 'node:fs'
+import sharp from 'sharp'
 
 const args = Object.fromEntries(process.argv.slice(2).map((a, i, arr) => a.startsWith('--') ? [a.slice(2), arr[i + 1] ?? '1'] : []).filter(x => x.length))
 const scenario = args.scenario ?? 'full'
@@ -13,13 +14,16 @@ const out = args.out ?? (args.replay ? `shots/replay-${args.replay.split('/').po
 const debug = args.debug ?? '0'
 const url = args.url ?? 'http://localhost:5173'
 const stepwise = args.stepwise === '1'
+// A page screenshot at the harness's usual 1920x1080 viewport is a 3x enlargement of the
+// 640x360 target. `--oneX 1` is the art-review lane: one PNG pixel is one target pixel.
+const oneX = args.oneX === '1'
 const mute = args.mute ?? '1'
 const evalJs = args.eval ?? ''  // JS run in the page before the screenshot, e.g. "__game.setInput({attack:true,aimX:1}); __game.step(8)"
 const replay = args.replay ? JSON.parse(readFileSync(args.replay, 'utf8')) : null
 mkdirSync('shots', { recursive: true })
 
 const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] })
-const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } })
+const page = await browser.newPage({ viewport: oneX ? { width: 640, height: 360 } : { width: 1920, height: 1080 }, deviceScaleFactor: 1 })
 const errors: string[] = []
 page.on('console', m => { if (m.type() === 'error' || m.type() === 'warning') errors.push(`${m.type()}: ${m.text()}`) })
 page.on('pageerror', e => errors.push('pageerror: ' + e.message))
@@ -46,6 +50,10 @@ await page.waitForFunction((n) => (window as any).__game.loop.frameTimes.length 
 const state = await page.evaluate(() => (window as any).__game.state())
 const stats = await page.evaluate(() => (window as any).__game.frameStats())
 const extra = await page.evaluate(() => (window as any).__out ?? null)
-await page.screenshot({ path: out })
+const png = await page.screenshot({ path: out })
+if (oneX) {
+  const info = await sharp(png).metadata()
+  if (info.width !== 640 || info.height !== 360) throw new Error(`oneX capture is ${info.width}x${info.height}, expected 640x360`)
+}
 console.log(JSON.stringify({ out, stats, extra, state, errors }, null, 2))
 await browser.close()

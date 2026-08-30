@@ -22,6 +22,7 @@
     "typecheck": "tsc --noEmit && tsc -p desktop/tsconfig.json --noEmit",
     "assets": "tsx tools/import-assets.ts",
     "tiles": "tsx tools/make-bardo-tiles.ts",
+    "room:gate": "tsx tools/room-art-gates.ts",
     "sim": "tsx tools/headless.ts",
     "shot": "tsx tools/shot.ts",
     "poses": "tsx tools/poses.ts",

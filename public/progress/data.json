@@ -1,10 +1,14 @@
 {
   "title": "Bardo Rogue",
   "subtitle": "First Gate: rooms-as-data, a generated route, a town that remembers",
-  "updated": "2026-08-29T23:05:00-04:00",
-  "now": "island-bardo",
-  "round": 3,
+  "updated": "2026-08-30T01:35:00-04:00",
+  "now": "native-room-art",
+  "round": 4,
   "timeline": [
+    {
+      "t": "01:35",
+      "text": "The target finally sees authored room pixels, not a 16px source enlarged by the 1.5x world. Room cells are 24px, props 48px, simulation remains unchanged, and the bake runs at native density before returning to logical size. A new blocking gate checks source and live-composite dimensions, canon palette, binary alpha, material spans, all four Bardo islands' negative space, frame value/highlight budgets, and full top-1% focality. Exact 640x360 before/after frames are named in shots; Look and Fun are still human calls."
+    },
     {
       "t": "23:05",
       "text": "The Bardo becomes a district. One 64x36 room of four floating islands - causeway, Forge, Shrine, Gate plaza - on a south-to-north pilgrimage line, bridges over starfield void, Seals in silhouette east and west, the Ferryman's pier moored at the south-west edge. Void cells are solid to the sim and transparent to the bake; the door-enter line is relative to the door's own row now. Matrix 100/100 both bots, pinned hashes unmoved."

@@ -364,6 +364,13 @@ describe('authored effect sprites', () => {
 // only contract-checks the two authored character sheets. Palette discipline is the whole thesis of
 // this pipeline, so the lane that produces most of the screen cannot be the one lane exempt from it.
 describe('code-generated sheets', () => {
+  it('locks the native 24px room and 48px prop source contracts', async () => {
+    const room = await sharp('public/assets/sprites/bardo_room.png').metadata()
+    const props = await sharp('public/assets/sprites/bardo_props.png').metadata()
+    expect([room.width, room.height]).toEqual([8 * 24, 11 * 24])
+    expect([props.width, props.height]).toEqual([4 * 48, 3 * 48])
+  })
+
   for (const name of ['bardo_room', 'bardo_props']) {
     it(`${name} is entirely canon, with binary alpha`, async () => {
       const canonHex = new Set(Object.values(canon().colors).map(c => c.hex))

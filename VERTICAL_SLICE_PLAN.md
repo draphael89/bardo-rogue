@@ -20,6 +20,15 @@
 
 ## STATUS — what has since been built
 
+**Art cycle checkpoint (2026-08-30, `codex/bardo-first-sixty-seconds`).** Room source art now has a
+locked 24px tile / 48px prop contract while simulation and layout remain 16px / 32px logical. The
+static room composite is baked at native art density and returned to logical world size, so the
+640×360 target sees one source pixel per target pixel at the 1.5× world scale. `pnpm room:gate`
+blocks wrong dimensions, partial alpha, palette drift, collapsed material spans, Bardo island
+negative-space loss, composite-size drift, value-budget drift, and top-one-percent focality. Named
+1× before/after frames are in `shots/`; Look and Fun remain human gates. Title, Bardo dressing,
+combat material refinement, and hero stress candidates remain in progress in this cycle.
+
 The sections below are the plan as written. This block records what was executed against it, so the
 document does not become the next stale audit. Tests: **275 passing**; `pnpm matrix` 100/100 seeds
 resolve on both loop bots (kite 93%, naive 0%); `pnpm smoke` boots the title with a real keypress,

@@ -18,8 +18,8 @@ export type SheetName = (typeof SHEETS)[number]
 
 export interface Atlas {
   tile(i: number): Texture          // Tiny Dungeon 16x16 by index (12 columns) — legacy actors, weapons
-  room(i: number): Texture          // Bardo room sheet 16x16 by index (8 columns)
-  prop(i: number): Texture          // Bardo furniture sheet 32x32 by index (4 columns)
+  room(i: number): Texture          // Bardo room source 24x24, logical 16x16 (8 columns)
+  prop(i: number): Texture          // Bardo furniture source 48x48, logical 32x32 (4 columns)
   white(i: number): Texture         // same tile as a white silhouette (hit flash)
   /**
    * An authored sheet, addressed by semantic frame name rather than cell index.
@@ -55,8 +55,12 @@ export async function loadAtlas(manifest: Record<string, string[]>): Promise<Atl
   const rooms = new Map<number, Texture>()
   const propTiles = new Map<number, Texture>()
   const whites = new Map<number, Texture>()
-  const sub = (src: Texture, i: number, cols: number, size: number) =>
-    new Texture({ source: src.source, frame: new Rectangle((i % cols) * size, Math.floor(i / cols) * size, size, size) })
+  const sub = (src: Texture, i: number, cols: number, sourceSize: number, logicalSize = sourceSize) =>
+    new Texture({
+      source: src.source,
+      frame: new Rectangle((i % cols) * sourceSize, Math.floor(i / cols) * sourceSize, sourceSize, sourceSize),
+      orig: new Rectangle(0, 0, logicalSize, logicalSize),
+    })
 
   // White silhouettes are baked once per sheet (hit flash without a shader). Authored frames use
   // the same path as the legacy tiles, so changing art does not change the feedback contract.
@@ -91,8 +95,8 @@ export async function loadAtlas(manifest: Record<string, string[]>): Promise<Atl
 
   return {
     tile: i => tiles.get(i) ?? (tiles.set(i, sub(tiny, i, 12, 16)), tiles.get(i)!),
-    room: i => rooms.get(i) ?? (rooms.set(i, sub(room, i, 8, 16)), rooms.get(i)!),
-    prop: i => propTiles.get(i) ?? (propTiles.set(i, sub(props, i, 4, 32)), propTiles.get(i)!),
+    room: i => rooms.get(i) ?? (rooms.set(i, sub(room, i, 8, 24, 16)), rooms.get(i)!),
+    prop: i => propTiles.get(i) ?? (propTiles.set(i, sub(props, i, 4, 48, 32)), propTiles.get(i)!),
     white: i => whites.get(i) ?? (whites.set(i, sub(tinyWhite, i, 12, 16)), whites.get(i)!),
     sheet: name => {
       const s = sheets.get(name)

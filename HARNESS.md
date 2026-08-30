@@ -28,6 +28,7 @@ per tick: `stepWorld(world, inputFrame)`.
 | `pnpm poses` | Pose sheet of key animation frames (`tools/poses.ts`) |
 | `pnpm strip -- ...` | Frame strip of anything that moves, for judging motion (`tools/strip.ts`; writes a JSON state/event sidecar beside the PNG) |
 | `pnpm assets` / `pnpm tiles` | Regenerate `public/assets/` (Kenney subset, then the original bardo tilesets). Both rewrite `manifest.json`; run `tiles` **after** `assets` or the bardo sprites drop out. |
+| `pnpm room:gate -- [--url <server>] [--shot-dir <dir>] [--out <json>]` | Blocks room-source dimension, palette, alpha, material-span, and Bardo negative-space drift. With a live server it also proves native composite dimensions and exact 1x frame value/highlight/focality budgets (`tools/room-art-gates.ts`). |
 | `pnpm build` | Web build, then `tools/check-build.ts` gates the payload (no evidence, no video, no missing asset, within budget) |
 | `pnpm check:build` | Re-run the built-payload gate against the current `dist/` |
 | `pnpm art` / `pnpm palette` / `pnpm fx` | Run the authored-art gates, canonical-palette gate, or rebuild the Bardo FX sheets |
@@ -105,7 +106,9 @@ Available once the page has booted (`await page.waitForFunction(() => !!window._
   runs free and the reported tick can overshoot by up to 4.
 - `--eval` runs JS in the page after the ticks and before the screenshot. Set `window.__out = {...}` to get values back
   in the printed JSON (`extra`). The JSON also has `state` (from `__game.state()`), `stats`, and console `errors`.
-- Then Read the PNG. It is 1920x1080; the 640x360 render target is upscaled 3x.
+- Then read the PNG. The default is 1920x1080 with the 640x360 render target upscaled 3x. Pass
+  `--oneX 1` for the art-review lane: the browser and PNG are exactly 640x360, and the command
+  fails if capture dimensions drift.
 
 ## Record and replay
 

@@ -1,4 +1,4 @@
-// Original 16×16 room sheet + 32×32 furniture for The Threshold. Not Kenney. Run: pnpm tiles
+// Native 24×24 room sheet + 48×48 furniture for The Threshold. Not Kenney. Run: pnpm tiles
 //
 // Built to ART_DIRECTION.md:
 //  §1.2  every colour is a canon palette entry; nothing off-palette, no pure black/white
@@ -15,7 +15,13 @@ import { writeFileSync, readFileSync, existsSync } from 'node:fs'
 import sharp from 'sharp'
 
 const COLS = 8
+// Simulation and layout stay on the original 16px grid. The source art has a separate, explicit
+// 24px contract so the 1.5x world render presents one authored source pixel as one target pixel.
+// Most legacy primitives below still speak the stable logical grid and are rasterised into the
+// denser cell; the floor quarry is authored directly at source resolution because it owns most of
+// every frame and benefits most from true one-pixel joints and chips.
 const SIZE = 16
+const ROOM_CELL = 24
 
 type C = readonly [number, number, number]
 
@@ -78,14 +84,20 @@ function hash(x: number, y: number, s: number): number {
 const chance = (x: number, y: number, s: number, n: number) => (hash(x, y, s) % 100) < n
 
 function makeTile() {
-  const d = new Uint8Array(SIZE * SIZE * 4)
-  const set = (x: number, y: number, c: C, a = 255) => {
-    if (x < 0 || y < 0 || x >= SIZE || y >= SIZE) return
-    const i = (y * SIZE + x) * 4
+  const d = new Uint8Array(ROOM_CELL * ROOM_CELL * 4)
+  const pixel = (x: number, y: number, c: C, a = 255) => {
+    if (x < 0 || y < 0 || x >= ROOM_CELL || y >= ROOM_CELL) return
+    const i = (y * ROOM_CELL + x) * 4
     d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; d[i + 3] = a
   }
+  const set = (x: number, y: number, c: C, a = 255) => {
+    if (x < 0 || y < 0 || x >= SIZE || y >= SIZE) return
+    const x0 = Math.round(x * ROOM_CELL / SIZE), x1 = Math.round((x + 1) * ROOM_CELL / SIZE)
+    const y0 = Math.round(y * ROOM_CELL / SIZE), y1 = Math.round((y + 1) * ROOM_CELL / SIZE)
+    for (let yy = y0; yy < y1; yy++) for (let xx = x0; xx < x1; xx++) pixel(xx, yy, c, a)
+  }
   const fill = (c: C, a = 255) => { for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++) set(x, y, c, a) }
-  return { d, set, fill }
+  return { d, set, fill, pixel }
 }
 
 // ---------------------------------------------------------------------------
@@ -145,7 +157,7 @@ const LV: Ramp[] = [
 function slabPiece(f: Ramp, hx: 'L' | 'M' | 'R', vy: 'T' | 'B', v: 0 | 1): Uint8Array {
   const t = makeTile()
   const s = 40 + v * 13 + (hx === 'L' ? 1 : hx === 'R' ? 5 : 0) + (vy === 'T' ? 0 : 3)
-  for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++) t.set(x, y, f.body)
+  for (let y = 0; y < ROOM_CELL; y++) for (let x = 0; x < ROOM_CELL; x++) t.pixel(x, y, f.body)
   // meso: SOLID value blocks, 3-6 px wide and 2-3 px tall, one step off the body. The old
   // version stamped these through a 58 % per-pixel coin flip, which is 1 px dither by
   // another name: it put more edge energy on an empty floor patch than a caster sprite
@@ -158,26 +170,34 @@ function slabPiece(f: Ramp, hx: 'L' | 'M' | 'R', vy: 'T' | 'B', v: 0 | 1): Uint8
   // offsets that differ per piece, leaves the floor quiet enough to spend nothing on itself.
   const blocks: Array<[C, number]> = [[f.dark, 0], [f.lit, 1]]
   for (const [col, b] of blocks) {
-    const w = 4 + hash(b, 3, s) % 4
-    const h = 2 + hash(b, 4, s) % 2
-    const bx = 2 + hash(b, 1, s) % (13 - w), by = 2 + hash(b, 2, s) % (12 - h)
-    for (let y = by; y < by + h; y++) for (let x = bx; x < bx + w; x++) t.set(x, y, col)
+    const w = 6 + hash(b, 3, s) % 5
+    const h = 3 + hash(b, 4, s) % 3
+    const bx = 3 + hash(b, 1, s) % (21 - w), by = 3 + hash(b, 2, s) % (20 - h)
+    for (let y = by; y < by + h; y++) for (let x = bx; x < bx + w; x++) t.pixel(x, y, col)
   }
   // §2.2 joints are 1 px and LOW contrast: a groove (joint plus one step of core shadow on
   // the SOUTH edge only, §2.1 Law 2), never a drawn grid. The wobble moves in 5 px runs, so
   // the joint is a line that wanders rather than a row of 1 px teeth.
-  const wob = (i: number, k: number) => (hash(Math.floor(i / 5), k, s) % 3 === 0 ? 1 : 0)
-  if (vy === 'T') for (let x = 0; x < SIZE; x++) t.set(x, wob(x, 3), f.joint)
-  if (vy === 'B') for (let x = 0; x < SIZE; x++) { const b = wob(x, 7); t.set(x, 15 - b, f.joint); t.set(x, 14 - b, f.dark) }
-  if (hx === 'L') for (let y = 0; y < SIZE; y++) t.set(wob(y, 11), y, f.joint)
-  if (hx === 'R') for (let y = 0; y < SIZE; y++) t.set(15 - wob(y, 13), y, f.joint)
+  const wob = (i: number, k: number) => (hash(Math.floor(i / 7), k, s) % 3 === 0 ? 1 : 0)
+  if (vy === 'T') for (let x = 0; x < ROOM_CELL; x++) t.pixel(x, wob(x, 3), f.joint)
+  if (vy === 'B') for (let x = 0; x < ROOM_CELL; x++) { const b = wob(x, 7); t.pixel(x, 23 - b, f.joint); t.pixel(x, 22 - b, f.dark) }
+  if (hx === 'L') for (let y = 0; y < ROOM_CELL; y++) t.pixel(wob(y, 11), y, f.joint)
+  if (hx === 'R') for (let y = 0; y < ROOM_CELL; y++) t.pixel(23 - wob(y, 13), y, f.joint)
+  // Native 1px erosion: sparse paired nicks instead of enlarged 16px-era flecks. These sit at
+  // low points and never form a uniform screen-wide noise field.
+  for (let i = 0; i < 2; i++) {
+    const x = 3 + hash(i, 17, s) % 17, y = 4 + hash(i, 19, s) % 15
+    t.pixel(x, y, i ? f.dark : f.lit)
+    if (hash(i, 23, s) % 2 === 0) t.pixel(x + 1, y, i ? f.dark : f.lit)
+  }
   // The chip is §2.2's fifth value and it belongs to a slab standing in the key. On the
   // ambient floor it was a 3 px B2 mark stamped at a fixed offset in every second cell, and
   // it was the single most legible repeat in the room. Level 4 is the ember pool at the
   // bell, so that is the only floor that keeps it.
   if (v === 1 && f.chip === P.slate3) {
     const cx = hx === 'R' ? 10 : hx === 'M' ? 7 : 4, cy = vy === 'T' ? 4 : 10
-    t.set(cx, cy, f.chip); t.set(cx + 1, cy, f.chip); t.set(cx, cy + 1, f.chip)
+    const ax = Math.round(cx * ROOM_CELL / SIZE), ay = Math.round(cy * ROOM_CELL / SIZE)
+    t.pixel(ax, ay, f.chip); t.pixel(ax + 1, ay, f.chip); t.pixel(ax, ay + 1, f.chip)
   }
   return t.d
 }
@@ -547,25 +567,25 @@ tiles.push(
 )
 
 const ROWS = Math.ceil(tiles.length / COLS)
-const sheet = Buffer.alloc(COLS * SIZE * ROWS * SIZE * 4)
+const sheet = Buffer.alloc(COLS * ROOM_CELL * ROWS * ROOM_CELL * 4)
 for (let i = 0; i < tiles.length; i++) {
   const col = i % COLS, row = Math.floor(i / COLS)
   const src = tiles[i]
-  for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++) {
-    const si = (y * SIZE + x) * 4
-    const dx = col * SIZE + x, dy = row * SIZE + y
-    const di = (dy * COLS * SIZE + dx) * 4
+  for (let y = 0; y < ROOM_CELL; y++) for (let x = 0; x < ROOM_CELL; x++) {
+    const si = (y * ROOM_CELL + x) * 4
+    const dx = col * ROOM_CELL + x, dy = row * ROOM_CELL + y
+    const di = (dy * COLS * ROOM_CELL + dx) * 4
     sheet[di] = src[si]; sheet[di + 1] = src[si + 1]; sheet[di + 2] = src[si + 2]; sheet[di + 3] = src[si + 3]
   }
 }
 
 const out = 'public/assets/sprites/bardo_room.png'
-await sharp(sheet, { raw: { width: COLS * SIZE, height: ROWS * SIZE, channels: 4 } }).png().toFile(out)
-console.log('wrote', out, COLS * SIZE, 'x', ROWS * SIZE, '(' + tiles.length + ' tiles)')
+await sharp(sheet, { raw: { width: COLS * ROOM_CELL, height: ROWS * ROOM_CELL, channels: 4 } }).png().toFile(out)
+console.log('wrote', out, COLS * ROOM_CELL, 'x', ROWS * ROOM_CELL, '(' + tiles.length + ' tiles)')
 
 const preview = 'public/progress/shots/tiles-r4.png'
-await sharp(sheet, { raw: { width: COLS * SIZE, height: ROWS * SIZE, channels: 4 } })
-  .resize(COLS * SIZE * 8, ROWS * SIZE * 8, { kernel: 'nearest' })
+await sharp(sheet, { raw: { width: COLS * ROOM_CELL, height: ROWS * ROOM_CELL, channels: 4 } })
+  .resize(COLS * ROOM_CELL * 6, ROWS * ROOM_CELL * 6, { kernel: 'nearest' })
   .png()
   .toFile(preview)
 console.log('wrote', preview)
@@ -580,20 +600,28 @@ if (existsSync(manPath)) {
 }
 
 // ===========================================================================
-// 32×32 furniture. Four cells of it are one 64×64 object: the sunken bell, the
+// 48×48 source furniture, expressed on the stable 32px logical grid. Four cells of it are one
+// 64×64 logical object: the sunken bell, the
 // room's focal mass (§5.1). Every piece answers "who put it there and why".
 // ===========================================================================
 const P32 = 32
+const PROP_CELL = 48
 const PCOLS = 4
 
 function make32() {
-  const d = new Uint8Array(P32 * P32 * 4)
-  const set = (x: number, y: number, c: C, a = 255) => {
-    if (x < 0 || y < 0 || x >= P32 || y >= P32) return
-    const i = (y * P32 + x) * 4
+  const d = new Uint8Array(PROP_CELL * PROP_CELL * 4)
+  const pixel = (x: number, y: number, c: C, a = 255) => {
+    if (x < 0 || y < 0 || x >= PROP_CELL || y >= PROP_CELL) return
+    const i = (y * PROP_CELL + x) * 4
     d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; d[i + 3] = a
   }
-  return { d, set }
+  const set = (x: number, y: number, c: C, a = 255) => {
+    if (x < 0 || y < 0 || x >= P32 || y >= P32) return
+    const x0 = Math.round(x * PROP_CELL / P32), x1 = Math.round((x + 1) * PROP_CELL / P32)
+    const y0 = Math.round(y * PROP_CELL / P32), y1 = Math.round((y + 1) * PROP_CELL / P32)
+    for (let yy = y0; yy < y1; yy++) for (let xx = x0; xx < x1; xx++) pixel(xx, yy, c, a)
+  }
+  return { d, set, pixel }
 }
 
 // --- the focal object: a great cracked bell, fallen and half-sunk, embers in the split.
@@ -710,10 +738,11 @@ function bell64(): Uint8Array[] {
 
   const cells: Uint8Array[] = []
   for (const [ox, oy] of [[0, 0], [32, 0], [0, 32], [32, 32]] as const) {
-    const c = new Uint8Array(P32 * P32 * 4)
-    for (let y = 0; y < P32; y++) for (let x = 0; x < P32; x++) {
-      const si = ((y + oy) * W + (x + ox)) * 4
-      const di = (y * P32 + x) * 4
+    const c = new Uint8Array(PROP_CELL * PROP_CELL * 4)
+    for (let y = 0; y < PROP_CELL; y++) for (let x = 0; x < PROP_CELL; x++) {
+      const sx = Math.floor(x * P32 / PROP_CELL), sy = Math.floor(y * P32 / PROP_CELL)
+      const si = ((sy + oy) * W + (sx + ox)) * 4
+      const di = (y * PROP_CELL + x) * 4
       c[di] = d[si]; c[di + 1] = d[si + 1]; c[di + 2] = d[si + 2]; c[di + 3] = d[si + 3]
     }
     cells.push(c)
@@ -916,21 +945,21 @@ const props32 = [
   reed32(), prow32(), pole32(), pan32(),
 ]
 const pRows = Math.ceil(props32.length / PCOLS)
-const pSheet = Buffer.alloc(PCOLS * P32 * pRows * P32 * 4)
+const pSheet = Buffer.alloc(PCOLS * PROP_CELL * pRows * PROP_CELL * 4)
 for (let i = 0; i < props32.length; i++) {
   const col = i % PCOLS, row = Math.floor(i / PCOLS)
   const src = props32[i]
-  for (let y = 0; y < P32; y++) for (let x = 0; x < P32; x++) {
-    const si = (y * P32 + x) * 4
-    const dx = col * P32 + x, dy = row * P32 + y
-    const di = (dy * PCOLS * P32 + dx) * 4
+  for (let y = 0; y < PROP_CELL; y++) for (let x = 0; x < PROP_CELL; x++) {
+    const si = (y * PROP_CELL + x) * 4
+    const dx = col * PROP_CELL + x, dy = row * PROP_CELL + y
+    const di = (dy * PCOLS * PROP_CELL + dx) * 4
     pSheet[di] = src[si]; pSheet[di + 1] = src[si + 1]; pSheet[di + 2] = src[si + 2]; pSheet[di + 3] = src[si + 3]
   }
 }
 const pout = 'public/assets/sprites/bardo_props.png'
-await sharp(pSheet, { raw: { width: PCOLS * P32, height: pRows * P32, channels: 4 } }).png().toFile(pout)
-console.log('wrote', pout, PCOLS * P32, 'x', pRows * P32)
-await sharp(pSheet, { raw: { width: PCOLS * P32, height: pRows * P32, channels: 4 } })
-  .resize(PCOLS * P32 * 4, pRows * P32 * 4, { kernel: 'nearest' })
+await sharp(pSheet, { raw: { width: PCOLS * PROP_CELL, height: pRows * PROP_CELL, channels: 4 } }).png().toFile(pout)
+console.log('wrote', pout, PCOLS * PROP_CELL, 'x', pRows * PROP_CELL)
+await sharp(pSheet, { raw: { width: PCOLS * PROP_CELL, height: pRows * PROP_CELL, channels: 4 } })
+  .resize(PCOLS * PROP_CELL * 4, pRows * PROP_CELL * 4, { kernel: 'nearest' })
   .png()
   .toFile('public/progress/shots/props-r9.png')

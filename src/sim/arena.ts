@@ -27,8 +27,8 @@ export const T = {
   silt: 81, water: 82, grate: 83, reed: 84, poppy: 85, coin: 86, beam: 87,
 } as const
 
-// Indices into the bardo_props sheet (4 columns, 32×32). The first four cells are one
-// 64×64 object: the sunken bell.
+// Indices into the bardo_props sheet (4 columns, 48×48 source / 32×32 logical). The first four
+// cells are one 96×96 source / 64×64 logical object: the sunken bell.
 export const PROP = {
   bellNW: 0, bellNE: 1, bellSW: 2, bellSE: 3,
   brazier: 4, ossuary: 5, shard: 6, pew: 7,

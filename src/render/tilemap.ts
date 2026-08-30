@@ -21,6 +21,12 @@ export interface TilemapView {
   lightShrine(): void
 }
 
+// The simulation remains 16px. Room art is authored at the exact 24px density produced by the
+// 1.5x world render, then the baked composite is returned to logical world size. This means the
+// final target sees each authored source pixel exactly once: no enlarged 16px placeholders.
+export const ROOM_ART_SCALE = 3 / 2
+export const ROOM_ART_TILE = TILE * ROOM_ART_SCALE
+
 const MARK = {
   combat: 0xff6a18, combatCore: 0xffcc56, combatEdge: 0x3a1008,
   gift: 0xe8c060, giftCore: 0xfff0c0, giftEdge: 0x4a3810,
@@ -478,7 +484,9 @@ const C = {
 } as const
 
 function px(g: Graphics, x: number, y: number, w: number, h: number, color: number): void {
-  g.rect(Math.round(x), Math.round(y), Math.round(w), Math.round(h))
+  const x0 = Math.round(x * ROOM_ART_SCALE), y0 = Math.round(y * ROOM_ART_SCALE)
+  const x1 = Math.round((x + w) * ROOM_ART_SCALE), y1 = Math.round((y + h) * ROOM_ART_SCALE)
+  g.rect(x0, y0, Math.max(1, x1 - x0), Math.max(1, y1 - y0))
   g.fill({ color, alpha: 1 })
 }
 
@@ -629,10 +637,16 @@ export function buildTilemap(renderer: Renderer, atlas: Atlas, arena: Arena, flo
     // The invariant lives in the SHEET — tools/make-bardo-tiles.ts emits cell 0 alpha-0 — so the
     // bake needs no per-tile branch.
     const s = new Sprite(atlas.room(arena.base[i]))
-    s.position.set(col * TILE, r * TILE)
+    s.position.set(col * ROOM_ART_TILE, r * ROOM_ART_TILE)
+    s.scale.set(ROOM_ART_SCALE)
     c.addChild(s)
     const o = arena.overlay[i]
-    if (o >= 0) { const os = new Sprite(atlas.room(o)); os.position.set(col * TILE, r * TILE); c.addChild(os) }
+    if (o >= 0) {
+      const os = new Sprite(atlas.room(o))
+      os.position.set(col * ROOM_ART_TILE, r * ROOM_ART_TILE)
+      os.scale.set(ROOM_ART_SCALE)
+      c.addChild(os)
+    }
   }
   const g = new Graphics()
   bakeOcclusion(g, arena)
@@ -644,10 +658,11 @@ export function buildTilemap(renderer: Renderer, atlas: Atlas, arena: Arena, flo
   bakePropShadows(g, arena)
   c.addChild(g)
 
-  const rt = RenderTexture.create({ width: arena.cols * TILE, height: arena.rows * TILE, scaleMode: 'nearest' })
+  const rt = RenderTexture.create({ width: arena.cols * ROOM_ART_TILE, height: arena.rows * ROOM_ART_TILE, scaleMode: 'nearest' })
   renderer.render({ container: c, target: rt, clear: true })
   c.destroy({ children: true })
   const sprite = new Sprite(rt)
+  sprite.scale.set(1 / ROOM_ART_SCALE)
   // The stone only. The starfield underlay and the door cluster are separate surfaces, so the void
   // stays void and the open door stays gold.
   sprite.tint = floorTint

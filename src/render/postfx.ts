@@ -60,6 +60,7 @@ uniform vec3 uShadowTint;
 uniform vec3 uHighlightTint;
 uniform float uContrast;
 uniform float uSat;
+uniform float uShadowLift;
 
 void main(void)
 {
@@ -69,7 +70,7 @@ void main(void)
     // Lift shadows toward the indigo tint, weighted by darkness. A flat 0.70 mix here applied the
     // pull at every luma, so the brightest colour the art bible allows (#ECF0F6, L240) rendered at
     // L173 and no lane could emit a bright event. Shadows still get the full lift.
-    float sw = 0.30 * (1.0 - smoothstep(0.0, 0.45, luma));
+    float sw = uShadowLift * (1.0 - smoothstep(0.0, 0.45, luma));
     c = mix(uShadowTint * max(luma, 0.02), c, 1.0 - sw);
     float hi = smoothstep(0.72, 0.96, luma);
     c = mix(c, c * uHighlightTint, hi * 0.38);
@@ -89,6 +90,7 @@ void main(void)
 export class PostFx {
   private filter: Filter
   private uniforms: UniformGroup
+  private gradeUniforms: UniformGroup
   private grade: Filter
   private left = 0
   private total = 1
@@ -118,7 +120,9 @@ export class PostFx {
       uHighlightTint: { value: new Float32Array([G.highlightR, G.highlightG, G.highlightB]), type: 'vec3<f32>' },
       uContrast: { value: G.contrast, type: 'f32' },
       uSat: { value: G.sat, type: 'f32' },
+      uShadowLift: { value: G.shadowLift, type: 'f32' },
     })
+    this.gradeUniforms = gradeUniforms
     this.grade = new Filter({
       glProgram: GlProgram.from({ vertex, fragment: gradeFragment, name: 'grade-filter' }),
       resources: { gradeUniforms },
@@ -157,7 +161,28 @@ export class PostFx {
     this.aberrated = aberrate
   }
 
+  /**
+   * `tuning.juice.grade` used to be uploaded ONCE, in the constructor, while `juice.light` is
+   * re-read every frame. A tuner editing the grade live saw nothing happen and concluded the knob
+   * was dead. This re-upload runs BEFORE the aberration early-out below on purpose: behind it, the
+   * grade would only follow the tuning during an aberration pulse.
+   */
+  private syncGrade() {
+    const G = tuning.juice.grade
+    const u = this.gradeUniforms.uniforms
+    ;(u.uStrength as number) = G.strength
+    const sh = u.uShadowTint as Float32Array
+    sh[0] = G.shadowR; sh[1] = G.shadowG; sh[2] = G.shadowB
+    const hi = u.uHighlightTint as Float32Array
+    hi[0] = G.highlightR; hi[1] = G.highlightG; hi[2] = G.highlightB
+    ;(u.uContrast as number) = G.contrast
+    ;(u.uSat as number) = G.sat
+    ;(u.uShadowLift as number) = G.shadowLift
+    this.gradeUniforms.update()
+  }
+
   update(dtSec: number) {
+    this.syncGrade()
     if (this.left <= 0) {
       if (this.aberrated) { this.syncFilters(false); this.strength = 0 }
       return

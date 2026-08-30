@@ -9,17 +9,29 @@ import { tuning } from '@/tuning'
 // and the letterbox continues the in-frame pattern. The hash is the sim's own hash2 (arena.ts) —
 // one set of constants — with this file's salts.
 export const VOID_BLACK = 0x08070e
+// THE SKY IS RANKED, AND IT USED TO OUT-RANK THE GATE. `star` (L 0.769) and `goldStar` (L 0.892)
+// are the two brightest colours in canon, and every star was painted at one of them, at full alpha,
+// over the darkest surface in the game. The measured consequence: the frame's brightest pixel was a
+// star at 0.897 and over half the top-1 % set was off-floor — no amount of gold on a threshold wins
+// a frame whose brightest pixel is in the sky (§3.2.5). One star in twelve keeps the old ranks; the
+// other eleven sit at 0.51, which is still clearly a star against a 0.03 void and no longer
+// competes with the district. All four are canon, so the palette and AA gates do not move, and
+// `eachStar` still serves both the in-frame and letterbox paths — §2.8's one sky, by construction.
 const STAR_COLD = 0xb0c4ff
 const STAR_WARM = 0xffe2a0
+const DIM_COLD = 0x76849a
+const DIM_WARM = 0x90806c
 const CELL = 16
-const SALT = { star: 51, dx: 52, dy: 53, warm: 54 }
+const SALT = { star: 51, dx: 52, dy: 53, warm: 54, bright: 55 }
 
 function starAt(i: number, j: number): { dx: number; dy: number; color: number } | null {
   if (hash2(i, j, SALT.star) < 0.5) return null
+  const warm = hash2(i, j, SALT.warm) < 1 / 3
+  const bright = hash2(i, j, SALT.bright) < 1 / 12
   return {
     dx: Math.floor(hash2(i, j, SALT.dx) * CELL),
     dy: Math.floor(hash2(i, j, SALT.dy) * CELL),
-    color: hash2(i, j, SALT.warm) < 1 / 3 ? STAR_WARM : STAR_COLD,
+    color: bright ? (warm ? STAR_WARM : STAR_COLD) : (warm ? DIM_WARM : DIM_COLD),
   }
 }
 

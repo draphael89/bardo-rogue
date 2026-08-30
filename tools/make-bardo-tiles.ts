@@ -109,7 +109,12 @@ function makeTile() {
 // §2.2 floor stone. Three quarries; each is a 5-value ramp, so a tile holds
 // joint / shadow face / body / lit face / chip and nothing else (§1.3.1).
 // ---------------------------------------------------------------------------
-interface Ramp { joint: C; dark: C; body: C; lit: C; chip: C }
+// `key` marks the ONE level that stands inside a light key and therefore keeps §2.2's fifth
+// value, the chip. It is a named flag rather than a colour sentinel because the guard used to
+// read `chip === P.slate3` — a test that silently stops drawing the chip the moment level 4's
+// ramp is re-authored, and that cannot be told apart from level 3, whose chip differs from its
+// lit face for unrelated reasons.
+interface Ramp { joint: C; dark: C; body: C; lit: C; chip: C; key?: true }
 
 // Five value LEVELS, not five materials. §2.1 Law 1 macro scale: the floor's largest
 // variation is between whole slabs, so arena.ts paints levels in patches that cross many
@@ -143,7 +148,13 @@ const LV: Ramp[] = [
      architecture out of the frame's top brightness rank, and a slate3 lit face out here put
      the floor's own marks into the top 1 % of luminance, six tiles from the fight. The pool
      reads as one step up anyway because its lit face turns WARM instead of lighter, which is
-     §2.1 Law 4's other half: 60 deg of hue at equal value separates as well as two bands. */
+     §2.1 Law 4's other half: 60 deg of hue at equal value separates as well as two bands.
+     THIS RAMP WAS ONCE FLIPPED to a warm body under a cool lit face (naveWarm / nave1). Two
+     things were wrong with it and both are worth remembering. Law 4 runs one way — the LIT
+     face shifts warm toward the key and the SHADOW face shifts cool toward ambientTint — and
+     the flip put cool slate on the brightest facet of every warm pool. It also collapsed the
+     step: naveWarm 0.3175 against nave1 0.3178 is no value at all, so the level carried three
+     distinct values against §2.2's five. Read at 1x it turned the plaza khaki. */
   { joint: P.seal0, dark: P.slate1, body: P.slate2, lit: P.naveWarm, chip: P.nave1 },
   /* 3 basalt: the old floor the bell tore open. It is a wound, so it is the one floor
      allowed to fall to B0 — there is nothing in it to lose (§5.3.2). */
@@ -151,8 +162,18 @@ const LV: Ramp[] = [
   /* 4 ember-lit stone at the bell: the key's own pool (§3.2.2), the only floor above B1 and
      the only one carrying §2.2's full ramp up to a B4 chip — and it sits under the focal
      object, which is where §3.2.5 wants the brightest static pixels to be. naveWarm is the
-     floor's only warm (§1.2). */
-  { joint: P.slate0, dark: P.slate1, body: P.slate2, lit: P.naveWarm, chip: P.slate3 },
+     floor's only warm (§1.2).
+     THIS RAMP WAS ONCE BRASS: grout / woodHi / coinBrass / boneDim / gold, a full band
+     brighter, and on paper it was the better ramp — five measured values one step apart
+     against this one's four. It shipped for one night and was read at 1x. `bardo_room.png`
+     is the sheet ALL FOURTEEN layouts pave from, so it did not land only on the Bardo's
+     embers: it put an olive-gold chip into Cocytus, whose floorTint is the palest and coldest
+     in the game, and it turned the Bardo plaza itself into khaki slabs butted against
+     near-black ones. Warm stopped being an intrusion and became half the floor, which cost
+     the wine runner its status as THE warm thing in the room. If this level is ever re-lit,
+     the brightness has to come from the bake or the lightmap, which are per-room; a ramp here
+     is not. */
+  { joint: P.slate0, dark: P.slate1, body: P.slate2, lit: P.naveWarm, chip: P.slate3, key: true },
 ]
 
 // One cell of a slab that is 2 or 3 tiles wide and ALWAYS 2 tiles tall. The slab crosses
@@ -197,9 +218,9 @@ function slabPiece(f: Ramp, hx: 'L' | 'M' | 'R', vy: 'T' | 'B', v: 0 | 1): Uint8
   }
   // The chip is §2.2's fifth value and it belongs to a slab standing in the key. On the
   // ambient floor it was a 3 px B2 mark stamped at a fixed offset in every second cell, and
-  // it was the single most legible repeat in the room. Level 4 is the ember pool at the
-  // bell, so that is the only floor that keeps it.
-  if (v === 1 && f.chip === P.slate3) {
+  // it was the single most legible repeat in the room. Level 4 is the floor standing in a
+  // key, so that is the only floor that keeps it — `key`, not a colour sentinel.
+  if (v === 1 && f.key) {
     const cx = hx === 'R' ? 10 : hx === 'M' ? 7 : 4, cy = vy === 'T' ? 4 : 10
     const ax = Math.round(cx * ROOM_CELL / SIZE), ay = Math.round(cy * ROOM_CELL / SIZE)
     t.pixel(ax, ay, f.chip); t.pixel(ax + 1, ay, f.chip); t.pixel(ax, ay + 1, f.chip)

@@ -24,15 +24,18 @@ const OUT = 'public/assets'
 // Tinted at runtime, so these are multipliers, not colours. Three steps, hard boundaries.
 const CORE = 255, MID = 168, RIM = 96
 
-type Grid = { d: Uint8Array; size: number }
-const grid = (size: number): Grid => ({ d: new Uint8Array(size * size * 2), size })   // [value, alpha] pairs
+// `size` is the canvas WIDTH and `rows` its height. Every effect here is square except the light
+// shaft, which needs to be much taller than it is wide, so `grid(n)` keeps meaning n x n and only
+// the shaft asks for the rectangular form.
+type Grid = { d: Uint8Array; size: number; rows: number }
+const grid = (size: number, rows = size): Grid => ({ d: new Uint8Array(size * rows * 2), size, rows })
 const put = (g: Grid, x: number, y: number, v: number, a = 255): void => {
-  if (x < 0 || y < 0 || x >= g.size || y >= g.size) return
+  if (x < 0 || y < 0 || x >= g.size || y >= g.rows) return
   const i = (y * g.size + x) * 2
   g.d[i] = v; g.d[i + 1] = a
 }
 const get = (g: Grid, x: number, y: number): number =>
-  (x < 0 || y < 0 || x >= g.size || y >= g.size) ? 0 : g.d[(y * g.size + x) * 2 + 1]
+  (x < 0 || y < 0 || x >= g.size || y >= g.rows) ? 0 : g.d[(y * g.size + x) * 2 + 1]
 
 /** Hard-edged filled ellipse. Integer rows, no anti-aliasing — the same discipline as the impact blobs. */
 function ellipse(g: Grid, cx: number, cy: number, rx: number, ry: number, v: number): void {
@@ -64,13 +67,13 @@ function fromRows(rows: string[], map: Record<string, number>): Grid {
 }
 
 async function write(dir: string, name: string, g: Grid): Promise<void> {
-  const px = Buffer.alloc(g.size * g.size * 4)
-  for (let i = 0; i < g.size * g.size; i++) {
+  const px = Buffer.alloc(g.size * g.rows * 4)
+  for (let i = 0; i < g.size * g.rows; i++) {
     const v = g.d[i * 2], a = g.d[i * 2 + 1]
     px[i * 4] = v; px[i * 4 + 1] = v; px[i * 4 + 2] = v; px[i * 4 + 3] = a
   }
   mkdirSync(`${OUT}/${dir}`, { recursive: true })
-  await sharp(px, { raw: { width: g.size, height: g.size, channels: 4 } })
+  await sharp(px, { raw: { width: g.size, height: g.rows, channels: 4 } })
     .png({ palette: false, compressionLevel: 9 }).toFile(`${OUT}/${dir}/${name}.png`)
 }
 
@@ -309,6 +312,56 @@ for (let i = 0; i < 5; i++) {
   particles['fog_0' + (i + 1)] = g
 }
 
+// --- the light shaft --------------------------------------------------------------------------------
+// The Bardo's Gate is an aperture and nothing ever came through it: the two "rays" the atmosphere
+// drew were stretched Kenney noise discs at an effective alpha of ~0.007 — invisible, and continuous
+// alpha under free rotation, which is §6.1/§10.11/§10.12 all at once. This is the authored
+// replacement, and it is the only additive lane in the renderer that sits above the lightmap's
+// multiply, so it is the one place light can exceed a baked value.
+//
+// Its own 32x48 canvas, the way the fog lobes take a dedicated canvas, for the same reason: a shaft
+// has to cover area, and squeezing it onto the 16px particle sheet would cost the steps.
+// FOUR alpha plateaus down its length (§6.6: "god-rays and fog quantize: step their alpha to 4
+// levels, or draw them as hard-edged pixel wedges" — this does both), and the sides jog in INTEGER
+// steps every 8 rows because a rasterised diagonal is the jaggy §6.1 forbids while an authored stair
+// reads as intent.
+//
+// THE 15-DEGREE LEAN IS BAKED IN AND MUST NEVER BE ROTATED AT RUNTIME. A hard-edged PNG turned by a
+// Sprite transform resamples into exactly the soft edge §6.6 exists to prevent, which is what the
+// rays it replaces were doing.
+const SHAFT_W = 32, SHAFT_H = 48
+{
+  // [centre, halfWidth] per 8-row band, top to bottom. The lean is the centre marching right; the
+  // widening is the half-width. Unequal jogs so the three variants never read as one stencil.
+  // THE FIRST BAND'S CENTRE IS 10 IN ALL THREE and it is not free to vary: the three wedges are
+  // drawn over one aperture with one shared `SHAFT_ANCHOR_X = 10 / 32`, so a variant that opened
+  // at 11 hung its mouth off the slot's centre line by one source pixel — about 2 world px on the
+  // widest veil — and the three stopped converging. Vary them from band 1 down.
+  const variants: Array<{ bands: Array<[number, number]>; slats: number[] }> = [
+    { bands: [[10, 3], [11, 5], [13, 7], [14, 8], [16, 10], [19, 12]], slats: [11, 27, 46] },
+    { bands: [[10, 2], [12, 4], [13, 6], [15, 9], [17, 10], [19, 11]], slats: [8, 31, 44] },
+    { bands: [[10, 3], [12, 5], [14, 6], [15, 9], [17, 11], [20, 12]], slats: [14, 24, 40] },
+  ]
+  variants.forEach((variant, n) => {
+    const g = grid(SHAFT_W, SHAFT_H)
+    const at = (y: number): [number, number] => variant.bands[Math.min(variant.bands.length - 1, y >> 3)]
+    for (let y = 0; y < SHAFT_H; y++) {
+      // Brightest at the aperture, dimmest where it dies on the floor. Four plateaus, twelve rows
+      // each: at 1x you can count them, which is the whole point of quantizing.
+      const a = y < 12 ? 255 : y < 24 ? 192 : y < 36 ? 128 : 64
+      const [c, half] = at(y)
+      for (let x = c - half; x <= c + half; x++) put(g, x, y, CORE, a)
+    }
+    // Two or three hard 1px core slats per wedge, at rows that never align across the variants, so
+    // three overlapping shafts read as one structured beam instead of one fat triangle.
+    for (const y of variant.slats) {
+      const [c, half] = at(y)
+      for (let x = c - half; x <= c + half; x++) put(g, x, y, CORE, 255)
+    }
+    particles['shaft_0' + (n + 1)] = g
+  })
+}
+
 // --- ground decals ----------------------------------------------------------------------------------
 // §6.4: chunky. 2x2 and 3x2 blobs, three values, a hard dark rim on the ground decal. Twelve authored
 // splats rather than twelve downsampled airbrush stains, each a small cluster of hard chunks so a
@@ -353,7 +406,7 @@ const manifest = existsSync(manifestPath)
   : { sprites: [], particles: [], decals: [], light: [], audio: [], fonts: [] }
 manifest.particles = Object.keys(particles).sort().map(n => n + '.png')
 manifest.decals = Object.keys(decals).sort().map(n => n + '.png')
-writeFileSync(manifestPath, JSON.stringify(manifest, null, 2))
+writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n')
 
 const bySize = Object.entries(particles).reduce<Record<number, number>>((a, [, g]) => (a[g.size] = (a[g.size] ?? 0) + 1, a), {})
 console.log(`fx: ${Object.entries(bySize).map(([sz, n]) => `${n} particles @${sz}px`).join(', ')}, ${Object.keys(decals).length} decals @${D}px -> ${OUT}`)

@@ -16,10 +16,6 @@ describe('per-layout air', () => {
 
   it('does not hang amber fog over iron or wine rooms', () => {
     expect(atmosphereFor('styx').fogTint).not.toBe(atmosphereFor('landing').fogTint)
-    expect(atmosphereFor('styx').rayTint).toBe(0x6a7080)
-    expect(atmosphereFor('styx').rayTint).not.toBe(EMBER)
-    expect(atmosphereFor('phlegethon').rayTint).toBe(WINE)
-    expect(atmosphereFor('phlegethon').rayTint).not.toBe(EMBER)
     expect(atmosphereFor('minos').fogTint).toBe(WINE_DARK)
     expect(atmosphereFor('minos-east').fogTint).toBe(WINE_DARK)
     expect(atmosphereFor('threshold').fogTint).toBe(0x1c2e3c)

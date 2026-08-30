@@ -151,7 +151,7 @@ export class Lighting {
     // ambient: white pulled toward the tint by ambientDarkness. Death drags the edges toward a deep red while the
     // centre lift grows, so it reads as a closing red vignette rather than a flat wash.
     const air = atmosphereFor(world.rooms[world.roomIndex]?.layout ?? 'threshold')
-    const dark = L.ambientDarkness
+    const dark = air.ambientDarkness ?? L.ambientDarkness
     const d = this.deathT
     // The room's own darkness. This used to be one global indigo for every realm, which is why a
     // wine hall and an ice reach measured the same colour: whatever the floor did, the same cool
@@ -163,7 +163,7 @@ export class Lighting {
     let b = lerp(1, (ambient & 255) / 255, dark)
     if (d > 0) { r = lerp(r, 0.42, d); g = lerp(g, 0.16, d); b = lerp(b, 0.18, d) }
     this.base.tint = ((r * 255) << 16) | ((g * 255) << 8) | (b * 255)
-    this.vignette.alpha = L.vignette + d * 0.34
+    this.vignette.alpha = (air.vignette ?? L.vignette) + d * 0.34
     this.vignette.tint = d > 0 ? lerpColor(0xffffff, 0xf0e4e0, d) : 0xffffff
 
     const src = world.arena.braziers

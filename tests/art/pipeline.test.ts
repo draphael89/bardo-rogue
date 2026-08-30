@@ -328,7 +328,13 @@ describe('authored effect sprites', () => {
   })
   it('are hard-edged: no partial alpha except the glows and haze that §6.6 permits', async () => {
     const manifest = JSON.parse(readFileSync('public/assets/manifest.json', 'utf8')) as Record<string, string[]>
-    const stepped = new Set(['circle_03.png', 'circle_05.png', 'fog_01.png', 'fog_02.png', 'fog_03.png', 'fog_04.png', 'fog_05.png'])
+    // §6.6 names the exceptions: "god-rays and fog quantize: step their alpha to 4 levels". The
+    // shafts are the god-rays that clause is about, and the next test is what holds them to four.
+    const stepped = new Set([
+      'circle_03.png', 'circle_05.png',
+      'fog_01.png', 'fog_02.png', 'fog_03.png', 'fog_04.png', 'fog_05.png',
+      'shaft_01.png', 'shaft_02.png', 'shaft_03.png',
+    ])
     for (const file of manifest.particles) {
       if (stepped.has(file)) continue
       const { data } = await sharp(`public/assets/particles/${file}`).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
@@ -339,7 +345,7 @@ describe('authored effect sprites', () => {
   })
 
   it('step their alpha to a handful of levels where a falloff is allowed at all', async () => {
-    for (const file of ['circle_03.png', 'circle_05.png', 'fog_01.png']) {
+    for (const file of ['circle_03.png', 'circle_05.png', 'fog_01.png', 'shaft_01.png', 'shaft_02.png', 'shaft_03.png']) {
       const { data } = await sharp(`public/assets/particles/${file}`).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
       const levels = new Set<number>()
       for (let i = 3; i < data.length; i += 4) if (data[i] > 0) levels.add(data[i])

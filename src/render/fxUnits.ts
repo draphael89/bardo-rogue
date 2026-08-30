@@ -5,6 +5,11 @@
 export const FX_UNIT = 16    // particles, sparks, dust, discs, rings, flames
 export const FOG_UNIT = 32   // drifting haze, which needs the area
 export const DECAL_UNIT = 32 // ground splats
+// The light shaft is the one authored effect that is not square, and its lean is baked into the
+// pixels, so the anchor cannot be 0.5: the beam's top-band centre sits at x = 10 of 32.
+export const SHAFT_UNIT_W = 32
+export const SHAFT_UNIT_H = 48
+export const SHAFT_ANCHOR_X = 10 / SHAFT_UNIT_W
 
 const FX_ROTATION_STEP = (Math.PI * 2) / 16
 

@@ -487,6 +487,12 @@ const C = {
   purple0: 0x2a0e1c,
   boneLo: 0x5a4e42,
   goldDim: 0x8c7040,
+  // Two canon names the map did not carry yet, for the warm marks the causeway bake scatters on
+  // ground the paving already says is lit. L 0.428 and 0.698: coinBrass stays under the 0.70
+  // highlight line even after the grade's 1.06 contrast, so a scatter of it costs the highlight
+  // budget nothing, and only the four single gold pixels beside the landing lamp are spent.
+  coinBrass: 0x8a6a38,
+  gold: 0xd4b060,
 } as const
 
 function px(g: Graphics, x: number, y: number, w: number, h: number, color: number): void {
@@ -603,6 +609,13 @@ function bakeBardoProcession(g: Graphics, arena: Arena): void {
     const x = cx * TILE, y = cy * TILE
     px(g, x - reach - 2, y, reach, 1, C.goldDim)
     px(g, x + 3, y, reach, 1, C.goldDim)
+    // ONE coinBrass pixel beside each pair, and no more. The setts run midway between the player
+    // and the focal, so anything out here that enters the frame's top 1 % fails
+    // `bardo:top-one-focality` while still looking correct — the axis is held at B2 on purpose.
+    // No gold, no goldHot, no level 4 anywhere on this line. This is the first discipline that
+    // will slip under pressure, and it is the gate this pass is most likely to break.
+    px(g, x - reach - 3, y, 1, 1, C.coinBrass)
+    px(g, x + reach + 3, y, 1, 1, C.coinBrass)
   }
 }
 
@@ -700,6 +713,17 @@ function bakeBardoCauseway(g: Graphics, arena: Arena): void {
     const t = arena.base[r * arena.cols + c]
     return t >= 1 && t <= 60
   }
+  // The baked VALUE LEVEL under a world point, or -1 off the floor. A warm mark may only land
+  // where the paving already says there is light (§3.2.7: the wear and the light have to agree).
+  // Read at 1x without this test, the warm blocks scattered across level-0 stone west of the
+  // landing and the causeway read as litter on a dark floor rather than as firelight on slabs —
+  // and the darker this pass made the un-pooled ground, the louder that litter got.
+  const levelAt = (wx: number, wy: number): number => {
+    const c = Math.floor(wx / TILE), r = Math.floor(wy / TILE)
+    if (c < 0 || r < 0 || c >= arena.cols || r >= arena.rows) return -1
+    const t = arena.base[r * arena.cols + c]
+    return t >= 1 && t <= 60 ? Math.floor((t - 1) / 12) : -1
+  }
   // 0) The Keeper's fire, baked onto the stone (§3.2.7: bake the pool — the multiplied lightmap
   //    can only reveal a baked colour, never exceed it, so the warmth must live in the art).
   //    Two quantized rings of warm value blocks around the cresset's foot, denser near the fire,
@@ -717,12 +741,37 @@ function bakeBardoCauseway(g: Graphics, arena: Arena): void {
     const d = Math.min(dFire, dLand * 1.6)      // the landing's ring is tighter than the fire's
     if (d > 92) continue
     const keep = d < 34 ? (h & 7) < 6 : d < 62 ? (h & 7) < 3 : (h & 7) < 1
-    if (!keep || !floorAt(wx, wy)) continue
+    if (!keep || levelAt(wx, wy) < 2) continue
     const w = 4 + (h >>> 14) % 6, ht = 2 + (h >>> 18) % 2
     artPx(g, wx * S, wy * S, w, ht, (h >>> 20) % 3 === 0 ? C.nave0 : C.naveWarm)
   }
-  for (const [ox, oy] of [[-9, 2], [6, 6], [-2, 10]] as const) {
+  // TWO glints, and they stay goldDim. They sit 96 world px from the spawn — outside the
+  // focality gate's own 64 px — so promoting them to gold grows the FAR half of the top-1 % set
+  // and is the single most likely way to fail `top-one-focality` at the arrival capture. The
+  // gold that gate needs goes on the landing instead, four pixels from the player's feet.
+  for (const [ox, oy] of [[-9, 2], [6, 6]] as const) {
     artPx(g, (fire.x + ox) * S, (fire.y + oy) * S, 1, 1, C.goldDim)
+  }
+  // 0b) THE LANDING. Arrival is IN light (§3.2.3), and at the spawn the Gate focal is 415 world
+  //     px north and off-screen — so the frame's own bright pixels have to be here, under the
+  //     player's feet, or the focality gate has nothing near the player to find. One rank of warm
+  //     value blocks inside 18 world px of playerStart, and four single gold pixels beside the
+  //     landing lamp at (35, 29).
+  //     ONE BRASS BLOCK IN THREE, and the rest naveWarm. Two in three brass was read at 4x and
+  //     the pool was sand: coinBrass is a whole band over naveWarm, so at that density it stops
+  //     being firelight on slate and becomes a material of its own. The brass is the accent the
+  //     eye finds; naveWarm is what carries the warmth.
+  for (let gy = 0; gy < 11; gy++) for (let gx = 0; gx < 11; gx++) {
+    const h = wearHash(gx, gy, 167)
+    const wx = landing.x - 26 + gx * 5 + ((h >>> 4) % 3) - 1
+    const wy = landing.y - 26 + gy * 5 + ((h >>> 10) % 3) - 1
+    if (Math.hypot(wx - landing.x, wy - landing.y) > 26 || levelAt(wx, wy) < 2) continue
+    const w = 3 + (h >>> 14) % 4, ht = 2 + (h >>> 18) % 2
+    artPx(g, wx * S, wy * S, w, ht, (h >>> 20) % 3 === 0 ? C.coinBrass : C.naveWarm)
+  }
+  for (const [ox, oy] of [[18, -6], [22, -2], [16, 2], [24, 4]] as const) {
+    const wx = landing.x + ox, wy = landing.y + oy
+    if (floorAt(wx, wy)) artPx(g, wx * S, wy * S, 1, 1, C.gold)
   }
   // 1) The walk. Scuffs scatter densest on the line and thin off it — a soft edge made of hard
   //    pixels. One step UP from the body (slate2); warm (naveWarm) inside the Keeper's pool,

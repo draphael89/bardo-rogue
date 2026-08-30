@@ -17,8 +17,11 @@ describe('letterbox void', () => {
     expect(ink.fills.slice(0, 4).map(fill => fill.color)).toEqual([
       VOID_BLACK, VOID_BLACK, VOID_BLACK, VOID_BLACK,
     ])
+    // Four star ranks, not two. `star` (L 0.769) and `goldStar` (L 0.892) are now the rare tier —
+    // one cell in twelve — and the other eleven use `slateHi` / `boneDim` at L 0.51, so the sky can
+    // no longer own the frame's brightest pixel (§3.2.5). All four are canon.
     expect(new Set(ink.fills.map(fill => fill.color))).toEqual(new Set([
-      VOID_BLACK, 0xb0c4ff, 0xffe2a0,
+      VOID_BLACK, 0xb0c4ff, 0xffe2a0, 0x76849a, 0x90806c,
     ]))
   })
 })

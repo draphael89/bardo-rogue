@@ -515,27 +515,37 @@ export const tuning = {
     },
     damageNumbers: false,
     light: {
+      // THIRTEEN LAYOUTS, NOT FOURTEEN. `ambientDarkness`, `ambientTint` and `vignette` are all
+      // fallbacks: a preset in `atmospherePresets.ts` may override any of them per room, and the
+      // hub does override all three (0.44 / indigo / 0.40). So editing the three numbers below
+      // and reloading into the Bardo changes nothing — tune HUB in atmospherePresets.ts instead.
       ambientDarkness: 0.28,  // 0 = untouched, 1 = black at the arena edge
       ambientTint: 0x1e1c38, // indigo void; warm floor is graded out, ember stays on the lights
       vignette: 0.32,        // how much brighter the arena centre is than the edge
-      brazierRadius: 108, brazierFlicker: 0.30, brazierTint: 0xff7a18,
+      brazierFlicker: 0.30,
       playerLightRadius: 32, playerLightAlpha: 0.12,
       flameRate: 16,         // flame particles per second per brazier
       deathFadeSec: 1.6,     // slow red vignette after playerDeath
-      doorRadius: 64, doorFlicker: 0.10, doorTint: 0xffe8c0, doorOpenTint: 0xd4b060, doorAlpha: 0.36,
-      windowRadius: 88, windowFlicker: 0.10, windowTint: 0xc8d8ff, windowAlpha: 0.70,
+      doorRadius: 64, doorFlicker: 0.10, doorOpenTint: 0xd4b060, doorAlpha: 0.36,
+      windowFlicker: 0.10, windowAlpha: 0.70,
     },
     atmosphere: {
       moteCount: 28, moteSpeed: 7, moteAlpha: 0.55, moteTint: 0xffe4b0,
       fogCount: 5, fogAlpha: 0.10, fogTint: 0x5a6080,
-      rayCount: 2, rayAlpha: 0.06, rayTint: 0xffd8a0,
-      doorGlowRadius: 36, doorGlowAlpha: 0.10, doorGlowTint: 0xffe8b8, doorOpenTint: 0xd4b060,
+      // The one beam in the game, through the Bardo's Gate. It replaced rayCount/rayAlpha/rayTint,
+      // which drove two stretched Kenney noise discs at an effective ~0.007 alpha.
+      shaftAlpha: 0.30,
+      doorGlowRadius: 36, doorGlowAlpha: 0.10,
     },
     grade: {
       strength: 1,
       shadowR: 0.07, shadowG: 0.08, shadowB: 0.20,
       highlightR: 0.98, highlightG: 0.94, highlightB: 0.90,
       contrast: 1.06, sat: 0.82,
+      // How hard the shadow lift pulls dark pixels toward `shadow*`. This lived as a literal 0.30
+      // inside the grade's GLSL string, where no tuner could find it and no live edit could reach
+      // it. Value unchanged; only its address moved.
+      shadowLift: 0.30,
     },
   },
 }

@@ -5,7 +5,11 @@ import { TILE, doorOpens, type ArenaDoor } from '@/sim/arena'
 import { tuning } from '@/tuning'
 import { atmosphereFor, type AtmospherePreset } from './atmospherePresets'
 import type { LayoutId } from '@/sim/layouts'
-import { FX_UNIT, FOG_UNIT, quantizeFxAlpha, quantizeFxRotation } from './fxUnits'
+import { FX_UNIT, FOG_UNIT, SHAFT_ANCHOR_X, SHAFT_UNIT_H, SHAFT_UNIT_W, quantizeFxAlpha, quantizeFxRotation } from './fxUnits'
+
+// Relative width and relative alpha of the three overlapping wedges that make one beam.
+const SHAFT_SPREAD = [0.62, 1.00, 1.34] as const
+const SHAFT_FADE = [1.00, 0.62, 0.38] as const
 
 interface Mote {
   s: Sprite
@@ -34,7 +38,8 @@ function motePos(arena: World['arena'], i: number): { x: number; y: number } {
 // Living air of the Threshold. Presentation-only: motes, haze, door bloom, shafts. Never touches the sim.
 export class Atmosphere {
   readonly root = new Container()
-  private rays: Sprite[] = []
+  private shafts: Sprite[] = []
+  private shaftStrength = 0
   private doorGlow: Sprite
   private extraDoorGlows: Array<{ s: Sprite; d: ArenaDoor }> = []
   private fog: Sprite[] = []
@@ -57,15 +62,27 @@ export class Atmosphere {
     this.root.addChild(this.doorGlow)
     this.placeExtraDoorGlows(arena, air)
 
-    for (let i = 0; i < A.rayCount; i++) {
-      const r = new Sprite(atlas.light('circle_noise'))
-      r.anchor.set(0.5, 0)
-      r.blendMode = 'add'
-      r.tint = air.rayTint
-      r.position.set(doorX, doorY + 1)
-      this.root.addChild(r)
-      this.rays.push(r)
+    // THE SHAFT, replacing two Kenney `circle_noise` discs — one source out for every source in.
+    // Those were stretched soft radial gradients with continuous alpha and free rotation at an
+    // effective 0.06 x 0.3 x 0.40 = ~0.007: invisible AND §6.1/§10.11/§10.12, sitting in exactly
+    // the layer a real shaft wants. These three sprites are the authored 32x48 wedges.
+    //
+    // BUILT ONCE, HERE, AND ONLY EVER REPOSITIONED. They go in BEFORE the fog and the motes so
+    // dust rides on top of the light rather than under it, and that ordering is the whole reason
+    // the sprites are not rebuilt per room: `addChild` appends, so a rebind that re-created them
+    // would put the beam over the fog it is supposed to sit under, and the Bardo would render one
+    // way on load and another way after a return through the Gate.
+    for (let i = 0; i < 3; i++) {
+      const s = new Sprite(atlas.particle('shaft_0' + (i + 1)))
+      s.anchor.set(SHAFT_ANCHOR_X, 0)
+      s.blendMode = 'add'
+      // The 15-degree lean is baked into the PNG. Rotating a hard-edged sprite resamples it into
+      // exactly the soft edge §6.6 exists to forbid, so this is set once and never touched.
+      s.rotation = 0
+      this.root.addChild(s)
+      this.shafts.push(s)
     }
+    this.placeShafts(arena)
 
     // Dedicated 32px stepped-alpha haze shapes, not the 16px dust puffs: fog is the one effect that
     // must cover a large area, and blowing a 16px puff up to 120px would read as a blocky lozenge.
@@ -110,10 +127,7 @@ export class Atmosphere {
     const doorY = (arena.door.row + 0.85) * TILE
     this.doorGlow.position.set(doorX, doorY)
     this.doorGlow.tint = air.doorGlowTint
-    for (const r of this.rays) {
-      r.position.set(doorX, doorY + 1)
-      r.tint = air.rayTint
-    }
+    this.placeShafts(arena)
     this.placeExtraDoorGlows(arena, air)
     for (let i = 0; i < this.motes.length; i++) {
       const m = this.motes[i]
@@ -156,13 +170,13 @@ export class Atmosphere {
       g.tint = o ? air.doorOpenTint : air.doorGlowTint
     }
 
-    for (let i = 0; i < this.rays.length; i++) {
-      const r = this.rays[i]
-      const sway = Math.sin(this.t * (0.35 + i * 0.12) + i * 1.4) * 0.06
-      r.rotation = (i - 1) * 0.16 + sway
-      r.scale.set(0.42 + i * 0.10, 1.9 + i * 0.28)
-      r.alpha = A.rayAlpha * air.rayAlphaMul * doorFade * (0.40 + i * 0.14) * (0.82 + Math.sin(this.t * 1.5 + i) * 0.18)
-      r.tint = air.rayTint
+    // The beam breathes in four authored steps and never rotates. Its tint is the open door's own
+    // gold, so the light coming through the aperture is the same colour as the crossing it leads to.
+    for (let k = 0; k < this.shafts.length; k++) {
+      const s = this.shafts[k]
+      s.alpha = A.shaftAlpha * this.shaftStrength * SHAFT_FADE[k] * doorFade
+        * quantizeFxAlpha(0.78 + Math.sin(this.t * 0.9 + k) * 0.22, 4)
+      s.tint = air.doorOpenTint
     }
 
     for (let i = 0; i < this.fog.length; i++) {
@@ -189,6 +203,29 @@ export class Atmosphere {
       m.s.scale.set(m.scale / FX_UNIT)
       m.s.alpha = A.moteAlpha * fade * twinkle
       m.s.tint = i % 5 === 0 ? air.moteAccent : air.moteTint
+    }
+  }
+
+  /**
+   * Aim the three wedges at this room's aperture, or hide them in the thirteen rooms that have no
+   * hole in the ceiling. Position and scale only — the sprites themselves live for the lifetime of
+   * the Atmosphere so their place in the child list, under the fog, is fixed.
+   *
+   * They overlap at 0.62 / 1.00 / 1.34 relative width and 1.00 / 0.62 / 0.38 relative alpha, so
+   * the beam has a bright core and two wider veils rather than one flat triangle.
+   */
+  private placeShafts(arena: World['arena']): void {
+    const shaft = arena.shaft
+    this.shaftStrength = shaft?.strength ?? 0
+    for (let i = 0; i < this.shafts.length; i++) {
+      const s = this.shafts[i]
+      s.visible = shaft !== undefined
+      if (!shaft) continue
+      s.position.set(Math.round(shaft.x), Math.round(shaft.y))
+      s.scale.set(
+        (shaft.halfWidth * 2 * SHAFT_SPREAD[i]) / SHAFT_UNIT_W,
+        (shaft.lenTiles * TILE) / SHAFT_UNIT_H,
+      )
     }
   }
 

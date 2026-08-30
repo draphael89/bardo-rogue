@@ -71,7 +71,9 @@ export function stepWorld(world: World, input: InputFrame): void {
 
   updatePlayer(world, playerInput)
   tryPrepareWeapon(world)
-  tryTalkSmith(world)
+  // Town suppresses combat above, but the original light-action edge remains the Smith's
+  // deliberate confirmation verb. Merely walking into his radius can never spend currency.
+  tryTalkSmith(world, input.attack || !!input.confirm)
   tryEnterDoor(world)
   tryCollectOffering(world)
   // The 'claiming' phase falls through to here on purpose: the room is cleared and yours, so the

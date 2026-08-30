@@ -69,31 +69,31 @@ function swingsOver(input: InputSystem, ticks: number, before: (t: number) => vo
 }
 
 describe('attack repeats while held', () => {
-  const chain = (swings: number[]) => swings.every((v, i) => v === i % 3)
+  const quickRhythm = (swings: number[]) => swings.every((v, i) => v === i % 2)
 
-  it('holding the attack key flows the combo at the chain\'s own pace', () => {
+  it('holding the attack key flows the quick two-cut rhythm without a heavy', () => {
     const h = harness()
     const swings = swingsOver(h.input, 150, t => {
       // a real browser sends one keydown per press; the auto-repeats that follow carry repeat=true
       h.win.fire('keydown', key('KeyJ', t > 0))
     })
     expect(swings.length).toBeGreaterThan(1)
-    expect(chain(swings), `chain broke: ${swings}`).toBe(true)
+    expect(quickRhythm(swings), `quick rhythm broke: ${swings}`).toBe(true)
   })
 
-  it('holding the mouse button flows the combo too', () => {
+  it('holding the mouse button flows the quick rhythm too', () => {
     const h = harness()
     const swings = swingsOver(h.input, 150, t => { if (t === 0) h.canvas.fire('mousedown', { button: 0 }) })
     expect(swings.length).toBeGreaterThan(1)
-    expect(chain(swings), `chain broke: ${swings}`).toBe(true)
+    expect(quickRhythm(swings), `quick rhythm broke: ${swings}`).toBe(true)
   })
 
-  it('holding a gamepad attack button flows the combo too', () => {
+  it('holding a gamepad attack button flows the quick rhythm too', () => {
     const pad: FakePad = { axes: [0, 0, 0, 0], buttons: Array.from({ length: 16 }, () => ({ pressed: false })) }
     const h = harness(pad)
     const swings = swingsOver(h.input, 150, t => { pad.buttons[2]!.pressed = t > 0 })
     expect(swings.length).toBeGreaterThan(1)
-    expect(chain(swings), `chain broke: ${swings}`).toBe(true)
+    expect(quickRhythm(swings), `quick rhythm broke: ${swings}`).toBe(true)
   })
 
   it('a tap swings exactly once', () => {

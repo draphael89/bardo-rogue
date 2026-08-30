@@ -140,12 +140,15 @@ export function updatePlayer(world: World, input: InputFrame): void {
       else if (hasIntent(p, p.attackQueuedAt, P.attack.buffer)) beginAttack(world)
     }
     else if (recoveryTick >= 0) {
+      const nextSwing = p.swingIndex + 1
       if (hasIntent(p, p.dodgeQueuedAt, P.dodge.buffer) && recoveryTick >= s.dodgeCancelFrom) startDodge(world)
       // A heavy called for during a light's recovery cuts the chain short and cashes it in now. This
       // is the combo's punctuation: light, light, slam is still there, but so is light-into-slam the
       // moment you read an opening, without spending a swing you no longer want.
       else if (!s.heavy && wantsHeavy(world, p) && recoveryTick >= s.chainFrom + wp) startSwing(world, HEAVY)
-      else if ((hasIntent(p, p.attackQueuedAt, P.attack.buffer) || input.attackHeld) && recoveryTick >= s.chainFrom + wp && p.swingIndex < P.attack.swings.length - 1) startSwing(world, p.swingIndex + 1)
+      // Holding keeps the quick two-cut rhythm, but crossing into the committed heavy needs a fresh
+      // press. The player should never plant their feet for the slowest action by merely holding on.
+      else if ((hasIntent(p, p.attackQueuedAt, P.attack.buffer) || (input.attackHeld && nextSwing < HEAVY)) && recoveryTick >= s.chainFrom + wp && nextSwing < P.attack.swings.length) startSwing(world, nextSwing)
     }
   }
 

@@ -721,9 +721,8 @@ describe('heavy bullet time', () => {
   })
 })
 
-// The heavy is the game's one committed action, and until now it could only be reached by finishing
-// a two-hit chain. As its own verb it has to keep every promise the chain version made — same reach,
-// same feint window — while being available the moment a player reads an opening.
+// The heavy is the game's one committed action. Whether opened directly or reached after two quick
+// cuts, it has to keep the same reach and feint window — and it always needs renewed player intent.
 describe('the heavy as its own verb', () => {
   const HEAVY = tuning.player.attack.swings.length - 1
   const heavyDef = tuning.player.attack.swings[HEAVY]
@@ -743,17 +742,36 @@ describe('the heavy as its own verb', () => {
     expect(tuning.player.attack.swings[w.player.swingIndex].heavy).toBe(true)
   })
 
-  it('keeps the chain intact: light, light, then the slam', () => {
+  it('keeps held light to the quick two-cut rhythm instead of silently committing', () => {
+    const w = world()
+    const swings: number[] = []
+    for (let i = 0; i < 120; i++) {
+      stepWorld(w, { ...emptyInput(), attack: i === 0, attackHeld: true })
+      for (const event of w.events) if (event.type === 'swing') swings.push(event.swing)
+      w.events.length = 0
+    }
+    expect(swings).toContain(1)
+    expect(swings).not.toContain(HEAVY)
+  })
+
+  it('keeps the combo route when a fresh light press asks for the slam', () => {
     const w = world()
     stepWorld(w, { ...emptyInput(), attack: true })
-    expect(w.player.swingIndex).toBe(0)
-    const seen = new Set<number>([0])
-    for (let i = 0; i < 120; i++) {
+    for (let i = 0; i < 120 && w.player.swingIndex === 0; i++) {
       stepWorld(w, { ...emptyInput(), attackHeld: true })
-      seen.add(w.player.swingIndex)
-      if (w.player.swingIndex === HEAVY) break
     }
-    expect([...seen].sort()).toEqual([0, 1, 2])
+    expect(w.player.swingIndex).toBe(1)
+
+    const second = tuning.player.attack.swings[1]
+    const gate = second.startup + second.active + second.chainFrom + second.whiffPenalty
+    for (let i = 0; i < 120 && w.player.stateTick < gate - 3; i++) stepWorld(w, emptyInput())
+    expect(w.player.stateTick).toBeGreaterThanOrEqual(gate - 3)
+    stepWorld(w, { ...emptyInput(), attack: true })
+    expect(w.player.swingIndex).toBe(1)
+    for (let i = 0; i < 120 && w.player.swingIndex === 1; i++) stepWorld(w, emptyInput())
+
+    expect(w.player.swingIndex).toBe(HEAVY)
+    expect(w.player.attackQueuedAt).toBe(-1)
   })
 
   it('cuts a chain short: a heavy called during a light recovery skips the second light', () => {

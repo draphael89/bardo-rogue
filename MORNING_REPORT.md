@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-30
 **Branch:** `codex/bardo-first-sixty-seconds`
-**Recorded proof head before the final report updates:** `8306cc45b172e733a31828b0165c8d9a957f4117`
+**Recorded proof head before the final report updates:** `0213b34b4b0fbdf779f1a0b2b0045c259a9ee22b`
 **Reconciled main:** `2b82d61c9103a34b9abdc535afe165efbad4f630`
 
 The branch now delivers a coherent first minute: the title belongs to the Bardo Gate; DESCEND makes
@@ -46,6 +46,9 @@ its original 16px logical grid.
   rendered frames, closing a stale-wide-frame race exposed by concurrent proof lanes.
 - `8306cc4` — damage-number pop scales now preserve the world parent's counter-scale, completing a
   latent pixel-type finding from the Claude sweep at exact 2× → 1× target-pixel sizes.
+- `0213b34` — the remaining live PR review gaps are closed: descent input is drained before the
+  landing, HUD first-fight state resets with a replacement world, render proof waits use a monotonic
+  counter, Blender is configurable, and dagger/heavy stress clips bind their real timing families.
 
 ## The three inherited polish gaps
 
@@ -81,6 +84,22 @@ sheets, and black tests. Their 1,062 automated gates have zero blocking failures
 mechanical pipeline and equipment envelopes, not the final identity or Look. The evidence mannequin
 does not yet carry the contract's split crest, face slit, or persistent wine/gold identity marks;
 the hard-constraints document records that boundary explicitly.
+
+## Claude and PR review sweep
+
+The finished Claude session has no hidden or uncommitted art layer. Its material causeway, first-fight
+teaching, and Bardo procession commits are all in this branch. A deeper read of its older defect sweep
+found that damage-number creation had been counter-scaled but its update animation restored the raw
+scale; `8306cc4` closes that dormant path with focused tests and a real Pixi runtime probe.
+
+PR #28 carried ten inline review findings across earlier heads. Five were already closed by the current
+evidence/tooling work. `0213b34` closes the other five source paths plus the related dagger timing error:
+input pressed during the 1.45-second descent no longer fires on landing; a replacement world may show
+its own fresh first-fight legend; Blender resolves from `BLENDER`, `PATH`, or the macOS fallback; the
+shot, viewport, and route smokes wait on an uncapped render count; and regenerated dagger specs bind
+`player.attack.swings.0` while heavy remains on `.2`. A 20-second live shot filled the 240-sample timing
+ring and still completed, the full 36-state viewport gate passed, and the browser smoke observed a
+free player after pressing Space during the descent.
 
 ## Attended observations
 
@@ -144,7 +163,7 @@ user-only gates.** No agent or automated play awarded them.
 | Lane | Result |
 |---|---|
 | Typecheck | `pnpm typecheck` green |
-| Full suite | `pnpm test` — 79 files, 916 tests green |
+| Full suite | `pnpm test` — 80 files, 918 tests green |
 | Loop matrices | Exact-current production-input `pnpm matrix` — kite 100/100 resolved, 78 wins; naive 100/100 resolved, 0 wins. The extended exact-current 1–10,000 pass resolves 10,000/10,000 for both policies, with 7,917 skilled wins (79%) and zero mash wins; no seed stranded or returned unresolved across 20,000 attempts |
 | Pinned replay | `slice-kite-loop-s7.json` hash `1142161593`, won |
 | Web package | `pnpm build` green; shipped 2.110 MB vs 4.096 MB budget, 174 files |
@@ -154,11 +173,11 @@ user-only gates.** No agent or automated play awarded them.
 | Realm separation | `pnpm realm-air -- --url http://localhost:5201 --seed N` installs the real seeded route before measuring it and owns every render. Exact repeat pairs are byte-identical for first-gate seed 1 (`ff8533e3…`, median 11.31), Fire Ford seed 31 (`9cb35419…`, 10.61), and Styx Gate seed 10 (`2bc3a662…`, 10.79); zero skipped rooms, browser errors, or temperature violations. No arbitrary pass threshold invented |
 | Regeneration | `pnpm palette`, `pnpm assets`, and `pnpm tiles` deterministic; the 192×288 room sheet and 192×192 prop sheet regenerate byte-identically with no unexplained drift |
 | Shipping sprite gates | 78/3 waived general, 144/2 hero, 144/4 north, 40/1 north roll, 145/2 south, 40/1 south roll; zero blocking |
-| Candidate stress | `pnpm art:stress-hero` green for dagger and heavy; all four regenerated 1×/black-test artifacts byte-identical to committed exhibits; candidate-only, with in-game motion and user Look still open |
+| Candidate stress | `pnpm art:stress-hero` green for dagger and heavy; all four regenerated 1×/black-test artifacts byte-identical to committed exhibits; generated dagger specs bind the light `.0` swing and heavy binds `.2`; candidate-only, with in-game motion and user Look still open |
 | Desktop | Exact current `pnpm desktop:build` and `pnpm smoke:desktop` are green across 23 checks and 6 launches. After correcting the import gate's cross-process observation race, 30 consecutive complete smokes (180 launches) passed with no recurrence |
 | Performance | Exact-current SwiftShader Warden probe: render p50 0.8 ms / p95 1.5 ms / p99 3.8 ms / max 9.4 ms, with the repeated sim hash identical. A separate 240-frame comparison at DPR 1/2/3 kept the exact same sim hash and p95 at 1.5/1.6/1.6 ms; isolated software-renderer maxima rose to 68.9/167.8/326.7 ms and are recorded rather than hidden by the percentiles. The earlier synthetic 32-enemy + 64-projectile render stress measured p50 24–25 ms / p95 31–32 ms with render-only hash unchanged. Pinned replay and dense sim each repeated 100× with stable hashes; stress figures are not a native-GPU or Fun claim |
 | Renderer longevity | One fresh page and persistent Pixi renderer completed 5,000 full production descents (18,313,112 ticks; 4,021 wins / 979 losses), with a real draw after every return and zero browser errors. After the first 1,000-run pool warm-up, forced-GC heap moved only 24.2 → 26.9 MB through run 5,000 instead of reaching the pre-fix 1.23 GB after 200 resets; live Graphics contexts stayed at 15, live texture sources at 69, batch roots at 6, and subtextures at 64. Pixi's dead-key registries compacted in cycles. The lifecycle regression locks explicit child-context teardown and reused offscreen roots |
-| Clean remote proof | A fresh clone of the pushed branch at `8306cc45b172e733a31828b0165c8d9a957f4117` passed frozen install, typecheck, 79/916 tests, build/check-build, palette/assets/tiles regeneration, and finished byte-clean against its remote |
+| Clean remote proof | A fresh clone of the pushed branch at `0213b34b4b0fbdf779f1a0b2b0045c259a9ee22b` passed typecheck, 80/918 tests, build/check-build, dagger/heavy stress generation, the 100-seed matrix, and the pinned replay, then finished byte-clean against its remote. The preceding `cc99ea4` clean-clone pass separately reran palette/assets/tiles regeneration byte-clean |
 | Deterministic visual evidence | `pnpm shot ... --visualMs N` owns every render from before boot and exits nonzero on page/console errors. Three independent exact-current live-bot captures at seed 7 / tick 400 + visual 500 ms are byte-identical, SHA-256 `b9e4fa9db6383cd281cb4d2cf57317af232167a831a4559cdb54a4279b928f3d`; this player-facing exhibit omits the replay diagnostic while the separate pinned-replay lane retains hash truth. Three title boots are byte-identical at `c1318840345230773edac472c8d31e25f78f4ce3b719954c83a85075abfc4bb4`; two independent captures match at each of the four descent phases. The exact replay strip captures all 12 requested frames at ticks 400–433 and repeats at SHA-256 `e8094445c4233d3427d3cb2f21ee32ff783ec03d2b9b4a0638862685c47b2a27`; the pose atlas captures 35/35 requested states. |
 | Viewport boundary evidence | 390×844 title SHA-256 `ed3d89b4a1a7225ce1100589116c275c75575a0593648811d3066cd01fc9b8d1`; 390×844 game `ebcc7c8c21b34bdd12d1ce29f1439aa953f863a8efc15f8d492e6d5659fd3969`; 900×506 title `becb27e095f6a2f2b0e3c4348b3de7344fc90e81e4e510c0d30ecd39855c7446` |
 

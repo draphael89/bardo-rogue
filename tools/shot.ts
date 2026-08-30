@@ -57,7 +57,11 @@ if (visualMs !== null) {
   }`)
 }
 const errors: string[] = []
-page.on('console', m => { if (m.type() === 'error' || m.type() === 'warning') errors.push(`${m.type()}: ${m.text()}`) })
+const warnings: string[] = []
+page.on('console', m => {
+  if (m.type() === 'error') errors.push(`console: ${m.text()}`)
+  else if (m.type() === 'warning') warnings.push(m.text())
+})
 page.on('pageerror', e => errors.push('pageerror: ' + e.message))
 // save=off: a capture must not depend on whether this machine has played before (a persisted
 // reducedEffects would cap flashes and camera movement in every shot). Pass --save on to opt out.
@@ -124,5 +128,6 @@ if (oneX) {
   const info = await sharp(png).metadata()
   if (info.width !== 640 || info.height !== 360) throw new Error(`oneX capture is ${info.width}x${info.height}, expected 640x360`)
 }
-console.log(JSON.stringify({ out, stats, extra, state, errors }, null, 2))
+console.log(JSON.stringify({ out, stats, extra, state, errors, warnings }, null, 2))
 await browser.close()
+if (errors.length) process.exit(2)

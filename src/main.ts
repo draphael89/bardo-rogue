@@ -743,7 +743,9 @@ async function boot() {
     else if (act === 'abandon') giveTheAttemptBack()
     else if (act === 'toggle-still') applyReduced(!reducedEffects)
     // The same host verb F carries; the row mirrors the title's so both settings pages share one order.
-    else if (act === 'fullscreen') void platform.fullscreen()
+    // A gamepad confirm arrives from polling, outside any user activation, and the browser refuses
+    // the request — say so instead of letting the row silently do nothing.
+    else if (act === 'fullscreen') void platform.fullscreen().then(ok => { if (!ok) presenter.hud.showBanner('FULLSCREEN NEEDS A KEY', 'PRESS F', 2.4) })
   }
 
   const answerTitle = (gesture: boolean): void => {
@@ -752,7 +754,8 @@ async function boot() {
     if (act === 'descend') void dismissTitle(gesture)
     else if (act === 'toggle-still') applyReduced(!reducedEffects)
     // The same host verb F carries; the row exists so the control is discoverable from Settings.
-    else if (act === 'fullscreen') void platform.fullscreen()
+    // On a gamepad confirm (no user activation) the browser refuses; the settings foot says why.
+    else if (act === 'fullscreen') void platform.fullscreen().then(ok => { if (!ok) presenter.title.say('FULLSCREEN NEEDS A KEY. PRESS F') })
   }
 
   // A click answers the focused title verb. Registered on the window rather than the canvas so a

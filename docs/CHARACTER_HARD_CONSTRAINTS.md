@@ -150,6 +150,12 @@ Current candidate evidence:
   `art/reference/concepts/bardo-hero-heavy-armor-stress-v1.png`: generated pose/silhouette references
   only. They are neither masters nor proof that the Blender candidates have the same finish.
 
+`pnpm art:stress-hero` now fails if either regenerated 1× sheet or black test differs from those four
+committed exhibits. Both variants currently complete admission steps 1–5, and branch-wide step 7 is
+green. Step 6 (in-game candidate motion amid enemies, FX, and UI) remains open because these variants
+are intentionally not wired into shipping art; step 8 is the user's open Look decision. The gate
+counts therefore prove pipeline stress, not full structural admission or a finished identity.
+
 ## 10. Explicit non-locks
 
 Still open for the user: final identity costume, whether the split crest survives the Look gate,

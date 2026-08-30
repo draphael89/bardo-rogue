@@ -34,7 +34,17 @@ run_variant() {
   if [ "$armor" = "heavy" ]; then prefix="${prefix}_heavy"; fi
   if [ "$weapon" = "dagger" ]; then prefix="${prefix}_dagger"; fi
   node tools/spike/evidence.mjs --compiled "$out/compiled" --out "$out" --prefix "$prefix" --label "$slug"
-  echo "[stress] PASS $slug -> $out/contact-sheet.png + blacktest.png"
+  local committed_contact="docs/pipeline-evidence-$slug-stress.png"
+  local committed_black="docs/pipeline-evidence-$slug-blacktest.png"
+  if ! cmp -s "$out/contact-sheet.png" "$committed_contact"; then
+    echo "[stress] $slug contact sheet drifted from $committed_contact; inspect it and update the exhibit deliberately" >&2
+    return 1
+  fi
+  if ! cmp -s "$out/blacktest.png" "$committed_black"; then
+    echo "[stress] $slug black test drifted from $committed_black; inspect it and update the exhibit deliberately" >&2
+    return 1
+  fi
+  echo "[stress] PASS $slug -> gates green; regenerated evidence matches committed exhibits"
 }
 
 run_variant dagger dagger base

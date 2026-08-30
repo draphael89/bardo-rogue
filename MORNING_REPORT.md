@@ -114,7 +114,7 @@ user-only gates.** No agent or automated play awarded them.
 | Realm separation | `pnpm realm-air -- --url http://localhost:5201` owns every render; three clean-room outputs are byte-identical. Median RGB distance 11.31, closest 2.95, widest 16.91, zero temperature violations; no arbitrary pass threshold invented |
 | Regeneration | `pnpm palette` and `pnpm tiles` deterministic; the 192×288 room sheet and 192×192 prop sheet regenerate byte-identically with no unexplained drift |
 | Shipping sprite gates | 78/3 waived general, 144/2 hero, 144/4 north, 40/1 north roll, 145/2 south, 40/1 south roll; zero blocking |
-| Candidate stress | `pnpm art:stress-hero` green for dagger and heavy; candidate-only |
+| Candidate stress | `pnpm art:stress-hero` green for dagger and heavy; all four regenerated 1×/black-test artifacts byte-identical to committed exhibits; candidate-only, with in-game motion and user Look still open |
 | Desktop | `pnpm desktop:build` green; isolated `pnpm smoke:desktop` green across 23 checks and 6 launches |
 | Deterministic visual evidence | `pnpm shot ... --visualMs N` owns every render from before boot. Five independent pinned-replay captures at tick 400 + visual 500 ms are byte-identical, SHA-256 `abebb71e7b498e456847a8596f3f091e44234df6ca6877cb4841ff5501a78063`; three title boots are byte-identical at `c1318840345230773edac472c8d31e25f78f4ce3b719954c83a85075abfc4bb4`; two independent captures match at each of the four descent phases. |
 | Viewport boundary evidence | 390×844 title SHA-256 `ed3d89b4a1a7225ce1100589116c275c75575a0593648811d3066cd01fc9b8d1`; 390×844 game `ebcc7c8c21b34bdd12d1ce29f1439aa953f863a8efc15f8d492e6d5659fd3969`; 900×506 title `becb27e095f6a2f2b0e3c4348b3de7344fc90e81e4e510c0d30ecd39855c7446` |

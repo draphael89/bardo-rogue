@@ -1,8 +1,8 @@
 # Bardo Rogue — overnight art and first-minute closeout
 
-**Date:** 2026-08-30  
-**Branch:** `codex/bardo-first-sixty-seconds`  
-**Recorded proof head before the final report updates:** `c696f668548174cc77bfb83d80c1919fa04ed058`
+**Date:** 2026-08-30
+**Branch:** `codex/bardo-first-sixty-seconds`
+**Recorded proof head before the final report updates:** `ff0b14b96fb96a7ea4e080027ad6c671b47aeb93`
 **Reconciled main:** `2b82d61c9103a34b9abdc535afe165efbad4f630`
 
 The branch now delivers a coherent first minute: the title belongs to the Bardo Gate; DESCEND makes
@@ -28,6 +28,12 @@ its original 16px logical grid.
 - `455a4e9`, `d2b8904`, `b017a2d`, `f50ccb1` — deterministic realm/room evidence and live resize coverage across every first-minute UI surface.
 - `1a4093d` — dagger/heavy stress regeneration now fails on any drift from its committed evidence.
 - `c696f66` — exact room evidence covers every production layout and the real Styx/Phlegethon nodes.
+- `d9d7bd7` — sparse iron-link and wine-dark heat-seam motifs distinguish the alternate rivers.
+- `694eec1`, `6ff79ed` — room/realm evidence now installs the real seeded route and captures the fresh
+  Bardo before any run can change its first-minute state.
+- `d1bc886` — the tracked first fight is a deterministic player-facing frame, without replay chrome.
+- `ff0b14b` — browser smoke accepts bankless routes while still requiring the toll on every route
+  that actually reaches the Landing.
 
 ## The three inherited polish gaps
 
@@ -88,6 +94,10 @@ At 390×844 and 900×506, the sampled sky values now remain continuous across ev
 the tracked portrait frames preserve the complete title and Bardo rather than clipping either.
 The 390-pixel portrait fit is intact but physically small: it is routing and no-crop proof, not a
 claim of comfortable keyboard play or user acceptance at that width.
+All 91 shipped Ogg files decode successfully. The hottest decoded source peaks belong to creature
+and door cues that the production mapping attenuates before the already-owned SFX/UI buses; the
+announcer files are explicitly excluded from loading. This is source/mix-graph integrity evidence,
+not a listening verdict.
 At Acheron, the lower fight lane now reads as one silt lip over a two-tile water body; the same-solid
 test proves this is geographic dress rather than hidden collision, and its exact exhibit is
 byte-identical across independent boots at SHA-256
@@ -121,7 +131,7 @@ user-only gates.** No agent or automated play awarded them.
 | Loop matrices | `pnpm matrix` — kite 100/100 resolved, 79 wins; naive 100/100 resolved, 0 wins |
 | Pinned replay | `slice-kite-loop-s7.json` hash `1142161593`, won |
 | Web package | `pnpm build` green; shipped 2.110 MB vs 4.096 MB budget, 174 files |
-| Browser smoke | `pnpm smoke -- --url http://localhost:5201 --seed N` green with real keyboard and both endings on Ash March seed 2, Styx Gate seed 10, and Fire Ford seed 31. Toll rendering is required only on routes that actually reach the Landing; early deaths and bankless spines no longer create a false failure |
+| Browser smoke | `pnpm smoke -- --url http://localhost:5201 --seed N` green with real keyboard and both endings on all six production route families: first-gate seed 1, Ash March seed 2, field-fork seed 4, late-shop seed 8, Styx Gate seed 10, and Fire Ford seed 31. Toll rendering is required only on routes that actually reach the Landing; early deaths and bankless spines no longer create a false failure |
 | Viewport transitions | `pnpm smoke:viewport -- --url http://localhost:5201` green through 640×360 → 1400×600 → 390×844 → 1920×700 → 900×506 → 640×360 across title menu/Settings/Credits, game HUD, and pause menu/Settings; target and UI bounds remain contained, tick stays 0 |
 | Room art | `pnpm room:gate` owns every render and is green across the fresh pre-run Bardo plus all 12 production route layouts, including the named Styx and Phlegethon nodes, dimensions, alpha, palette, material spans, negative space, value, highlights, focality, and browser errors; two complete outputs are byte-identical at SHA-256 `4464422c2d45fdd404d0ac49c3d645a6e4c971720c5413750e23a2549a8d4884` |
 | Realm separation | `pnpm realm-air -- --url http://localhost:5201 --seed N` installs the real seeded route before measuring it and owns every render. Exact repeat pairs are byte-identical for first-gate seed 1 (`ff8533e3…`, median 11.31), Fire Ford seed 31 (`9cb35419…`, 10.61), and Styx Gate seed 10 (`2bc3a662…`, 10.79); zero skipped rooms, browser errors, or temperature violations. No arbitrary pass threshold invented |

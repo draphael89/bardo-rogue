@@ -7,6 +7,7 @@ import { SLOW_FULL, type World } from './world'
 import { ARM, grantArm } from './weapons'
 import { Rng, STREAM, streamSeed } from './rng'
 import { buildSliceRooms, installRoute, templateForSeed, type RunMap } from './route'
+import type { ContractId } from './contracts'
 import { tuning } from '@/tuning'
 
 // 'claiming' is the beat between the last body dropping and a god standing on the screen: the room
@@ -91,6 +92,10 @@ export interface RunState {
   boundaryRng: number
   /** One reforging of a boon offer, earned from the Smith. */
   rerolls: number
+  /** The sentence chosen at the first authored fork. */
+  contract: ContractId | null
+  /** Authored rooms whose final wave actually cleared, in clear order. */
+  clearedRoomIds: string[]
 }
 
 export interface MetaStateV1 {
@@ -103,8 +108,22 @@ export interface MetaStateV1 {
   unlockedWeapons: ArmId[]
 }
 
+export interface MetaStateV2 {
+  version: 2
+  attempts: number
+  victories: number
+  remembrances: number
+  rerollUnlocked: boolean
+  vesselUnlocked: boolean
+  unlockedWeapons: ArmId[]
+  pendingSmithUnburied: boolean
+  pendingSmithContract: ContractId | null
+}
+
+export type MetaState = MetaStateV1 | MetaStateV2
+
 export interface GameSessionState {
-  meta: MetaStateV1
+  meta: MetaStateV2
   preparedWeapon: ArmId | null
   run: RunState | null
   /** Remembrances banked by the last finished attempt. Town reads this on the way home. */
@@ -113,12 +132,36 @@ export interface GameSessionState {
   lastMystery: MysteryChoice | null
 }
 
-export function defaultMetaState(): MetaStateV1 {
-  return { version: 1, attempts: 0, victories: 0, remembrances: 0, rerollUnlocked: false, vesselUnlocked: false, unlockedWeapons: ['blade'] }
+export function defaultMetaState(): MetaStateV2 {
+  return {
+    version: 2,
+    attempts: 0,
+    victories: 0,
+    remembrances: 0,
+    rerollUnlocked: false,
+    vesselUnlocked: false,
+    unlockedWeapons: ['blade'],
+    pendingSmithUnburied: false,
+    pendingSmithContract: null,
+  }
+}
+
+export function normalizeMetaState(meta: MetaState = defaultMetaState()): MetaStateV2 {
+  return {
+    version: 2,
+    attempts: Math.max(0, Math.floor(meta.attempts)),
+    victories: Math.max(0, Math.floor(meta.victories)),
+    remembrances: Math.max(0, Math.floor(meta.remembrances)),
+    rerollUnlocked: !!meta.rerollUnlocked,
+    vesselUnlocked: !!meta.vesselUnlocked,
+    unlockedWeapons: meta.unlockedWeapons.includes('blade') ? [...meta.unlockedWeapons] : ['blade', ...meta.unlockedWeapons],
+    pendingSmithUnburied: meta.version === 2 && !!meta.pendingSmithUnburied,
+    pendingSmithContract: meta.version === 2 ? meta.pendingSmithContract : null,
+  }
 }
 
 /** Town and every fresh descent wear the banked cup. The shop cup dies with the attempt. */
-export function townMaxHp(meta: MetaStateV1): number {
+export function townMaxHp(meta: MetaState): number {
   return tuning.player.hp + (meta.vesselUnlocked ? tuning.economy.smith.vesselAmount : 0)
 }
 
@@ -128,24 +171,16 @@ export function applyTownHealth(world: World): void {
   world.player.hp = max
 }
 
-export function smithWaiting(meta: MetaStateV1): boolean {
+export function smithWaiting(meta: MetaState): boolean {
   const s = tuning.economy.smith
   if (!meta.rerollUnlocked) return meta.remembrances >= s.rerollCost
   if (!meta.vesselUnlocked) return meta.remembrances >= s.vesselCost
   return false
 }
 
-export function makeSessionState(meta: MetaStateV1 = defaultMetaState()): GameSessionState {
+export function makeSessionState(meta: MetaState = defaultMetaState()): GameSessionState {
   return {
-    meta: {
-      version: 1,
-      attempts: Math.max(0, Math.floor(meta.attempts)),
-      victories: Math.max(0, Math.floor(meta.victories)),
-      remembrances: Math.max(0, Math.floor(meta.remembrances ?? 0)),
-      rerollUnlocked: !!meta.rerollUnlocked,
-      vesselUnlocked: !!meta.vesselUnlocked,
-      unlockedWeapons: meta.unlockedWeapons.includes('blade') ? [...meta.unlockedWeapons] : ['blade', ...meta.unlockedWeapons],
-    },
+    meta: normalizeMetaState(meta),
     preparedWeapon: null,
     run: null,
     lastBanked: 0,
@@ -169,6 +204,8 @@ export function startRun(world: World, firstRoomId: string): boolean {
   // (replay.ts), so a recorded attempt still reproduces exactly.
   const runSeed = streamSeed(world.seed, STREAM.gameplay ^ Math.imul(attempt, 0x45d9f3b))
   world.session.meta.attempts = attempt
+  world.session.meta.pendingSmithUnburied = false
+  world.session.meta.pendingSmithContract = null
   world.session.lastBanked = 0
   world.session.lastMystery = null
   world.player.hp = world.player.maxHp = townMaxHp(world.session.meta)
@@ -199,6 +236,8 @@ export function startRun(world: World, firstRoomId: string): boolean {
     map: null,
     boundaryRng: 0,
     rerolls: world.session.meta.rerollUnlocked ? 1 : 0,
+    contract: null,
+    clearedRoomIds: [],
   }
   world.rng = new Rng(runSeed)
   world.boonBits = 0
@@ -240,15 +279,30 @@ export function recordRoomEntry(world: World, id: string, via?: DoorMark): void 
   run.roomHistory.push({ id, enteredTick: world.tick, ...(via ? { via } : {}) })
 }
 
+/** Record one authored room only when its final wave clears. Replays and saves preserve the order. */
+export function recordRoomClear(world: World, id: string): boolean {
+  const run = world.session.run
+  if (!run || run.result !== 'active') return false
+  if (world.rooms[world.roomIndex]?.id !== id) return false
+  if (run.clearedRoomIds.includes(id)) return false
+  run.clearedRoomIds.push(id)
+  return true
+}
+
 export function finishRun(world: World, result: Exclude<RunResult, 'active'>): void {
   const run = world.session.run
   if (!run || run.result !== 'active') return
   run.result = result
   if (result === 'won') world.session.meta.victories++
-  const gained = run.depth * tuning.economy.remembrancePerDepth
+  const gained = run.clearedRoomIds.length * tuning.economy.remembrancePerDepth
     + (result === 'won' ? tuning.economy.remembranceOnVictory : 0)
   world.session.meta.remembrances += gained
   world.session.lastBanked = gained
+  if (world.session.lastMystery === 'leave') {
+    world.session.meta.pendingSmithUnburied = true
+    world.session.lastMystery = null
+  }
+  if (run.contract) world.session.meta.pendingSmithContract = run.contract
   world.roomPhase = 'resolved'
   world.phaseTick = world.tick
   world.emit({ type: 'remembrancesBanked', amount: gained, total: world.session.meta.remembrances })

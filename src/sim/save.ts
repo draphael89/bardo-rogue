@@ -11,7 +11,7 @@
 //   - the two pre-envelope browser keys are read (see migrateLegacySave) and never deleted, so
 //     a rollback to an older build still finds a player's attempts and victories where it left them.
 import { parseCheckpoint, normalizeCheckpoint, type RunCheckpoint } from './checkpoint'
-import { defaultMetaState, type MetaStateV1 } from './session'
+import { defaultMetaState, type MetaStateV2 } from './session'
 import { ARM, type ArmId } from './weapons'
 import { defaultSettings, normalizeSettings, type SettingsStateV2 } from './storage'
 
@@ -24,7 +24,9 @@ export type { RunCheckpoint }
 // node-resume payload, and settings grew volume sliders (V2). One version for both on purpose — two
 // builds each stamping 3 for a different document is the one failure the version number exists to
 // prevent, because neither would see the other as 'future' and both would happily overwrite it.
-export const SAVE_SCHEMA_VERSION = 3
+// 4 promotes the two one-shot Smith responses into durable meta (V2), so a reload cannot erase a
+// choice the player has already earned or replay a response the Smith has already consumed.
+export const SAVE_SCHEMA_VERSION = 4
 
 // Diagnostic only: which build wrote this file. Hand-maintained against package.json's version --
 // stamping it from the build would drag Vite into src/sim for a string that never gates a load.
@@ -44,7 +46,7 @@ export interface BardoSave {
   profileId: string
   revision: number
   settings: SettingsStateV2
-  meta: MetaStateV1
+  meta: MetaStateV2
   checkpoint: RunCheckpoint | null
 }
 
@@ -92,7 +94,7 @@ function jsonObject(raw: string | null | undefined): Obj | null {
 }
 
 // Field-level clamping only; shape-level failure is the caller's call. Mirrors storage.ts loadMeta.
-function validateMeta(input: unknown): MetaStateV1 {
+function validateMeta(input: unknown): MetaStateV2 {
   const v = isObj(input) ? input : {}
   const unlockedWeapons: ArmId[] = ['blade']            // makeSessionState() requires the blade present
   const seen = new Set<ArmId>(unlockedWeapons)
@@ -100,13 +102,17 @@ function validateMeta(input: unknown): MetaStateV1 {
     for (const id of v.unlockedWeapons) if (isArmId(id) && !seen.has(id)) { seen.add(id); unlockedWeapons.push(id) }
   }
   return {
-    version: 1,
+    version: 2,
     attempts: count(v.attempts),
     victories: count(v.victories),
     remembrances: count(v.remembrances),
     rerollUnlocked: v.rerollUnlocked === true,
     vesselUnlocked: v.vesselUnlocked === true,
     unlockedWeapons,
+    pendingSmithUnburied: v.pendingSmithUnburied === true,
+    pendingSmithContract: v.pendingSmithContract === 'cut' || v.pendingSmithContract === 'commit'
+      ? v.pendingSmithContract
+      : null,
   }
 }
 // storage.ts owns the shape and the clamping; this file owns only the envelope around it.
@@ -123,7 +129,7 @@ function envelope(
   revision: number,
   contentRevision: string,
   settings: SettingsStateV2,
-  meta: MetaStateV1,
+  meta: MetaStateV2,
   checkpoint: RunCheckpoint | null = null,
 ): BardoSave {
   return {
@@ -157,6 +163,19 @@ const UPGRADES: Record<number, (prev: Obj) => Obj> = {
   // Both halves of 3 are field-level: normalizeSettings defaults the new sliders and parseCheckpoint
   // defaults a missing checkpoint, so the step only advances the version and carries the payload.
   2: prev => ({ ...prev, schemaVersion: 3 }),
+  3: prev => ({
+    ...prev,
+    schemaVersion: 4,
+    meta: {
+      ...(isObj(prev.meta) ? prev.meta : {}),
+      version: 2,
+      pendingSmithUnburied: isObj(prev.meta) && prev.meta.version === 2 && prev.meta.pendingSmithUnburied === true,
+      pendingSmithContract: isObj(prev.meta) && prev.meta.version === 2
+        && (prev.meta.pendingSmithContract === 'cut' || prev.meta.pendingSmithContract === 'commit')
+        ? prev.meta.pendingSmithContract
+        : null,
+    },
+  }),
 }
 
 // Takes an already-parsed value so migrations are testable with plain object fixtures.
@@ -165,6 +184,10 @@ export function migrateSave(input: unknown, opts: ParseSaveOptions = {}): Migrat
   const sv = input.schemaVersion
   if (typeof sv !== 'number' || !Number.isInteger(sv) || sv < 1) return { kind: 'corrupt', reason: 'bad-schema-version' }
   if (sv > SAVE_SCHEMA_VERSION) return { kind: 'future', schemaVersion: sv }
+  // Validate the source generation before an upgrade adds defaults. Otherwise a v3 document with
+  // `meta: 42` would be turned into a clean-looking V2 object and the evidence of damage erased.
+  if (input.meta !== undefined && (!isObj(input.meta) || (input.meta.version !== undefined && input.meta.version !== 1 && input.meta.version !== 2))) return { kind: 'corrupt', reason: 'bad-meta' }
+  if (input.settings !== undefined && (!isObj(input.settings) || (input.settings.version !== undefined && input.settings.version !== 1 && input.settings.version !== 2))) return { kind: 'corrupt', reason: 'bad-settings' }
 
   let obj: Obj = input
   let v = sv
@@ -179,15 +202,21 @@ export function migrateSave(input: unknown, opts: ParseSaveOptions = {}): Migrat
 
   // Present-but-wrong-typed is damage and must not be silently zeroed into a fresh save; on a
   // MIGRATED document, absent is simply a field that version predates.
-  if (obj.meta !== undefined && (!isObj(obj.meta) || (obj.meta.version !== undefined && obj.meta.version !== 1))) return { kind: 'corrupt', reason: 'bad-meta' }
+  if (obj.meta !== undefined && (!isObj(obj.meta) || (obj.meta.version !== undefined && obj.meta.version !== 1 && obj.meta.version !== 2))) return { kind: 'corrupt', reason: 'bad-meta' }
   if (obj.settings !== undefined && (!isObj(obj.settings) || (obj.settings.version !== undefined && obj.settings.version !== 1 && obj.settings.version !== 2))) return { kind: 'corrupt', reason: 'bad-settings' }
-  // A document ALREADY at the current schema must carry the current settings shape. Schema 3 exists
-  // partly to require V2, so a v3 envelope holding v1 settings is a mixed-generation or damaged
+  // A document ALREADY at the current schema must carry the current payload shapes. Schema 3 exists
+  // partly to require V2 settings, and schema 4 requires V2 meta, so a current envelope holding an
+  // older payload is a mixed-generation or damaged
   // file, not a readable one: accepting it would parse 'ok', skip the good backup, and let the next
   // write normalize and rotate the damaged document instead of recovering from it. V1 settings are
   // legitimate only on a document still being migrated UP from schema 1 or 2.
   if (sv === SAVE_SCHEMA_VERSION && isObj(obj.settings) && obj.settings.version !== undefined
     && obj.settings.version !== 2) return { kind: 'corrupt', reason: 'bad-settings' }
+  if (sv === SAVE_SCHEMA_VERSION && isObj(obj.meta) && (
+    obj.meta.version !== 2
+    || typeof obj.meta.pendingSmithUnburied !== 'boolean'
+    || (obj.meta.pendingSmithContract !== null && obj.meta.pendingSmithContract !== 'cut' && obj.meta.pendingSmithContract !== 'commit')
+  )) return { kind: 'corrupt', reason: 'bad-meta' }
 
   // Every ENVELOPE version (2 and up) has always carried both payloads, so a sparse one was never
   // written by us and is damage. Treating it as valid-with-defaults would be worse than corruption --
@@ -195,9 +224,9 @@ export function migrateSave(input: unknown, opts: ParseSaveOptions = {}): Migrat
   // generation away under a document full of zeroes. Only the synthetic v1 keeps the leniency below:
   // a v1 with no settings key is a real settings-less legacy player, not damage.
   if (sv >= 2) {
-    if (obj.meta === undefined) return { kind: 'corrupt', reason: 'missing-meta' }
-    if (obj.settings === undefined) return { kind: 'corrupt', reason: 'missing-settings' }
-  } else if (obj.meta === undefined && obj.settings === undefined) {
+    if (input.meta === undefined) return { kind: 'corrupt', reason: 'missing-meta' }
+    if (input.settings === undefined) return { kind: 'corrupt', reason: 'missing-settings' }
+  } else if (input.meta === undefined && input.settings === undefined) {
     // A pre-current document may legitimately lack ONE of the two (a settings-less legacy player),
     // but never both: migrateLegacySave only ever constructs a v1 around at least one payload, so an
     // empty {"schemaVersion":1} was never written by us -- and migrating it into all-defaults would

@@ -24,6 +24,9 @@ export function updateEnemies(world: World): void {
       case 'warden': updateWarden(world, e); break
       default: { const _n: never = e.kind; void _n }
     }
+    // An attack above may have ended the run. Do not tick a later body's status or AI behind the
+    // terminal event on this same simulation tick, or move the body that caused the verdict.
+    if (world.scenario === 'loop' && world.session.run && world.session.run.result !== 'active') return
     applyEnemyKnockback(world, e)
   }
 }

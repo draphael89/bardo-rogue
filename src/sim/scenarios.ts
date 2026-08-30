@@ -3,7 +3,7 @@ import { World } from './world'
 import { TILE } from './arena'
 import { grantBoon, type BoonId } from './boons'
 import { grantArm, type ArmId } from './weapons'
-import type { MetaStateV1 } from './session'
+import type { MetaState } from './session'
 
 export interface Scenario { waves?: WaveDef[]; spawns?: SpawnDef[]; god?: boolean; boon?: BoonId; arm?: ArmId }
 
@@ -25,7 +25,7 @@ export const SCENARIOS: Record<string, Scenario> = {
   boss: { waves: [{ groups: [{ delay: 0, spawns: [{ kind: 'warden', x: 10, y: 6 }] }] }] },
 }
 
-export function createWorld(seed: number, scenarioName = 'full', opts: { god?: boolean; meta?: MetaStateV1 } = {}): World {
+export function createWorld(seed: number, scenarioName = 'full', opts: { god?: boolean; meta?: MetaState } = {}): World {
   const sc = SCENARIOS[scenarioName] ?? SCENARIOS.full
   const world = new World(seed, scenarioName, opts.meta)
   world.player.god = !!(opts.god ?? sc.god)

@@ -19,7 +19,7 @@ import { decodeReplay, isEncodedReplay, MAX_REPLAY_FRAMES, quantizeFrame, replay
 import { downloadJson, Recorder } from '@/input/recorder'
 import { tuning } from '@/tuning'
 import { Text } from 'pixi.js'
-import { defaultMetaState, type MetaStateV1 } from '@/sim/session'
+import { defaultMetaState, type MetaState } from '@/sim/session'
 import { captureCheckpoint, restoreCheckpoint } from '@/sim/checkpoint'
 import { bumpRevision, defaultSave, serializeSave, parseSave, CONTENT_REVISION, type BardoSave } from '@/sim/save'
 import { detectPlatform, PROFILE_ID } from '@/platform'
@@ -165,7 +165,7 @@ async function boot() {
   // R restarts whatever is currently running (not the URL scenario), so replays and __game.reset() restart correctly
   let cur = { seed, scenario, god }
 
-  const reset = (s = cur.seed, sc = cur.scenario, opts: { god?: boolean; meta?: MetaStateV1 } = { god: cur.god }) => {
+  const reset = (s = cur.seed, sc = cur.scenario, opts: { god?: boolean; meta?: MetaState } = { god: cur.god }) => {
     cur = { seed: s, scenario: sc, god: !!opts.god }
     const suppliedMeta = Object.prototype.hasOwnProperty.call(opts, 'meta')
     // A reset throws the run away, and with it whatever that run bought and never wrote down.
@@ -261,6 +261,7 @@ async function boot() {
     if (world.scenario === 'loop' && world.events.some(ev =>
       ev.type === 'runStarted' || ev.type === 'roomEnter' || ev.type === 'boonChosen' || ev.type === 'riteChosen'
       || ev.type === 'shopBought' || ev.type === 'mysteryChosen' || ev.type === 'rerollUnlocked' || ev.type === 'vesselUnlocked'
+      || (ev.type === 'smithSpoke' && (ev.beat === 'unburied' || ev.beat === 'cut' || ev.beat === 'commit'))
       || ev.type === 'runWon' || ev.type === 'runLost' || ev.type === 'returned'
     )) {
       // An explicit copy: reset() builds a NEW meta object, so holding the live one would leave this

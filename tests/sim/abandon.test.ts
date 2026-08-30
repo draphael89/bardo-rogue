@@ -39,6 +39,7 @@ describe('abandonRun', () => {
     const types = world.events.map(e => e.type)
     expect(types).toContain('runLost')
     expect(types).toContain('returned')
+    expect(types.indexOf('runLost')).toBeLessThan(types.indexOf('returned'))
   })
 
   it('does nothing outside a run', () => {

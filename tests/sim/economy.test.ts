@@ -5,8 +5,9 @@ import { hashWorld } from '@/sim/hash'
 import { emptyInput } from '@/sim/input'
 import { enterRoomById } from '@/sim/rooms'
 import { ensureUtility, pinUtility } from '@/sim/route'
+import { abandonRun } from '@/sim/return'
 import { createWorld } from '@/sim/scenarios'
-import { prepareWeapon, startRun } from '@/sim/session'
+import { finishRun, prepareWeapon, recordRoomClear, startRun } from '@/sim/session'
 import { stepWorld } from '@/sim/step'
 import { tuning } from '@/tuning'
 import { claimShrine } from './claim'
@@ -130,12 +131,33 @@ describe("Charon's stall", () => {
 })
 
 describe('remembrances', () => {
-  it('bank on death and again on victory, and enter the loop hash', () => {
+  it('does not pay for entering a room that was never cleared', () => {
     const lost = beginRun(3)
-    lost.player.hp = 1
-    hurtPlayer(lost, 0, 1)
-    expect(lost.session.meta.remembrances).toBe(lost.session.run!.depth * tuning.economy.remembrancePerDepth)
+    expect(abandonRun(lost)).toBe(true)
+    expect(lost.session.lastBanked).toBe(0)
+    expect(lost.session.meta.remembrances).toBe(0)
     expect(lost.events.some(e => e.type === 'remembrancesBanked')).toBe(true)
+  })
+
+  it('pays once for a full clear, never twice for the same authored room', () => {
+    const lost = beginRun(3)
+    clearAndClaim(lost)
+    expect(lost.session.run!.clearedRoomIds).toEqual([lost.rooms[lost.roomIndex]!.id])
+    expect(recordRoomClear(lost, lost.rooms[lost.roomIndex]!.id)).toBe(false)
+    finishRun(lost, 'lost')
+    expect(lost.session.lastBanked).toBe(tuning.economy.remembrancePerDepth)
+    expect(lost.session.meta.remembrances).toBe(tuning.economy.remembrancePerDepth)
+  })
+
+  it('adds the existing victory bonus to the cleared-room payout', () => {
+    const won = beginRun(3)
+    clearAndClaim(won)
+    finishRun(won, 'won')
+    expect(won.session.lastBanked).toBe(tuning.economy.remembrancePerDepth + tuning.economy.remembranceOnVictory)
+    expect(won.session.meta.pendingSmithContract).toBeNull()
+  })
+
+  it('includes the bank in the loop hash', () => {
 
     const a = createWorld(1, 'loop')
     const b = createWorld(1, 'loop')

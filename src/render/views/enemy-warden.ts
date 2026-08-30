@@ -292,7 +292,7 @@ export function updateWardenView(v: EntityView, e: Enemy, f: EnemyFrame, out: Po
       sx = MASS * (1.35 + blast * 0.15); sy = MASS * (0.74 - blast * 0.08)
       hop = blast * 2
     } else {
-      const recoil = clamp01(1 - (tk % W.fanVolleyGap) / 3)
+      const recoil = clamp01(1 - tk / 3)
       sx = MASS * (1 + 0.20 * recoil); sy = MASS * (1 - 0.16 * recoil)
       rot = -e.facing * (0.30 - 0.16 * r)
     }
@@ -537,7 +537,7 @@ function drawRingTell(g: Graphics, hi: Graphics | null, e: Enemy, x: number, y: 
   const W = tuning.warden
   const q = tellProgress(e, tk)
   const committed = e.state === 'attack' || tk >= wardenWindup(e) - W.commitLead + 1
-  const contract = wardenProjectileContract('ring', e.actionPhase)
+  const contract = wardenProjectileContract('ring')
   octagon(g, x, y, Math.round(10 + q * 8), MINOS.dark, 0.72, false)
   for (let i = 0; i < contract.count; i++) {
     const a = wardenProjectileAngle(contract, e.aimAngle, e.patternCursor, i)
@@ -552,18 +552,14 @@ function drawFanTell(g: Graphics, hi: Graphics | null, e: Enemy, x: number, y: n
   const W = tuning.warden
   const q = tellProgress(e, tk)
   const committed = e.state === 'attack' || tk >= wardenWindup(e) - W.commitLead + 1
-  const contract = wardenProjectileContract('fan', e.actionPhase)
-  for (let volley = 0; volley < contract.volleys; volley++) {
-    const released = e.state === 'attack' && e.patternStep > volley
-    const reveal = volley === 0 ? q : clamp01((q - 0.34) / 0.66)
-    const returnLane = volley > 0
-    const laneCommitted = committed && !released
-    const laneAlpha = released ? 0.18 : returnLane ? 0.66 : committed ? 0.92 : 0.62
-    for (let i = 0; i < contract.count; i++) {
-      const a = wardenProjectileAngle(contract, e.aimAngle, e.patternCursor, i, volley)
-      threatLane(g, hi, arena, e, x, y, foot, a, contract, reveal, laneCommitted,
-        returnLane ? MINOS.veil : committed ? MINOS.fanHot : MINOS.fan, laneAlpha, returnLane)
-    }
+  const contract = wardenProjectileContract('fan')
+  const released = e.state === 'attack' && e.patternStep > 0
+  const laneCommitted = committed && !released
+  const laneAlpha = released ? 0.18 : committed ? 0.92 : 0.62
+  for (let i = 0; i < contract.count; i++) {
+    const a = wardenProjectileAngle(contract, e.aimAngle, e.patternCursor, i)
+    threatLane(g, hi, arena, e, x, y, foot, a, contract, q, laneCommitted,
+      committed ? MINOS.fanHot : MINOS.fan, laneAlpha)
   }
   octagon(g, x, y, Math.round(7 + q * 4), MINOS.dark, 0.75, false)
 }

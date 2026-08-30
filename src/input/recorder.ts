@@ -1,6 +1,6 @@
 import type { InputFrame } from '@/sim/input'
 import { MAX_REPLAY_FRAMES, replayToJson, type Replay } from '@/sim/replay'
-import type { MetaStateV1 } from '@/sim/session'
+import type { MetaState } from '@/sim/session'
 
 // Captures every frame the sim consumes while recording. Starting a recording must coincide with a fresh
 // world (main.ts resets first), otherwise the replay would begin from state it cannot reproduce.
@@ -10,9 +10,9 @@ export class Recorder {
   frames: InputFrame[] = []
   last: Replay | null = null
   private seed = 0; private scenario = ''; private god = false
-  private meta: MetaStateV1 | undefined
+  private meta: MetaState | undefined
 
-  start(seed: number, scenario: string, god: boolean, meta?: MetaStateV1): void {
+  start(seed: number, scenario: string, god: boolean, meta?: MetaState): void {
     this.seed = seed; this.scenario = scenario; this.god = god
     this.meta = meta ? { ...meta, unlockedWeapons: [...meta.unlockedWeapons] } : undefined
     this.frames = []

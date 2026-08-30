@@ -1,4 +1,4 @@
-import { defaultMetaState, type MetaStateV1 } from './session'
+import type { MetaState, MetaStateV1 } from './session'
 
 export const META_KEY = 'bardo-rogue.meta.v1'
 export const SETTINGS_KEY = 'bardo-rogue.settings.v1'
@@ -64,13 +64,25 @@ export function normalizeSettings(
 }
 
 
+function defaultLegacyMeta(): MetaStateV1 {
+  return {
+    version: 1,
+    attempts: 0,
+    victories: 0,
+    remembrances: 0,
+    rerollUnlocked: false,
+    vesselUnlocked: false,
+    unlockedWeapons: ['blade'],
+  }
+}
+
 export function loadMeta(storage?: StorageLike): MetaStateV1 {
-  if (!storage) return defaultMetaState()
+  if (!storage) return defaultLegacyMeta()
   try {
     const raw = storage.getItem(META_KEY)
-    if (!raw) return defaultMetaState()
+    if (!raw) return defaultLegacyMeta()
     const value = JSON.parse(raw) as Partial<MetaStateV1>
-    if (value.version !== 1) return defaultMetaState()
+    if (value.version !== 1) return defaultLegacyMeta()
     return {
       version: 1,
       attempts: Number.isFinite(value.attempts) ? Math.max(0, Math.floor(value.attempts!)) : 0,
@@ -82,11 +94,11 @@ export function loadMeta(storage?: StorageLike): MetaStateV1 {
       unlockedWeapons: ['blade'],
     }
   } catch {
-    return defaultMetaState()
+    return defaultLegacyMeta()
   }
 }
 
-export function saveMeta(meta: MetaStateV1, storage?: StorageLike): boolean {
+export function saveMeta(meta: MetaState, storage?: StorageLike): boolean {
   if (!storage) return false
   try {
     storage.setItem(META_KEY, JSON.stringify({

@@ -89,46 +89,16 @@ describe('first-gate route', () => {
     expect(world.rooms[0]).toBe(hub)
     pinUtility(world, 'shop')
     const template = templateForSeed(world.session.run!.seed)
-    expect(world.session.run?.map?.template).toBe(template.id)
-    expect(world.session.run?.map?.nodes.map(n => n.id)).toEqual(template.nodes.map(n => n.id))
-    if (template.id === FIRST_GATE.id) {
-      const live = world.rooms.map(r => ({
-        ...graphNode(r),
-        layout: r.id === 'antechamber' ? 'antechamber' : r.id === 'warden' ? 'minos' : r.layout,
-      }))
-      expect(live).toEqual(sliceGraph.map(graphNode))
-      expect(['antechamber', 'oath-court']).toContain(world.rooms.find(r => r.id === 'antechamber')!.layout)
-      expect(['minos', 'minos-east']).toContain(world.rooms.find(r => r.id === 'warden')!.layout)
-    } else if (template.id === LATE_SHOP.id) {
-      expect(world.rooms.find(r => r.id === 'veil-path')!.exits![0]!.to).toBe('cocytus')
-      expect(world.rooms.find(r => r.id === 'cocytus')!.exits![0]!.to).toBe('black-step')
-      expect(world.rooms.find(r => r.id === 'black-step')!.exits![0]!.to).toBe('antechamber')
-    } else if (template.id === FIRE_FORD.id) {
-      expect(world.rooms.find(r => r.id === 'black-step')!.exits![0]!.to).toBe('phlegethon')
-      expect(world.rooms.find(r => r.id === 'phlegethon')!.exits![0]!.to).toBe('antechamber')
-      expect(world.rooms.find(r => r.id === 'cocytus')).toBeUndefined()
-    } else if (template.id === STYX_GATE.id) {
-      expect(world.rooms.find(r => r.id === 'threshold')).toBeUndefined()
-      expect(world.rooms.find(r => r.id === 'styx')!.exits).toEqual([
-        { dir: 'north', to: 'veil-path', mark: 'veil' },
-        { dir: 'east', to: 'blade-path', mark: 'blade' },
-      ])
-      expect(world.session.run?.roomId).toBe('styx')
-    } else if (template.id === ASH_MARCH.id) {
-      expect(world.rooms.find(r => r.id === 'black-step')).toBeUndefined()
-      expect(world.rooms.find(r => r.id === 'phlegethon')!.exits![0]!.to).toBe('cocytus')
-      expect(world.rooms.find(r => r.id === 'cocytus')!.exits![0]!.to).toBe('antechamber')
-    } else {
-      expect(world.rooms.find(r => r.id === 'threshold')!.exits).toEqual([
-        { dir: 'north', to: 'blade-path', mark: 'blade' },
-      ])
-      expect(world.rooms.find(r => r.id === 'blade-path')!.exits).toEqual([
-        { dir: 'north', to: 'veil-path', mark: 'veil' },
-        { dir: 'east', to: 'cocytus', mark: 'hard' },
-      ])
-      expect(world.rooms.find(r => r.id === 'veil-path')!.exits![0]!.to).toBe('black-step')
-      expect(world.rooms.find(r => r.id === 'cocytus')!.exits![0]!.to).toBe('black-step')
-    }
+    expect(template).toBe(FIRST_GATE)
+    expect(world.session.run?.map?.template).toBe(FIRST_GATE.id)
+    expect(world.session.run?.map?.nodes.map(n => n.id)).toEqual(FIRST_GATE.nodes.map(n => n.id))
+    const live = world.rooms.map(r => ({
+      ...graphNode(r),
+      layout: r.id === 'antechamber' ? 'antechamber' : r.id === 'warden' ? 'minos' : r.layout,
+    }))
+    expect(live).toEqual(sliceGraph.map(graphNode))
+    expect(['antechamber', 'oath-court']).toContain(world.rooms.find(r => r.id === 'antechamber')!.layout)
+    expect(['minos', 'minos-east']).toContain(world.rooms.find(r => r.id === 'warden')!.layout)
   })
 
   it('restores the authored fixture when the attempt returns to town', () => {
@@ -229,10 +199,10 @@ describe('first-gate route', () => {
 
   it('the exits strip is the plan, not a second title of this floor', () => {
     const rooms = buildSliceRooms(FIRST_GATE, { fixed: true })
-    const plan = mapPlan(rooms, 'threshold')
-    expect(plan.doors.map(d => ({ mark: d.markLabel, dest: d.dest }))).toEqual([
-      { mark: 'VEIL', dest: 'LETHE CISTERN' },
-      { mark: 'BLADE', dest: 'FIELD OF ASPHODEL' },
+    const plan = mapPlan(rooms, 'threshold', true)
+    expect(plan.doors.map(d => ({ mark: d.markLabel, dest: d.dest, detail: d.detail }))).toEqual([
+      { mark: 'CUT', dest: 'LETHE CISTERN', detail: 'BOLTS · HECATE · MINOS: VEIL' },
+      { mark: 'COMMIT', dest: 'FIELD OF ASPHODEL', detail: 'GUARD · KINDLY ONE · MINOS: CIRCLE' },
     ])
     expect(plan.then).toBe('LANDING · COCYTUS · OATH · MINOS')
     expect(JSON.stringify(plan)).not.toMatch(/ACHERON/)
@@ -254,6 +224,8 @@ describe('first-gate route', () => {
     expect(rooms.find(r => r.id === 'black-step')!.exits).toEqual([
       { dir: 'north', to: 'antechamber', mark: 'elite' },
     ])
+    expect(mapPlan(rooms, 'threshold').doors.every(door => door.detail === undefined)).toBe(true)
+    expect(mapPlan(rooms, 'threshold').doors.map(door => door.markLabel)).toEqual(['VEIL', 'BLADE'])
   })
 
   it('flood-fills the field-fork spine and omits Lethe or the Reach', () => {
@@ -272,6 +244,8 @@ describe('first-gate route', () => {
     const east = rooms.find(r => r.id === 'cocytus')!
     expect(north.exits![0]!.to).toBe('black-step')
     expect(east.exits![0]!.to).toBe('black-step')
+    expect(mapPlan(rooms, 'blade-path').doors[0]).toMatchObject({ markLabel: 'VEIL' })
+    expect(mapPlan(rooms, 'blade-path').doors[0]?.detail).toBeUndefined()
   })
 
   it('flood-fills the fire-ford spine and names Phlegethon after the landing', () => {
@@ -326,9 +300,8 @@ describe('first-gate route', () => {
     ])
   })
 
-  it('assigns all six spines across live descents', () => {
+  it('keeps every live descent on the one authored first-gate spine', () => {
     const seen = new Set<string>()
-    let flipped = false
     for (let seed = 1; seed <= 48; seed++) {
       const world = createWorld(seed, 'loop')
       prepareWeapon(world, 'blade')
@@ -341,15 +314,8 @@ describe('first-gate route', () => {
       startRun(world, 'threshold')
       const second = world.session.run!.map!.template
       seen.add(second)
-      if (first !== second) flipped = true
     }
-    expect(seen.has(FIRST_GATE.id)).toBe(true)
-    expect(seen.has(LATE_SHOP.id)).toBe(true)
-    expect(seen.has(FIELD_FORK.id)).toBe(true)
-    expect(seen.has(FIRE_FORD.id)).toBe(true)
-    expect(seen.has(STYX_GATE.id)).toBe(true)
-    expect(seen.has(ASH_MARCH.id)).toBe(true)
-    expect(flipped).toBe(true)
+    expect([...seen]).toEqual([FIRST_GATE.id])
   })
 
   it('keeps catalog layouts on a fixed fill and dresses combat rooms live', () => {
@@ -379,7 +345,7 @@ describe('first-gate route', () => {
       fireSeen.add(river.layout)
     }
     expect(seen.get('threshold')!.size).toBeGreaterThanOrEqual(2)
-    expect(seen.get('cocytus')!.size).toBeGreaterThanOrEqual(2)
+    expect(seen.get('cocytus')).toEqual(new Set(['cocytus']))
     expect(seen.get('cocytus')!.has('asphodel')).toBe(false)
     expect(seen.get('antechamber')!.size).toBeGreaterThanOrEqual(2)
     expect(seen.get('antechamber')!.has('antechamber')).toBe(true)
@@ -390,7 +356,7 @@ describe('first-gate route', () => {
     expect(seen.get('warden')!.has('minos-east')).toBe(true)
     expect(seen.get('warden')!.has('asphodel')).toBe(false)
     expect(seen.get('veil-path')!.size).toBeGreaterThanOrEqual(2)
-    expect(fireSeen.size).toBeGreaterThanOrEqual(2)
+    expect(fireSeen).toEqual(new Set(['phlegethon']))
     expect(fireSeen.has('asphodel')).toBe(false)
     const styxSeen = new Set<string>()
     for (let seed = 1; seed <= 64; seed++) {
@@ -399,9 +365,7 @@ describe('first-gate route', () => {
       expect(arenaKind(gate.layout)).toBe(gate.kind)
       styxSeen.add(gate.layout)
     }
-    expect(styxSeen.has('styx')).toBe(true)
-    expect(styxSeen.has('threshold')).toBe(false)
-    expect(styxSeen.size).toBeGreaterThanOrEqual(2)
+    expect(styxSeen).toEqual(new Set(['styx']))
     expect(utility.has('shop')).toBe(true)
     expect(utility.has('mystery')).toBe(true)
     expect(roomsFor('loop')).toBe(sliceGraph)

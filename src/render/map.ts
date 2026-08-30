@@ -1,6 +1,6 @@
 import { Container, Graphics, Text } from 'pixi.js'
 import type { DoorMark } from '@/sim/arena'
-import { mapPlan, type MapPlan } from '@/sim/route'
+import { FIRST_GATE, mapPlan, type MapPlan } from '@/sim/route'
 import type { World } from '@/sim/world'
 import { tuning } from '@/tuning'
 import { fadeToBlack, label, placeLeft, typeBehindPlate, P } from './ui'
@@ -67,8 +67,8 @@ export class RouteMap {
     this.root.visible = show
     if (!show) return
     const path = run.roomHistory.map(v => v.id).join('>')
-    const plan = mapPlan(world.rooms, room.id)
-    const next = plan.doors.map(d => `${d.mark}:${d.dest}`).join('|')
+    const plan = mapPlan(world.rooms, room.id, run.map?.template === FIRST_GATE.id)
+    const next = plan.doors.map(d => `${d.mark}:${d.dest}:${d.detail ?? ''}`).join('|')
     const nextKey = `${tuning.view.width}|${path}|${next}|${plan.then ?? ''}`
     if (nextKey !== this.key) {
       this.key = nextKey
@@ -87,10 +87,11 @@ export class RouteMap {
     this.clear()
     const W = tuning.view.width
     const rowH = 14
+    const contractRowH = 25
     const pad = 8
     const nameX = 52          // the second column, measured from the plate's left edge
-    const rows = plan.doors.length + (plan.then ? 1 : 0)
-    const boxH = pad * 2 + rows * rowH
+    const doorHeights = plan.doors.map(ex => ex.detail ? contractRowH : rowH)
+    const boxH = pad * 2 + doorHeights.reduce((sum, h) => sum + h, 0) + (plan.then ? rowH : 0)
     const boxY = 82
 
     // Build the type first and let it decide the plate's width. It used to be a flat 280 — which was
@@ -98,10 +99,12 @@ export class RouteMap {
     // moment the plate was made to read at all. A panel earns exactly the room its longest row needs.
     const marks = plan.doors.map(ex => label(ex.markLabel, 'meta', markColor(ex.mark)))
     const names = plan.doors.map(ex => label(ex.dest, 'meta', P.bone))
+    const details = plan.doors.map(ex => ex.detail ? label(ex.detail, 'meta', P.dim) : null)
     const then = plan.then ? label(plan.then, 'meta', P.dim) : null
     const widest = Math.max(
       ...names.map(t => nameX + Math.round(t.width)),
       ...marks.map(t => 10 + Math.round(t.width)),
+      ...details.map(t => t ? 10 + Math.round(t.width) : 0),
       then ? 10 + Math.round(then.width) : 0,
     )
     const boxW = Math.min(W - 16, widest + 12)
@@ -113,17 +116,24 @@ export class RouteMap {
     this.g.roundRect(boxX, boxY, boxW, boxH, 2).fill({ color: P.face, alpha: 0.9 })
     this.g.rect(boxX, boxY, 2, boxH).fill({ color: P.gold })
 
-    plan.doors.forEach((_ex, i) => {
-      const y = boxY + pad + rowH * i + rowH / 2
+    let rowY = boxY + pad
+    plan.doors.forEach((ex, i) => {
+      const y = rowY + rowH / 2
       // The doors already face the room. NORTH / EAST on this strip was a compass sitting on the plan.
       placeLeft(marks[i], boxX + 10, y)
       this.add(marks[i])
       placeLeft(names[i], boxX + nameX, y)
       this.add(names[i])
+      const detail = details[i]
+      if (detail && ex.detail) {
+        placeLeft(detail, boxX + 10, y + 11)
+        this.add(detail)
+      }
+      rowY += doorHeights[i] ?? rowH
     })
 
     if (then) {
-      const y = boxY + pad + rowH * plan.doors.length + rowH / 2
+      const y = rowY + rowH / 2
       placeLeft(then, boxX + 10, y)
       this.add(then)
     }

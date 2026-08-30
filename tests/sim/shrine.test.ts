@@ -19,8 +19,7 @@ function inRoom(id: string, seed = 3, utility: 'shop' | 'mystery' = 'shop'): W {
   const world = createWorld(seed, 'loop')
   prepareWeapon(world, 'blade')
   startRun(world, 'threshold')
-  // The attempt seed picks one of six spines and not all of them contain every authored room, so
-  // the fixed first-gate fill is installed rather than hoped for.
+  // Pin the fixed fill so this helper's room and utility assumptions do not depend on live dress.
   installRoute(world, buildSliceRooms(FIRST_GATE, FIXED_ROUTE), FIRST_GATE)
   pinUtility(world, utility)
   enterRoomById(world, id)

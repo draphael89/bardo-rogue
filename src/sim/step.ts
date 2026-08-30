@@ -20,12 +20,45 @@ import { updateReward } from './rewards'
 import { updateRite } from './rites'
 import { tuning } from '@/tuning'
 
+function loopResolved(world: World): boolean {
+  return world.scenario === 'loop' && !!world.session.run && world.session.run.result !== 'active'
+}
+
+function collapseInterpolation(world: World): void {
+  const p = world.player
+  p.px = p.x; p.py = p.y
+  for (const e of world.enemies) if (e.active) { e.px = e.x; e.py = e.y }
+  for (const b of world.projectiles) if (b.active) { b.px = b.x; b.py = b.y }
+}
+
+function stopResolvedTick(world: World): boolean {
+  if (!loopResolved(world)) return false
+  collapseInterpolation(world)
+  return true
+}
+
 // One deterministic tick. Presentation must never call anything else on the sim.
 export function stepWorld(world: World, input: InputFrame): void {
   world.tick++
   if (input.restart || (input.confirm && canReturn(world))) {
-    if (canReturn(world)) returnToHub(world)
+    if (canReturn(world)) {
+      returnToHub(world)
+      // Returning rebuilds the Bardo and resets the body. Do not let the input that dismissed the
+      // terminal card become the first town tick too: that would age control state and could trigger
+      // a nearby interaction in the freshly entered room.
+      return
+    }
     else if (world.scenario !== 'loop') world.wantsRestart = true
+  }
+
+  // A resolved loop attempt is a presentation state. Its clock continues so the terminal card can
+  // stage itself, but nothing in the abandoned combat is allowed another update: statuses used to
+  // keep burning enemies here and could kill the Warden several ticks after runLost was emitted.
+  if (loopResolved(world)) {
+    collapseInterpolation(world)
+    if (world.freeze > 0) world.freeze--
+    else if (world.slowmoTicks > 0 && --world.slowmoTicks === 0) world.timeScale = 1
+    return
   }
 
   // snapshot previous positions for render interpolation. Enemies and projectiles are snapshotted
@@ -71,7 +104,9 @@ export function stepWorld(world: World, input: InputFrame): void {
 
   updatePlayer(world, playerInput)
   tryPrepareWeapon(world)
-  tryTalkSmith(world)
+  // Town suppresses combat above, but the original light-action edge remains the Smith's
+  // deliberate confirmation verb. Merely walking into his radius can never spend currency.
+  tryTalkSmith(world, input.attack || !!input.confirm)
   tryEnterDoor(world)
   tryCollectOffering(world)
   // The 'claiming' phase falls through to here on purpose: the room is cleared and yours, so the
@@ -88,10 +123,13 @@ export function stepWorld(world: World, input: InputFrame): void {
     for (const e of world.enemies) if (e.active) { e.px = e.x; e.py = e.y }
     for (const b of world.projectiles) if (b.active) { b.px = b.x; b.py = b.y }
     updateEnemies(world)
+    if (stopResolvedTick(world)) return
     updateProjectiles(world)
+    if (stopResolvedTick(world)) return
   }
   updateSpawnQueue(world)
   updateWaves(world)
+  if (stopResolvedTick(world)) return
   resolveOverlaps(world, worldMoves)
   if (world.player.dodgeProcTick === world.tick) triggerPerfectDodge(world)
 }

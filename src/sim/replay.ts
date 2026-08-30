@@ -1,19 +1,21 @@
 // Input recording + replay. Pure: a replay is its initial session snapshot plus input frames, and
-// replaying those frames is fully deterministic.
+// replaying those frames is fully deterministic within the same content revision. V1 is a
+// regression artifact, not a cross-version save; HARNESS.md requires re-recording after intended
+// sim/content changes and the fixture hashes make that drift explicit.
 import { createWorld } from './scenarios'
 import { stepWorld } from './step'
 import { hashWorld } from './hash'
 import { Metrics } from './metrics'
 import type { InputFrame } from './input'
 import type { World } from './world'
-import { defaultMetaState, type MetaStateV1 } from './session'
+import { defaultMetaState, type MetaState, type MetaStateV1, type MetaStateV2 } from './session'
 
-export interface Replay { v: 1; seed: number; scenario: string; god?: boolean; meta?: MetaStateV1; frames: InputFrame[] }
+export interface Replay { v: 1; seed: number; scenario: string; god?: boolean; meta?: MetaState; frames: InputFrame[] }
 
 // On-disk form. Each run is [moveX, moveY, aimX, aimY, flags, count]: axes are ints scaled by Q,
 // flags is a bitmask (see FLAG), count is how many consecutive ticks used that exact frame.
 export type EncodedRun = [number, number, number, number, number, number]
-export interface EncodedReplay { v: 1; seed: number; scenario: string; god?: boolean; meta?: MetaStateV1; runs: EncodedRun[] }
+export interface EncodedReplay { v: 1; seed: number; scenario: string; god?: boolean; meta?: MetaState; runs: EncodedRun[] }
 
 export const Q = 10000
 export const MAX_REPLAY_FRAMES = 1_000_000
@@ -74,18 +76,41 @@ function assertInputFrame(value: unknown, index: number): asserts value is RawIn
   }
 }
 
-function copyMeta(meta: MetaStateV1): MetaStateV1 {
-  if (meta.version !== 1) return defaultMetaState()
-  return {
-    version: 1,
-    attempts: Number.isFinite(meta.attempts) ? Math.max(0, Math.floor(meta.attempts)) : 0,
-    victories: Number.isFinite(meta.victories) ? Math.max(0, Math.floor(meta.victories)) : 0,
-    remembrances: Number.isFinite(meta.remembrances) ? Math.max(0, Math.floor(meta.remembrances)) : 0,
+function copyMeta(input: unknown): MetaState {
+  const meta = typeof input === 'object' && input !== null && !Array.isArray(input)
+    ? input as Record<string, unknown>
+    : {}
+  const common = {
+    attempts: Number.isFinite(meta.attempts) ? Math.max(0, Math.floor(meta.attempts as number)) : 0,
+    victories: Number.isFinite(meta.victories) ? Math.max(0, Math.floor(meta.victories as number)) : 0,
+    remembrances: Number.isFinite(meta.remembrances) ? Math.max(0, Math.floor(meta.remembrances as number)) : 0,
     rerollUnlocked: !!meta.rerollUnlocked,
     vesselUnlocked: !!meta.vesselUnlocked,
-    // Blade is the only valid production weapon in v1; unknown replay ids never enter the sim.
-    unlockedWeapons: ['blade'],
+    // Blade is the only valid production weapon; unknown replay ids never enter the sim.
+    unlockedWeapons: ['blade'] as const,
   }
+  if (meta.version === 1) return {
+    version: 1,
+    ...common,
+    unlockedWeapons: [...common.unlockedWeapons],
+  } satisfies MetaStateV1
+  if (meta.version === 2) return {
+    version: 2,
+    ...common,
+    unlockedWeapons: [...common.unlockedWeapons],
+    pendingSmithUnburied: meta.pendingSmithUnburied === true,
+    pendingSmithContract: meta.pendingSmithContract === 'cut' || meta.pendingSmithContract === 'commit'
+      ? meta.pendingSmithContract
+      : null,
+  } satisfies MetaStateV2
+  return defaultMetaState()
+}
+
+function decodeMeta(input: unknown): MetaState {
+  if (typeof input !== 'object' || input === null || Array.isArray(input)) throw new Error('replay meta must be an object')
+  const version = (input as Record<string, unknown>).version
+  if (version !== 1 && version !== 2) throw new Error(`unsupported replay meta version ${String(version)}`)
+  return copyMeta(input)
 }
 
 // Encoding rounds axes to 1/Q. Recorders feed the sim quantized frames so encode(decode()) is lossless.
@@ -129,7 +154,7 @@ export function decodeReplay(e: EncodedReplay): Replay {
   }
   const out: Replay = { v: 1, seed: e.seed, scenario: e.scenario, frames }
   if (e.god) out.god = true
-  if (e.meta) out.meta = copyMeta(e.meta)
+  if (e.meta) out.meta = decodeMeta(e.meta)
   return out
 }
 
@@ -155,7 +180,10 @@ export function replayFromJson(json: string): Replay {
     assertInputFrame(frame, index)
     return { ...frame, attackHeld: frame.attackHeld ?? false, heavy: frame.heavy ?? false }
   })
-  return { ...obj, frames } as Replay
+  const out: Replay = { v: 1, seed: raw.seed as number, scenario: raw.scenario as string, frames }
+  if (raw.god === true) out.god = true
+  if (raw.meta !== undefined) out.meta = decodeMeta(raw.meta)
+  return out
 }
 
 // Fresh world from the replay header, then one frame per tick. A restart frame rebuilds the world and

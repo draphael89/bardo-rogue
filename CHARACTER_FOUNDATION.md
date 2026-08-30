@@ -128,15 +128,31 @@ candidates with radically different weapons and armor before locking.
 The final test: **if we build hundreds of animations, dozens of weapons, and many armor sets on this
 foundation, will we be grateful we chose it?**
 
-## Exploration phase (open)
+## Exploration phase — two of three locks in
 
-1. **Mannequin directions:** several substantially different base-body proportion/posture
-   candidates, presented naked, at concept scale AND true gameplay scale, in idle / run / combat
-   silhouettes — judged by §1–§2, not by costume.
-2. **Pipeline investigation:** costed options for the single-source-of-truth workflow (3D-rendered
-   mannequin, socket-composited 2D layering over the existing sidecar/socket infrastructure,
-   skeleton-driven 2D tooling, or hybrids), with a recommendation and a small proof.
-3. **Stress tests:** the top mannequins carry a greatsword, a dagger, and heavy armor as silhouette
-   blocks before any final choice.
-4. The user locks the mannequin, the hard-constraints spec, and the pipeline — then, and only then,
-   identity art resumes.
+1. **Mannequin: LOCKED (2026-08-30) — the Veteran.** Four directions were generated naked and
+   judged at 1× (Sentinel, Veteran, Grounded, Wraith-light; sheets in
+   `.art-cache/candidates/mannequin-v1/`, D2's cells preserved in `art/reference/mannequin/`).
+   The user chose the Veteran: its identity is posture, not shape — the shoulder slope and lean
+   survive every equipment tier — and it matches the fiction ("you fell in wars that were never
+   yours"). The Wraith-light body is noted as a future enemy-family direction.
+
+   **The canonical recipe** (standing idle, 64×64 canvas, feet row 60 — the rig is built to
+   these numbers):
+   - Standing height **37 px**; heads ≈ **2.8** (head ≈ 13 px).
+   - Shoulder line **heavily sloped**, drooping, width ≈ **15 px**; head set low and forward.
+   - Stance width ≈ **10 px**, flat-footed.
+   - Torso: thick barrel trunk, **forward lean ≈ 10°** from vertical.
+   - Center of gravity ≈ **0.48** of height. Arms hang heavy, slightly forward.
+   - Pose height factors: idle 1.00, run 0.96, combat 0.90 (compression IS the pose; never
+     normalize pose heights).
+2. **Pipeline: LOCKED (2026-08-30) — Option A**, a rigged Blender mannequin as the single source
+   of truth feeding the existing compile→gates→approve machinery, with pivots/anchors/sockets
+   computed from bones (evidence and costing: `docs/CHARACTER_PIPELINE_OPTIONS.md`). The proof
+   spike (idle + run + greatsword arc, three facings, timed proportion-change finale) is the
+   standing verification; PixelLab and gpt-image remain accelerator/set-piece tiers.
+3. **Stress tests (open):** the Veteran rig carries a greatsword, a dagger, and heavy-armor
+   silhouette blocks before the hard-constraints spec is finalized.
+4. **Hard-constraints spec (open):** drafted from the spike's rig conventions, then locked by the
+   user — and only then does identity art (§2's recognizable person on top of the mannequin)
+   resume.

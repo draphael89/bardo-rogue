@@ -20,6 +20,10 @@ _Avoid_: Background, black space, letterbox
 A silent presence dwelling in the Bardo — a figure you approach and read, not a dialogue system.
 _Avoid_: NPC, vendor, shopkeeper
 
+**Mannequin**:
+The canonical base body of the player character — the Veteran recipe (CHARACTER_FOUNDATION.md): sloped shoulders, forward lean, heavy trunk. Equipment modifies its silhouette, never defines it.
+_Avoid_: Base sprite, template, rig (the rig implements the mannequin)
+
 **Pantheon**:
 One mythology's underworld tradition — Greek, Norse, Aztec, Egyptian — each with its own art style. The Bardo and the hero belong to no pantheon.
 

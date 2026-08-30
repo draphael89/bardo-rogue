@@ -36,9 +36,18 @@ function inside(label: string, bounds: Bounds, width: number, height: number): v
 }
 
 async function resize(page: Page, size: { width: number; height: number }, phase: Phase): Promise<Row> {
-  const before = await page.evaluate(() => (window as any).__game.loop.frameTimes.length)
   await page.setViewportSize(size)
-  await page.waitForFunction(n => (window as any).__game.loop.frameTimes.length >= n + 2, before)
+  const expectedW = Math.max(640, Math.min(1024, Math.round((360 * size.width / size.height) / 16) * 16))
+  // Under load, two frames that were already queued at the OLD width can land after
+  // setViewportSize resolves but before the resize event rebuilds the target. First require the
+  // new target itself, then require two frames rendered from that exact state.
+  await page.waitForFunction(({ width, height }) => {
+    const g = (window as any).__game
+    return innerWidth === width && innerHeight === height
+      && g.presenter.ra.rt.width === Math.max(640, Math.min(1024, Math.round((360 * width / height) / 16) * 16))
+  }, size)
+  const resizedAt = await page.evaluate(() => (window as any).__game.loop.frameTimes.length)
+  await page.waitForFunction(n => (window as any).__game.loop.frameTimes.length >= n + 2, resizedAt)
   const row = await page.evaluate((phase): Row => {
     const g = (window as any).__game
     const ra = g.presenter.ra
@@ -58,7 +67,6 @@ async function resize(page: Page, size: { width: number; height: number }, phase
   const [vw, vh] = row.viewport
   const [tw, th] = row.target
   const [x, y, w, h] = row.screen
-  const expectedW = Math.max(640, Math.min(1024, Math.round((360 * vw / vh) / 16) * 16))
   if (tw !== expectedW || th !== 360) throw new Error(`${vw}x${vh}: target ${tw}x${th}, expected ${expectedW}x360`)
   inside(`${vw}x${vh} target`, { x, y, width: w, height: h }, vw, vh)
   inside(`${vw}x${vh} ${phase}`, row.ui, tw, th)

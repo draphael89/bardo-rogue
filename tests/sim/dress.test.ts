@@ -86,6 +86,8 @@ describe('first-gate dress', () => {
     const bardo = buildArena(new Rng(1), 'bardo')
     const before = overlayKeys(bardo)
     const n = bardo.props.length
+    expect(bardo.props.some(p => p.sheet === 'prop' && p.tile === PROP.veteranRelic)).toBe(true)
+    expect(bardo.props.some(p => p.sheet === 'prop' && p.tile === PROP.ossuary)).toBe(false)
     dressArena(bardo, 'bardo')
     expect(overlayKeys(bardo)).toBe(before)
     expect(bardo.props.length).toBe(n)

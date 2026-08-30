@@ -33,7 +33,7 @@ export const PROP = {
   bellNW: 0, bellNE: 1, bellSW: 2, bellSE: 3,
   brazier: 4, ossuary: 5, shard: 6, pew: 7,
   reed: 8, prow: 9, pole: 10, pan: 11,
-  keeperLamp: 12, brazierCold: 13,
+  keeperLamp: 12, brazierCold: 13, veteranRelic: 14,
 } as const
 
 export type RoomKind = 'bardo' | 'threshold' | 'crossing' | 'shore'
@@ -610,7 +610,9 @@ function buildBardo(rng: Rng): Arena {
   // focal object (§8.4.6): it carries the one fire still kept, takes the key, occludes, casts.
   // Same solid cells as ever; only what stands on them changed.
   furniture(28, 28, PROP.brazierCold)
-  furniture(29, 31, PROP.ossuary)
+  // The concept's fallen knight, translated without a corpse: empty Veteran iron and a torn mantle.
+  // It replaces the generic ossuary on the same hard cell, so the story changes and collision does not.
+  furniture(29, 31, PROP.veteranRelic)
   furniture(37, 28, PROP.pew)
   furniture(39, 30, PROP.keeperLamp)
   // FORGE: the Smith's ground; the forge fire has a body, and quenched slag sits by the west wall.

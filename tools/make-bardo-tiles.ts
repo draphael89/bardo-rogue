@@ -1030,6 +1030,75 @@ function brazierCold32(): Uint8Array {
   return d
 }
 
+// The Veteran nobody carried home (§8.2.4): empty armour, not a body. A low collapsed triangle
+// undercuts the Keeper's upright column; the split helm crest and diagonal broken scabbard make the
+// silhouette legible in solid black. Wine cloth owns the ground, iron owns the weight, and two tiny
+// bone catches mark the split crest and broken end. No gold: this is a death, not a crossing.
+function veteranRelic32(): Uint8Array {
+  const { d, set, pixel } = make32()
+  // Contact shadow: hard, south and slightly right (§3.2.8), kept inside the cell.
+  for (let x = 5; x <= 27; x++) set(x, 27, P.grout)
+  for (let x = 8; x <= 29; x++) set(x, 28, P.mortar)
+
+  // Torn mantle under every piece. An asymmetric stepped mass, never a rectangular mat.
+  for (let y = 12; y <= 25; y++) {
+    const left = y < 17 ? 4 : y < 22 ? 6 : 9
+    const right = y < 16 ? 24 : y < 21 ? 28 : 25
+    for (let x = left; x <= right; x++) {
+      const torn = (y >= 23 && (x + y) % 4 === 0) || (x === right && y % 3 === 0)
+      if (!torn) set(x, y, x < 8 || y > 22 ? P.purple0 : (x + y) % 7 === 0 ? P.purple2 : P.purple1)
+    }
+  }
+
+  // Dented helm, tipped toward the viewer. The empty slit is the void — identity left behind.
+  for (let y = 5; y <= 16; y++) for (let x = 6; x <= 17; x++) {
+    const dx = (x - 11.5) / 6.2, dy = (y - 10.5) / 6.1
+    if (dx * dx + dy * dy > 1) continue
+    let col: C = P.iron
+    if (x <= 8 || y <= 7) col = P.ironHi
+    if (x >= 15 || y >= 15) col = P.mortar
+    set(x, y, col)
+  }
+  for (let x = 8; x <= 15; x++) set(x, 11, P.void)
+  set(8, 12, P.void); set(15, 12, P.void)
+  for (let y = 2; y <= 8; y++) { set(11, y, P.iron); set(12, y, y < 5 ? P.ironHi : P.iron) }
+  set(10, 4, P.mortar); set(13, 6, P.mortar)                 // the crest is split, not ceremonial
+
+  // One collapsed shoulder plate, rotated away from the helm; its chipped outer rim catches north.
+  for (let y = 9; y <= 19; y++) for (let x = 18; x <= 29; x++) {
+    const dx = (x - 23.5) / 6.4, dy = (y - 14) / 5.6
+    if (dx * dx + dy * dy > 1) continue
+    let col: C = P.iron
+    if (x <= 20 || y <= 11) col = P.ironHi
+    if (x >= 28 || y >= 18) col = P.mortar
+    set(x, y, col)
+  }
+  set(21, 11, P.mortar); set(22, 11, P.mortar); set(27, 15, P.mortar)
+
+  // The gauntlet is a small clenched fan below the helm, five fingers with gaps rather than a blob.
+  for (let x = 8; x <= 14; x++) set(x, 18, P.iron)
+  for (let i = 0; i < 4; i++) {
+    set(9 + i, 19 + (i & 1), P.ironHi)
+    set(10 + i, 21 + (i & 1), P.iron)
+  }
+  set(8, 20, P.mortar); set(14, 22, P.mortar)
+
+  // Broken scabbard crosses the pile and points out of it. Extremes touch along its worn spine.
+  for (let i = 0; i < 14; i++) {
+    const x = 13 + i, y = 17 + Math.floor(i * 0.62)
+    set(x, y, P.iron)
+    if (i < 10) set(x, y - 1, i % 4 === 0 ? P.ironHi : P.iron)
+  }
+  set(26, 25, P.boneLo); set(27, 25, P.boneLo)
+
+  // True 48px-source nicks: single final pixels the stable logical scaffold could not express.
+  pixel(18, 4, P.boneDim); pixel(19, 5, P.boneDim)              // crest catch: identity at 1x
+  pixel(13, 10, P.ironHi); pixel(14, 10, P.ironHi)
+  pixel(32, 17, P.ironHi); pixel(34, 19, P.ironHi)
+  pixel(19, 31, P.ironHi); pixel(39, 37, P.boneLo)
+  return d
+}
+
 function pan32(): Uint8Array {
   const { d, set } = make32()
   for (let x = 6; x < 26; x++) set(x, 28, P.grout)
@@ -1048,7 +1117,7 @@ const props32 = [
   bellCells[0], bellCells[1], bellCells[2], bellCells[3],
   brazier32(), ossuary32(), shard32(), pew32(),
   reed32(), prow32(), pole32(), pan32(),
-  keeperLamp32(), brazierCold32(),
+  keeperLamp32(), brazierCold32(), veteranRelic32(),
 ]
 const pRows = Math.ceil(props32.length / PCOLS)
 const pSheet = Buffer.alloc(PCOLS * PROP_CELL * pRows * PROP_CELL * 4)

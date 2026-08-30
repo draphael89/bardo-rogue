@@ -1,10 +1,14 @@
 {
   "title": "Bardo Rogue",
   "subtitle": "First Gate: rooms-as-data, a generated route, a town that remembers",
-  "updated": "2026-08-29T16:20:00-04:00",
-  "now": "hall-plate-wine",
+  "updated": "2026-08-29T23:05:00-04:00",
+  "now": "island-bardo",
   "round": 3,
   "timeline": [
+    {
+      "t": "23:05",
+      "text": "The Bardo becomes a district. One 64x36 room of four floating islands - causeway, Forge, Shrine, Gate plaza - on a south-to-north pilgrimage line, bridges over starfield void, Seals in silhouette east and west, the Ferryman's pier moored at the south-west edge. Void cells are solid to the sim and transparent to the bake; the door-enter line is relative to the door's own row now. Matrix 100/100 both bots, pinned hashes unmoved."
+    },
     {
       "t": "16:20",
       "text": "Review round on PR 20: three P2s, all real. The Oath-Bound and the Warden had their heavy poise breaks suppressed by a rule that only knew the brute — the sim now says which bodies do not yield to a light. The plant latch resets where swing ids restart, and one shared promiseFrame() keeps the drawing on the same frame as the dust."

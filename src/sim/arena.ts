@@ -66,6 +66,12 @@ export interface ArenaDoor {
 }
 
 export interface Prop { x: number; y: number; tile: number; sortY: number; sheet: 'room' | 'prop' }
+/**
+ * A walled island's tile rect (inclusive), for rooms whose interior is void (§8.4). Render-only:
+ * the tilemap bakes occlusion and grit per island instead of per room. The sim never reads it —
+ * void cells are ordinary `solid` wall, which is what stops a body at an island's edge.
+ */
+export interface IslandRect { c0: number; r0: number; c1: number; r1: number }
 // A light source authored with the room, not with the renderer: the room decides where the
 // key is and how far it reaches; tuning owns the flicker and the tint ramp (§3.2).
 export interface RoomLight { x: number; y: number; radius: number; strength: number; tint?: number }
@@ -92,6 +98,7 @@ export interface Arena {
   rackTaken?: boolean
   smith?: { x: number; y: number } // west of the rack: remember, then prepare
   smithNear?: boolean
+  islands?: IslandRect[]           // walled masses in an interior-void room (§8.4); render-only
 }
 
 export const ARENA_COLS = 26
@@ -201,6 +208,69 @@ function pave(s: Shell, levelAt: (c: number, r: number) => number): void {
           const i = s.idx(cc, rr)
           if (s.solid[i]) continue
           s.base[i] = T.level(lv, v, hx, dr === 1)
+        }
+      }
+      c += wide
+      w++
+    }
+  }
+}
+
+// ---- island toolkit (§8.4): a room whose interior is void, with walled masses carved into it ----
+
+// A field of nothing. Everything is solid and every base cell is T.void, which the tilemap bake
+// leaves TRANSPARENT so the screen-space starfield shows through (ADR 0001). Islands are carved in.
+function voidField(cols: number, rows: number): Shell {
+  const base = new Uint16Array(cols * rows).fill(T.void)
+  const overlay = new Int16Array(cols * rows).fill(-1)
+  const solid = new Uint8Array(cols * rows).fill(1)
+  return { cols, rows, base, overlay, solid, idx: (c, r) => r * cols + c }
+}
+
+// The same wall language as shell(), on a sub-rect: cope + face on the north (two rows), caps on
+// the other three sides, corners falling to void. The interior is carved walkable; pave it after.
+function ringIsland(s: Shell, R: IslandRect): void {
+  for (let r = R.r0; r <= R.r1; r++) for (let c = R.c0; c <= R.c1; c++) {
+    const i = s.idx(c, r)
+    const edge = r <= R.r0 + 1 || r === R.r1 || c === R.c0 || c === R.c1
+    if (!edge) { s.solid[i] = 0; continue }
+    const corner = (r <= R.r0 + 1 || r === R.r1) && (c === R.c0 || c === R.c1)
+    let t: number = T.corner
+    if (!corner) {
+      if (r === R.r0) t = T.capNorth
+      else if (r === R.r1) t = T.capSouth
+      else if (c === R.c0) t = T.capWest
+      else if (c === R.c1) t = T.capEast
+      else t = T.wallFace
+    }
+    s.base[i] = t
+    s.solid[i] = 1
+  }
+}
+
+// §2.2 slab paving scoped to a rect: bridges, piers, and island interiors. Same running bond as
+// pave() — 2/3-wide slabs in two-row bands, level picked per slab — but bands align to the rect's
+// own top, so every island's stone starts on a whole slab. Rects must span an even number of rows.
+// Every cell it touches becomes walkable, which is also how a bridge cuts through an island wall.
+function paveRect(s: Shell, R: IslandRect, levelAt: (c: number, r: number) => number): void {
+  const widths = [2, 3, 2, 3, 3, 2, 3]
+  for (let top = R.r0; top < R.r1; top += 2) {
+    const band = (top - R.r0) >> 1
+    let c = R.c0 - ((band * 2) % 3)
+    let w = 0
+    while (c <= R.c1) {
+      const wide = widths[(band * 3 + w) % widths.length]
+      const mc = Math.min(R.c1, Math.max(R.c0, c + (wide >> 1)))
+      const lv = levelAt(mc, top)
+      const v: 0 | 1 = hash2(mc, top, 29) < 0.5 ? 0 : 1
+      for (let k = 0; k < wide; k++) {
+        const cc = c + k
+        if (cc < R.c0 || cc > R.c1) continue
+        const hx: 0 | 1 | 2 = k === 0 ? 0 : k === wide - 1 ? 2 : 1
+        for (const dr of [0, 1] as const) {
+          const i = s.idx(cc, top + dr)
+          s.base[i] = T.level(lv, v, hx, dr === 1)
+          s.solid[i] = 0
         }
       }
       c += wide
@@ -421,65 +491,175 @@ function buildCrossing(rng: Rng): Arena {
   }
 }
 
-// Home is intentionally quieter and more directional than a combat chamber. The dark reliquary on
-// the west, the sword rack on the east, and the sealed threshold in the north form a single readable
-// sentence: remember, prepare, depart. Empty floor around the rack gives the pickup room to breathe.
+// THE BARDO DISTRICT (§8.4, ADR 0001): one continuous 64×36 room of floating islands in interior
+// void, read south to north as a pilgrimage line — the arrival causeway (battlefield relics), the
+// Forge west of the line, the Shrine east of it, the Gate plaza at the top. Bridges of walkable
+// stone carry the line; the void between islands is solid to the sim and starfield to the eye.
+// Seals foreshadow the waiting pantheons in silhouette only (§8.4.3): a chained stub toward a dark
+// arch island east, a dead obelisk tower west, a stepped mass drifting unreachable north-east.
+// Each island keeps its own focal object, negative space and light pool (§8.4.6, §5).
 function buildBardo(rng: Rng): Arena {
-  void rng
-  const cols = ARENA_COLS, rows = ARENA_ROWS
-  const s = shell(cols, rows)
+  void rng   // the district is fully authored; nothing here is random
+  const cols = 64, rows = 36
+  const s = voidField(cols, rows)
   const { base, overlay, solid, idx } = s
-  const focal = { x: 5.5 * TILE, y: 7.5 * TILE }
-  const rack = { x: 19.5 * TILE, y: 8.3 * TILE, arm: 'blade' as const }
-  const smith = { x: 7.5 * TILE, y: 10.2 * TILE }
-  const furrow = { x0: focal.x + 18, y0: focal.y + 20, x1: 13 * TILE, y1: 2.4 * TILE }
 
-  pave(s, makeLevelAt({
-    cols, rows, focal, furrow, bandW: 8, emberR: 32, seed: 31,
-    fight: { x: rack.x, y: rack.y, rx: 1.45, r: 58 },
-  }))
+  // ---- the four walled islands (≤ ~20×10 each, §8.1 footprint cap) ----
+  const PLAZA: IslandRect = { c0: 24, r0: 2, c1: 43, r1: 12 }   // the Gate plaza, north
+  const SHRINE: IslandRect = { c0: 42, r0: 16, c1: 57, r1: 24 } // east of the line
+  const FORGE: IslandRect = { c0: 8, r0: 18, c1: 23, r1: 26 }   // west of the line
+  const CAUSE: IslandRect = { c0: 26, r0: 26, c1: 41, r1: 32 }  // the arrival causeway, south
+  const islands = [PLAZA, SHRINE, FORGE, CAUSE]
+  for (const R of islands) ringIsland(s, R)
 
-  // A worn runner points to the threshold without outlining a UI arrow.
-  for (let r = 3; r <= 11; r++) for (let c = 12; c <= 14; c++) {
-    if (solid[idx(c, r)]) continue
-    base[idx(c, r)] = r === 3 ? T.matNorth : r === 11 ? T.matSouth : T.matBody
+  // ---- fixtures the light and the paving both know about ----
+  const door: ArenaDoor = { dir: 'north', col: 33, row: PLAZA.r0 + 1 }
+  const focal = { x: 33.5 * TILE, y: 4.6 * TILE }               // the Gate: the line's destination
+  const rack = { x: 28.5 * TILE, y: 8.3 * TILE, arm: 'blade' as const }
+  const smith = { x: 15.5 * TILE, y: 22.5 * TILE }
+  const forgeFire = { x: 18 * TILE, y: 21.2 * TILE }
+  const bell = { x: 51 * TILE, y: 20 * TILE }                   // the reliquary, upright on the Shrine
+  const causeEmber = { x: 28.5 * TILE, y: 28.6 * TILE }
+  // Battle scar across the arrival ground (§5.3.2): the causeway's one non-axis-aligned form.
+  const furrow = { x0: 28 * TILE, y0: 30.8 * TILE, x1: 39 * TILE, y1: 28.6 * TILE }
+
+  // ---- baked value hierarchy (§3.2.7): pools at each island's key, edges falling away ----
+  const pools = [
+    { x: focal.x, y: focal.y, r: 120, s: 1.05 },
+    { x: forgeFire.x, y: forgeFire.y, r: 90, s: 1.0 },
+    { x: bell.x, y: bell.y, r: 80, s: 0.9 },
+    { x: causeEmber.x, y: causeEmber.y, r: 70, s: 0.85 },
+  ]
+  // The pilgrimage wear line (§8.4.1): a level-2 ridge worn along the spine, slightly off-axis.
+  const spine = { x0: 33.5 * TILE, y0: 5 * TILE, x1: 32.8 * TILE, y1: 30 * TILE }
+  const levelFor = (R: IslandRect) => (c: number, r: number): number => {
+    const px = (c + 0.5) * TILE, py = (r + 0.5) * TILE
+    const dEdge = Math.min(c - R.c0, R.c1 - c, r - R.r0, R.r1 - r)
+    let key = 0
+    for (const p of pools) key = Math.max(key, (1 - Math.min(1, Math.hypot(px - p.x, py - p.y) / p.r)) * p.s)
+    key = Math.max(key, (1 - Math.min(1, distToSeg(px, py, spine.x0, spine.y0, spine.x1, spine.y1) / 26)) * 0.78)
+    const edge = Math.max(0, 1 - dEdge / 2) * 0.42
+    const lift = Math.max(0.52, key) - edge + hash2(c, r, 31) * 0.12 - 0.06
+    if (lift < 0.24) return 0
+    if (lift < 0.60) return 1
+    if (lift < 0.84) return 2
+    return 4
+  }
+  const interior = (R: IslandRect): IslandRect => ({ c0: R.c0 + 1, r0: R.r0 + 2, c1: R.c1 - 1, r1: R.r1 - 1 })
+  for (const R of islands) paveRect(s, interior(R), levelFor(R))
+
+  // ---- the line itself: bridges and the pier, paved through the walls they meet ----
+  const JUNCTION: IslandRect = { c0: 29, r0: 20, c1: 36, r1: 23 } // where the side islands hang off
+  const walks: IslandRect[] = [
+    { c0: 31, r0: 12, c1: 34, r1: 19 },   // north spine: junction → plaza, through its south wall
+    JUNCTION,
+    // The side links are two tiles and STAGGERED — the west one hangs south, the east one north —
+    // so the middle latitude reads as three masses with narrow spans, never one east-west boulevard.
+    { c0: 23, r0: 22, c1: 28, r1: 23 },   // west link, through the Forge's east wall
+    { c0: 37, r0: 20, c1: 42, r1: 21 },   // east link, through the Shrine's west wall
+    { c0: 31, r0: 24, c1: 34, r1: 27 },   // south spine: causeway → junction, through its north wall
+    { c0: 20, r0: 29, c1: 26, r1: 30 },   // the Ferryman's pier, a dead end at the south-west void
+  ]
+  for (const R of walks) paveRect(s, R, levelFor(R))
+
+  // A worn runner carries the line's last steps to the Gate (no UI arrow, §8.4.1).
+  for (let r = 5; r <= 11; r++) for (let c = 32; c <= 34; c++) {
+    base[idx(c, r)] = r === 5 ? T.matNorth : r === 11 ? T.matSouth : T.matBody
   }
 
-  const door: ArenaDoor = { dir: 'north', col: 13, row: 1 }
+  // ---- the Gate wall: door, star panes, one relief. Nothing mirrored (§5.2) ----
   const doors = [door]
   base[idx(door.col, door.row)] = T.wallFace
-  base[idx(4, 1)] = T.windowL
-  base[idx(5, 1)] = T.windowR
-  base[idx(21, 1)] = T.relief
-  for (const c of [8, 17, 24] as const) base[idx(c, 1)] = T.wallFaceB
+  base[idx(37, 3)] = T.windowL
+  base[idx(38, 3)] = T.windowR
+  base[idx(27, 3)] = T.relief
+  for (const c of [29, 40] as const) base[idx(c, 3)] = T.wallFaceB
+  // Shrine north wall: one star pane pair; Forge keeps a blank working wall.
+  base[idx(47, 17)] = T.windowL
+  base[idx(48, 17)] = T.windowR
+  for (const c of [12, 19] as const) base[idx(c, 19)] = T.wallFaceB
+  base[idx(53, 17)] = T.wallFaceB
 
-  for (const [c, r, t] of [[9, 10, T.crackA], [16, 5, T.crackB], [22, 12, T.pit]] as const) overlay[idx(c, r)] = t
+  // ---- evidence of use, one island at a time (§5.3.3) ----
+  for (const [c, r, t] of [
+    [30, 30, T.crackA], [36, 31, T.crackB], [28, 31, T.pit],    // causeway: the battlefield
+    [27, 10, T.crackA], [41, 5, T.pit],                          // plaza
+    [12, 21, T.crackB], [20, 25, T.pit],                         // forge
+    [44, 19, T.crackA], [53, 22, T.poppy],                       // shrine
+    [21, 30, T.coin], [25, 29, T.silt],                          // pier: the toll, the waterline
+  ] as const) overlay[idx(c, r)] = t
+  // The chained stub east of the Shrine (Seal, §8.4.3): a broken beam over the gap, going nowhere.
+  overlay[idx(58, 19)] = T.beam
+  overlay[idx(58, 20)] = T.beam
 
   const props: Prop[] = []
-  // West reliquary: one compact Bardo-specific landmark, built from the existing bell language but
-  // upright and intact rather than sunken into a battle floor.
+  const furniture = (c: number, r: number, tile: number, hard = true) => {
+    if (hard) solid[idx(c, r)] = 1
+    props.push({ x: c * TILE - 8, y: r * TILE - 20, tile, sortY: (r + 1) * TILE, sheet: 'prop' })
+  }
+
+  // PLAZA: braziers flank the Gate at differing Y (§5.2); the rack keeps clear floor to its east.
+  furniture(31, 4, PROP.brazier)
+  furniture(36, 5, PROP.brazier)
+  // CAUSEWAY: battlefield relics, the arrival ember, and the Keeper's broken column (§8.4.4).
+  furniture(28, 28, PROP.brazier)
+  furniture(29, 31, PROP.ossuary)
+  furniture(37, 28, PROP.pew)
+  base[idx(39, 30)] = T.pillarBase
+  solid[idx(39, 30)] = 1
+  props.push({ x: 39 * TILE, y: 29 * TILE, tile: T.pillarTop, sortY: 31 * TILE, sheet: 'room' })
+  // FORGE: the Smith's ground; the forge fire has a body, and quenched slag sits by the west wall.
+  furniture(18, 21, PROP.brazier)
+  furniture(11, 24, PROP.shard)
+  // SHRINE: the reliquary bell, upright and whole, with the offering pan before it.
+  const bellX = 51 * TILE - 8, bellY = 18 * TILE, bellSort = 22 * TILE
   for (const [dx, dy, tile] of [
     [0, 0, PROP.bellNW], [32, 0, PROP.bellNE], [0, 32, PROP.bellSW], [32, 32, PROP.bellSE],
-  ] as const) props.push({ x: 3.5 * TILE + dx, y: 4.5 * TILE + dy, tile, sortY: 9 * TILE, sheet: 'prop' })
-  for (let r = 7; r <= 8; r++) for (let c = 4; c <= 6; c++) solid[idx(c, r)] = 1
+  ] as const) props.push({ x: bellX + dx, y: bellY + dy, tile, sortY: bellSort, sheet: 'prop' })
+  for (let r = 20; r <= 21; r++) for (let c = 50; c <= 52; c++) solid[idx(c, r)] = 1
+  props.push({ x: 46 * TILE - 8, y: 22 * TILE - 20, tile: PROP.pan, sortY: 23 * TILE, sheet: 'prop' })
+  // PIER: the Ferryman's mooring (§8.4.4) — a pole on the boards, the skiff's prow in the void.
+  furniture(20, 29, PROP.pole)
+  props.push({ x: 18 * TILE - 8, y: 31 * TILE - 20, tile: PROP.prow, sortY: 32 * TILE, sheet: 'prop' })
 
-  // Two small edge clusters only; the open centre belongs to the route from rack to door.
-  for (const [c, r, tile] of [[2, 11, PROP.ossuary], [23, 4, PROP.pew]] as const) {
-    solid[idx(c, r)] = 1
-    props.push({ x: c * TILE - 8, y: r * TILE - 20, tile, sortY: (r + 1) * TILE, sheet: 'prop' })
+  // ---- the Seals, silhouette only (§8.4.3) ----
+  // West: the dead tower — an obelisk profile and a brazier nobody lights (§8.2.4).
+  for (const r of [12, 13, 14] as const) for (const c of [4, 5] as const) base[idx(c, r)] = r === 12 ? T.wallFace : T.wallFaceB
+  base[idx(4, 15)] = T.capSouth
+  base[idx(5, 15)] = T.capSouth
+  props.push({ x: 4 * TILE, y: 11 * TILE, tile: T.pillarTop, sortY: 16 * TILE, sheet: 'room' })
+  furniture(6, 15, PROP.brazier)
+  // East: the dark arch island beyond the chained stub, a sealed door in a foreign mass.
+  for (let r = 17; r <= 20; r++) for (let c = 59; c <= 62; c++) base[idx(c, r)] = r === 17 ? T.wallFace : T.wallFaceB
+  base[idx(60, 19)] = T.doorClosed
+  for (const c of [59, 60, 61, 62] as const) base[idx(c, 21)] = T.capSouth
+  // North-east: a stepped mass drifting past the walkable edge (the Mictlan tease).
+  for (const [c0, c1, rTop] of [[57, 58, 2], [56, 59, 4], [55, 60, 6]] as const) {
+    for (let c = c0; c <= c1; c++) { base[idx(c, rTop)] = T.capNorth; base[idx(c, rTop + 1)] = T.wallFaceB }
   }
 
   return {
     kind: 'bardo', cols, rows, base, overlay, solid, props, door, doors,
-    playerStart: { x: 10 * TILE, y: 11.5 * TILE },
+    playerStart: { x: 33.5 * TILE, y: 30.5 * TILE },
     braziers: [
-      { x: focal.x, y: focal.y, radius: 92, strength: 0.8 },
-      { x: rack.x, y: rack.y, radius: 74, strength: 0.72 },
-      { x: smith.x, y: smith.y, radius: 52, strength: 0.55 },
+      // [0] is the key (§3.2.1): the Gate, gold — a crossing's colour (§8.2.2). Light climbs
+      // northward along the line: dim arrival ember, working forge fire, votive, then the Gate.
+      { x: 31 * TILE + 8, y: 4.8 * TILE, radius: 116, strength: 1.7, tint: 0xffd9a0 },
+      { x: 36 * TILE + 8, y: 5.2 * TILE, radius: 72, strength: 0.8, tint: 0xffd9a0 },
+      { x: forgeFire.x, y: forgeFire.y, radius: 86, strength: 1.3, tint: 0xff7a18 },
+      { x: 46 * TILE, y: 21.8 * TILE, radius: 48, strength: 0.6, tint: 0xd4b060 },
+      { x: causeEmber.x, y: causeEmber.y, radius: 56, strength: 0.5 },
+      { x: 20.5 * TILE, y: 29.6 * TILE, radius: 40, strength: 0.45, tint: 0xd4b060 },
     ],
-    windows: [{ x: 4.5 * TILE, y: 1.5 * TILE, radius: 48, strength: 0.62 }],
+    windows: [
+      { x: 37.5 * TILE, y: 3.5 * TILE, radius: 60, strength: 0.6 },
+      { x: 47.5 * TILE, y: 17.5 * TILE, radius: 56, strength: 0.55 },
+      { x: bell.x, y: bell.y, radius: 64, strength: 0.5 },
+      { x: 39.5 * TILE, y: 29.4 * TILE, radius: 30, strength: 0.4 },
+    ],
     furrow, focal, rack, rackTaken: false, smith, smithNear: false,
-    inner: { x0: TILE, y0: 2 * TILE, x1: (cols - 1) * TILE, y1: (rows - 1) * TILE },
+    islands,
+    inner: { x0: 9 * TILE, y0: 4 * TILE, x1: 57 * TILE, y1: 32 * TILE },
   }
 }
 

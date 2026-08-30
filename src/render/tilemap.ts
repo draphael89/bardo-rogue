@@ -351,15 +351,20 @@ function px(g: Graphics, x: number, y: number, w: number, h: number, color: numb
 }
 
 // §2.1 Law 3. Wherever two surfaces meet, darken the joint. The wall tiles carry their own
-// bottom strip; this is the floor side of the same joint, on all four walls.
+// bottom strip; this is the floor side of the same joint, on all four walls. An island room
+// (arena.islands, §8.4) runs the same joint per island instead of around the room's rect —
+// the room's own rect is void there, and a strip across it would float on the starfield.
 function bakeOcclusion(g: Graphics, arena: Arena): void {
-  const x0 = TILE, x1 = (arena.cols - 1) * TILE
-  const y0 = 2 * TILE, y1 = (arena.rows - 1) * TILE
-  px(g, x0, y0, x1 - x0, 3, C.void)
-  px(g, x0, y0 + 3, x1 - x0, 1, C.mortar)
-  px(g, x0, y1 - 2, x1 - x0, 2, C.void)
-  px(g, x0, y0, 2, y1 - y0, C.void)
-  px(g, x1 - 2, y0, 2, y1 - y0, C.void)
+  const rects = arena.islands ?? [{ c0: 0, r0: 0, c1: arena.cols - 1, r1: arena.rows - 1 }]
+  for (const R of rects) {
+    const x0 = (R.c0 + 1) * TILE, x1 = R.c1 * TILE
+    const y0 = (R.r0 + 2) * TILE, y1 = R.r1 * TILE
+    px(g, x0, y0, x1 - x0, 3, C.void)
+    px(g, x0, y0 + 3, x1 - x0, 1, C.mortar)
+    px(g, x0, y1 - 2, x1 - x0, 2, C.void)
+    px(g, x0, y0, 2, y1 - y0, C.void)
+    px(g, x1 - 2, y0, 2, y1 - y0, C.void)
+  }
 }
 
 // §5.3.2 the one large graphic form that is not axis-aligned to the tile grid: the gouge the
@@ -436,15 +441,20 @@ function bakeGrit(g: Graphics, arena: Arena): void {
   // spread over the perimeter is film grain — it reads as sensor noise at 1x and it was the
   // second half of the floor's edge energy. These are 24 drifts of 3-5 px, all one step
   // BELOW the floor body, gathered against the wall where nobody walks (§5.4).
-  const w = (arena.cols - 2) * TILE, h = (arena.rows - 3) * TILE
-  for (let i = 0; i < 40; i++) {
-    const x = TILE + ((i * 97) % w)
-    const y = 2 * TILE + ((i * 61) % h)
-    // only near the walls: the middle is swept by the fight
-    const edge = Math.min(x - TILE, w + TILE - x, y - 2 * TILE, h + 2 * TILE - y)
-    if (edge > 26) continue
-    px(g, x, y, 3 + (i % 3), 2, C.grout)
-    px(g, x + 1, y + 2, 2 + (i % 2), 1, C.mortar)
+  // An island room scatters per island, against each island's own walls.
+  const rects = arena.islands ?? [{ c0: 0, r0: 0, c1: arena.cols - 1, r1: arena.rows - 1 }]
+  for (const R of rects) {
+    const bx = (R.c0 + 1) * TILE, by = (R.r0 + 2) * TILE
+    const w = (R.c1 - R.c0 - 1) * TILE, h = (R.r1 - R.r0 - 2) * TILE
+    for (let i = 0; i < 40; i++) {
+      const x = bx + ((i * 97) % w)
+      const y = by + ((i * 61) % h)
+      // only near the walls: the middle is swept by the fight
+      const edge = Math.min(x - bx, bx + w - x, y - by, by + h - y)
+      if (edge > 26) continue
+      px(g, x, y, 3 + (i % 3), 2, C.grout)
+      px(g, x + 1, y + 2, 2 + (i % 2), 1, C.mortar)
+    }
   }
   void C.slate1; void C.slate2; void C.naveWarm
 }
@@ -458,16 +468,20 @@ export function buildTilemap(renderer: Renderer, atlas: Atlas, arena: Arena, flo
   const c = new Container()
   for (let r = 0; r < arena.rows; r++) for (let col = 0; col < arena.cols; col++) {
     const i = r * arena.cols + col
-    const s = new Sprite(atlas.room(arena.base[i]))
-    s.position.set(col * TILE, r * TILE)
-    c.addChild(s)
+    // Void cells stay TRANSPARENT in the bake (ADR 0001): the screen-space starfield underlay is
+    // the sky between an island room's masses, and a baked void tile would freeze a second one.
+    if (arena.base[i] !== T.void) {
+      const s = new Sprite(atlas.room(arena.base[i]))
+      s.position.set(col * TILE, r * TILE)
+      c.addChild(s)
+    }
     const o = arena.overlay[i]
     if (o >= 0) { const os = new Sprite(atlas.room(o)); os.position.set(col * TILE, r * TILE); c.addChild(os) }
   }
   const g = new Graphics()
   bakeOcclusion(g, arena)
   bakeFurrow(g, arena)
-  bakeScorch(g, arena)
+  if (!arena.islands) bakeScorch(g, arena)   // the soot fan is the bell's; islands author their own use marks
   bakeGrit(g, arena)
   bakePropShadows(g, arena)
   c.addChild(g)

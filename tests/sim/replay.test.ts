@@ -106,6 +106,14 @@ describe('replay format', () => {
       frames: [{ ...emptyInput(), moveX: 'right' }],
     }))).toThrow(/invalid moveX/)
   })
+  it('loads legacy raw frames with new input flags defaulted off', () => {
+    const legacy = { ...emptyInput() } as Partial<InputFrame>
+    delete legacy.attackHeld
+    delete legacy.heavy
+    const replay = replayFromJson(JSON.stringify({ v: 1, seed: 1, scenario: 'empty', frames: [legacy] }))
+    expect(replay.frames[0]).toEqual(emptyInput())
+    expect(() => replayFromJson(JSON.stringify({ v: 1, seed: 1, scenario: 'empty', frames: [{ ...legacy, heavy: 'yes' }] }))).toThrow(/invalid heavy/)
+  })
 })
 
 describe('replay fixtures', () => {

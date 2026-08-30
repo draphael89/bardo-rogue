@@ -55,16 +55,18 @@ function assertEncodedReplay(value: unknown): asserts value is EncodedReplay {
   }
 }
 
-function assertInputFrame(value: unknown, index: number): asserts value is InputFrame {
+type RawInputFrame = Omit<InputFrame, 'attackHeld' | 'heavy'> & Partial<Pick<InputFrame, 'attackHeld' | 'heavy'>>
+
+function assertInputFrame(value: unknown, index: number): asserts value is RawInputFrame {
   const frame = replayObject(value)
   for (const key of ['moveX', 'moveY', 'aimX', 'aimY'] as const) {
     const axis = frame[key]
     if (typeof axis !== 'number' || !Number.isFinite(axis) || Math.abs(axis) > 1) throw new Error(`replay frame ${index} has invalid ${key}`)
   }
-  for (const key of ['aimSoft', 'attack', 'attackHeld', 'heavy', 'dodge', 'restart'] as const) {
+  for (const key of ['aimSoft', 'attack', 'dodge', 'restart'] as const) {
     if (typeof frame[key] !== 'boolean') throw new Error(`replay frame ${index} has invalid ${key}`)
   }
-  for (const key of ['confirm', 'reroll'] as const) {
+  for (const key of ['attackHeld', 'heavy', 'confirm', 'reroll'] as const) {
     if (frame[key] !== undefined && typeof frame[key] !== 'boolean') throw new Error(`replay frame ${index} has invalid ${key}`)
   }
   if (frame.choiceDelta !== undefined && frame.choiceDelta !== -1 && frame.choiceDelta !== 0 && frame.choiceDelta !== 1) {
@@ -149,8 +151,11 @@ export function replayFromJson(json: string): Replay {
   const raw = obj as unknown as Record<string, unknown>
   if (!Array.isArray(raw.frames)) throw new Error('raw replay frames must be an array')
   if (raw.frames.length > MAX_REPLAY_FRAMES) throw new Error(`replay exceeds the ${MAX_REPLAY_FRAMES}-frame limit`)
-  raw.frames.forEach(assertInputFrame)
-  return obj as Replay
+  const frames = raw.frames.map((frame, index) => {
+    assertInputFrame(frame, index)
+    return { ...frame, attackHeld: frame.attackHeld ?? false, heavy: frame.heavy ?? false }
+  })
+  return { ...obj, frames } as Replay
 }
 
 // Fresh world from the replay header, then one frame per tick. A restart frame rebuilds the world and

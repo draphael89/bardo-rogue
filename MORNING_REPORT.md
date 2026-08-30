@@ -49,7 +49,9 @@ pipeline and silhouette constraints, not the final identity or Look.
 
 ## Attended observations
 
-Evidence lives under `shots/attended/`:
+The curated exact-head title, arrival, and descent frames are tracked in `public/progress/shots/` as
+`title-menu.png`, `bardo-arrival-r7.png`, and `descent-r7-*.png`. The broader scratch study remains
+local and intentionally ignored under `shots/attended/`:
 
 - `first-minute/` and `keyboard-route/`: title, Settings, Credits, descent beats, rack, first fight,
   and the exact-head teaching strip.
@@ -85,6 +87,7 @@ user-only gates.** No agent or automated play awarded them.
 | Shipping sprite gates | 78/3 waived general, 144/2 hero, 144/4 north, 40/1 north roll, 145/2 south, 40/1 south roll; zero blocking |
 | Candidate stress | `pnpm art:stress-hero` green for dagger and heavy; candidate-only |
 | Desktop | `pnpm desktop:build` green; isolated `pnpm smoke:desktop` green across 23 checks and 6 launches |
+| Deterministic visual evidence | `pnpm shot ... --visualMs N`; independent title boots at 500 ms are byte-identical, SHA-256 `096aca3759cd68606d6b7790d21fc66b99a6cde2028b7c0fdd172e5a92e2eed9` |
 
 The first desktop smoke observed one banner-timing failure on the import-durability assertion
 (`ROOM CLEARED` replaced the expected acknowledgement). An isolated rerun passed the same durable

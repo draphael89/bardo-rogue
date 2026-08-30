@@ -1,10 +1,14 @@
 {
   "title": "Bardo Rogue",
   "subtitle": "First Gate: rooms-as-data, a generated route, a town that remembers",
-  "updated": "2026-08-30T03:14:44-04:00",
+  "updated": "2026-08-30T03:29:51-04:00",
   "now": "exact-head-closeout",
   "round": 7,
   "timeline": [
+    {
+      "t": "03:29",
+      "text": "The evidence now obeys the same determinism discipline as the simulation. The ordinary screenshot harness let atmosphere, lighting, idle poses, and the title descent advance by however many live frames happened before capture, so two tick-zero PNGs were not byte-identical. A narrow --visualMs lane freezes browser time at boot and advances it in fixed 50 ms quanta. Independent title boots pinned at 500 ms now produce the same SHA-256; the exact title, arrival, and four descent phases are tracked in the progress gallery instead of living only in ignored scratch shots."
+    },
     {
       "t": "03:14",
       "text": "The arrival causeway now answers the Gate before the player moves: a Keeper lamp puts the landing inside warm light, cold braziers and soot hold the dead shore, the pier carries a numen lantern, and wear crosses tile boundaries toward the north. One generic ossuary became a fallen Veteran relic on the same already-solid cell: low helm, shoulder, and wine mantle read as a body rather than scatter without changing collision. The new prop is code-authored, 10 canonical colours, binary alpha, and below the 12-colour cap; the ImageGen overpaint and relic study remained references only. All 909 tests, pinned replays, room gates, and the 100/100 matrices remain green. Look and Fun are still the user's calls."

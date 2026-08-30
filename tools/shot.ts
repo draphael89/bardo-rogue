@@ -117,8 +117,8 @@ if (postWaitMs) await page.waitForTimeout(postWaitMs)
 if (visualMs !== null && postEvalJs) await page.evaluate(() => (window as any).__captureRender(0))
 if (visualMs === null) {
   // headless rAF can be slow; make sure at least two frames rendered after the last sim change
-  const f0 = await page.evaluate(() => (window as any).__game.loop.frameTimes.length)
-  await page.waitForFunction((n) => (window as any).__game.loop.frameTimes.length >= n + 2, f0, { timeout: 10000 })
+  const f0 = await page.evaluate(() => (window as any).__game.loop.frameCount)
+  await page.waitForFunction((n) => (window as any).__game.loop.frameCount >= n + 2, f0, { timeout: 10000 })
 }
 const state = await page.evaluate(() => (window as any).__game.state())
 const stats = await page.evaluate(() => (window as any).__game.frameStats())

@@ -16,6 +16,13 @@ function harness() {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('fixed-step catch-up telemetry', () => {
+  it('keeps a monotonic render count after the timing sample ring fills', () => {
+    const h = harness()
+    for (let i = 0; i < 260; i++) h.frames.shift()!(h.base + i)
+    expect(h.loop.frameCount).toBe(260)
+    expect(h.loop.frameTimes).toHaveLength(240)
+  })
+
   it('does not call an exact five-tick catch-up a dropped frame', () => {
     const h = harness()
     h.frames.shift()!(h.base + TICK_MS * 5 + 0.001)

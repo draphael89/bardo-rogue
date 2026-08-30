@@ -4,7 +4,15 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
-BLENDER=/Applications/Blender.app/Contents/MacOS/Blender
+BLENDER="${BLENDER:-}"
+if [ -z "$BLENDER" ]; then BLENDER="$(command -v blender || true)"; fi
+if [ -z "$BLENDER" ] && [ -x /Applications/Blender.app/Contents/MacOS/Blender ]; then
+  BLENDER=/Applications/Blender.app/Contents/MacOS/Blender
+fi
+if [ -z "$BLENDER" ] || ! command -v "$BLENDER" >/dev/null 2>&1; then
+  echo "[stress] Blender not found; set BLENDER or install blender on PATH" >&2
+  exit 1
+fi
 ROOT=.art-cache/spike/stress
 
 run_variant() {
@@ -18,6 +26,13 @@ run_variant() {
     --save-blend "$out/$slug.blend" >"$out/render.log" 2>&1
   echo "[stress] assemble $slug"
   node tools/spike/assemble.mjs --renders "$renders" --out "$out" --specs "$specs"
+  local clip="heavy" ref="player.attack.swings.2"
+  if [ "$weapon" = "dagger" ]; then clip="attack"; ref="player.attack.swings.0"; fi
+  for facing in south north east; do
+    node -e 'const [f,c,r]=process.argv.slice(1),s=JSON.parse(require("fs").readFileSync(f)); if(s.clips?.[c]?.sim?.ref!==r) throw new Error(`${f}: ${c} must bind ${r}`)' \
+      "$specs/spike-$facing.json" "$clip" "$ref"
+  done
+  echo "[stress] timing $slug: $clip -> $ref"
   local failed=0
   for facing in south north east; do
     echo "[stress] compile $slug/$facing"

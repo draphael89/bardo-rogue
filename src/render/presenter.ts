@@ -176,6 +176,7 @@ export class Presenter {
   // Called when the world object is replaced (restart).
   bindWorld(world: World) {
     this.world = world
+    this.hud.resetForWorld()
     // presentation randomness restarts with the run, so the same seed replays the same sparks
     seedFx(world.seed)
     for (const v of this.enemyViews.values()) v.destroy(); this.enemyViews.clear()

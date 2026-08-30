@@ -46,8 +46,8 @@ async function resize(page: Page, size: { width: number; height: number }, phase
     return innerWidth === width && innerHeight === height
       && g.presenter.ra.rt.width === Math.max(640, Math.min(1024, Math.round((360 * width / height) / 16) * 16))
   }, size)
-  const resizedAt = await page.evaluate(() => (window as any).__game.loop.frameTimes.length)
-  await page.waitForFunction(n => (window as any).__game.loop.frameTimes.length >= n + 2, resizedAt)
+  const resizedAt = await page.evaluate(() => (window as any).__game.loop.frameCount)
+  await page.waitForFunction(n => (window as any).__game.loop.frameCount >= n + 2, resizedAt)
   const row = await page.evaluate((phase): Row => {
     const g = (window as any).__game
     const ra = g.presenter.ra

@@ -359,6 +359,14 @@ export class Hud {
     this.bannerStart = this.prevTick < 0 ? 0 : this.prevTick
   }
 
+  // A replay/debug reset installs a new World in the same Presenter. The opening-fight legend is
+  // world history, not page history, so the new world's own attempts/route must decide it afresh.
+  resetForWorld(): void {
+    this.prevTick = -1
+    this.hintStart = -1
+    this.firstLoopHintShown = false
+  }
+
   clearBanner() { this.bannerTicks = 0; this.hideBanner() }
 
   /**

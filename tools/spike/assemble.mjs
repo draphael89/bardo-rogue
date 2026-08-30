@@ -61,7 +61,7 @@ const CLIPS = {
   [rig.weapon === 'dagger' ? 'attack' : 'heavy']: {
     frames: ['swingAnticipate', 'swingCommit', 'swingImpact', 'swingFollow', 'swingRecover'],
     timing: 'sim',
-    sim: { ref: 'player.attack.swings.2', contact: 'swingImpact' },
+    sim: { ref: rig.weapon === 'dagger' ? 'player.attack.swings.0' : 'player.attack.swings.2', contact: 'swingImpact' },
   },
 }
 

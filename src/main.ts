@@ -781,6 +781,9 @@ async function boot() {
     titleToken = 0
     presenter.title.setShown(false)
     presenter.resetTitleFocus()
+    // The input listeners stay live while the descent owns the paused loop. Anything pressed in
+    // that 1.45 s window is presentation input, not a buffered first combat action.
+    input.releaseHeldIntent()
     setPaused(userPaused)
   }
   if (wantsTitle) setPaused(false)

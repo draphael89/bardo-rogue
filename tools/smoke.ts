@@ -138,9 +138,10 @@ async function play(page: Page, spec: PathSpec): Promise<void> {
     return { seenRooms, sawReward, sawRite, tollAnswer, maxHpAfterToll, resolved, killedBy, boons, rendered, ticks: s.tick, meta: s.session.meta, done: false }
   }, MAX_TICKS)
 
-  // Which screens this path must have rendered real frames over. The death path dies at the
-  // Landing, so the boss and the victory card belong to the winning path alone.
-  const mustRender = ['the hub', 'the toll', 'an offer',
+  // Which screens this path must have rendered real frames over. A naive path may die before the
+  // Landing, and two legal spines omit the bank entirely, so the toll belongs only to a route that
+  // actually reached it. The boss and victory card still belong to the winning path alone.
+  const mustRender = ['the hub', ...(outcome.seenRooms.includes('black-step') ? ['the toll'] : []), 'an offer',
     ...(spec.expect === 'won' ? ['the boss mid-fight', 'the victory card'] : ['the death card'])]
   for (const state of mustRender) {
     check(outcome.rendered[state] === true, `renders frames over ${state}`)

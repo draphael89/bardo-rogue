@@ -25,6 +25,7 @@ export const T = {
   pillarTop: 76, pillarBase: 77,
   crackA: 78, crackB: 79, pit: 80,
   silt: 81, water: 82, grate: 83, reed: 84, poppy: 85, coin: 86, beam: 87, verdict: 88,
+  oathLink: 89, heatSeam: 90,
 } as const
 
 // Indices into the bardo_props sheet (4 columns, 48×48 source / 32×32 logical). The first four

@@ -577,6 +577,46 @@ function verdictTile(): Uint8Array {
   return t.d
 }
 
+// Two low iron links. This is a floor-fastening motif, not a collectible icon or a bright chain
+// prop: it stays inside B1/B2, casts one short southern shadow, and leaves most of its cell empty.
+function oathLinkTile(): Uint8Array {
+  const t = makeTile()
+  t.fill(P.void, 0)
+  const link = (x0: number, lit: boolean) => {
+    const hi = lit ? P.ironHi : P.iron
+    for (let x = x0 + 3; x <= x0 + 7; x++) {
+      t.pixel(x, 8, hi); t.pixel(x, 9, P.iron)
+      t.pixel(x, 15, P.iron); t.pixel(x, 16, P.mortar)
+    }
+    for (let y = 10; y <= 14; y++) {
+      t.pixel(x0 + 1, y, hi); t.pixel(x0 + 2, y, P.iron)
+      t.pixel(x0 + 8, y, P.iron); t.pixel(x0 + 9, y, P.mortar)
+    }
+  }
+  link(1, true)
+  link(11, false)
+  // The overlap has to read as one link passing through another, not as two tiny rings.
+  t.pixel(11, 11, P.ironHi); t.pixel(12, 12, P.ironHi)
+  t.pixel(10, 13, P.mortar); t.pixel(13, 13, P.iron)
+  return t.d
+}
+
+// A dead-hot fracture, not lava. The seam is sparse, wine-dark, and never uses ember/gold; a
+// player or tell owns every higher value in this cell.
+function heatSeamTile(): Uint8Array {
+  const t = makeTile()
+  t.fill(P.void, 0)
+  const path = [[2, 18], [4, 17], [6, 15], [8, 14], [10, 12], [12, 11], [14, 9], [16, 8], [18, 6], [21, 5]] as const
+  for (const [i, [x, y]] of path.entries()) {
+    t.pixel(x, y, i % 3 === 1 ? P.poppy : P.purple1)
+    if (i % 2 === 0) t.pixel(x + 1, y, P.purple0)
+  }
+  for (const [x, y, dx] of [[8, 14, -3], [15, 8, 3]] as const) {
+    for (let i = 1; i <= 2; i++) t.pixel(x + dx * i, y - i, P.purple1)
+  }
+  return t.d
+}
+
 // TRANSPARENT (ADR 0001): the screen-space starfield underlay is the sky between an island
 // room's masses, and an opaque baked void tile would freeze a second one. The sheet carries
 // the invariant, so the renderer bakes every base cell with no per-tile branch.
@@ -604,6 +644,7 @@ tiles.push(
   /* 81 */ siltTile(), /* 82 */ waterTile(), /* 83 */ grateTile(),
   /* 84 */ reedTile(), /* 85 */ poppyTile(), /* 86 */ coinTile(), /* 87 */ beamTile(),
   /* 88 */ verdictTile(),
+  /* 89 */ oathLinkTile(), /* 90 */ heatSeamTile(),
 )
 
 const ROWS = Math.ceil(tiles.length / COLS)

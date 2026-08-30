@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-30  
 **Branch:** `codex/bardo-first-sixty-seconds`  
-**Recorded proof head before the final report updates:** `f50ccb14b16b96ce1a5e8317e735f20afb8ef38c`
+**Recorded proof head before the final report updates:** `c696f668548174cc77bfb83d80c1919fa04ed058`
 **Reconciled main:** `2b82d61c9103a34b9abdc535afe165efbad4f630`
 
 The branch now delivers a coherent first minute: the title belongs to the Bardo Gate; DESCEND makes
@@ -27,6 +27,7 @@ its original 16px logical grid.
 - `0c2abd4`, `e8b8ca9`, `ac5bb72` — Acheron shore, Cocytus weep, and Minos verdict dressing.
 - `455a4e9`, `d2b8904`, `b017a2d`, `f50ccb1` — deterministic realm/room evidence and live resize coverage across every first-minute UI surface.
 - `1a4093d` — dagger/heavy stress regeneration now fails on any drift from its committed evidence.
+- `c696f66` — exact room evidence covers every production layout and the real Styx/Phlegethon nodes.
 
 ## The three inherited polish gaps
 
@@ -49,7 +50,9 @@ material, control-strip, procession, and fallen-relic studies; no generated pixe
 `public/` or the approved catalogue. The admitted relic was redrawn through `tools/make-bardo-tiles.ts`
 using 10 canonical colours, binary alpha, and a 12-colour cap. The Hall of Minos study likewise
 stayed reference-only: its admitted result is one code-authored verdict stele and one transparent
-wax-red sentencing rule in the native sheets. `pnpm art approve` was not run.
+wax-red sentencing rule in the native sheets. A later four-realm ImageGen board was deliberately
+rejected as too ornate; only its material premise survived as low iron-link overlays for Styx/Oath
+Court and sparse wine-dark seams for Phlegethon. `pnpm art approve` was not run.
 
 The candidate constraints are in `docs/CHARACTER_HARD_CONSTRAINTS.md`. Dagger and heavy armor each
 render 42 frames across south/north/east, six compiled sheets in total, computed sockets, 1× floor
@@ -99,6 +102,9 @@ At Minos, the existing unequal scale now answers a broken verdict stele and a na
 beneath the Judge. Both are non-solid dress behind the fight lanes; the stele spends no gold and the
 circle at `(13, 8)` remains bare. The exact tick-3,000 combat exhibit is byte-identical across clean
 boots at SHA-256 `2041adda274fce80d0c9dd1ebd22a62df9688dbfbd81a9c284f9aa3f926f704d`.
+At real 640×360 presentation scale, Styx's two iron fastenings remain readable beside the black-water
+banks without resembling pickups; Oath Court repeats the motif at opposite edges; Phlegethon's two
+dead-wine seams read as heat without borrowing bright ember, gold, or the central combat field.
 
 Subjective questions left deliberately open: whether the causeway has the desired emotional weight,
 whether the Veteran relic is poignant rather than merely legible, whether combat reads as satisfying
@@ -116,7 +122,7 @@ user-only gates.** No agent or automated play awarded them.
 | Web package | `pnpm build` green; shipped 2.110 MB vs 4.096 MB budget, 174 files |
 | Browser smoke | `pnpm smoke -- --url http://localhost:5201` green, real keyboard and both endings |
 | Viewport transitions | `pnpm smoke:viewport -- --url http://localhost:5201` green through 640×360 → 1400×600 → 390×844 → 1920×700 → 900×506 → 640×360 across title menu/Settings/Credits, game HUD, and pause menu/Settings; target and UI bounds remain contained, tick stays 0 |
-| Room art | `pnpm room:gate` owns every render and is green across all 13 production-loop layouts, including the named Styx and Phlegethon nodes, dimensions, alpha, palette, material spans, negative space, value, highlights, focality, and browser errors; two complete outputs are byte-identical at SHA-256 `35247bb81f4af78591d9365861e4252b0bf0dbfc78294c1eb5c77ad55f3b2f22` |
+| Room art | `pnpm room:gate` owns every render and is green across all 13 production-loop layouts, including the named Styx and Phlegethon nodes, dimensions, alpha, palette, material spans, negative space, value, highlights, focality, and browser errors; two complete outputs are byte-identical at SHA-256 `0fc6d1c6abe6eda42d8f608ba55d392c11084af4415a784685ead0d015135988` |
 | Realm separation | `pnpm realm-air -- --url http://localhost:5201` owns every render; three clean-room outputs are byte-identical. Median RGB distance 11.31, closest 2.95, widest 16.91, zero temperature violations; no arbitrary pass threshold invented |
 | Regeneration | `pnpm palette`, `pnpm assets`, and `pnpm tiles` deterministic; the 192×288 room sheet and 192×192 prop sheet regenerate byte-identically with no unexplained drift |
 | Shipping sprite gates | 78/3 waived general, 144/2 hero, 144/4 north, 40/1 north roll, 145/2 south, 40/1 south roll; zero blocking |

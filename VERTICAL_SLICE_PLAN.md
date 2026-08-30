@@ -46,6 +46,8 @@ realm separation is 11.31 with no wrong-temperature rooms. Look and Fun
 remain human gates. The
 Hall of Minos now keeps its unequal scale but gains a broken, goldless verdict stele and a narrow
 wax-red sentence behind the boss, without marking the fight circle or changing collision. The
+alternate spines now carry sparse code-authored material motifs rather than tint alone: iron oath
+links at Styx and the Oath Court, dead-wine heat seams at Phlegethon, all outside the fight circle.
 letterbox and target sky now enter the shared frame grade from identical authored colours; exact
 390×844 and 900×506 probes keep all four target boundaries continuous. The attended evidence and
 exact-head ledger are recorded in `MORNING_REPORT.md`.

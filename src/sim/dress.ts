@@ -134,6 +134,8 @@ function dressAntechamber(a: Arena): void {
 function dressOathCourt(a: Arena): void {
   // Same lintel-before-the-judge, walked from the south. Iron, not bronze. No poppy, no pan.
   for (let c = 11; c <= 15; c++) stamp(a, c, 12, T.beam)
+  stamp(a, 6, 11, T.oathLink)
+  stamp(a, 19, 10, T.oathLink)
   stamp(a, 3, 11, T.grate)
   stamp(a, 22, 6, T.silt)
   prop(a, 22, 11, PROP.shard)
@@ -151,6 +153,8 @@ function dressPhlegethon(a: Arena): void {
   stamp(a, 12, 3, T.silt)
   stamp(a, 13, 3, T.silt)
   stamp(a, 14, 3, T.silt)
+  stamp(a, 5, 10, T.heatSeam)
+  stamp(a, 20, 10, T.heatSeam)
   if (a.windows[0]) { a.windows[0].strength = 0.48; a.windows[0].tint = 0xb03010 }
   if (a.braziers[0]) { a.braziers[0].strength = 1.2; a.braziers[0].tint = 0xb03010 }
   if (a.braziers[1]) { a.braziers[1].strength = 0.7; a.braziers[1].tint = 0x8a2410 }
@@ -169,6 +173,8 @@ function dressStyx(a: Arena): void {
   stamp(a, 22, 10, T.grate)
   stamp(a, 2, 12, T.silt)
   stamp(a, 23, 12, T.silt)
+  stamp(a, 3, 4, T.oathLink)
+  stamp(a, 22, 8, T.oathLink)
   prop(a, 4, 12, PROP.shard)
   if (a.windows[0]) { a.windows[0].strength = 0.3; a.windows[0].tint = 0x2a3038 }
   if (a.braziers[0]) { a.braziers[0].strength = 0.4; a.braziers[0].tint = 0x6a7080 }

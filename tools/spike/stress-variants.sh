@@ -40,6 +40,23 @@ run_variant() {
       "$specs/spike-$facing.json" "$clip" "$ref"
   done
   echo "[stress] timing $slug: $clip -> $ref"
+  # The weapon-apex waivers used to be a table inside assemble.mjs, keyed by facing. A greatsword
+  # family now owns three attack chains and a shouldered carry, so which frames break the content
+  # cap is a property of the render, not of a list — and `summarise()` rejects a waiver over a gate
+  # that passes, so a stale list is itself a build failure. Probe once bare, hand the ids the gates
+  # actually raised back to assemble, and let it attach the body-only measurement to each reason.
+  local waive=""
+  for facing in south north east; do
+    pnpm art compile "$specs/spike-$facing.json" >"$out/probe-$facing.log" 2>&1 || true
+    for gate in $(grep -oE "frame:[A-Za-z0-9]+:height" "$out/probe-$facing.log" | sort -u); do
+      waive="$waive,$facing:$(echo "$gate" | cut -d: -f2)"
+    done
+  done
+  waive="${waive#,}"
+  if [ -n "$waive" ]; then
+    echo "[stress] $slug weapon-apex height findings: $waive"
+    node tools/spike/assemble.mjs --renders "$renders" --out "$out" --specs "$specs" --waive "$waive"
+  fi
   local failed=0
   for facing in south north east; do
     echo "[stress] compile $slug/$facing"

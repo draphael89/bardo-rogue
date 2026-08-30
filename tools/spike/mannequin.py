@@ -7,7 +7,7 @@
 #
 # `--weapon none` is the DEFAULT and the identity variant: unarmed is authored FIRST, so a baked
 # weapon can never force the renderer's stock fallback, and its five action cells carry SS8's shared
-# body grammar (hurt, death, dodge, fall, land) instead of an attack chain.
+# body grammar (hurt, dead, dodge, fall, land) instead of an attack chain.
 # Run `node tools/spike/lanes.mjs` BEFORE this script: it proves each authored material still owns
 # its own canon ramp under the exposure below, which is the thing a render cannot tell you.
 #
@@ -320,16 +320,52 @@ for side, sx in (("R", 1), ("L", -1)):
 # spend it at ~2.9 art px of tab standing clear in every facing.
 head_ball.scale.x *= 0.76      # helm/shoulder width 0.46 — the concept exhibit reads about 0.42
 head_ball.scale.y *= 0.72      # DEPTH. y is screen-x in east; an 11-unit-deep skull read as a snout
-head_ball.scale.z *= 0.44
+head_ball.scale.z *= 0.40      # COMPRESSED from 0.44: the recovered envelope is what the crest spends
 
-# ANCHOR 1 — the split crest. Two matched steel tabs, symmetric in X, at ONE depth and ONE height,
-# which is what the concept exhibit shows and what keeps their tops matched in south AND north.
-# (A depth stagger buys east a void but costs north its pair: in a top-down view the near tab drops
-# 0.342 px per unit of depth, and at any stagger wide enough to separate them in east the aft tab
-# falls below the dome and north sees one tab, not two.) East reads the pair as one raised tab with
-# a step in it; that is measured and reported, not claimed.
-for _s, _sx in (("L", -1), ("R", 1)):
-    box("crest" + _s, V(3.0 * _sx, -3.0, HZ + 20.37), 1.0, 0.9, 2.8, "head", MAT_STEEL)
+# ANCHOR 1 — the BROKEN split crest.
+#
+# The previous crest was two matched 2x5.6 steel towers standing 4.2px clear of a round dome at the
+# helm's extreme left and right. Every anchor measured green and it read as EARS — the shape was
+# present, the meaning was not (docs/CHARACTER_HARD_CONSTRAINTS.md records the same verdict as
+# "horns / minotaur"). Four things make a matched pair of thin tabs on the sides of a ball read as
+# ears, and this rebuild inverts all four:
+#   1. aspect — 2px wide standing 4.2px clear is a spike. The tabs are now ~1.7px wide standing
+#      ~3px clear, which is the proportion measured off the concept exhibit (crest 8.5% of figure
+#      height on a 37px body = 3.1px).
+#   2. isolation — two bright objects floating over a dark dome are two objects. `crestBase` is a
+#      steel FIN running fore-aft along the crown, so the tabs are the ends of ONE mass and the void
+#      between them is a NOTCH cut into it, not air between appendages.
+#   3. symmetry — a matched pair is anatomy. This crest is broken: the right tab is intact and
+#      squared, the left is a sheared stub leaning outward off its snapped root. That asymmetry IS
+#      the fiction (SS8.2.4 "something unfinished", applied to a body).
+#   4. depth — the old tabs were 1.8 units deep and read as posts. At 5.2 units they are a fin, and
+#      east (where authored X is DEPTH) reads the pair as a tall crest with a broken step behind it
+#      instead of one anonymous raised tab.
+#
+# THE HEIGHT BUDGET, which is the constraint that governs every number here. North projects
+# z - 0.342*y, so the crest's own depth costs north height, and north idle was ALREADY at the 40px
+# cap with zero headroom. The dome pays for it, never the body: scale.z 0.44 -> 0.40 and the crown
+# top drops 19.0 -> 18.7, and the crest's apex drops 23.17 -> 21.9. Measured north crest apex
+# 24.50 -> 23.88; the north idle body comes down with it.
+# The crest is IRON, not steel, and that is the fix for point 2 rather than a palette preference.
+# Steel tabs on an iron dome are two bright objects with dark air around them, which is what the eye
+# names "ears" — and it is not what the concept exhibit does: there the helm and its crest are ONE
+# dark mass, separated from the ground by outline and by a single lit edge. So the crest joins the
+# helm's own ramp, `crestBase` welds the two tabs into that mass, and exactly one steel cap rides the
+# intact tab as the lit edge (SS2.4: worn metal breaks its highlight into segments).
+# The base is SHALLOW on purpose. North projects z - 0.342*y, so a deep base projects UP and
+# fills the notch: at hy 2.9 the weld swallowed all but one row of the 4px void. hy 1.2 keeps
+# the weld and hands the void back. The TABS carry the fore-aft depth, and they are what east
+# reads as a fin, so nothing is lost there.
+box("crestBase", V(0, -2.6, HZ + 18.85), 3.7, 1.2, 0.3, "head", MAT_IRON)
+# The intact tab lives on +X, and that is deliberate: east projects z + 0.342*x, so the FAR tab
+# reads higher. Intact-far / broken-near is what gives east a legible step instead of a flat tab.
+box("crestR", V(3.0, -2.6, HZ + 20.6), 1.0, 2.3, 1.6, "head", MAT_IRON)
+box("crestCap", V(3.0, -2.6, HZ + 22.04), 1.0, 2.3, 0.32, "head", MAT_STEEL)
+# The stub: shorter, and sheared outward about Y so its top is a diagonal break rather than a
+# squared-off second tower. It keeps the >=4px void (inner faces at x = -2.0 and +2.0).
+box("crestL", V(-3.0, -2.6, HZ + 19.9), 1.0, 2.3, 1.15, "head", MAT_IRON,
+    rot=(0, radians(-22), 0))
 
 # ANCHOR 3 — the face. A flat visor PLATE turns the dome into a great helm (the concept exhibit's
 # helm is a flat dark block, not a ball), and the slit is inset into that plate rather than chasing
@@ -339,9 +375,14 @@ for _s, _sx in (("L", -1), ("R", 1)):
 # A flat CROWN squares off the dome. Without it the tabs rise from the shoulders of a ball and read
 # as ears with air between them and the skull; on a flat crown they read as a crest. The concept
 # exhibit's helm is a block, not a head.
-box("helmCrown", V(0, -3.2, HZ + 17.0), 3.6, 3.7, 2.0, "head", MAT_IRON)
-box("visorPlate", V(0, -6.4, HZ + 16.6), 2.9, 0.7, 2.4, "head", MAT_VISOR)
-box("faceSlit", V(0, -7.3, HZ + 17.3), 2.3, 0.5, 0.8, "head", MAT_SLIT)
+box("helmCrown", V(0, -3.4, HZ + 16.8), 3.6, 3.2, 1.9, "head", MAT_IRON)
+box("visorPlate", V(0, -6.4, HZ + 16.3), 2.9, 0.7, 2.3, "head", MAT_VISOR)
+box("faceSlit", V(0, -7.3, HZ + 17.0), 2.3, 0.5, 0.8, "head", MAT_SLIT)
+# The brow. `mortar` (slit) and `seal0` (visor) are neighbouring canon darks, so at 1x the slit is
+# invisible INSIDE the plate — the whole face reads as one black block and SS3.4's "the face slit
+# must remain readable" quietly fails while every gate stays green. What makes a slit read is the LIT
+# edge above it, not a darker dark: one steel line, and the black below it becomes a slit.
+box("helmBrow", V(0, -7.0, HZ + 18.1), 2.7, 0.85, 0.34, "head", MAT_STEEL)
 box("napeBand", V(0, 1.0, HZ + 17.2), 2.3, 0.5, 1.1, "head", MAT_SLIT)
 
 # ANCHOR 2 — ONE wine garment in five meshes, sized as a GARMENT against a 10.4-unit torso rather
@@ -356,11 +397,54 @@ box("napeBand", V(0, 1.0, HZ + 17.2), 2.3, 0.5, 1.1, "head", MAT_SLIT)
 # collar the cape read as "bright side south" and four north run frames failed light-direction
 # at +1.00 while idle passed at -1.00. Dark only at the hem and the sides is both the correct
 # reading of a hanging garment and the stable one.
-box("capeShadow", V(0, 4.3, HZ + 2.98), 6.5, 1.0, 7.0, "spine", MAT_WINE_DARK)
-box("mantleBack", V(0, 5.1, HZ + 3.6), 5.4, 0.9, 6.5, "spine", MAT_WINE)
-# The ONE asymmetry in the set: the left corner hangs lower. It is why the crest does not have to be
-# asymmetric, and it is what stops the north silhouette being a perfect mirror of itself.
-box("hemNotch", V(-4.4, 4.3, HZ - 5.6), 2.1, 1.0, 1.4, "spine", MAT_WINE_DARK)
+# The dark backing, in two widths so it stays a 1.1-unit material-dark outline around a cape that is
+# no longer a rectangle.
+box("capeShadowUp", V(0, 4.3, HZ + 6.2), 6.5, 1.0, 3.9, "spine", MAT_WINE_DARK)
+box("capeShadowLo", V(0, 4.3, HZ - 1.3), 5.7, 1.0, 3.95, "spine", MAT_WINE_DARK)
+# The panel, TAPERED and shortened at the top so the yoke and the pauldrons own the shoulder line. A
+# cape whose top edge is a straight rule across the full shoulder width, and whose sides are two
+# parallel verticals, is the slab this rebuild exists to end: three stacked widths give the north
+# silhouette a trapezoid instead of a card, and let the pauldrons and the hips read past its edges.
+box("mantleUp", V(0, 5.1, HZ + 5.65), 5.4, 0.9, 2.45, "spine", MAT_WINE)
+box("mantleLo", V(0, 5.1, HZ + 1.0), 4.6, 0.9, 2.4, "spine", MAT_WINE)
+box("mantleYoke", V(0, 5.0, HZ + 9.1), 3.7, 0.85, 1.2, "spine", MAT_WINE)
+# The clasp the cloth hangs FROM. Steel, so it is the same family as the pauldron rims rather than a
+# new bright object, and it is what the folds below it converge toward.
+box("mantleClasp", V(0, 5.05, HZ + 10.5), 2.5, 0.8, 0.42, "spine", MAT_STEEL)
+#
+# THE FOLDS (SS2.5): "a fold is a 1px dark line with a 1px lighter line beside it". The first pass
+# built them as GEOMETRY — 3px diamond ridges turned 45deg so the key resolved each into a lit flank
+# and a shadow flank. It worked arithmetically and failed at 1x: read on the floor value the panel
+# was no longer a card but a BULGE, bright in the middle and dark at both edges, with a lumpy
+# outline where the ridges poked past the hem. Pillow shading is not drapery, and the fold line the
+# rule asks for never survived the 8x downscale as a line.
+#
+# So the folds are drawn, not lit. Each crease is a 1px strip of the cloth's own material-dark value
+# (MAT_WINE_DARK is FLAT, so it quantizes to purple0 whatever the light does) laid on the panel face,
+# with the lit panel either side of it. Three of them, unevenly spaced so the back is not a mirror,
+# tilted about Y so they GATHER toward the clasp and OPEN toward the hem — which is where a hanging
+# garment's folds go, and which also keeps purple0's mean row low. That last part is load-bearing:
+# `familyLightScore` reads the wine form's purple0/purple2/purple3 steps against their mean rows, and
+# creases running the full height would drag the darkest step to the middle of the form.
+# Two creases, not three: the baldric now draws the central break, and at 1x an 11px panel
+# carrying three creases plus a strap plus a hem plus a sigil is speckle, not drapery (SS5.4).
+for _fx, _tilt in ((-2.9, 11), (3.5, -13)):
+    box("mantleCrease%+.1f" % _fx, V(_fx, 6.05, HZ + 1.7), 0.32, 0.28, 3.3, "spine",
+        MAT_WINE_DARK, rot=(0, radians(_tilt), 0))
+# The hem break: a material-dark band across the bottom of the panel, protruding so it carries its
+# own contact shadow. Dark at the hem and nowhere else is both the correct reading of a hanging
+# garment and the STABLE one — `familyLightScore` fits a line through the wine form's luminance
+# steps, and a lit flap below the dark band would put the bright step south and fail SS2.1 Law 2.
+box("mantleHem", V(0, 5.75, HZ - 1.9), 4.55, 0.85, 0.62, "spine", MAT_WINE_DARK)
+# THE BALDRIC, continued round the back. `sashFront` already carries the strap across the chest and
+# `sashClasp` pins it at the shoulder, and the concept exhibit's loudest structural device on the
+# BACK is that same strap crossing the mantle on the diagonal — it is what stops the reference cape
+# reading as a rectangle. Material-dark wine, so it is the cloth's own value and adds no family.
+box("baldricBack", V(0, 6.0, HZ + 4.2), 5.0, 0.3, 0.55, "spine", MAT_WINE_DARK,
+    rot=(0, radians(-34), 0))
+# The ONE asymmetry in the CLOTH: the left corner hangs lower and torn. The crest is broken on the
+# other side, so the two asymmetries cross rather than stack.
+box("hemNotch", V(-4.4, 4.3, HZ - 5.9), 2.1, 1.0, 1.5, "spine", MAT_WINE_DARK)
 box("sashFront", V(0, -3.5, HZ + 7.8), 4.8, 0.9, 1.9, "spine", MAT_WINE, rot=(0, radians(30), 0))
 sphere("waistWrap", V(0, 0, HZ + 1.6), 4.0, 3.1, 1.9, "pelvis", MAT_WINE)
 box("wrapHem", V(0, 0, HZ - 0.2), 3.95, 3.05, 0.4, "pelvis", MAT_WINE_DARK)
@@ -370,14 +454,20 @@ box("wrapHem", V(0, 0, HZ - 0.2), 3.95, 3.05, 0.4, "pelvis", MAT_WINE_DARK)
 # +1.4/side, inside SS6's ~3px allowance; torso +1/side (cape), lower legs and head height base.
 for _s, _sx in (("R", 1), ("L", -1)):
     box("pauldron" + _s, V(5.8 * _sx, -0.4, HZ + 10.8), 3.0, 3.3, 2.0, "upperArm" + _s, MAT_IRON)
-    box("pauldronRim" + _s, V(5.8 * _sx, -0.4, HZ + 12.6), 3.05, 3.35, 0.45, "upperArm" + _s, MAT_STEEL)
+    # SS2.4: "worn metal breaks its highlight into 2-3 segments; a continuous highlight along a full
+    # edge reads as plastic". One 6px rim per shoulder ran unbroken across the whole north shoulder
+    # line and was the brightest thing in the frame — a chrome bar, not a worn pauldron. Two segments
+    # with a 0.9-unit gap, and the gap sits on the OUTBOARD half so the break reads as wear at the
+    # edge that takes the hits.
+    box("pauldronRimA" + _s, V(4.55 * _sx, -0.4, HZ + 12.6), 1.7, 3.35, 0.45, "upperArm" + _s, MAT_STEEL)
+    box("pauldronRimB" + _s, V(7.5 * _sx, -0.4, HZ + 12.6), 1.15, 3.35, 0.45, "upperArm" + _s, MAT_STEEL)
 
 # Gold, exactly twice, both FLAT. SS7: gold marks boundaries and identity, never the armor body.
 # The cape sigil is north's mark (literally the concept exhibit's shot); the baldric clasp is
 # south's. It rides the sash at the SHOULDER, not the hip: measured at the hip, six south run
 # frames swung a bone forearm into 4-neighbour contact with it, which is the boneDim<->gold
 # collision this whole ramp exists to close. At the shoulder the count across 42 cells is zero.
-box("capeSigil", V(0, 5.95, HZ + 6.0), 1.35, 0.35, 1.35, "spine", MAT_GOLD)
+box("capeSigil", V(0, 6.25, HZ + 6.0), 1.35, 0.5, 1.35, "spine", MAT_GOLD)
 box("sashClasp", V(-2.8, -4.4, HZ + 9.4), 0.9, 0.45, 1.0, "spine", MAT_GOLD)
 
 # The stress armor is geometry on the same rig, not a painted overlay. It deliberately changes
@@ -412,31 +502,69 @@ if WEAPON != "none":
     h_tail = arm.matrix_world @ hb.tail_local
     sword_dir = (h_tail - h_head).normalized()
 
-    def sword_box(name, center, hx, hy, hz):
+    # THE BLADE'S ROLL IS PINNED, not tracked. `sword_dir.to_track_quat("Z", "Y")` asks Blender to
+    # aim local Z down the blade while pointing local Y at world up — and at rest the hand bone
+    # points almost straight DOWN, so the hint is nearly anti-parallel to the track axis and the roll
+    # it returns is arbitrary. The whole weapon inherits that roll, which is why the shouldered carry
+    # rendered as a black rod in south (the mortar spine turned to face the camera) and as a lit flat
+    # in north. Building the basis explicitly puts the blade's broad face on the camera axis at rest,
+    # so the flat reads flat and the spine stays a stripe along one edge in every facing.
+    _z = sword_dir.normalized()
+    _y = Vector((0, -1, 0))
+    _y = (_y - _z * _y.dot(_z)).normalized()
+    blade_right = _y.cross(_z).normalized()       # across the flat of the blade
+    blade_rot = Matrix((blade_right, _y, _z)).transposed().to_4x4().to_euler()
+
+    def sword_box(name, center, hx, hy, hz, mat):
         bpy.ops.mesh.primitive_cube_add(size=2, location=center)
         o = bpy.context.active_object
         o.name = name
         o.scale = (hx, hy, hz)
-        o.rotation_euler = sword_dir.to_track_quat("Z", "Y").to_euler()
-        # The blade is the ONE material the unarmed body never authors: `cope` stays off the
-        # unarmed sheet, which IS SS7's "one slot free for the weapon material" — proved by the
-        # compile report's used-colour count rather than asserted. Grip and guard stay iron.
-        o.data.materials.append(MAT_BLADE if "Blade" in name else MAT_IRON)
+        o.rotation_euler = blade_rot
+        o.data.materials.append(mat)
         attach(o, "handR")
         sword.append(o)
         return o
 
+    # THE BLADE IS A VALUE RANGE, NOT A VALUE (SS2.4). One MAT_BLADE slab renders every pixel of a
+    # 23px weapon at brickHi/cope — B5 across the largest bright shape in the frame — which is
+    # exactly SS2.4's "a continuous highlight along a full edge reads as plastic". At 1x the blade
+    # was the loudest thing on the sheet and the body hung off it.
+    #
+    # The fix is a `mortar` SPINE, not a darker blade, and the reason is a measured gate interaction
+    # worth writing down. `familyLightScore` groups by canon family (name minus Hi/Lo/Dim), and a
+    # form with exactly two steps returns +/-1 whatever the evidence: in south heavyContact one iron
+    # form scored +1.00 on two steps whose mean rows were IDENTICAL to one decimal. So the blade must
+    # not become a big two-step form of one family. Dropping its body to MAT_STEEL did exactly that
+    # (brick + brickHi, n=63) and failed south heavyContact at +0.79. Left as MAT_BLADE its two steps
+    # are brickHi (family "brick") and cope (family "cope") — two SINGLE-step forms, which the gate
+    # skips. So the body stays MAT_BLADE and the value range comes from a 1px flat `mortar` spine
+    # along the back edge: the canon's darkest value against a B5 highlight with no midtone between,
+    # which is the rest of SS2.4 read literally, and one flat step the gate also skips.
+    # `cope` stays reachable ONLY through the weapon — SS7's free-slot proof survives intact.
+    #
+    # The grip is BONE-wrapped and the guard is steel, and that is a gate fix as much as a material
+    # choice. `familyLightScore` scores each connected form, and the iron family owns exactly two
+    # canon steps (iron, ironHi), so an iron form is a SIGN TEST that flips on a few pixels. An iron
+    # grip and guard carried overhead put a small dark-iron cluster ABOVE the lit torso and took east
+    # heavyCommit to +0.43 against a +0.35 cap — measured. Bone is a flat single-step mark, so the
+    # grip cannot score at all, and the steel guard joins the blade's own family. It is also what SS7
+    # already says the hero's bone wrapping is for.
     grip_c = h_head + sword_dir * (hb.length * 0.5)
     if WEAPON == "dagger":
-        sword_box("daggerGrip", grip_c - sword_dir * 1.8, 0.48, 0.48, 1.8)
-        sword_box("daggerGuard", h_tail + sword_dir * 0.2, 2.6, 0.65, 0.55)
-        sword_box("daggerBlade", h_tail + sword_dir * 5.3, 1.25, 0.55, 4.8)
+        sword_box("daggerGrip", grip_c - sword_dir * 1.8, 0.48, 0.48, 1.8, MAT_BONE)
+        sword_box("daggerGuard", h_tail + sword_dir * 0.2, 2.6, 0.65, 0.55, MAT_STEEL)
+        sword_box("daggerBlade", h_tail + sword_dir * 5.3, 1.25, 0.55, 4.8, MAT_BLADE)
+        sword_box("daggerSpine", h_tail + sword_dir * 5.3 - blade_right * 0.85,
+                  0.28, 0.56, 4.8, MAT_SLIT)
         WEAPON_TIP = 10.2
         WEAPON_MID = 5.4
     else:
-        sword_box("swordGrip", grip_c - sword_dir * 3.4, 0.55, 0.55, 3.4)
-        sword_box("swordGuard", h_tail + sword_dir * 0.3, 4.5, 0.8, 0.7)
-        sword_box("swordBlade", h_tail + sword_dir * 12.5, 1.6, 0.65, 11.5)
+        sword_box("swordGrip", grip_c - sword_dir * 3.4, 0.55, 0.55, 3.4, MAT_BONE)
+        sword_box("swordGuard", h_tail + sword_dir * 0.3, 4.5, 0.8, 0.7, MAT_STEEL)
+        sword_box("swordBlade", h_tail + sword_dir * 12.5, 1.45, 0.65, 11.5, MAT_BLADE)
+        sword_box("swordSpine", h_tail + sword_dir * 12.5 - blade_right * 0.95,
+                  0.3, 0.66, 11.5, MAT_SLIT)
         WEAPON_TIP = 23.0
         WEAPON_MID = 12.0
 
@@ -583,6 +711,39 @@ SWING_STANCE = [
     ("T", "pelvis", (0, 0, -2.2)),
 ]
 
+# The light chain plants less than the heavy: two quick cuts off a narrow base, weight already moving.
+LIGHT_STANCE = [
+    ("R", "thighR", "Y", -5), ("R", "thighL", "Y", 5),
+    ("R", "shinR", "X", 11), ("R", "shinL", "X", 11),
+    ("R", "thighR", "X", -7), ("R", "thighL", "X", -7),
+    ("T", "pelvis", (0, 0, -1.3)),
+]
+
+# THE CARRY. An armed family that only holds its weapon during the swing is the Kenney-fallback bug
+# wearing a different hat: the player runs the whole room with the blade invisible and it appears out
+# of the hand at the moment of contact. So the greatsword is visible in EVERY armed cell, and idle,
+# run and the shared body grammar get a shouldered carry — right hand at the shoulder, blade up and
+# back over it. Shouldered rather than trailing because a 23px blade dropped to the side either
+# leaves the 64px cell or drives its tip through the ground line; over the shoulder the whole weapon
+# stays in frame at every pose, which is also what the concept exhibit shows. The left arm is left
+# alone on purpose: it keeps its run swing, and a two-handed grip belongs to the attack, not the walk.
+# The blade leans AWAY from the head, not across it, and it goes UP, not out. Two measured failures
+# shaped these three numbers. Aimed up-and-LEFT, a 3px blade sat straight over the helm in idle and
+# all eight run cells and occluded the crest — the one fast recognition hook — in the poses the
+# player sees ninety per cent of the time. Aimed up-and-RIGHT to clear it, east broke instead: east
+# projects z + 0.342*x, so 0.20 of +X on a 23px blade added 1.6px of height and nine east cells
+# (idle, six runs, hurt) went over the 52px content cap. Waiving nine locomotion frames would be
+# armour, not evidence. So the blade rises almost vertically and the SHOULDER carries it clear:
+# upperArmR swings out to +0.48, which moves the whole grip right of the 8px helm without adding a
+# single pixel of east height, and the blade lays BACK over the shoulder (+0.62 of Y) instead of
+# standing straight up: in east, authored Y is screen-X, so every degree of that lean is free height,
+# while in south it reads as the weight of the thing resting on him.
+CARRY = [
+    ("A", "upperArmR", (0.48, -0.26, -0.84)),
+    ("A", "foreArmR", (0.30, -0.20, 0.93)),
+    ("A", "handR", (0.06, 0.62, 0.78)),
+]
+
 POSES = {
     "idle": BASE + [
         ("R", "upperArmR", "Y", -4), ("R", "upperArmL", "Y", 4),
@@ -605,7 +766,12 @@ POSES = {
     ],
     "swingCommit": BASE + SWING_STANCE + [
         ("R", "pelvis", "Z", 4), ("R", "spine", "Z", 8), ("R", "chest", "Z", 2),
-        ("R", "spine", "X", 4), ("R", "head", "Z", -8),
+        # Same correction as the contact frame: the chest tipped back against the spine's forward
+        # pitch so the pauldron and helm top faces stay the highest LIT iron. Measured — without it
+        # east heavyCommit put two iron forms' shadow steps above their lit steps and scored +0.37
+        # against the +0.35 cap.
+        ("R", "spine", "X", 4), ("R", "chest", "X", -8), ("R", "head", "X", -5),
+        ("R", "head", "Z", -8),
         ("A", "upperArmR", (0.18, -0.30, 0.94)),
         ("A", "foreArmR", (0.24, -0.50, 0.83)),
         ("A", "handR", (0.55, -0.45, 0.38)),
@@ -616,7 +782,14 @@ POSES = {
         ("R", "thighL", "X", -22), ("R", "shinL", "X", 16),
         ("R", "thighR", "X", 14), ("R", "shinR", "X", -6),
         ("R", "pelvis", "Z", -8), ("R", "spine", "Z", -18), ("R", "chest", "Z", -8),
-        ("R", "spine", "X", 8), ("R", "head", "Z", 14),
+        # The chest is tipped BACK against the spine's forward pitch, which lifts the pauldron and
+        # helm top faces — the two surfaces most square to the key — clear of the arms. Measured:
+        # with the trunk pitched forward the frame's largest iron form had its lit and its shadow
+        # step at the SAME mean row (35.3 vs 35.3) because the split was left/right rather than
+        # north/south, and `familyLightScore` returns +/-1 on a two-step form whatever the evidence,
+        # so south heavyContact failed light-direction at +0.79 on rounding.
+        ("R", "spine", "X", 8), ("R", "chest", "X", -9), ("R", "head", "X", -7),
+        ("R", "head", "Z", 14),
         ("A", "upperArmR", (-0.10, -0.58, -0.30)),
         ("A", "foreArmR", (-0.16, -0.68, -0.28)),
         ("A", "handR", (-0.40, -0.44, -0.22)),
@@ -645,12 +818,15 @@ POSES = {
     ],
 }
 
-if WEAPON == "none":
-    # SS8's SHARED BODY GRAMMAR, not an attack chain: with no weapon there is no swing to author, and
-    # the five cells the greatsword spends on its arc buy hurt / death / dodge / fall / land instead.
-    # Exactly five, so FRAMES stays 14 and the 4x4 grid needs no compiler work.
-    POSES.pop("swingAnticipate"), POSES.pop("swingCommit"), POSES.pop("swingImpact")
-    POSES.pop("swingFollow"), POSES.pop("swingRecover")
+GRAMMAR = ["hurt", "dead", "dodge", "fall", "land"]
+
+if True:
+    # SS8's SHARED BODY GRAMMAR. It is SHARED, so it is authored unconditionally: the player is hurt,
+    # dies, dodges, falls and lands while holding the greatsword exactly as often as while unarmed,
+    # and an armed catalogue that owns only its swing chain sends the renderer back to the unarmed
+    # body (or to stock) the first time something hits him. The unarmed family spends its five
+    # non-locomotion cells here and nowhere else; the greatsword family carries these AND its three
+    # attack chains.
     POSES.update({
         # Lost initiative: the trunk thrown BACK, head last to arrive, both arms splayed wide so the
         # silhouette gains width exactly where idle had none.
@@ -668,14 +844,14 @@ if WEAPON == "none":
             ("T", "pelvis", (0, 2.8, -1.4)),
         ],
         # A collapse onto the knees, not a lie-down: the pivot still lands on `feetCenter`, and the
-        # cape and crest stay in frame so `identity:sheet:death` still reads as the same character.
+        # cape and crest stay in frame so `identity:sheet:dead` still reads as the same character.
         #
         # LEG ARITHMETIC, because getting it wrong sinks the sprite into the floor and the only
         # symptom is an edge-clearance failure. With a hip drop d, thigh angle a from vertical and
         # an ABSOLUTE shin angle s = a + shin_rotation, the ankle lands at
         #     z = (13.5 - d) - 6.5*cos(a) - 5.4*cos(s)      and standing (0,0,0) gives 1.6.
         # So d = 11.9 - 6.5*cos(a) - 5.4*cos(s) keeps the feet ON the floor at any crouch depth.
-        "death": BASE + [
+        "dead": BASE + [
             ("R", "spine", "X", 26), ("R", "chest", "X", 14), ("R", "head", "X", 22),
             ("R", "pelvis", "Z", 8), ("R", "spine", "Z", 11),
             ("R", "thighR", "X", -10), ("R", "shinR", "X", 112),      # a =10, s =102: heel back, up
@@ -715,6 +891,210 @@ if WEAPON == "none":
             ("T", "pelvis", (0, -1.3, -3.7)),
         ],
     })
+
+# THE VERTICAL ROLL, four airborne phases. It is a SEPARATE SHEET, not four more cells on the body
+# sheet: `src/render/views/player.ts` binds `bardo_hero_{north,south}_roll` and calls
+# `requireRollClip`, which throws unless the sheet declares a `roll` clip of at least four frames.
+# Keeping them out of FRAME_ORDER's action block is also what keeps the 14- and 29-cell body sheets
+# on their existing 4x4 / 6x5 grids, so every gate number already measured on them still stands.
+#
+# The read is COMPACTION, not literal rotation — the shipping 16px art wins on silhouette: a
+# diagonal streak, then two tight balls, then an unfolding. So the tumble is driven from `pelvis`
+# (parent-first, so the whole body follows) and the limbs curl into it, rather than the trunk
+# bending alone, which at this size just reads as a crouch.
+#
+# WHERE THE LIFT LIVES, measured rather than assumed. `feetCenter` is parented to `root`, not to the
+# pelvis, so it does NOT travel with the body: all four roll pivots come out at the same cell px,
+# and the airborne rise is carried by the pelvis translation moving the DRAWING up inside its cell.
+# That is the opposite of the shipping 16px sheet, whose pivots run 28 > 16 > 16 > 28 and whose
+# cells hold a body drawn at rest. Both land the sprite in the same place, because the renderer
+# aligns pivot to the entity's floor position either way; only `grounded: false` matters to the
+# gates, and it is declared for both.
+ROLL = ["dive", "tuck", "apex", "extend"]
+# THE VERTICAL ROLL, four airborne phases, and the ONE pose family authored per facing rather than
+# once in character space.
+#
+# Why it has to be: `apply_ops` poses the body, and only then is the armature turned to face the
+# camera. Every other pose is therefore identical in character space and merely SEEN from a
+# different side. A tumble is not, because the key light is fixed to the room, not to the hero:
+# turned one way the camera gets his lit top surfaces, turned the other it gets his shadowed
+# underside. Measured on this rig, a single shared sign fails outright — the forward tumble put
+# south at Weber 1.26-1.32 and north at 0.71-0.81 against a +1.00 sheet floor, and simply flipping
+# the sign swapped which facing failed. So the turn carries a per-facing sign and the limb curl,
+# which is symmetric and sagittal, is shared. Both sheets then clear §4.3.4 on their own pixels.
+#
+# The magnitudes are not free either. The body is most foreshortened near 60 degrees off vertical
+# (the camera's pitch), so that is where the ball reads; a HARDER curl there makes the sprite TALLER,
+# not rounder, because folding a body that is already end-on swings the head up the screen. Hence a
+# mild curl and a turn that carries the shape.
+ROLL_TURN = {"dive": -44, "tuck": -76, "apex": -110, "extend": -340}
+ROLL_TUMBLE = {"south": -1, "north": 1, "east": -1}
+# Everything except the trunk turn. Kept separate so the turn can take the per-facing sign above
+# without a second copy of the pose table.
+ROLL_LIMBS = {
+    # Launch: legs still trailing (a NEGATIVE — thigh X positive — they have not caught up yet),
+    # arms reaching down the line of travel.
+    "dive": [
+        ("R", "spine", "X", 18), ("R", "chest", "X", 10), ("R", "head", "X", 20),
+        ("R", "thighR", "X", 24), ("R", "shinR", "X", -6),
+        ("R", "thighL", "X", 30), ("R", "shinL", "X", 0),
+        ("A", "upperArmR", (0.34, -0.84, -0.42)), ("A", "foreArmR", (0.18, -0.95, -0.26)),
+        ("A", "upperArmL", (-0.34, -0.84, -0.42)), ("A", "foreArmL", (-0.18, -0.95, -0.26)),
+        ("T", "pelvis", (0, -1.2, 2.2)),
+    ],
+    # The ball: knees up, arms held IN against the trunk. Hanging arms are what kept the first pass
+    # reading as a crouch instead of a tumble.
+    "tuck": [
+        ("R", "spine", "X", 14), ("R", "chest", "X", 8), ("R", "head", "X", 16),
+        ("R", "thighR", "X", -68), ("R", "shinR", "X", 98),
+        ("R", "thighL", "X", -62), ("R", "shinL", "X", 92),
+        ("A", "upperArmR", (0.26, -0.52, -0.81)), ("A", "foreArmR", (0.12, -0.88, -0.46)),
+        ("A", "upperArmL", (-0.26, -0.52, -0.81)), ("A", "foreArmL", (-0.12, -0.88, -0.46)),
+        ("T", "pelvis", (0, -0.9, 5.0)),
+    ],
+    # Over the top, and the highest pivot of the four — which is the lift, since the clip is
+    # `grounded: false` and the pivot is computed from `feetCenter` like everywhere else.
+    "apex": [
+        ("R", "spine", "X", 10), ("R", "chest", "X", 6), ("R", "head", "X", 12),
+        ("R", "thighR", "X", -94), ("R", "shinR", "X", 120),
+        ("R", "thighL", "X", -88), ("R", "shinL", "X", 114),
+        ("A", "upperArmR", (0.24, -0.46, -0.85)), ("A", "foreArmR", (0.10, -0.84, -0.53)),
+        ("A", "upperArmL", (-0.24, -0.46, -0.85)), ("A", "foreArmL", (-0.10, -0.84, -0.53)),
+        ("T", "pelvis", (0, -0.7, 6.0)),
+    ],
+    # Coming out of it, feet first, arms open for the catch. The turn lands 20 degrees short of a
+    # full circle rather than completing it: the state after `dodge` is `free`, so an extend that
+    # ends inverted would pop into idle.
+    "extend": [
+        ("R", "spine", "X", 20), ("R", "chest", "X", 10), ("R", "head", "X", 8),
+        ("R", "thighR", "Y", -8), ("R", "thighL", "Y", 8),
+        ("R", "thighR", "X", -52), ("R", "shinR", "X", 74),
+        ("R", "thighL", "X", -44), ("R", "shinL", "X", 64),
+        ("A", "upperArmR", (0.66, -0.44, -0.61)), ("A", "foreArmR", (0.80, -0.30, -0.52)),
+        ("A", "upperArmL", (-0.66, -0.44, -0.61)), ("A", "foreArmL", (-0.80, -0.30, -0.52)),
+    ],
+}
+
+
+def roll_ops(fname, facing):
+    """The roll pose for one facing: the shared curl, behind a turn that takes this facing's sign."""
+    return (BASE + [("R", "pelvis", "X", ROLL_TURN[fname] * ROLL_TUMBLE[facing])]
+            + ROLL_LIMBS[fname])
+
+
+# Registered so `POSES` stays the single frame-name vocabulary (south's sign, arbitrarily); the
+# render loop calls `roll_ops` for the facing it is actually on.
+POSES.update({f: roll_ops(f, "south") for f in ROLL})
+
+ARC = ["Anticipate", "Commit", "Contact", "Follow", "Recover"]
+
+if WEAPON == "greatsword":
+    # The greatsword owns THREE chains, because the sim does: `player.attack.swings` is a light .0,
+    # a light .1 and a heavy .2, and a family that authors only the heavy makes the two cuts the
+    # player actually spends the fight on borrow a pose that was timed for a 43-tick commitment.
+    # The generic arc authored above IS the heavy (215 deg, 30px lunge, 12-tick startup) — it is
+    # renamed, not rewritten, so the shipped waivers and the measured apex carry over unchanged.
+    for _suf, _old in zip(ARC, ["Anticipate", "Commit", "Impact", "Follow", "Recover"]):
+        POSES["heavy" + _suf] = POSES.pop("swing" + _old)
+    # light .0 — sweep +1, 130 deg, 13px lunge: a fast descending cut from the right shoulder across
+    # to the left hip. Shallow base, short travel, and the trunk does the work the legs do in the
+    # heavy. light .1 — sweep -1, 150 deg, 15px lunge: the RETURN, low-left up to high-right, which
+    # is what makes the chain read as two cuts rather than the same cut played twice.
+    POSES.update({
+        # THE BLADE STAYS LEVEL. A 23px blade on a 64px canvas cannot be raised overhead twice
+        # more: the first pass aimed the light cuts up like the heavy and four frames left the cell
+        # (bladeTip projected to art-px 70 and -6) while three more broke the 52px content cap. The
+        # sim already says what these are — 130 and 150 degrees of arc against the heavy's 215, a
+        # 13/15px lunge against 30 — so they are WAIST-TO-CHEST sweeps that travel across the body
+        # rather than over the head. That is both the fix and the correct reading of a light attack.
+        "light1Anticipate": BASE + LIGHT_STANCE + [
+            ("R", "pelvis", "Z", 10), ("R", "spine", "Z", 19), ("R", "chest", "Z", 9),
+            ("R", "head", "Z", -14), ("R", "spine", "X", -3),
+            ("A", "upperArmR", (0.66, 0.30, -0.30)), ("A", "foreArmR", (0.80, 0.36, 0.10)),
+            ("A", "handR", (0.84, 0.44, 0.31)),
+            ("A", "upperArmL", (0.58, -0.42, -0.42)), ("A", "foreArmL", (0.62, -0.30, 0.30)),
+            ("T", "pelvis", (0, 0.5, -0.5)),
+        ],
+        "light1Commit": BASE + LIGHT_STANCE + [
+            ("R", "pelvis", "Z", 4), ("R", "spine", "Z", 8), ("R", "head", "Z", -6),
+            ("R", "spine", "X", 3),
+            ("A", "upperArmR", (0.70, -0.36, -0.28)), ("A", "foreArmR", (0.78, -0.50, 0.06)),
+            ("A", "handR", (0.74, -0.62, 0.26)),
+            ("A", "upperArmL", (0.50, -0.60, -0.30)), ("A", "foreArmL", (0.46, -0.68, 0.14)),
+            ("T", "pelvis", (0, -0.4, -0.2)),
+        ],
+        "light1Contact": BASE + LIGHT_STANCE + [
+            ("R", "thighR", "X", -16), ("R", "shinR", "X", 20),
+            ("R", "pelvis", "Z", -9), ("R", "spine", "Z", -19), ("R", "chest", "Z", -8),
+            ("R", "spine", "X", 7), ("R", "head", "Z", 12),
+            ("A", "upperArmR", (-0.10, -0.74, -0.30)), ("A", "foreArmR", (-0.40, -0.78, -0.14)),
+            ("A", "handR", (-0.56, -0.80, 0.16)),
+            ("A", "upperArmL", (0.28, -0.74, -0.32)), ("A", "foreArmL", (0.02, -0.86, -0.20)),
+            ("T", "pelvis", (0.4, -1.3, -0.6)),
+        ],
+        "light1Follow": BASE + LIGHT_STANCE + [
+            ("R", "thighR", "X", -10), ("R", "pelvis", "Z", -15), ("R", "spine", "Z", -26),
+            ("R", "chest", "Z", -10), ("R", "spine", "X", 7), ("R", "head", "Z", 18),
+            ("A", "upperArmR", (-0.56, -0.52, -0.36)), ("A", "foreArmR", (-0.76, -0.44, -0.18)),
+            ("A", "handR", (-0.88, -0.36, 0.20)),
+            ("A", "upperArmL", (-0.14, -0.64, -0.52)), ("A", "foreArmL", (-0.28, -0.58, -0.56)),
+            ("T", "pelvis", (0.2, -1.0, -0.3)),
+        ],
+        "light1Recover": BASE + LIGHT_STANCE + [
+            ("R", "pelvis", "Z", -5), ("R", "spine", "Z", -9), ("R", "head", "Z", 6),
+            ("R", "spine", "X", 3),
+            ("A", "upperArmR", (-0.16, -0.40, -0.72)), ("A", "foreArmR", (-0.30, -0.42, 0.20)),
+            ("A", "handR", (-0.52, -0.18, 0.62)),
+            ("A", "upperArmL", (0.18, -0.34, -0.88)), ("A", "foreArmL", (0.14, -0.38, -0.88)),
+            ("T", "pelvis", (0, -0.2, 0.3)),
+        ],
+        # The return. It starts where light .0 finished — low and left — and travels back to the
+        # right, so the two cuts read as one chain rather than the same cut played twice.
+        "light2Anticipate": BASE + LIGHT_STANCE + [
+            ("R", "pelvis", "Z", -12), ("R", "spine", "Z", -21), ("R", "chest", "Z", -9),
+            ("R", "head", "Z", 15), ("R", "spine", "X", 8),
+            ("A", "upperArmR", (-0.60, -0.42, -0.48)), ("A", "foreArmR", (-0.80, -0.36, -0.26)),
+            ("A", "handR", (-0.88, -0.34, -0.16)),
+            ("A", "upperArmL", (-0.18, -0.62, -0.56)), ("A", "foreArmL", (-0.32, -0.56, -0.60)),
+            ("T", "pelvis", (-0.3, 0.4, -0.5)),
+        ],
+        "light2Commit": BASE + LIGHT_STANCE + [
+            ("R", "pelvis", "Z", -5), ("R", "spine", "Z", -9), ("R", "head", "Z", 6),
+            ("R", "spine", "X", 7),
+            ("A", "upperArmR", (-0.52, -0.68, -0.30)), ("A", "foreArmR", (-0.62, -0.72, -0.10)),
+            ("A", "handR", (-0.58, -0.78, 0.08)),
+            ("A", "upperArmL", (-0.20, -0.80, -0.24)), ("A", "foreArmL", (-0.34, -0.76, -0.10)),
+            ("T", "pelvis", (-0.2, -0.6, -0.2)),
+        ],
+        "light2Contact": BASE + LIGHT_STANCE + [
+            ("R", "thighL", "X", -15), ("R", "shinL", "X", 19),
+            ("R", "pelvis", "Z", 10), ("R", "spine", "Z", 20), ("R", "chest", "Z", 9),
+            ("R", "spine", "X", 6), ("R", "head", "Z", -13),
+            ("A", "upperArmR", (0.36, -0.78, -0.24)), ("A", "foreArmR", (0.58, -0.74, -0.06)),
+            ("A", "handR", (0.66, -0.72, 0.18)),
+            ("A", "upperArmL", (-0.04, -0.86, -0.20)), ("A", "foreArmL", (0.22, -0.84, -0.10)),
+            ("T", "pelvis", (-0.4, -1.2, -0.5)),
+        ],
+        "light2Follow": BASE + LIGHT_STANCE + [
+            ("R", "thighL", "X", -8), ("R", "pelvis", "Z", 16), ("R", "spine", "Z", 27),
+            ("R", "chest", "Z", 10), ("R", "spine", "X", 3), ("R", "head", "Z", -19),
+            ("A", "upperArmR", (0.68, -0.40, -0.26)), ("A", "foreArmR", (0.80, -0.26, 0.02)),
+            ("A", "handR", (0.86, -0.10, 0.28)),
+            ("A", "upperArmL", (0.32, -0.68, -0.28)), ("A", "foreArmL", (0.44, -0.58, -0.10)),
+            ("T", "pelvis", (-0.2, -0.7, -0.2)),
+        ],
+        "light2Recover": BASE + LIGHT_STANCE + [
+            ("R", "pelvis", "Z", 6), ("R", "spine", "Z", 10), ("R", "head", "Z", -7),
+            ("R", "spine", "X", 3),
+            ("A", "upperArmR", (0.40, -0.36, -0.62)), ("A", "foreArmR", (0.22, -0.44, 0.60)),
+            ("A", "handR", (-0.20, -0.10, 0.94)),
+            ("A", "upperArmL", (0.20, -0.34, -0.88)), ("A", "foreArmL", (0.14, -0.40, -0.88)),
+            ("T", "pelvis", (0, -0.2, 0.3)),
+        ],
+    })
+    # Every non-attack cell carries the shouldered blade.
+    for _n in ["idle"] + [f"run{i}" for i in range(8)] + GRAMMAR:
+        POSES[_n] = POSES[_n] + CARRY
 
 if WEAPON == "dagger":
     # A short weapon earns a different body. The attack stays low, travels forward, keeps the
@@ -768,10 +1148,26 @@ if WEAPON == "dagger":
         ],
     })
 
-ACTION_FRAMES = (["hurt", "death", "dodge", "fall", "land"] if WEAPON == "none" else
-                 ["swingAnticipate", "swingCommit", "swingImpact", "swingFollow", "swingRecover"])
-FRAME_ORDER = ["idle"] + [f"run{i}" for i in range(8)] + ACTION_FRAMES
-SWORD_FRAMES = {f for f in FRAME_ORDER if f.startswith("swing")}
+DAGGER_ARC = ["swingAnticipate", "swingCommit", "swingImpact", "swingFollow", "swingRecover"]
+GS_ARCS = ["light1" + s for s in ARC] + ["light2" + s for s in ARC] + ["heavy" + s for s in ARC]
+# What the family's non-locomotion cells hold. The greatsword carries BOTH the shared grammar and
+# three attack chains: 1 + 8 + 5 + 15 = 29 cells, which is why its grid is 6x5 and not 4x4.
+ACTION_FRAMES = (GRAMMAR if WEAPON == "none" else
+                 DAGGER_ARC if WEAPON == "dagger" else GRAMMAR + GS_ARCS)
+# ROLL is rendered by every family that has a body, but it is assembled into its OWN sheet, so it is
+# appended AFTER the action block rather than folded into it — that is what leaves the body sheets'
+# cell counts (and every gate number measured on them) exactly where they were.
+# The roll belongs to the UNARMED body and to no armed family, which is the live contract rather
+# than a concession: `src/render/views/player.ts` binds exactly one `bardo_hero_{north,south}_roll`
+# pair and selects it by DIRECTION, never by the equipped arm, so one roll sheet serves every
+# weapon. Rendering it armed also fails on its own terms — a greatsword carried through a tuck
+# throws `bladeTip` to art-px (42.7, 71.3), outside the 64px cell, and CARRY forbids answering that
+# by hiding the blade for four cells.
+FRAME_ORDER = (["idle"] + [f"run{i}" for i in range(8)] + ACTION_FRAMES
+               + (ROLL if WEAPON == "none" else []))
+ATTACK_FRAMES = {f for f in FRAME_ORDER if f in DAGGER_ARC or f in GS_ARCS}
+# The blade is drawn in EVERY cell of an armed family (see CARRY), not only during the attack.
+SWORD_FRAMES = set(FRAME_ORDER) if WEAPON != "none" else set()
 FACING_ROT = {"south": 0.0, "north": pi, "east": pi / 2}
 
 # ---------------------------------------------------------------- render + export
@@ -789,27 +1185,49 @@ for facing in FACINGS:
     for fname in FRAME_ORDER:
         if only and fname not in only:
             continue
-        swing = fname in SWORD_FRAMES
+        attack = fname in ATTACK_FRAMES
         # The dagger lunge travels farther through the body than the greatsword plant. Give those
         # five cells two extra rows of recovery room instead of waiving a clipped foot.
-        if swing:
+        if attack:
             feet_row = 55 if WEAPON == "dagger" else 57
         elif fname.startswith("run"):
             feet_row = 58
-        elif WEAPON == "none" and fname in ACTION_FRAMES:
+        elif fname in GRAMMAR:
             # The five shared-grammar cells travel further through the body than idle does; give
             # them the same three rows of recovery room the greatsword plant gets.
             feet_row = 57
+        elif fname in ROLL:
+            # The roll leaves the floor, so the origin row is set by what swings BELOW it — a trunk
+            # carried past vertical puts head and arms under the world origin — not by standing
+            # height. Four rows of room under the origin, which the tuck and apex actually use.
+            feet_row = 54
         else:
             feet_row = FEET_ROW
-        EAST_OX = {"swingAnticipate": 38, "swingCommit": 34, "swingImpact": 26,
-                   "swingFollow": 26, "swingRecover": 30}
-        origin_x = EAST_OX.get(fname, 32) if facing == "east" and WEAPON == "greatsword" else 32
-        place_camera(feet_row, origin_x)
         for o in sword:
-            o.hide_render = not swing
+            o.hide_render = fname not in SWORD_FRAMES
         reset_pose()
-        apply_ops(POSES[fname])
+        apply_ops(roll_ops(fname, facing) if fname in ROLL else POSES[fname])
+        # AUTO-FRAMING, which replaces the hand-kept east origin table. A 23px blade swung level
+        # through a 130deg arc reaches ~28 art px from the body's centre line, so a centred camera
+        # puts the tip at art-px 69 of a 64px cell — measured, in four south and four north cells of
+        # the first light-chain pass. The table that used to hold five east numbers cannot cover 29
+        # frames x 3 facings, and every number in it was a guess re-checked by eye.
+        # So: project the rig's own markers, pad each by the mass it carries, and slide the camera
+        # until that span is centred. Registration is unaffected because the pivot, anchorX and every
+        # socket are projected AFTER this, from the same camera — the body simply sits off-centre in
+        # its cell and the computed pivot says so, which is what fit "grid" is for.
+        place_camera(feet_row, CANVAS / 2)
+        bpy.context.view_layer.update()
+        span = []
+        for mname, e in MARKERS.items():
+            if mname.startswith("blade") and fname not in SWORD_FRAMES:
+                continue
+            pad = 2.0 if mname.startswith("blade") else 10.0 if mname == "feetCenter" else 5.0
+            ax = world_to_camera_view(scene, cam, e.matrix_world.translation).x * CANVAS
+            span += [ax - pad, ax + pad]
+        origin_x = max(6.0, min(58.0, CANVAS / 2 + (CANVAS / 2 - (min(span) + max(span)) / 2)))
+        place_camera(feet_row, origin_x)
+        bpy.context.view_layer.update()
         bones = {}
         for mname, e in MARKERS.items():
             if mname.startswith("blade") and fname not in SWORD_FRAMES:
@@ -824,6 +1242,17 @@ for facing in FACINGS:
                 print(f"[spike] FIT WARNING {facing}/{fname}: {mname} projects at art-px ({ax:.1f}, {ay:.1f}) — outside the {CANVAS}px cell")
         scene.render.filepath = os.path.join(OUT, facing, fname + ".png")
         bpy.ops.render.render(write_still=True)
+        # The BODY-ONLY pass, for every armed cell. docs/CHARACTER_HARD_CONSTRAINTS.md SS9.3 asks for
+        # the body measured independently against the 40px cap, because the generic character gate
+        # allows a 52px weapon envelope and therefore cannot prove the stricter invariant. The only
+        # way to measure a body under a blade is to render it without one, so this is that render.
+        # `assemble.mjs` reads these and writes the measurement INTO each weapon-apex waiver, which
+        # is what stops "the overage is blade" from being a claim nobody checked.
+        if fname in SWORD_FRAMES:
+            for o in sword:
+                o.hide_render = True
+            scene.render.filepath = os.path.join(OUT, facing, "body-" + fname + ".png")
+            bpy.ops.render.render(write_still=True)
         print(f"[spike] rendered {facing}/{fname}")
 
 rig_path = os.path.join(OUT, "rig.json")

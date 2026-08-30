@@ -103,18 +103,24 @@ async function label(text, w, h = 16) {
     }
     top += CELL + 8
   }
-  // The 4x strip shows the family's five ACTION cells. An unarmed sheet has no swing chain; without
-  // this fallback its strip renders as a labelled blank row.
-  const swing = FRAMES.filter(n => n.startsWith('swing'))
-  if (!swing.length) swing.push(...['hurt', 'death', 'dodge', 'fall', 'land'].filter(n => FRAMES.includes(n)))
-  for (const f of FACINGS) {
-    comp.push({ input: await label(`${f} — ${LABEL} arc 4x: ${swing.join(' > ')}`, 900), left: 4, top })
-    top += 16
-    for (let i = 0; i < swing.length; i++) {
-      const idx = sheets[f].def.frames[swing[i]].i
-      comp.push({ input: await toPng(cellRaw(sheets[f], idx), S4), left: 4 + i * w4, top })
+  // The magnified strips are driven by the sidecar's own CLIPS, not by a name prefix. A family that
+  // owns three attack chains plus a dodge gets four labelled strips per facing, each in the clip's
+  // authored order and tagged with the sim window it binds — which is the thing a reader has to
+  // check: that the pose called "contact" is the one shown while damage is live.
+  const strips = Object.entries(sheets.south.def.clips ?? {})
+    .filter(([name]) => name !== 'run')
+    .map(([name, c]) => [name, c.frames, c.sim?.ref ?? c.timing])
+  if (!strips.length) strips.push([LABEL, FRAMES.slice(9), 'ticks'])
+  for (const [name, frames, ref] of strips) {
+    for (const f of FACINGS) {
+      comp.push({ input: await label(`${f} — clip "${name}" -> ${ref} — 4x: ${frames.join(' > ')}`, 1100), left: 4, top })
+      top += 16
+      for (let i = 0; i < frames.length; i++) {
+        const idx = sheets[f].def.frames[frames[i]].i
+        comp.push({ input: await toPng(cellRaw(sheets[f], idx), S4), left: 4 + i * w4, top })
+      }
+      top += CELL * S4 + 10
     }
-    top += CELL * S4 + 10
   }
   comp.push({ input: await label(`south idle / run4 — 4x`, 300), left: 4, top })
   top += 16

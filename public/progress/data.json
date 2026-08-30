@@ -1,10 +1,14 @@
 {
   "title": "Bardo Rogue",
   "subtitle": "First Gate: rooms-as-data, a generated route, a town that remembers",
-  "updated": "2026-08-30T01:35:00-04:00",
-  "now": "native-room-art",
-  "round": 4,
+  "updated": "2026-08-30T01:52:00-04:00",
+  "now": "title-descent-and-bardo-materials",
+  "round": 5,
   "timeline": [
+    {
+      "t": "01:52",
+      "text": "The first frame belongs to the Gate. The title is now a local left-hand inscription instead of a veil over the room; Settings and Credits are compact steles. DESCEND makes one guarded 1.45s camera passage from the monument to the unarmed body, holds simulation at tick 0, suppresses stray input, snaps for reduced motion, and cannot complete after reset or replay. The Gate itself gained one render-only stepped arch and dark opening without changing a solid cell or adding a light. Live cancellation proof stayed reset after the old transition would have finished; all 882 tests and the room gate are green."
+    },
     {
       "t": "01:35",
       "text": "The target finally sees authored room pixels, not a 16px source enlarged by the 1.5x world. Room cells are 24px, props 48px, simulation remains unchanged, and the bake runs at native density before returning to logical size. A new blocking gate checks source and live-composite dimensions, canon palette, binary alpha, material spans, all four Bardo islands' negative space, frame value/highlight budgets, and full top-1% focality. Exact 640x360 before/after frames are named in shots; Look and Fun are still human calls."

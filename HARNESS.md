@@ -106,6 +106,10 @@ Available once the page has booted (`await page.waitForFunction(() => !!window._
   runs free and the reported tick can overshoot by up to 4.
 - `--eval` runs JS in the page after the ticks and before the screenshot. Set `window.__out = {...}` to get values back
   in the printed JSON (`extra`). The JSON also has `state` (from `__game.state()`), `stats`, and console `errors`.
+- `--press Enter --waitMs 700 --postEval "window.__out = ..."` drives and observes a real-time UI
+  transition after deterministic setup. `--postEval` runs after the wait, immediately before capture.
+- `--postWaitMs 1000` waits again after `--postEval`; use it to prove a cancelled async transition
+  stays cancelled instead of completing late.
 - Then read the PNG. The default is 1920x1080 with the 640x360 render target upscaled 3x. Pass
   `--oneX 1` for the art-review lane: the browser and PNG are exactly 640x360, and the command
   fails if capture dimensions drift.

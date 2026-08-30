@@ -19,6 +19,10 @@ const stepwise = args.stepwise === '1'
 const oneX = args.oneX === '1'
 const mute = args.mute ?? '1'
 const evalJs = args.eval ?? ''  // JS run in the page before the screenshot, e.g. "__game.setInput({attack:true,aimX:1}); __game.step(8)"
+const press = args.press ?? ''
+const waitMs = Math.max(0, +(args.waitMs ?? 0))
+const postEvalJs = args.postEval ?? ''
+const postWaitMs = Math.max(0, +(args.postWaitMs ?? 0))
 const replay = args.replay ? JSON.parse(readFileSync(args.replay, 'utf8')) : null
 mkdirSync('shots', { recursive: true })
 
@@ -44,6 +48,10 @@ if (stepwise) {
   await page.waitForFunction((n) => (window as any).__game.world.tick >= n, ticks, { timeout: 60000 })
 }
 if (evalJs) await page.evaluate((js) => { new Function(js)() }, evalJs)
+if (press) await page.keyboard.press(press)
+if (waitMs) await page.waitForTimeout(waitMs)
+if (postEvalJs) await page.evaluate((js) => { new Function(js)() }, postEvalJs)
+if (postWaitMs) await page.waitForTimeout(postWaitMs)
 // headless rAF can be slow; make sure at least two frames rendered after the last sim change
 const f0 = await page.evaluate(() => (window as any).__game.loop.frameTimes.length)
 await page.waitForFunction((n) => (window as any).__game.loop.frameTimes.length >= n + 2, f0, { timeout: 10000 })

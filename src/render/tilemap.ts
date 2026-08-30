@@ -481,6 +481,12 @@ const C = {
   nave0: 0x343c4c,
   naveWarm: 0x5c503a,
   emberLo: 0xb03010,
+  woodLo: 0x261a16,
+  wood: 0x3c2a22,
+  woodHi: 0x5c4230,
+  purple0: 0x2a0e1c,
+  boneLo: 0x5a4e42,
+  goldDim: 0x8c7040,
 } as const
 
 function px(g: Graphics, x: number, y: number, w: number, h: number, color: number): void {
@@ -488,6 +494,89 @@ function px(g: Graphics, x: number, y: number, w: number, h: number, color: numb
   const x1 = Math.round((x + w) * ROOM_ART_SCALE), y1 = Math.round((y + h) * ROOM_ART_SCALE)
   g.rect(x0, y0, Math.max(1, x1 - x0), Math.max(1, y1 - y0))
   g.fill({ color, alpha: 1 })
+}
+
+function artPx(g: Graphics, x: number, y: number, w: number, h: number, color: number): void {
+  g.rect(Math.round(x), Math.round(y), Math.max(1, Math.round(w)), Math.max(1, Math.round(h)))
+  g.fill({ color, alpha: 1 })
+}
+
+function wearHash(c: number, r: number, salt: number): number {
+  let n = Math.imul(c + 31, 374761393) ^ Math.imul(r + 47, 668265263) ^ Math.imul(salt, 1274126177)
+  n = Math.imul(n ^ (n >>> 13), 1274126177)
+  return n >>> 0
+}
+
+// Coordinate-authored wear breaks the atlas repeat without turning the floor into random noise.
+// Each accepted cell gets one compact low-point cluster, placed near a slab edge and drawn in true
+// source pixels. Overlays are composited afterwards, so a crack or realm material always wins.
+function bakeMaterialWear(g: Graphics, arena: Arena): void {
+  for (let r = 0; r < arena.rows; r++) for (let c = 0; c < arena.cols; c++) {
+    const tile = arena.base[r * arena.cols + c]
+    if (tile < 1 || tile > 60) continue
+    const h = wearHash(c, r, 91)
+    if (h % 5 > 1) continue
+    const x = c * ROOM_ART_TILE + 3 + (h >>> 5) % 16
+    const y = r * ROOM_ART_TILE + 3 + (h >>> 11) % 16
+    const w = 2 + (h >>> 17) % 4
+    artPx(g, x, y, w, 1, h & 1 ? C.grout : C.slate0)
+    if ((h >>> 23) % 3 === 0) artPx(g, x + 1, y + 1, Math.max(1, w - 2), 1, C.mortar)
+  }
+}
+
+// The title screenshot proved the Bardo's destination was a one-cell door in a horizontal wall:
+// functionally correct, compositionally anonymous. This render-only mass grows that existing door
+// into the Gate without changing one solid cell. It is deliberately dark masonry with a broken
+// warm inner edge, not a second light source or a gold portal pasted over the plaza.
+function bakeBardoGate(g: Graphics, arena: Arena): void {
+  if (arena.kind !== 'bardo') return
+  const cx = (arena.door.col + 0.5) * ROOM_ART_TILE
+  const foot = (arena.door.row + 1) * ROOM_ART_TILE
+  // One continuous silhouette first. The earlier study stacked five narrow towers and read as
+  // organ pipes; this one has two pylons, one crown, and one unmistakable absence in the middle.
+  artPx(g, cx - 52, foot - 82, 104, 70, C.mortar)
+  artPx(g, cx - 48, foot - 94, 22, 82, C.woodLo)
+  artPx(g, cx + 26, foot - 94, 22, 82, C.woodLo)
+  artPx(g, cx - 35, foot - 80, 70, 68, C.woodLo)
+  for (const [half, top, h] of [
+    [34, 80, 15], [29, 88, 16], [23, 96, 17], [16, 103, 17], [9, 109, 18],
+  ] as const) {
+    artPx(g, cx - half, foot - top, half * 2, h, C.woodLo)
+  }
+
+  // Re-cut the portal after the mass. Its stepped crown is the focal shape at 1x; the opening is
+  // intentionally unlit because the existing two braziers own every warm pixel in this view.
+  artPx(g, cx - 16, foot - 64, 32, 52, C.void)
+  for (const [half, top, h] of [
+    [15, 69, 8], [13, 75, 8], [10, 81, 8], [6, 86, 8],
+  ] as const) artPx(g, cx - half, foot - top, half * 2, h, C.void)
+
+  // Stone courses and a broken inner arris make the Gate masonry, not a flat UI icon. All accents
+  // stay below the braziers' value; the player still reads first once the camera arrives.
+  for (const y of [foot - 77, foot - 59, foot - 41, foot - 23]) {
+    artPx(g, cx - 47, y, 20, 2, C.mortar)
+    artPx(g, cx + 27, y, 20, 2, C.mortar)
+  }
+  artPx(g, cx - 44, foot - 88, 3, 70, C.woodHi)
+  artPx(g, cx + 41, foot - 88, 3, 70, C.void)
+  artPx(g, cx - 33, foot - 75, 3, 57, C.wood)
+  artPx(g, cx + 30, foot - 75, 3, 57, C.mortar)
+  for (const [x, y, w] of [
+    [cx - 14, foot - 67, 7], [cx - 7, foot - 74, 5],
+    [cx + 2, foot - 74, 5], [cx + 8, foot - 67, 6],
+  ] as const) artPx(g, x, y, w, 1, C.goldDim)
+
+  // Torn ceremonial cloth: enough wine to tie the monument to the Bardo mat, never enough to
+  // compete with the runner. It hangs outside the opening so the destination remains black.
+  artPx(g, cx - 26, foot - 68, 6, 30, C.purple0)
+  artPx(g, cx + 20, foot - 65, 6, 26, C.purple0)
+  artPx(g, cx - 24, foot - 38, 2, 4, C.purple0)
+  artPx(g, cx + 22, foot - 39, 2, 5, C.purple0)
+  artPx(g, cx - 38, foot - 15, 76, 3, C.boneLo)
+  artPx(g, cx - 43, foot - 12, 86, 5, C.woodLo)
+  for (const [x, y, w] of [[-42, -53, 8], [28, -48, 9], [-30, -84, 7], [22, -86, 8]] as const) {
+    artPx(g, cx + x, foot + y, w, 2, C.void)
+  }
 }
 
 // §2.1 Law 3. Wherever two surfaces meet, darken the joint. The wall tiles carry their own
@@ -630,6 +719,7 @@ function bakeGrit(g: Graphics, arena: Arena): void {
  */
 export function buildTilemap(renderer: Renderer, atlas: Atlas, arena: Arena, floorTint = 0xffffff): TilemapView {
   const c = new Container()
+  const overlays = new Container()
   for (let r = 0; r < arena.rows; r++) for (let col = 0; col < arena.cols; col++) {
     const i = r * arena.cols + col
     // Void cells stay TRANSPARENT in the bake (ADR 0001): the screen-space starfield underlay is
@@ -645,9 +735,12 @@ export function buildTilemap(renderer: Renderer, atlas: Atlas, arena: Arena, flo
       const os = new Sprite(atlas.room(o))
       os.position.set(col * ROOM_ART_TILE, r * ROOM_ART_TILE)
       os.scale.set(ROOM_ART_SCALE)
-      c.addChild(os)
+      overlays.addChild(os)
     }
   }
+  const wear = new Graphics()
+  bakeMaterialWear(wear, arena)
+  c.addChild(wear, overlays)
   const g = new Graphics()
   bakeOcclusion(g, arena)
   bakeFurrow(g, arena)
@@ -656,6 +749,7 @@ export function buildTilemap(renderer: Renderer, atlas: Atlas, arena: Arena, flo
   if (arena.kind !== 'bardo') bakeScorch(g, arena)
   bakeGrit(g, arena)
   bakePropShadows(g, arena)
+  bakeBardoGate(g, arena)
   c.addChild(g)
 
   const rt = RenderTexture.create({ width: arena.cols * ROOM_ART_TILE, height: arena.rows * ROOM_ART_TILE, scaleMode: 'nearest' })

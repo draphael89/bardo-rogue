@@ -208,25 +208,34 @@ function slabPiece(f: Ramp, hx: 'L' | 'M' | 'R', vy: 'T' | 'B', v: 0 | 1): Uint8
 // ---------------------------------------------------------------------------
 function matTile(part: 'body' | 'north' | 'south'): Uint8Array {
   const t = makeTile()
-  for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++) {
-    const w = ((x >> 1) + (y >> 1)) & 1            // woven micro pattern, 4 px repeat
-    let col: C = w ? P.purple1 : P.purple0
-    if (chance(x, y, 61, 6)) col = P.purple2       // worn nap catching the key
-    t.set(x, y, col)
+  for (let y = 0; y < ROOM_CELL; y++) for (let x = 0; x < ROOM_CELL; x++) {
+    // A quiet 3px weave at source density. The old logical weave expanded into alternating
+    // 3/4px squares and read as a checkerboard before it read as cloth.
+    const weave = ((Math.floor(x / 3) + Math.floor(y / 3)) & 1) === 0
+    t.pixel(x, y, weave ? P.purple0 : P.purple1)
   }
-  // folds: a 1 px dark line with a 1 px lighter line beside it, converging on the pinned end
-  for (const [fx, sign] of [[4, 1], [9, -1], [12, 1]] as const) {
-    for (let y = 0; y < SIZE; y++) {
-      const x = fx + ((y >> 2) * sign)
-      t.set(x, y, P.purple0)
-      t.set(x + 1, y, P.purple2)
+  // Three broken folds converge rather than forming vertical rails.
+  for (const [fx, sign] of [[5, 1], [13, -1], [18, 1]] as const) {
+    for (let y = 1; y < ROOM_CELL - 1; y++) {
+      if ((y + fx) % 7 === 0) continue
+      const x = fx + Math.floor(y / 6) * sign
+      t.pixel(x, y, P.purple0)
+      if (y % 3 !== 0) t.pixel(x + 1, y, P.purple2)
     }
+  }
+  for (const [x, y] of [[3, 8], [7, 17], [20, 5]] as const) {
+    t.pixel(x, y, P.purple2); t.pixel(x + 1, y, P.purple2)
   }
   // The fringe is a different material (§2.5) but it is not a light: boneDim is B3 and on a
   // B1 floor it put a two-tile bright bar into the frame's top 1 % of luminance, four tiles
   // from the fight (§3.2.5). boneLo is the warm B2 hollow value and still reads as bone.
-  if (part === 'north') for (let x = 0; x < SIZE; x++) { t.set(x, 0, P.woodLo); t.set(x, 1, P.boneLo); t.set(x, 2, P.purple0) }
-  if (part === 'south') for (let x = 0; x < SIZE; x++) { t.set(x, 15, P.woodLo); t.set(x, 14, P.boneLo); t.set(x, 13, P.purple0) }
+  if (part === 'north') for (let x = 0; x < ROOM_CELL; x++) {
+    t.pixel(x, 0, P.woodLo); t.pixel(x, 1, P.boneLo); t.pixel(x, 2, P.purple0)
+  }
+  if (part === 'south') for (let x = 0; x < ROOM_CELL; x++) {
+    t.pixel(x, 23, P.woodLo); t.pixel(x, 22, P.boneLo); t.pixel(x, 21, P.purple0)
+    if (x % 4 === 1) t.pixel(x, 23, P.boneLo)
+  }
   return t.d
 }
 
@@ -263,25 +272,28 @@ function capNorth(): Uint8Array {
 // occlusion strip falling into the floor (§2.1 Law 3).
 function wallFace(variant: 'a' | 'b'): Uint8Array {
   const t = makeTile()
-  for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++) {
+  for (let y = 0; y < ROOM_CELL; y++) for (let x = 0; x < ROOM_CELL; x++) {
     let col: C = P.wood
-    if (y <= 1) col = P.boneLo
-    else if (y === 2) col = P.woodHi
+    if (y <= 2) col = P.boneLo
+    else if (y === 3) col = P.woodHi
     else {
-      const row = Math.floor((y - 3) / 4)
-      const ox = (row & 1) * 5
-      const hx = (x + ox) % 10, hy = (y - 3) % 4
+      const row = Math.floor((y - 4) / 6)
+      const ox = (row & 1) * 7
+      const hx = (x + ox) % 15, hy = (y - 4) % 6
       col = P.wood
       if (hy === 0) col = P.mortar                 // course joint
       else if (hy === 1) col = P.boneLo            // one band up: the lit course face
-      else if (hy === 3) col = P.woodLo
+      else if (hy >= 4) col = P.woodLo
       if (hx === 0) col = P.mortar
-      if (variant === 'b' && hy === 2 && hx > 5) col = P.woodLo
+      if (variant === 'b' && hy === 3 && hx > 8) col = P.woodLo
     }
     if (chance(x, y, 83, 5) && y > 3) col = P.woodLo
-    t.set(x, y, col)
+    t.pixel(x, y, col)
   }
-  for (let x = 0; x < SIZE; x++) { t.set(x, 13, P.woodLo); t.set(x, 14, P.mortar); t.set(x, 15, P.grout) }
+  for (let x = 0; x < ROOM_CELL; x++) {
+    t.pixel(x, 20, P.woodLo); t.pixel(x, 21, P.woodLo)
+    t.pixel(x, 22, P.mortar); t.pixel(x, 23, P.grout)
+  }
   return t.d
 }
 
@@ -438,8 +450,9 @@ function crackTile(k: 0 | 1): Uint8Array {
   // energy of the overlay for no read at 1x, so the lip appears every third step only, and
   // one step up from the floor body rather than four (§2.2 low-contrast joints).
   pts.forEach(([x, y], i) => {
-    t.set(x, y, P.mortar)
-    if (i % 3 === 1) t.set(x, y - 1, P.slate1)
+    const ax = Math.round(x * ROOM_CELL / SIZE), ay = Math.round(y * ROOM_CELL / SIZE)
+    t.pixel(ax, ay, P.mortar)
+    if (i % 3 === 1) t.pixel(ax, ay - 1, P.slate1)
   })
   return t.d
 }
@@ -452,9 +465,9 @@ function pitTile(): Uint8Array {
   // Solid clusters, not a 55 % coin flip over a 3x3: the coin flip is salt-and-pepper and
   // §2.1 Law 1 bans uniform 1 px noise outright. Two values, both BELOW the floor body — a
   // low point is a hollow, and a bright fleck on top of one reads as sparkle (§10.8).
-  for (const [bx, by, w, h] of [[3, 10, 3, 2], [5, 12, 2, 2], [9, 8, 3, 2], [11, 10, 2, 3]] as const) {
-    for (let y = by; y < by + h; y++) for (let x = bx; x < bx + w; x++) t.set(x, y, P.grout)
-    t.set(bx, by, P.mortar); t.set(bx + w - 1, by + h - 1, P.mortar)
+  for (const [bx, by, w, h] of [[4, 15, 5, 2], [8, 18, 3, 3], [14, 11, 5, 2], [17, 15, 3, 4]] as const) {
+    for (let y = by; y < by + h; y++) for (let x = bx; x < bx + w; x++) t.pixel(x, y, P.grout)
+    t.pixel(bx, by, P.mortar); t.pixel(bx + w - 1, by + h - 1, P.mortar)
   }
   return t.d
 }
@@ -463,35 +476,38 @@ function pitTile(): Uint8Array {
 function siltTile(): Uint8Array {
   const t = makeTile()
   t.fill(P.void, 0)
-  for (let y = 9; y < 16; y++) for (let x = 0; x < SIZE; x++) {
-    const col: C = y === 9 ? P.ashFieldLit : y > 13 ? P.riverShadow : chance(x, y, 71, 28) ? P.ashField : P.riverBody
-    t.set(x, y, col)
+  for (let y = 13; y < ROOM_CELL; y++) for (let x = 0; x < ROOM_CELL; x++) {
+    const col: C = y === 13 ? P.ashFieldLit : y > 20 ? P.riverShadow : y % 4 === 0 ? P.ashField : P.riverBody
+    t.pixel(x, y, col)
+  }
+  for (const [x0, x1, y] of [[2, 11, 16], [9, 21, 19], [1, 8, 22]] as const) {
+    for (let x = x0; x <= x1; x++) t.pixel(x, y, P.ashField)
   }
   return t.d
 }
 
 function waterTile(): Uint8Array {
   const t = makeTile()
-  t.fill(P.riverShadow)
-  for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++) {
-    if (chance(x, y, 73, 18)) t.set(x, y, P.riverBody)
-    if (y % 5 === 2 && chance(x, y, 74, 40)) t.set(x, y, P.riverLit)
+  for (let y = 0; y < ROOM_CELL; y++) for (let x = 0; x < ROOM_CELL; x++) {
+    t.pixel(x, y, y > 16 ? P.riverShadow : P.riverBody)
   }
-  for (let x = 2; x < 14; x++) if (x % 3 !== 1) t.set(x, 4, P.riverLit)
+  // Long, broken horizontal reflections. No per-pixel scatter: Lethe is still water.
+  for (const [x0, x1, y, col] of [
+    [2, 12, 5, P.riverLit], [15, 21, 5, P.riverLit],
+    [0, 7, 11, P.riverShadow], [10, 19, 11, P.riverLit],
+    [4, 15, 18, P.riverBody], [18, 23, 18, P.riverLit],
+  ] as const) for (let x = x0; x <= x1; x++) t.pixel(x, y, col)
   return t.d
 }
 
 function grateTile(): Uint8Array {
   const t = makeTile()
   // Overlay cells replace, they do not composite — the water has to live in this tile.
-  t.fill(P.riverShadow)
-  for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++) {
-    if (chance(x, y, 73, 14)) t.set(x, y, P.riverBody)
-  }
-  for (let x = 1; x < 15; x++) { t.set(x, 3, P.iron); t.set(x, 11, P.iron) }
-  for (let y = 2; y < 14; y++) { t.set(4, y, P.iron); t.set(11, y, P.iron) }
-  t.set(4, 3, P.ironHi); t.set(11, 3, P.ironHi)
-  t.set(1, 11, P.mortar); t.set(14, 11, P.mortar)
+  for (let y = 0; y < ROOM_CELL; y++) for (let x = 0; x < ROOM_CELL; x++) t.pixel(x, y, y < 12 ? P.riverBody : P.riverShadow)
+  for (let x = 2; x < 22; x++) { t.pixel(x, 5, P.iron); t.pixel(x, 17, P.iron) }
+  for (let y = 3; y < 21; y++) { t.pixel(6, y, P.iron); t.pixel(17, y, P.iron) }
+  t.pixel(6, 5, P.ironHi); t.pixel(17, 5, P.ironHi)
+  t.pixel(2, 17, P.mortar); t.pixel(21, 17, P.mortar)
   return t.d
 }
 

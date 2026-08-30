@@ -20,14 +20,18 @@
 
 ## STATUS — what has since been built
 
-**Art cycle checkpoint (2026-08-30, `codex/bardo-first-sixty-seconds`).** Room source art now has a
+**Art cycle checkpoints (2026-08-30, `codex/bardo-first-sixty-seconds`).** Room source art now has a
 locked 24px tile / 48px prop contract while simulation and layout remain 16px / 32px logical. The
 static room composite is baked at native art density and returned to logical world size, so the
 640×360 target sees one source pixel per target pixel at the 1.5× world scale. `pnpm room:gate`
 blocks wrong dimensions, partial alpha, palette drift, collapsed material spans, Bardo island
 negative-space loss, composite-size drift, value-budget drift, and top-one-percent focality. Named
-1× before/after frames are in `shots/`; Look and Fun remain human gates. Title, Bardo dressing,
-combat material refinement, and hero stress candidates remain in progress in this cycle.
+1× before/after frames are in `shots/`. The title then became a local left inscription which leaves
+the Bardo Gate visible, with compact Settings/Credits steles and one guarded, reduced-motion-aware
+Gate-to-player descent. The Gate gained render-only architectural mass; collision and replay state
+remain untouched. Live cancellation proof survives beyond the old completion time, the room gate is
+green, and the suite is 882/882. Look and Fun remain human gates. Hero stress candidates and the
+final attended/exact-head ledger remain in progress in this cycle.
 
 The sections below are the plan as written. This block records what was executed against it, so the
 document does not become the next stale audit. Tests: **275 passing**; `pnpm matrix` 100/100 seeds

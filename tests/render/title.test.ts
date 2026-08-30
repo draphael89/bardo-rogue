@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { arrivalBanner, backPause, buildStripLadder, backTitle, confirmTitle, deathCarriedLadder, deathCarriedLine, deathClose, deathReachedLine, deathSentLine, deathTakenLine, duoFooter, hideFightChrome, hidePlaceCaption, homeBanner, keptLabel, meetingVeil, offerAct, offerCardHeight, offerSpoken, pauseFooter, pauseNudge, pauseRows, resolvePause, runStartBanner, shopAct, shopSpoken, showBuildStrip, titleDescend, titleNudge, titleRows, townTally, victoryKeptLine, wrapPauseFocus, wrapTitleFocus } from '@/render/titleMenu'
+import { arrivalBanner, backPause, buildStripLadder, backTitle, confirmTitle, deathCarriedLadder, deathCarriedLine, deathClose, deathReachedLine, deathSentLine, deathTakenLine, duoFooter, hideFightChrome, hidePlaceCaption, homeBanner, keptLabel, meetingVeil, offerAct, offerCardHeight, offerSpoken, pauseFooter, pauseNudge, pauseRows, resolvePause, runStartBanner, shopAct, shopSpoken, showBuildStrip, titleDescend, titleDescentEase, titleNudge, titleRows, townTally, victoryKeptLine, wrapPauseFocus, wrapTitleFocus } from '@/render/titleMenu'
+import { TitleFlow } from '@/titleFlow'
 import { SHOP_COPY } from '@/sim/economy'
 import { clampSlider, nudgeSlider } from '@/sim/storage'
 
@@ -38,6 +39,28 @@ describe('the death card cannot outgrow its stele', () => {
 })
 
 describe('title menu', () => {
+  it('uses a bounded direct ease for the Gate-to-player descent', () => {
+    expect(titleDescentEase(-1)).toBe(0)
+    expect(titleDescentEase(0.5)).toBe(0.5)
+    expect(titleDescentEase(2)).toBe(1)
+    expect(titleDescentEase(0.25)).toBeLessThan(0.25)
+    expect(titleDescentEase(0.75)).toBeGreaterThan(0.75)
+  })
+
+  it('invalidates late audio and camera completions on every cancellation', () => {
+    const flow = new TitleFlow()
+    const first = flow.beginUnlock()!
+    expect(flow.phase).toBe('unlocking')
+    flow.cancel()
+    expect(flow.phase).toBe('idle')
+    expect(flow.beginDescent(first)).toBe(false)
+
+    const second = flow.beginUnlock()!
+    expect(flow.beginDescent(second)).toBe(true)
+    flow.cancel()
+    expect(flow.finish(second)).toBe(false)
+    expect(flow.phase).toBe('idle')
+  })
   it('counts a first death as one descent, not one attempts', () => {
     expect(townTally(1, 0)).toBe('1 DESCENT  ·  UNNAMED')
     expect(townTally(1, 0, 1)).toBe('1 DESCENT  ·  UNNAMED  ·  1 KEPT')

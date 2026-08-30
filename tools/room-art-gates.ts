@@ -143,6 +143,11 @@ async function runtime(url: string, shotDir?: string): Promise<RuntimeRoom[]> {
       if (roomId !== 'bardo') { g.gotoRoom(roomId, { skipRite: true }); g.step(1) }
     }, id)
     await settle(page)
+    // Audio permission can finish booting after __game exists and raise WAKE THE ROOM. The room
+    // frame gate is not allowed to pass on bright title typography, so hide once more after boot's
+    // async boundary and only then sample the live composite.
+    await page.evaluate(() => (window as unknown as { __game: any }).__game.title(false))
+    await settle(page)
     const room = await page.evaluate((roomId) => {
       const g = (window as unknown as { __game: any }).__game
       const p = g.presenter

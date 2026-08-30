@@ -11,6 +11,12 @@ const METER_AT: Record<number, 'master' | 'music' | 'sfx' | undefined> = { 1: 'm
 export type TitlePage = 'menu' | 'settings' | 'credits'
 export type TitleAct = 'none' | 'descend' | 'toggle-still' | 'fullscreen'
 export type TitleNudge = 'none' | 'master' | 'music' | 'sfx'
+export const TITLE_DESCENT_SEC = 1.45
+
+export function titleDescentEase(t: number): number {
+  const x = Math.max(0, Math.min(1, t))
+  return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2
+}
 
 export function titleRows(page: TitlePage): number {
   switch (page) {

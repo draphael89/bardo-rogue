@@ -145,6 +145,11 @@ export class Presenter {
     this.tilemap.setDoorOpen(world.doorOpen)
   }
 
+  resetTitleFocus(): void {
+    this.camera.rest()
+    this.camera.snapFollow()
+  }
+
   setReducedEffects(reduced: boolean) {
     this.reducedEffects = reduced
     this.camera.setReducedEffects(reduced)
@@ -1239,12 +1244,13 @@ export class Presenter {
     // Rounding happens in TARGET pixels: the pivot is quantised to the target grid (round(v*S)/S)
     // and the translation rounded whole, so integer world positions land on whole target pixels.
     const aimX = Math.cos(p.aimAngle), aimY = Math.sin(p.aimAngle)
-    this.camera.update(dtSec, aimX, aimY)
+    const titleFocus = this.title.cameraFocus(w)
+    this.camera.update(dtSec, titleFocus ? 0 : aimX, titleFocus ? 0 : aimY)
     const V = tuning.view, S = V.worldScale
     const pxi = lerp(p.px, p.x, alpha), pyi = lerp(p.py, p.y, alpha)
-    this.camera.follow(pxi, pyi, dtSec)
-    const fx = clampFocus(this.camera.followX, w.arena.cols * TILE, V.width / S)
-    const fy = clampFocus(this.camera.followY, w.arena.rows * TILE, V.height / S)
+    if (!titleFocus) this.camera.follow(pxi, pyi, dtSec)
+    const fx = clampFocus(titleFocus?.x ?? this.camera.followX, w.arena.cols * TILE, V.width / S)
+    const fy = clampFocus(titleFocus?.y ?? this.camera.followY, w.arena.rows * TILE, V.height / S)
     const tx = Math.round(V.width / 2 - fx * S), ty = Math.round(V.height / 2 - fy * S)
     const pxq = Math.round(pxi * S) / S, pyq = Math.round(pyi * S) / S
     this.ra.world.pivot.set(pxq, pyq)

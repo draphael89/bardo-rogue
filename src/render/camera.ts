@@ -63,6 +63,12 @@ export class Camera {
   punchZoom(z: number) { this.zoom = Math.max(this.zoom, 1 + (z - 1) * (this.reducedEffects ? 0.15 : 1)) }
   // A new room must be framed, never scrolled into: the next follow() lands instantly.
   snapFollow() { this.followFresh = true }
+  rest() {
+    this.trauma = 0; this.kickX = 0; this.kickY = 0
+    this.lookX = 0; this.lookY = 0; this.leanX = 0; this.leanY = 0
+    this.leanTX = 0; this.leanTY = 0
+    this.offsetX = 0; this.offsetY = 0; this.rotation = 0; this.zoom = 1
+  }
   follow(tx: number, ty: number, dtSec: number) {
     if (this.followFresh) { this.followX = tx; this.followY = ty; this.followFresh = false; return }
     const k = lerpK(tuning.view.camera.followLerp, dtSec)

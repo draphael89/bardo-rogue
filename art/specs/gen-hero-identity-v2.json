@@ -1,0 +1,29 @@
+{
+  "subject": "the hero of the Bardo: a soldier of every war, dead, walking the road between lives. A lean warrior in dark worn iron plate over wine-dark cloth, a split helm crest breaking the top of the silhouette, a wine-red cape hanging from the shoulders carrying one muted-gold sigil, muted-gold trim only at the plate's edges, bone-pale wrappings at the forearms. UNARMED is the primary identity pose: both hands empty, standing at rest, no weapon anywhere in frame. The greatsword is a separate paired state generated later against this master; when armed he carries it low in both hands, point trailing — carried, never raised. Facing south toward the viewer, seen from the game's high top-down action camera: mostly frontal with a slight overhead tilt, NOT the concept art's isometric projection. Pantheon-neutral: no Greek, Norse, Egyptian, or Aztec iconography anywhere on him — he belongs to every underworld and none.",
+  "size": 64,
+  "kind": "character",
+  "view": "high top-down",
+  "count": 8,
+  "palette": [
+    "mortar",
+    "iron",
+    "ironHi",
+    "slate3",
+    "slateHi",
+    "purple0",
+    "purple1",
+    "purple2",
+    "purple3",
+    "goldDim",
+    "gold",
+    "goldHot",
+    "boneLo",
+    "boneDim",
+    "bone"
+  ],
+  "paletteNote": "Fifteen canon colours, one budget slot deliberately unspent. Iron ramp mortar>iron>ironHi with slate3/slateHi as the 1px worn-edge lights (SS2.4: metal is a value range and its extremes touch): the plate is dark iron at B1-B2 so the wine and gold own the eye. Wine purple0..3 is the cape and underskirt: the full four-step ramp so folds read as drawn shapes (SS2.5), the Brute lesson — starve the wine ramp and a lifted dark wine drifts to the nearest strong red. Gold goldDim/gold/goldHot are threshold accents only (SS8.2.2): the cape sigil, the crest edge, plate rivets — small areas, never an armor body colour. Bone boneLo/boneDim/bone is the forearm wrappings and skirt fringe, the eye's second stop, warm never grey (SS2.6). NO numen: SS1.3.6 reserves that ramp for what touches the beyond — the star pool, Seals, the Ferryman's lantern — and the hero is a walker through the Bardo, not a piece of it. The unspent sixteenth slot is headroom for the paired sword state's steel edge, so hero-plus-greatsword still fits one 16-colour character budget.",
+  "references": [
+    "art/reference/concepts/playbardo-hero-inspiration-01.png"
+  ],
+  "note": "The v2 identity sheet under ADR 0002: 64x64 canvas, visible standing body at most 40px, feet anchored at row 60, authored UNARMED-FIRST with the sword as a separate paired state (SS4.1) so the baked-sword fallback bug can never recur. ONE south-facing master pose, generated as 8 candidates, gated, then approved by a human — the single deliberate human checkpoint in the pipeline. Nothing downstream (directions, sword state, swing chain, hurt, death) may be generated until a master from this batch is approved into art/approved/, because everything after it is conditioned on the master and would inherit its faults. Identity reference: art/reference/concepts/playbardo-hero-inspiration-01.png (dark iron, wine cape, gold sigil, greatsword carried not raised) — the reference lends identity, not projection; candidates match the game camera, not the concept's isometric."
+}

@@ -1,0 +1,44 @@
+{
+  "id": "setpiece.skiff.candidate",
+  "kind": "prop",
+  "input": ".art-cache/setpieces/masters/setpiece-skiff-522.png",
+  "output": ".art-cache/setpieces/compiled/setpiece_skiff.png",
+  "sidecar": ".art-cache/setpieces/compiled/setpiece_skiff.json",
+  "cell": 160,
+  "cols": 1,
+  "rows": 1,
+  "maxColors": 12,
+  "palette": [
+    "void",
+    "mortar",
+    "woodLo",
+    "wood",
+    "woodHi",
+    "iron",
+    "ironHi",
+    "boneLo",
+    "numenDim",
+    "numen",
+    "numenHi",
+    "goldDim"
+  ],
+  "fit": "grid",
+  "chromaKey": false,
+  "coverage": 0.5,
+  "salience": {
+    "minShare": 0.2,
+    "minDelta": 0.16
+  },
+  "frames": [
+    {
+      "name": "skiff",
+      "i": 0
+    }
+  ],
+  "provenance": {
+    "provider": "pixellab",
+    "model": "create_image_pixflux (MCP), seed 522, 176x112, forced canon ramp",
+    "promptFile": ".art-cache/setpieces/prompts/skiff-522.txt"
+  },
+  "registrationNote": "CANDIDATE ONLY. Output stays in .art-cache/setpieces; nothing here is approved. The drawn hull is 143x87 target px, which is 3.0 x 1.8 prop cells at the game's 48px prop pitch, so the shipping form is a 3x2 multi-cell prop mass sharing one sortY at the hull's near gunwale. The 160px cell is a judging canvas only; the skiff is south-anchored in it so the black test reads its real footprint."
+}

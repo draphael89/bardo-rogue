@@ -139,6 +139,17 @@ A candidate is structurally admissible only when all of these are recorded:
 
 Current candidate evidence:
 
+- `.art-cache/spike/stress/unarmed/`: the **unarmed** variant, authored first so no baked weapon can
+  force the renderer's Kenney fallback — which is the fallback the whole opening area is played in.
+  42 deterministic frames (idle, 8-frame run, hurt, death, dodge, fall, land — §8's shared body
+  grammar), three compiled sheets, **507/507 gates, zero waivers** (169 per facing), 1× floor
+  contact sheet and 1× black test. Its one sim-timed clip is `dodge -> player.dodge`, since an
+  unarmed family has no swing chain to bind. Committed exhibits:
+  `docs/pipeline-evidence-unarmed-stress.png` and `docs/pipeline-evidence-unarmed-blacktest.png`.
+- `.art-cache/spike/identity-gs/`: the same body with the greatsword, 531/531 gates and the four
+  pre-existing weapon-apex height waivers, proving the anchors survive a weapon family. This one is
+  an **ungated cache observation**: nothing regenerates it, and `.gitignore` marks that directory
+  disposable, so the number above dies with the cache.
 - `.art-cache/spike/stress/dagger/`: 42 deterministic frames, three compiled sheets, 531/531 gates,
   zero waivers, contact sheet and black test. Committed exhibits:
   `docs/pipeline-evidence-dagger-stress.png` and `docs/pipeline-evidence-dagger-blacktest.png`.
@@ -150,14 +161,43 @@ Current candidate evidence:
   `art/reference/concepts/bardo-hero-heavy-armor-stress-v1.png`: generated pose/silhouette references
   only. They are neither masters nor proof that the Blender candidates have the same finish.
 
-`pnpm art:stress-hero` now fails if either regenerated 1× sheet or black test differs from those four
-committed exhibits. Both variants complete the mechanical portions of admission steps 1–5, and
-branch-wide step 7 is green. They do **not** satisfy this contract's identity anchors: the neutral
-mannequin has no readable split crest or face slit, and its material study does not preserve the
-required wine cloth and restrained-gold mark. Step 6 (in-game candidate motion amid enemies, FX,
-and UI) also remains open because these variants are intentionally not wired into shipping art;
-step 8 is the user's open Look decision. The gate counts therefore prove compact/massive weapon and
-armor-envelope pipeline stress, not structural identity admission or a finished character.
+`pnpm art:stress-hero` runs three variants — `unarmed`, `dagger`, `heavy` — and fails if any
+regenerated 1× sheet or black test differs from those **six** committed exhibits. The dagger and
+heavy exhibits were regenerated deliberately when the identity anchors moved onto the BASE body,
+read at 1× first, and replaced; the unarmed pair is new. Before the unarmed variant was added the
+script had a `weapon = none` naming branch that nothing could reach, and the unarmed evidence rested
+on log lines in a gitignored cache — the numbers were real, but nothing could reproduce them.
+
+**The anchors now exist and are measured** (§3), which the previous version of this paragraph
+recorded as absent:
+
+| Anchor | south | north | east |
+|---|---|---|---|
+| Split crest: rows with exactly two opaque runs, and the void between them | 3 rows, 4px | 4 rows, 4px | 0 rows — one raised tab, no void |
+| Face slit / nape band: `mortar` inside the head bbox of the compiled idle cell | 4×2 px | 6×2 px | 3×4 px |
+| Wine field, share of opaque pixels in the compiled idle cell | 13.3% | 44.9% | 22.3% |
+| Gold, per frame across all 14 cells | 1–12 px, ≤2.6% of opaque, present in all three facings |||
+| Body height, idle (cap 40px, target 37) | 18×36 | 18×39 | 17×39 |
+| Sheet-wide ground separation, median frame Weber (hard floor +1.00) | +1.22 | +1.53 | +1.27 |
+| Colours used of 15 declared (`cope` absent — §7's free weapon slot, proved) | 12 | 10 | 11 |
+
+The east crest is the one measured shortfall against §3.1 and it is geometric, not an oversight: a
+crest split across X projects to a horizontal void in south and north, but in east authored X is
+DEPTH, so the same split produces a vertical step and never a gap. A crest that reads as two tabs in
+east would have to be split fore-and-aft as well, which is four tabs on an 8px-wide helm.
+
+**One thing the measurements do not catch, and it is the first thing a person sees.** Read
+`docs/pipeline-evidence-unarmed-stress.png` at 4×: the split crest passes §3.1 as two tabs with a
+void between them, and it reads as **horns**. The silhouette says minotaur, not fallen soldier. Every
+anchor in the table above is green and the character is still wrong, which is what an anchor is for —
+it proves a shape is present, never that the shape means what it was meant to mean. Fix the crest
+before anyone spends a Look decision on this body; a candidate that ships with horns will be read as
+a beast for the rest of the project.
+
+Step 6 (in-game candidate motion amid enemies, FX, and UI) remains open because these variants are
+intentionally not wired into shipping art; step 8 is the user's open Look decision. The gate counts
+prove structural admissibility and pipeline stress across an unarmed, a compact-weapon, a
+massive-weapon and a heavy-armor variant — not a finished character.
 
 ## 10. Explicit non-locks
 

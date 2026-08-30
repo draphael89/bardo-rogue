@@ -1,0 +1,44 @@
+{
+  "id": "setpiece.gate.candidate",
+  "kind": "prop",
+  "input": ".art-cache/setpieces/masters/setpiece-gate-1002.png",
+  "output": ".art-cache/setpieces/compiled/setpiece_gate.png",
+  "sidecar": ".art-cache/setpieces/compiled/setpiece_gate.json",
+  "cell": 160,
+  "cols": 1,
+  "rows": 1,
+  "maxColors": 12,
+  "palette": [
+    "void",
+    "mortar",
+    "slate0",
+    "nave0",
+    "nave1",
+    "nave2",
+    "goldDim",
+    "gold",
+    "sky",
+    "star",
+    "goldStar",
+    "purple1"
+  ],
+  "fit": "grid",
+  "chromaKey": false,
+  "coverage": 0.5,
+  "salience": {
+    "minShare": 0.2,
+    "minDelta": 0.16
+  },
+  "frames": [
+    {
+      "name": "gate",
+      "i": 0
+    }
+  ],
+  "provenance": {
+    "provider": "pixellab",
+    "model": "create_image_pixflux (MCP), seed 1002, 144x192, forced canon ramp",
+    "promptFile": ".art-cache/setpieces/prompts/gate-1002.txt"
+  },
+  "registrationNote": "CANDIDATE ONLY. Output stays in .art-cache/setpieces; nothing here is approved and nothing enters art/approved or public/assets. The 160px cell is a judging canvas, not a shipping cell: the drawn mass is 124x146 target px, which is 2.6 x 3.0 prop cells at the game's 48px prop pitch, so the shipping form is a 3x4 multi-cell prop mass sharing one sortY (the bell's pattern, src/sim/arena.ts:624-627). salience.minShare is lowered from the 0.25 default to 0.20 so the single-pixel stars in the sky slot survive the majority vote; despeckle's brightness protection already covers them (star is +0.69 luminance over sky, far past protectDelta 0.16). No valueLift: the candidate already measures mean luminance 0.158 against a rendered floor of 0.130, and lifting it would brighten the stone into the wall-cope band that SS2.3 reserves for a 1px cap."
+}

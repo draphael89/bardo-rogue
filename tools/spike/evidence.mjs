@@ -103,7 +103,10 @@ async function label(text, w, h = 16) {
     }
     top += CELL + 8
   }
+  // The 4x strip shows the family's five ACTION cells. An unarmed sheet has no swing chain; without
+  // this fallback its strip renders as a labelled blank row.
   const swing = FRAMES.filter(n => n.startsWith('swing'))
+  if (!swing.length) swing.push(...['hurt', 'death', 'dodge', 'fall', 'land'].filter(n => FRAMES.includes(n)))
   for (const f of FACINGS) {
     comp.push({ input: await label(`${f} — ${LABEL} arc 4x: ${swing.join(' > ')}`, 900), left: 4, top })
     top += 16

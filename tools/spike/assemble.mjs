@@ -33,18 +33,31 @@ const fileVariant = variant.replaceAll('-', '_')
 const model = variant === 'veteran'
   ? `blender-eevee ortho pitch ${rig.pitchDeg}deg, legScale ${rig.legScale}`
   : `blender-eevee ortho pitch ${rig.pitchDeg}deg, legScale ${rig.legScale}, weapon ${rig.weapon}, armor ${rig.armor}`
+      + (rig.sunEnergy === undefined ? '' : `, sun ${rig.sunEnergy}, ambient ${rig.ambientStrength}`)
 const S = rig.scale                     // render px per art px
 const CELL = 64, COLS = 4, ROWS = 4
 const PX = rig.px
 
-const FRAMES = ['idle', 'run0', 'run1', 'run2', 'run3', 'run4', 'run5', 'run6', 'run7',
-  'swingAnticipate', 'swingCommit', 'swingImpact', 'swingFollow', 'swingRecover']
+// The unarmed family spends its five action cells on SS8's shared body grammar; a weapon family
+// spends them on its five-pose attack semantics. Either way the count is 14 and the grid is 4x4.
+const ACTIONS = rig.weapon === 'none'
+  ? ['hurt', 'death', 'dodge', 'fall', 'land']
+  : ['swingAnticipate', 'swingCommit', 'swingImpact', 'swingFollow', 'swingRecover']
+const FRAMES = ['idle', 'run0', 'run1', 'run2', 'run3', 'run4', 'run5', 'run6', 'run7', ...ACTIONS]
 
-// 15 canon colours: iron + slate for the suit, bone for the head, brick/brickHi/cope for the
-// greatsword. brickHi is deliberate (SS12.4): without it the cool ramp jumps 0.62 -> 0.84 in
-// luminance and mid-bright steel snapped to warm bone, so the blade flipped hue between frames.
-const PALETTE = ['mortar', 'seal0', 'iron', 'ironHi', 'slate1', 'slate2', 'slate3', 'slateHi',
-  'brickLo', 'brick', 'brickHi', 'cope', 'boneLo', 'boneDim', 'bone']
+// ONE 15-name ramp, declared IDENTICALLY on the unarmed and the armed sheets so the hero cannot
+// shift hue between states. `node tools/spike/lanes.mjs` is the gate that proves each authored
+// material owns its own steps here; run it before Blender.
+//
+// Dropped from the old slate slate: slate1/2/3 were the cloth this replaces, and slateHi was
+// MEASURED as used zero times in all three facings. Added: the wine lane and gold. `goldDim` is
+// deliberately absent — removing it is what closes the measured boneDim<->goldDim collision
+// (0.0105 weighted OKLab) at the source rather than hoping the vote never lands there.
+// `cope` is declared but authorable only by the blade, so the unarmed sheet leaves it unused: that
+// absence IS SS7's "one slot free in the unarmed state for the weapon material", and the compile
+// report's used-colour count is the proof.
+const PALETTE = ['mortar', 'seal0', 'iron', 'ironHi', 'purple0', 'purple2', 'purple3',
+  'boneLo', 'boneDim', 'bone', 'brickLo', 'brick', 'brickHi', 'cope', 'gold']
 
 // Judged height-cap findings carried per facing, as measured by the gates: the raised greatsword
 // apex exceeds the 52px standing-body cap by design — SS4.1 sanctions exactly this via declared
@@ -58,11 +71,21 @@ const WAIVERS = {
 
 const CLIPS = {
   run: { frames: FRAMES.slice(1, 9), timing: 'ticks', ticks: Array(8).fill(4), loop: true },
-  [rig.weapon === 'dagger' ? 'attack' : 'heavy']: {
-    frames: ['swingAnticipate', 'swingCommit', 'swingImpact', 'swingFollow', 'swingRecover'],
-    timing: 'sim',
-    sim: { ref: rig.weapon === 'dagger' ? 'player.attack.swings.0' : 'player.attack.swings.2', contact: 'swingImpact' },
-  },
+  // The unarmed family has no attack chain to bind. Its one sim-timed clip is the dodge, which
+  // resolves to `player.dodge` (total 20, travel 13 — both real timing windows) and asserts NO
+  // contact, which is legal precisely because that window has no `active` phase. `grounded: false`
+  // is what exempts the airborne apex from the planted-feet gate.
+  ...(rig.weapon === 'none' ? {
+    dodge: {
+      frames: ['dodge', 'fall', 'land'], timing: 'sim', sim: { ref: 'player.dodge' }, grounded: false,
+    },
+  } : {
+    [rig.weapon === 'dagger' ? 'attack' : 'heavy']: {
+      frames: ['swingAnticipate', 'swingCommit', 'swingImpact', 'swingFollow', 'swingRecover'],
+      timing: 'sim',
+      sim: { ref: rig.weapon === 'dagger' ? 'player.attack.swings.0' : 'player.attack.swings.2', contact: 'swingImpact' },
+    },
+  }),
 }
 
 /** Tight bbox of alpha>=128 pixels of one render, in render px. */
@@ -90,14 +113,16 @@ for (const facing of Object.keys(rig.facings)) {
     cells.push(buf)
   }
   const master = join(OUT, `master-${facing}.png`)
+  mkdirSync(OUT, { recursive: true })     // a fresh --out dir must not fail on the first composite
   await sharp({
     create: { width: COLS * PX, height: ROWS * PX, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
   }).composite(cells.map((input, i) => ({ input, left: (i % COLS) * PX, top: Math.floor(i / COLS) * PX })))
     .png().toFile(master)
 
-  // The greatsword's east reach needs shared fit. A dagger does not: using that family-wide scale
-  // on the compact weapon enlarged the body past its height cap, a useful first stress failure.
-  const shared = facing === 'east' && rig.weapon !== 'dagger'
+  // Shared fit belongs to LONG-REACH families, not to a facing — the rule SS5 records after using
+  // the greatsword's east scale on the compact dagger enlarged every east body past the height cap.
+  // An unarmed body has no reach, so it registers on the grid like the dagger does.
+  const shared = facing === 'east' && rig.weapon === 'greatsword'
   const frames = FRAMES.map((name, i) => {
     const bones = rig.facings[facing].frames[name].bones
     const sword = rig.facings[facing].frames[name].sword
@@ -147,11 +172,17 @@ for (const facing of Object.keys(rig.facings)) {
     ...(shared ? { register: [27, 60], margin: 1 } : {}),
     chromaKey: false,
     coverage: 0.5,
-    valueLift: { targetMean: 0.31 },
+    // OFF, and this is a measured change rather than an argument: the previous compile reported
+    // liftGamma 1, i.e. the lift was ALREADY a no-op. But `solveLiftGamma` solves one gamma from
+    // the sheet's own content and applies it BEFORE `nearestIndex`, so the moment a wine field
+    // drags the mean under the target it would move every FLAT mark off its canon value and
+    // silently re-quantize the helm because you added a cape. Off converts a silent colour shift
+    // into a visible ground-separation failure you fix at the light, which is an authored constant.
+    valueLift: false,
     salience: { minShare: 0.22, minDelta: 0.16 },
     frames,
     clips: CLIPS,
-    waivers: (rig.weapon === 'dagger' ? [] : (WAIVERS[facing] ?? [])).map(f => ({
+    waivers: (rig.weapon === 'greatsword' ? (WAIVERS[facing] ?? []) : []).map(f => ({
       gate: `frame:${f}:height`,
       reason: 'The raised greatsword apex IS the tell (SS4.1 weapon-apex waiver, as on the brute): the body is ~33px, well under the cap; the overage is blade. Measured on this compile.',
     })),

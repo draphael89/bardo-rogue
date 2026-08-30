@@ -30,8 +30,11 @@ run_variant() {
     --save-blend "$out/$slug.blend" >"$out/render.log" 2>&1
   echo "[stress] assemble $slug"
   node tools/spike/assemble.mjs --renders "$renders" --out "$out" --specs "$specs"
+  # Which sim-timed clip this rig is supposed to bind. Keep in step with CLIPS in assemble.mjs:
+  # the unarmed family has no swing chain, so its one sim-timed clip is the dodge.
   local clip="heavy" ref="player.attack.swings.2"
   if [ "$weapon" = "dagger" ]; then clip="attack"; ref="player.attack.swings.0"; fi
+  if [ "$weapon" = "none" ]; then clip="dodge"; ref="player.dodge"; fi
   for facing in south north east; do
     node -e 'const [f,c,r]=process.argv.slice(1),s=JSON.parse(require("fs").readFileSync(f)); if(s.clips?.[c]?.sim?.ref!==r) throw new Error(`${f}: ${c} must bind ${r}`)' \
       "$specs/spike-$facing.json" "$clip" "$ref"
@@ -49,9 +52,11 @@ run_variant() {
     echo "[stress] $slug stopped at the real gates; inspect $out/compile-*.log" >&2
     return 1
   fi
+  # Keep this in step with the slug rule in mannequin.py: one naming law, two copies.
   local prefix="spike_veteran"
   if [ "$armor" = "heavy" ]; then prefix="${prefix}_heavy"; fi
   if [ "$weapon" = "dagger" ]; then prefix="${prefix}_dagger"; fi
+  if [ "$weapon" = "none" ]; then prefix="${prefix}_unarmed"; fi
   node tools/spike/evidence.mjs --compiled "$out/compiled" --out "$out" --prefix "$prefix" --label "$slug"
   local committed_contact="docs/pipeline-evidence-$slug-stress.png"
   local committed_black="docs/pipeline-evidence-$slug-blacktest.png"
@@ -66,5 +71,8 @@ run_variant() {
   echo "[stress] PASS $slug -> gates green; regenerated evidence matches committed exhibits"
 }
 
+# The unarmed body first: it is the one the renderer falls back to Kenney stock for, so it is the
+# one whose evidence has to be reproducible rather than a log in a disposable cache.
+run_variant unarmed none base
 run_variant dagger dagger base
 run_variant heavy greatsword heavy

@@ -63,7 +63,9 @@ Court and sparse wine-dark seams for Phlegethon. `pnpm art approve` was not run.
 The candidate constraints are in `docs/CHARACTER_HARD_CONSTRAINTS.md`. Dagger and heavy armor each
 render 42 frames across south/north/east, six compiled sheets in total, computed sockets, 1× floor
 sheets, and black tests. Their 1,062 automated gates have zero blocking failures. This proves the
-pipeline and silhouette constraints, not the final identity or Look.
+mechanical pipeline and equipment envelopes, not the final identity or Look. The evidence mannequin
+does not yet carry the contract's split crest, face slit, or persistent wine/gold identity marks;
+the hard-constraints document records that boundary explicitly.
 
 ## Attended observations
 

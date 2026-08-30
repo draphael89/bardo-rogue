@@ -151,10 +151,13 @@ Current candidate evidence:
   only. They are neither masters nor proof that the Blender candidates have the same finish.
 
 `pnpm art:stress-hero` now fails if either regenerated 1× sheet or black test differs from those four
-committed exhibits. Both variants currently complete admission steps 1–5, and branch-wide step 7 is
-green. Step 6 (in-game candidate motion amid enemies, FX, and UI) remains open because these variants
-are intentionally not wired into shipping art; step 8 is the user's open Look decision. The gate
-counts therefore prove pipeline stress, not full structural admission or a finished identity.
+committed exhibits. Both variants complete the mechanical portions of admission steps 1–5, and
+branch-wide step 7 is green. They do **not** satisfy this contract's identity anchors: the neutral
+mannequin has no readable split crest or face slit, and its material study does not preserve the
+required wine cloth and restrained-gold mark. Step 6 (in-game candidate motion amid enemies, FX,
+and UI) also remains open because these variants are intentionally not wired into shipping art;
+step 8 is the user's open Look decision. The gate counts therefore prove compact/massive weapon and
+armor-envelope pipeline stress, not structural identity admission or a finished character.
 
 ## 10. Explicit non-locks
 

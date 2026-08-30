@@ -20,6 +20,26 @@
 
 ## STATUS — what has since been built
 
+**The hero the renderer can load (2026-08-30, late).** The staged hero candidate was immaculate and
+uninstallable: `src/render/views/player.ts` demands clips `run, dodge, light1, light2, heavy`, frames
+`idle, hurt, dead`, and separate `bardo_hero_{north,south}_roll` sheets with a four-frame `roll`
+clip, while the candidate shipped `light0, light1, heavy`, a frame named `death`, and no roll sheet
+at all — so it would have compiled green, passed 507 gates and then thrown at load. Both halves are
+closed in the generator, never by editing a compiled asset: a single-pass rename in `mannequin.py`
+and `assemble.mjs`, and a new vertical roll (`ROLL_TURN`/`ROLL_TUMBLE`/`ROLL_LIMBS` plus a 2x2 sheet
+emitter) that clears 104/104 gates with zero waivers. The roll measured three things worth keeping —
+a harder curl makes the sprite taller rather than rounder near the camera's 60-degree foreshortening;
+the tumble needs a per-facing sign because the key light belongs to the room and one shared sign put
+north at Weber 0.71-0.81 against a 1.00 floor; and the roll is unarmed-only, which is the live
+contract rather than a concession. The Oath-Bound's shield leaf became a flat `brickLo` mark instead
+of a shaded `brickLo`/`brick` lane, cutting sheet median luminance 0.4122 -> 0.3774 (8.4%) with 78/78
+still green — an honest half-fix that leaves the actor brighter than the hero. The warden, caster and
+charger were deliberately left alone: each passes every automated gate and each fails the one test
+the gates cannot run, and all three need a new silhouette rather than a polish pass. Typecheck exit
+0, 918/918, matrix 78/0 with zero stranded seeds, replay hashes unmoved and `record-bots` correctly
+not run. **Every Kenney placeholder still ships** — `SPRITE` is still seven `tiny_dungeon.png`
+indices — because wiring is a separate change and only the hero's replacement is ready for it.
+
 **Art cycle checkpoints (2026-08-30, `codex/bardo-first-sixty-seconds`).** Room source art now has a
 locked 24px tile / 48px prop contract while simulation and layout remain 16px / 32px logical. The
 static room composite is baked at native art density and returned to logical world size, so the

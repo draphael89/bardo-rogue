@@ -338,3 +338,84 @@ touched, and the four pinned fixtures pass inside the 918.
 3. The `keeperLamp` prop is a grey disc with a white candle. At 1x it reads as a lollipop, and there
    are now two of them on the causeway.
 4. Caster, charger, warden and several weapon sprites are still Kenney. The rooms are not.
+
+---
+
+# Run: the hero the renderer can actually load (2026-08-30, late)
+
+## What was wrong, and it was not the art
+
+The staged hero was immaculate and **uninstallable**. `src/render/views/player.ts` asks a hero sheet
+for clips `run, dodge, light1, light2, heavy` and frames `idle, hurt, dead`, and asks for separate
+`bardo_hero_{north,south}_roll` sheets carrying a `roll` clip of four or more frames. The candidate
+shipped `light0, light1, heavy`, named its death frame `death`, and had **no roll sheet in any
+facing**. `requireHeroClips` and `requireRollClip` would both have thrown at load — a sheet that
+compiles green, passes 507 gates, and then kills the renderer the first time the player dodges.
+
+Both halves are closed **in the generator**. No compiled asset was hand-edited.
+
+- The rename went through `mannequin.py` and `assemble.mjs` in one pass — `light1→light2` before
+  `light0→light1`, so the two cannot collide — plus `death→dead`.
+- The roll is new art: `ROLL_TURN` / `ROLL_TUMBLE` / `ROLL_LIMBS` in `mannequin.py`, a 2×2 sheet
+  emitter in `assemble.mjs`, and two more compiles in `hero-final.sh`.
+  **104/104 gates, zero waivers.**
+
+## Three things the roll measured that were not obvious
+
+1. **A harder curl makes the sprite taller, not rounder.** The body foreshortens hardest around 60°
+   off vertical — the camera's pitch — and folding a body that is already end-on swings its head up
+   the screen. Four iterations went into a tighter and tighter ball before the measurements said the
+   curl was the problem. The turn carries the shape; the curl stays mild.
+2. **The tumble needs a per-facing sign.** The key light belongs to the room, not to the hero. One
+   shared sign put south at Weber 1.26–1.32 and north at 0.71–0.81 against a 1.00 floor; flipping it
+   merely swapped which facing failed `ground-separation`. The roll is now the one pose family
+   authored per facing.
+3. **The roll is unarmed-only**, and that is the live contract rather than a concession: `player.ts`
+   binds one roll pair by direction and never by weapon. Armed it also fails outright — a greatsword
+   through the tuck throws `bladeTip` outside the 64 px cell, and the carry rule forbids hiding the
+   blade to fix it.
+
+## The Oath-Bound: an honest half-fix
+
+Its shield leaf was a *shaded* lane spanning `brickLo` **and** `brick` across the largest mass on the
+actor, which is what made an enemy the brightest thing in the game. The field is now a **flat mark at
+`brickLo`**, handing the sheet's bright line back to the steel rim — which is what the rim was
+authored to be. Measured both ways: sheet median mean-luminance **0.4122 → 0.3774, an 8.4 % cut**,
+78/78 gates still green, zero waivers.
+
+**It does not finish the job.** At 0.3928 the actor is still 1.41× the unarmed hero. Going lower
+needs the leaf below `brickLo`, which the palette lanes forbid without restructuring them — `ironHi`
+is the iron family's, and `slate`/`nave` belong to the floor and to the Judge. That is a design pass.
+I did not make it, and the package says so.
+
+## Declined, with reasons
+
+The warden, the caster and the charger were left alone. Each passes every automated gate and each
+fails the one test the gates cannot run — naming the actor at 1x on black. The warden is a stone
+altar (58×53, wider than tall, 5.2× the hero's area, IoU 0.77–0.79 against the Gate setpiece and
+0.98 between its own two facings). The caster is a pair of legs carrying a mallet, and it is 1.36×
+the hero's height, so the fragile ranged unit out-measures the player. The charger is a brass bar in
+125 opaque pixels. **None of these is a polish pass; all three need a new silhouette**, and a small
+edit that pretended otherwise would have been worse than leaving them staged.
+
+## Gates
+
+`pnpm typecheck` exit 0 · `pnpm test` **918/918** in 80 files, 3.23 s · `pnpm matrix -- --seeds
+1-100` slice-kite **78/100**, slice-naive **0/100**, 100/100 resolved, **0 seeds stranded** ·
+hero compile **507 + 104 + 1212** gates, 0 blocking, 4 waivers (all weapon-apex, each measured) ·
+actors warden 274 / caster 92 / charger 81 / oathbound 78 / dummy 22, all 0 blocking.
+
+**Replay hashes did not move, and `record-bots` was not run.** Every file this run touched is a
+build tool under `tools/spike/`, unreachable from `stepWorld` or `createWorld`. The 16 pinned
+fixtures pass unmodified inside the 918.
+
+## Still not beautiful
+
+1. **Every Kenney placeholder still ships.** `SPRITE` in `src/render/views/shared.ts` is still seven
+   indices into `tiny_dungeon.png`, and that file is still in the manifest after a green build.
+   Approving this package removes zero Kenney pixels — the wiring is a separate change, and only the
+   hero's replacement is ready for it.
+2. The Oath-Bound is still brighter than the hero.
+3. The warden, caster and charger are not figures yet.
+4. `tuck` and `apex` are close cousins in the south roll. It reads as a tumble; it is not the equal
+   of the hand-drawn 16 px roll for personality.

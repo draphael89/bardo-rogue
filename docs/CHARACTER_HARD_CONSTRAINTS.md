@@ -157,6 +157,33 @@ Current candidate evidence:
   four pre-existing greatsword-apex waivers across the three sheets, contact sheet and black test.
   Committed exhibits: `docs/pipeline-evidence-heavy-stress.png` and
   `docs/pipeline-evidence-heavy-blacktest.png`.
+- `.art-cache/spike/hero-final/` (`bash tools/spike/hero-final.sh`, reproducible end to end): the
+  candidate that **satisfies the renderer's contract**, which none of the entries above did. Every
+  earlier variant would have thrown at load: `src/render/views/player.ts` requires clips
+  `run, dodge, light1, light2, heavy` and frames `idle, hurt, dead`, plus separate
+  `bardo_hero_{north,south}_roll` sheets carrying a `roll` clip of at least four frames, and the
+  staged candidates shipped `light0, light1, heavy`, a frame named `death`, and **no roll sheet in
+  any facing**. `requireHeroClips` and `requireRollClip` would both have thrown. Closed in the
+  generator — `tools/spike/mannequin.py` and `tools/spike/assemble.mjs` — never by editing a
+  compiled sheet.
+  - unarmed body, 3 facings, 14 cells: **507/507 gates, zero waivers**.
+  - **vertical roll, south + north, 4 cells each: 104/104 gates, zero waivers.** Frames
+    `dive, tuck, apex, extend`, clip `roll -> player.dodge`, `grounded: false`.
+  - greatsword, 3 facings, 29 cells: **1212/1212**, four weapon-apex height waivers, each carrying a
+    body-only measurement (39.5–42.6 px) taken on that same render with the blade hidden.
+
+  Three facts the roll established, each measured, each now load-bearing in the tool:
+  1. The body foreshortens hardest near 60° off vertical — the camera's own pitch. A **harder curl
+     there makes the sprite taller, not rounder**, because folding a body that is already end-on
+     swings the head up the screen. The tumble is carried by the turn; the curl stays mild.
+  2. The tumble needs a **per-facing sign** (`ROLL_TUMBLE`). The key light is fixed to the room, not
+     to the hero, so one shared sign put south at Weber 1.26–1.32 and north at 0.71–0.81 against the
+     1.00 sheet floor, and flipping the sign only swapped which facing failed. This is the one pose
+     family in the rig that is authored per facing rather than once in character space.
+  3. The roll is **unarmed-only**, which matches the live contract: `player.ts` binds one roll pair
+     and selects it by direction, never by the equipped arm. It also fails on its own terms armed —
+     a greatsword carried through the tuck throws `bladeTip` to art-px (42.7, 71.3), outside the
+     64 px cell, and §5's carry rule forbids answering that by hiding the blade for four cells.
 - `art/reference/concepts/bardo-hero-dagger-stress-v1.png` and
   `art/reference/concepts/bardo-hero-heavy-armor-stress-v1.png`: generated pose/silhouette references
   only. They are neither masters nor proof that the Blender candidates have the same finish.

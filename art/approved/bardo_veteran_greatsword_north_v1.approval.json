@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "id": "veteran.greatsword.north",
+  "file": "bardo_veteran_greatsword_north_v1.png",
+  "sha256": "c92106da5ed056db72d247250bda27275e351fcacc239a625d05ab46f8e82060",
+  "approvedAt": "2026-08-30T18:08:45.352Z",
+  "approvedBy": "david@flatiron.co (via Claude, judged at 1x)",
+  "note": "Approve-on-green, authorised 2026-08-30; judged at 1x. 404 gates per facing, 0 blocking; 4 weapon-apex height waivers, each carrying a body-only measurement on the same render with the blade hidden."
+}

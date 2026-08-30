@@ -1,10 +1,14 @@
 {
   "title": "Bardo Rogue",
   "subtitle": "First Gate: rooms-as-data, a generated route, a town that remembers",
-  "updated": "2026-08-30T01:52:00-04:00",
-  "now": "title-descent-and-bardo-materials",
-  "round": 5,
+  "updated": "2026-08-30T02:03:00-04:00",
+  "now": "hero-stress-contract",
+  "round": 6,
   "timeline": [
+    {
+      "t": "02:03",
+      "text": "Weapon 20 and armor set 30 get a real production answer. One Blender rig now renders base greatsword, dagger-specific body grammar, and silhouette-changing heavy armor without touching approved or shipping art. Dagger and heavy each produced 42 frames across south/north/east, six compiled sheets, computed sockets, 1x floor sheets and black tests: 1,062 gates, zero blocking. The first dagger run failed honestly on cell-edge contact and on reusing a long-weapon east fit for a compact family; the fixes are now written into the draft hard-constraints contract. Two ImageGen studies are committed as references only. The original greatsword catalogue re-rendered in 10 seconds and remained byte-identical at its specs. Human Look lock is still open."
+    },
     {
       "t": "01:52",
       "text": "The first frame belongs to the Gate. The title is now a local left-hand inscription instead of a veil over the room; Settings and Credits are compact steles. DESCEND makes one guarded 1.45s camera passage from the monument to the unarmed body, holds simulation at tick 0, suppresses stray input, snaps for reduced motion, and cannot complete after reset or replay. The Gate itself gained one render-only stepped arch and dark opening without changing a solid cell or adding a light. Live cancellation proof stayed reset after the old transition would have finished; all 882 tests and the room gate are green."

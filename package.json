@@ -23,6 +23,7 @@
     "assets": "tsx tools/import-assets.ts",
     "tiles": "tsx tools/make-bardo-tiles.ts",
     "room:gate": "tsx tools/room-art-gates.ts",
+    "art:stress-hero": "bash tools/spike/stress-variants.sh",
     "sim": "tsx tools/headless.ts",
     "shot": "tsx tools/shot.ts",
     "poses": "tsx tools/poses.ts",

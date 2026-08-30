@@ -28,6 +28,11 @@ const OUT = flag('out', '.art-cache/spike')
 const SPECS = flag('specs', 'art/specs/spike')
 
 const rig = JSON.parse(readFileSync(join(RENDERS, 'rig.json'), 'utf8'))
+const variant = rig.variant ?? 'veteran'
+const fileVariant = variant.replaceAll('-', '_')
+const model = variant === 'veteran'
+  ? `blender-eevee ortho pitch ${rig.pitchDeg}deg, legScale ${rig.legScale}`
+  : `blender-eevee ortho pitch ${rig.pitchDeg}deg, legScale ${rig.legScale}, weapon ${rig.weapon}, armor ${rig.armor}`
 const S = rig.scale                     // render px per art px
 const CELL = 64, COLS = 4, ROWS = 4
 const PX = rig.px
@@ -53,7 +58,7 @@ const WAIVERS = {
 
 const CLIPS = {
   run: { frames: FRAMES.slice(1, 9), timing: 'ticks', ticks: Array(8).fill(4), loop: true },
-  heavy: {
+  [rig.weapon === 'dagger' ? 'attack' : 'heavy']: {
     frames: ['swingAnticipate', 'swingCommit', 'swingImpact', 'swingFollow', 'swingRecover'],
     timing: 'sim',
     sim: { ref: 'player.attack.swings.2', contact: 'swingImpact' },
@@ -90,7 +95,9 @@ for (const facing of Object.keys(rig.facings)) {
   }).composite(cells.map((input, i) => ({ input, left: (i % COLS) * PX, top: Math.floor(i / COLS) * PX })))
     .png().toFile(master)
 
-  const shared = facing === 'east'      // demonstrate BOTH registration lanes of the spec contract
+  // The greatsword's east reach needs shared fit. A dagger does not: using that family-wide scale
+  // on the compact weapon enlarged the body past its height cap, a useful first stress failure.
+  const shared = facing === 'east' && rig.weapon !== 'dagger'
   const frames = FRAMES.map((name, i) => {
     const bones = rig.facings[facing].frames[name].bones
     const sword = rig.facings[facing].frames[name].sword
@@ -124,11 +131,11 @@ for (const facing of Object.keys(rig.facings)) {
   })
 
   const spec = {
-    id: `spike.veteran.${facing}`,
+    id: `spike.${variant}.${facing}`,
     kind: 'character',
     input: master,
-    output: join(OUT, 'compiled', `spike_veteran_${facing}.png`),
-    sidecar: join(OUT, 'compiled', `spike_veteran_${facing}.json`),
+    output: join(OUT, 'compiled', `spike_${fileVariant}_${facing}.png`),
+    sidecar: join(OUT, 'compiled', `spike_${fileVariant}_${facing}.json`),
     cell: CELL, cols: COLS, rows: ROWS,
     maxColors: 16,
     palette: PALETTE,
@@ -144,11 +151,11 @@ for (const facing of Object.keys(rig.facings)) {
     salience: { minShare: 0.22, minDelta: 0.16 },
     frames,
     clips: CLIPS,
-    waivers: (WAIVERS[facing] ?? []).map(f => ({
+    waivers: (rig.weapon === 'dagger' ? [] : (WAIVERS[facing] ?? [])).map(f => ({
       gate: `frame:${f}:height`,
       reason: 'The raised greatsword apex IS the tell (SS4.1 weapon-apex waiver, as on the brute): the body is ~33px, well under the cap; the overage is blade. Measured on this compile.',
     })),
-    provenance: { provider: 'blender-mannequin-spike', model: `blender-eevee ortho pitch ${rig.pitchDeg}deg, legScale ${rig.legScale}` },
+    provenance: { provider: 'blender-mannequin-spike', model },
     registrationNote: 'Pivots, anchorX and sockets are COMPUTED from projected rig bones (rig.json), not judged. Spike output only: .art-cache/spike, never public/assets.',
   }
   mkdirSync(SPECS, { recursive: true })

@@ -1,6 +1,6 @@
 # Concept references — the named bar
 
-These nine images are the visual bar for the graphics overhaul (VERTICAL_SLICE_PLAN.md Revision 6,
+These images are the visual bar and bounded design studies for the graphics overhaul (VERTICAL_SLICE_PLAN.md Revision 6,
 2026-08-29). They are **references, not assets**: never compiled, never shipped, never entered into
 `art/approved/`. The blind-critic protocol (§11.2) uses them as the reference side of every exhibit.
 
@@ -20,3 +20,5 @@ now canonized as the `numen` ramp (§1.2).
 | `playbardo-concept-06-duat-weighing-floor.png` | Duat realm (§9.1) |
 | `playbardo-concept-07-niflheim-rime-court.png` | Niflheim realm (§9.2) |
 | `playbardo-concept-08-mictlan-wind-of-knives.png` | Mictlan realm (§9.3) |
+| `bardo-hero-dagger-stress-v1.png` | Codex ImageGen study (2026-08-30): compact weapon-family body grammar; candidate reference only |
+| `bardo-hero-heavy-armor-stress-v1.png` | Codex ImageGen study (2026-08-30): maximum useful armor silhouette; candidate reference only |

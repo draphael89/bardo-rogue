@@ -22,6 +22,10 @@ const flag = (name, dflt) => {
 }
 const COMPILED = flag('compiled', '.art-cache/spike/compiled')
 const OUT = flag('out', '.art-cache/spike')
+const PREFIX = flag('prefix', 'spike_veteran')
+const LABEL = flag('label', 'greatsword')
+const BLACK_FILE = flag('black', 'blacktest.png')
+const CONTACT_FILE = flag('contact', 'contact-sheet.png')
 
 const FACINGS = ['south', 'north', 'east']
 const CELL = 64
@@ -30,9 +34,9 @@ const GREY = { r: 128, g: 128, b: 128 }
 
 const sheets = {}
 for (const f of FACINGS) {
-  const path = join(COMPILED, `spike_veteran_${f}.png`)
+  const path = join(COMPILED, `${PREFIX}_${f}.png`)
   const { data, info } = await sharp(path).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
-  const def = JSON.parse(readFileSync(join(COMPILED, `spike_veteran_${f}.json`), 'utf8'))
+  const def = JSON.parse(readFileSync(join(COMPILED, `${PREFIX}_${f}.json`), 'utf8'))
   sheets[f] = { data, width: info.width, def }
 }
 const FRAMES = Object.entries(sheets.south.def.frames).sort((a, b) => a[1].i - b[1].i).map(([n]) => n)
@@ -79,8 +83,8 @@ async function label(text, w, h = 16) {
     top += rowH
   }
   await sharp({ create: { width: W, height: top + 4, channels: 4, background: { ...GREY, alpha: 1 } } })
-    .composite(comp).png().toFile(join(OUT, 'blacktest.png'))
-  console.log(`black test -> ${join(OUT, 'blacktest.png')}`)
+    .composite(comp).png().toFile(join(OUT, BLACK_FILE))
+  console.log(`black test -> ${join(OUT, BLACK_FILE)}`)
 }
 
 // ---------------------------------------------------------------- contact sheet
@@ -101,7 +105,7 @@ async function label(text, w, h = 16) {
   }
   const swing = FRAMES.filter(n => n.startsWith('swing'))
   for (const f of FACINGS) {
-    comp.push({ input: await label(`${f} — greatsword arc 4x: ${swing.join(' > ')}`, 900), left: 4, top })
+    comp.push({ input: await label(`${f} — ${LABEL} arc 4x: ${swing.join(' > ')}`, 900), left: 4, top })
     top += 16
     for (let i = 0; i < swing.length; i++) {
       const idx = sheets[f].def.frames[swing[i]].i
@@ -117,6 +121,6 @@ async function label(text, w, h = 16) {
   }
   top += CELL * S4 + 8
   await sharp({ create: { width: W, height: top, channels: 4, background: { ...FLOOR, alpha: 1 } } })
-    .composite(comp).png().toFile(join(OUT, 'contact-sheet.png'))
-  console.log(`contact sheet -> ${join(OUT, 'contact-sheet.png')}`)
+    .composite(comp).png().toFile(join(OUT, CONTACT_FILE))
+  console.log(`contact sheet -> ${join(OUT, CONTACT_FILE)}`)
 }

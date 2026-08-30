@@ -3,6 +3,7 @@
 #   /Applications/Blender.app/Contents/MacOS/Blender -b -noaudio --factory-startup \
 #     --python tools/spike/mannequin.py -- --out .art-cache/spike/renders [--px 512] \
 #     [--leg-scale 1.0] [--facings south,north,east] [--save-blend path.blend]
+#     [--weapon greatsword|dagger] [--armor base|heavy]
 #
 # Builds the locked Veteran recipe (CHARACTER_FOUNDATION.md "Exploration phase" lock: 37px standing,
 # ~2.8 heads, sloped 15px shoulders, 10px stance, 10 deg lean, CoG 0.48) as an armature with named
@@ -41,6 +42,13 @@ LEG_SCALE = float(arg("--leg-scale", "1.0"))
 FACINGS = arg("--facings", "south,north,east").split(",")
 SAVE_BLEND = arg("--save-blend", "")
 ONLY = arg("--only", "")          # comma list of frame names, for quick pose iteration
+WEAPON = arg("--weapon", "greatsword")
+ARMOR = arg("--armor", "base")
+if WEAPON not in ("greatsword", "dagger"):
+    sys.exit(f"[spike] unsupported --weapon {WEAPON!r}; expected greatsword or dagger")
+if ARMOR not in ("base", "heavy"):
+    sys.exit(f"[spike] unsupported --armor {ARMOR!r}; expected base or heavy")
+VARIANT = "veteran" + ("-heavy" if ARMOR == "heavy" else "") + ("-dagger" if WEAPON == "dagger" else "")
 
 # ---------------------------------------------------------------- constants
 CANVAS = 64                       # art px per cell
@@ -191,7 +199,7 @@ HZ = HIP_Z
 sphere("torsoBarrel", V(0, 0.4, HZ + 7.0), 5.2, 4.0, 6.4, "spine", MAT_CLOTH)
 sphere("chestCap", V(0, 0, HZ + 11.3), 4.9, 3.6, 3.2, "chest", MAT_CLOTH)
 box("pelvisBlock", V(0, 0, HZ + 1.6), 3.4, 2.6, 2.2, "pelvis", MAT_IRON)
-sphere("headBall", V(0, -3.0, HZ + 17.7), 5.3, 5.5, 6.8, "head", MAT_BONE)
+head_ball = sphere("headBall", V(0, -3.0, HZ + 17.7), 5.3, 5.5, 6.8, "head", MAT_BONE)
 for side, sx in (("R", 1), ("L", -1)):
     sphere("deltoid" + side, V(5.0 * sx, -0.4, HZ + 10.7), 2.4, 2.5, 2.7, "upperArm" + side, MAT_CLOTH)
     limb_cyl("upperArmM" + side, "upperArm" + side, 1.8, MAT_CLOTH)
@@ -201,7 +209,33 @@ for side, sx in (("R", 1), ("L", -1)):
     limb_cyl("shinM" + side, "shin" + side, 1.7, MAT_CLOTH)
     box("footBox" + side, V(3.2 * sx, -1.7, 0.8), 1.6, 2.7, 0.8, "foot" + side, MAT_IRON)
 
-# Greatsword in the right hand: crude gray blade, guard, grip. Rest blade points down along the arm.
+# The stress armor is geometry on the same rig, not a painted overlay. It deliberately changes
+# shoulder, torso and greave silhouettes while leaving joints, hands and the head readable. This
+# is candidate evidence for the cheap-variation claim; it never enters a shipping asset directory.
+if ARMOR == "heavy":
+    # Reserve the original head envelope for the crest: the helmet compresses the round mannequin
+    # mass, then two plates spend the recovered contour. Without this, the gap exists in 3D but the
+    # head fills it in the 1x black test.
+    head_ball.scale.x *= 0.88
+    head_ball.scale.z *= 0.68
+    box("heavyCuirass", V(0, -1.5, HZ + 8.0), 5.7, 3.5, 5.8, "spine", MAT_IRON)
+    box("heavyChestLip", V(0, -3.6, HZ + 10.8), 5.2, 0.8, 1.0, "chest", MAT_STEEL)
+    box("heavyFauld", V(0, -0.4, HZ + 0.4), 4.8, 3.2, 1.8, "pelvis", MAT_IRON)
+    for side, sx in (("R", 1), ("L", -1)):
+        box("heavyPauldron" + side, V(6.0 * sx, -0.4, HZ + 10.6), 3.1, 3.4, 2.2,
+            "upperArm" + side, MAT_IRON)
+        box("heavyGreave" + side, V(3.2 * sx, -0.4, 4.2), 2.1, 2.2, 3.5,
+            "shin" + side, MAT_IRON)
+    # Split crest: two short plates with a void between them, the identity anchor that armor may
+    # strengthen but never replace with horns or a continuous plume.
+    # The first stress render made these 4px taller and quietly took north idle/run to 44–45px.
+    # Seat the split plates inside the canonical head envelope: armor may reshape the hook, not buy
+    # four more body pixels under the generic 52px content gate.
+    box("crestL", V(-2.0, -2.4, HZ + 20.3), 1.2, 1.0, 4.1, "head", MAT_STEEL)
+    box("crestR", V(2.0, -2.4, HZ + 20.3), 1.2, 1.0, 4.1, "head", MAT_STEEL)
+
+# Weapon in the right hand. Greatsword is the established stress proof; dagger is intentionally
+# short enough that a broad two-handed arc cannot fake a distinct family at 1x.
 hb = arm_data.bones["handR"]
 h_head = arm.matrix_world @ hb.head_local
 h_tail = arm.matrix_world @ hb.tail_local
@@ -222,9 +256,18 @@ def sword_box(name, center, hx, hy, hz):
 
 
 grip_c = h_head + sword_dir * (hb.length * 0.5)
-sword_box("swordGrip", grip_c - sword_dir * 3.4, 0.55, 0.55, 3.4)
-sword_box("swordGuard", h_tail + sword_dir * 0.3, 4.5, 0.8, 0.7)
-sword_box("swordBlade", h_tail + sword_dir * 12.5, 1.6, 0.65, 11.5)
+if WEAPON == "dagger":
+    sword_box("daggerGrip", grip_c - sword_dir * 1.8, 0.48, 0.48, 1.8)
+    sword_box("daggerGuard", h_tail + sword_dir * 0.2, 2.6, 0.65, 0.55)
+    sword_box("daggerBlade", h_tail + sword_dir * 5.3, 1.25, 0.55, 4.8)
+    WEAPON_TIP = 10.2
+    WEAPON_MID = 5.4
+else:
+    sword_box("swordGrip", grip_c - sword_dir * 3.4, 0.55, 0.55, 3.4)
+    sword_box("swordGuard", h_tail + sword_dir * 0.3, 4.5, 0.8, 0.7)
+    sword_box("swordBlade", h_tail + sword_dir * 12.5, 1.6, 0.65, 11.5)
+    WEAPON_TIP = 23.0
+    WEAPON_MID = 12.0
 
 # ---------------------------------------------------------------- marker empties (the rig's registration truth)
 MARKERS = {}
@@ -247,8 +290,8 @@ sp = arm_data.bones["spine"]
 marker("spine", arm.matrix_world @ ((sp.head_local + sp.tail_local) / 2), "spine")
 hd = arm_data.bones["head"]
 marker("head", arm.matrix_world @ ((hd.head_local + hd.tail_local) / 2), "head")
-marker("bladeTip", h_tail + sword_dir * 23.0, "handR")
-marker("bladeMid", h_tail + sword_dir * 12.0, "handR")
+marker("bladeTip", h_tail + sword_dir * WEAPON_TIP, "handR")
+marker("bladeMid", h_tail + sword_dir * WEAPON_MID, "handR")
 
 # ---------------------------------------------------------------- camera + light
 cam_data = bpy.data.cameras.new("cam")
@@ -424,6 +467,58 @@ POSES = {
     ],
 }
 
+if WEAPON == "dagger":
+    # A short weapon earns a different body. The attack stays low, travels forward, keeps the
+    # off-hand between chest and threat, and recovers inside the silhouette. Reusing the greatsword
+    # arc with a shorter mesh would be the exact "weapon glued to a hand" failure this stress lane
+    # exists to expose.
+    DAGGER_STANCE = [
+        ("R", "thighR", "Y", -5), ("R", "thighL", "Y", 5),
+        ("R", "shinR", "X", 22), ("R", "shinL", "X", 18),
+        ("R", "thighR", "X", -17), ("R", "thighL", "X", -12),
+        ("T", "pelvis", (0, 0, -3.0)),
+    ]
+    POSES.update({
+        "swingAnticipate": BASE + DAGGER_STANCE + [
+            ("R", "pelvis", "Z", -10), ("R", "spine", "Z", -18), ("R", "spine", "X", 9),
+            ("A", "upperArmR", (-0.45, 0.30, 0.12)), ("A", "foreArmR", (-0.66, 0.18, 0.08)),
+            ("A", "handR", (-0.75, 0.12, 0.02)),
+            ("A", "upperArmL", (0.20, -0.72, 0.28)), ("A", "foreArmL", (0.18, -0.82, 0.12)),
+            ("T", "pelvis", (0, 0.8, -0.6)),
+        ],
+        "swingCommit": BASE + DAGGER_STANCE + [
+            ("R", "thighR", "X", -28), ("R", "shinR", "X", 36),
+            ("R", "pelvis", "Z", 5), ("R", "spine", "Z", 12), ("R", "spine", "X", 12),
+            ("A", "upperArmR", (0.38, -0.78, 0.10)), ("A", "foreArmR", (0.62, -0.74, 0.05)),
+            ("A", "handR", (0.82, -0.52, 0.02)),
+            ("A", "upperArmL", (-0.12, -0.78, 0.22)), ("A", "foreArmL", (-0.18, -0.86, 0.10)),
+            ("T", "pelvis", (0, -1.2, -1.4)),
+        ],
+        "swingImpact": BASE + DAGGER_STANCE + [
+            ("R", "thighR", "X", -34), ("R", "shinR", "X", 42),
+            ("R", "thighL", "X", 8), ("R", "pelvis", "Z", 15), ("R", "spine", "Z", 24),
+            ("R", "spine", "X", 14), ("R", "head", "Z", -12),
+            ("A", "upperArmR", (0.78, -0.50, 0.05)), ("A", "foreArmR", (0.92, -0.30, 0.02)),
+            ("A", "handR", (0.98, -0.12, 0.00)),
+            ("A", "upperArmL", (-0.24, -0.70, 0.20)), ("A", "foreArmL", (-0.32, -0.78, 0.08)),
+            ("T", "pelvis", (0.8, -2.0, -1.8)),
+        ],
+        "swingFollow": BASE + DAGGER_STANCE + [
+            ("R", "pelvis", "Z", 24), ("R", "spine", "Z", 31), ("R", "head", "Z", -18),
+            ("A", "upperArmR", (-0.45, -0.62, 0.04)), ("A", "foreArmR", (-0.66, -0.48, 0.02)),
+            ("A", "handR", (-0.80, -0.32, 0.00)),
+            ("A", "upperArmL", (0.18, -0.62, 0.30)), ("A", "foreArmL", (0.22, -0.76, 0.14)),
+            ("T", "pelvis", (0.4, -1.0, -1.0)),
+        ],
+        "swingRecover": BASE + DAGGER_STANCE + [
+            ("R", "pelvis", "Z", 5), ("R", "spine", "Z", 8), ("R", "spine", "X", 8),
+            ("A", "upperArmR", (-0.20, 0.18, 0.05)), ("A", "foreArmR", (-0.34, 0.08, 0.02)),
+            ("A", "handR", (-0.52, 0.02, 0.00)),
+            ("A", "upperArmL", (0.12, -0.55, 0.25)), ("A", "foreArmL", (0.14, -0.66, 0.10)),
+            ("T", "pelvis", (0, -0.2, -0.4)),
+        ],
+    })
+
 FRAME_ORDER = ["idle"] + [f"run{i}" for i in range(8)] + [
     "swingAnticipate", "swingCommit", "swingImpact", "swingFollow", "swingRecover"]
 SWORD_FRAMES = {f for f in FRAME_ORDER if f.startswith("swing")}
@@ -433,7 +528,8 @@ FACING_ROT = {"south": 0.0, "north": pi, "east": pi / 2}
 os.makedirs(OUT, exist_ok=True)
 only = set(ONLY.split(",")) if ONLY else None
 rig = {"px": PX, "canvas": CANVAS, "scale": PX / CANVAS, "pitchDeg": math.degrees(PITCH),
-       "legScale": LEG_SCALE, "feetRow": FEET_ROW, "facings": {}}
+       "legScale": LEG_SCALE, "feetRow": FEET_ROW, "weapon": WEAPON, "armor": ARMOR,
+       "variant": VARIANT, "facings": {}}
 
 for facing in FACINGS:
     arm.rotation_euler = (0, 0, FACING_ROT[facing])
@@ -443,10 +539,12 @@ for facing in FACINGS:
         if only and fname not in only:
             continue
         swing = fname in SWORD_FRAMES
-        feet_row = 57 if swing else (58 if fname.startswith("run") else FEET_ROW)
+        # The dagger lunge travels farther through the body than the greatsword plant. Give those
+        # five cells two extra rows of recovery room instead of waiving a clipped foot.
+        feet_row = (55 if WEAPON == "dagger" else 57) if swing else (58 if fname.startswith("run") else FEET_ROW)
         EAST_OX = {"swingAnticipate": 38, "swingCommit": 34, "swingImpact": 26,
                    "swingFollow": 26, "swingRecover": 30}
-        origin_x = EAST_OX.get(fname, 32) if facing == "east" else 32
+        origin_x = EAST_OX.get(fname, 32) if facing == "east" and WEAPON == "greatsword" else 32
         place_camera(feet_row, origin_x)
         for o in sword:
             o.hide_render = not swing
@@ -476,7 +574,7 @@ if only:
     if os.path.exists(rig_path):
         with open(rig_path) as f:
             merged = json.load(f)
-        for k in ("px", "canvas", "scale", "pitchDeg", "legScale", "feetRow"):
+        for k in ("px", "canvas", "scale", "pitchDeg", "legScale", "feetRow", "weapon", "armor", "variant"):
             if merged.get(k) != rig[k]:
                 print(f"[spike] WARNING: --only run changes {k} ({merged.get(k)} -> {rig[k]}); "
                       "frames not re-rendered keep stale geometry")

@@ -29,6 +29,7 @@ per tick: `stepWorld(world, inputFrame)`.
 | `pnpm strip -- ...` | Frame strip of anything that moves, for judging motion (`tools/strip.ts`; writes a JSON state/event sidecar beside the PNG) |
 | `pnpm assets` / `pnpm tiles` | Regenerate `public/assets/` (Kenney subset, then the original bardo tilesets). Both rewrite `manifest.json`; run `tiles` **after** `assets` or the bardo sprites drop out. |
 | `pnpm room:gate -- [--url <server>] [--shot-dir <dir>] [--out <json>]` | Blocks room-source dimension, palette, alpha, material-span, and Bardo negative-space drift. With a live server it also proves native composite dimensions and exact 1x frame value/highlight/focality budgets (`tools/room-art-gates.ts`). |
+| `pnpm art:stress-hero` | Candidate-only Blender proof: renders dagger grammar and heavy-armor geometry from the Veteran rig, compiles six sheets through the real gates, and writes 1x/black evidence under `.art-cache/spike/stress/`. Never approves or touches shipping assets. |
 | `pnpm build` | Web build, then `tools/check-build.ts` gates the payload (no evidence, no video, no missing asset, within budget) |
 | `pnpm check:build` | Re-run the built-payload gate against the current `dist/` |
 | `pnpm art` / `pnpm palette` / `pnpm fx` | Run the authored-art gates, canonical-palette gate, or rebuild the Bardo FX sheets |

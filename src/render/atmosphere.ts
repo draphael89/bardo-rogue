@@ -252,7 +252,10 @@ export class Atmosphere {
         case 'east': s.position.set(d.col * TILE, (d.row + 0.5) * TILE); break
         default: { const _e: never = d.dir; return _e }
       }
-      this.root.addChild(s)
+      // Beside the primary glow, never appended: a rebind runs after the shafts and the fog are in
+      // the tree, and `addChild` would put a re-created glow on top of the normal-blend fog it is
+      // meant to sit under — the room would light one way on load and another way after a return.
+      this.root.addChildAt(s, this.root.getChildIndex(this.doorGlow) + 1)
       this.extraDoorGlows.push({ s, d })
     }
   }

@@ -584,6 +584,28 @@ function bakeBardoGate(g: Graphics, arena: Arena): void {
   }
 }
 
+// The district is a pilgrimage before it is a menu. Value already carries the broad south-to-north
+// line; these seven broken threshold setts let the foot read it at 1x without becoming a quest
+// arrow. GoldDim is the crossing colour, spent in tiny pairs perpendicular to travel and left dark
+// through the middle where generations of feet wore it away. The furrow and grit bake after this,
+// so the battlefield can scar the line instead of the line painting over its history.
+function bakeBardoProcession(g: Graphics, arena: Arena): void {
+  if (arena.kind !== 'bardo') return
+  for (const [cx, cy, reach] of [
+    [33.4, 29.6, 6], // arrival ground
+    [33.2, 25.4, 5], // south bridge
+    [32.8, 22.2, 6], // three-way threshold
+    [33.1, 18.3, 5], // north bridge
+    [33.4, 15.2, 4],
+    [33.2, 11.0, 6], // first edge of the Gate runner
+    [33.5, 8.0, 5],
+  ] as const) {
+    const x = cx * TILE, y = cy * TILE
+    px(g, x - reach - 2, y, reach, 1, C.goldDim)
+    px(g, x + 3, y, reach, 1, C.goldDim)
+  }
+}
+
 // §2.1 Law 3. Wherever two surfaces meet, darken the joint. The wall tiles carry their own
 // bottom strip; this is the floor side of the same joint, on all four walls. An island room
 // (arena.islands, §8.4) runs the same joint per island instead of around the room's rect —
@@ -748,6 +770,7 @@ export function buildTilemap(renderer: Renderer, atlas: Atlas, arena: Arena, flo
   c.addChild(wear, overlays)
   const g = new Graphics()
   bakeOcclusion(g, arena)
+  bakeBardoProcession(g, arena)
   bakeFurrow(g, arena)
   // The soot fan is the sunken bell's; the bardo district authors its own use marks. Keyed on the
   // room's identity, not on islands-presence — a future walled room without a bell keeps its floor.

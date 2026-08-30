@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-30
 **Branch:** `codex/bardo-first-sixty-seconds`
-**Recorded proof head before the final report updates:** `ff0b14b96fb96a7ea4e080027ad6c671b47aeb93`
+**Recorded proof head before the final report updates:** `d7648a4523b7fdf837244fc0a749d33c292325cb`
 **Reconciled main:** `2b82d61c9103a34b9abdc535afe165efbad4f630`
 
 The branch now delivers a coherent first minute: the title belongs to the Bardo Gate; DESCEND makes
@@ -34,6 +34,8 @@ its original 16px logical grid.
 - `d1bc886` — the tracked first fight is a deterministic player-facing frame, without replay chrome.
 - `ff0b14b` — browser smoke accepts bankless routes while still requiring the toll on every route
   that actually reaches the Landing.
+- `f9e3521`, `f1cf1d6`, `d7648a4` — screenshot, strip, pose, room, and realm evidence now fail
+  loudly on browser errors, missing evidence, or skipped rooms, and document that failure boundary.
 
 ## The three inherited polish gaps
 
@@ -58,7 +60,10 @@ using 10 canonical colours, binary alpha, and a 12-colour cap. The Hall of Minos
 stayed reference-only: its admitted result is one code-authored verdict stele and one transparent
 wax-red sentencing rule in the native sheets. A later four-realm ImageGen board was deliberately
 rejected as too ornate; only its material premise survived as low iron-link overlays for Styx/Oath
-Court and sparse wine-dark seams for Phlegethon. `pnpm art approve` was not run.
+Court and sparse wine-dark seams for Phlegethon. A final three-frame ImageGen paintover challenged
+the exact title, arrival, and combat hierarchy; it validated the restrained value path but proposed
+no change strong enough to justify churn. Its pixels also remain outside the repository. `pnpm art
+approve` was not run.
 
 The candidate constraints are in `docs/CHARACTER_HARD_CONSTRAINTS.md`. Dagger and heavy armor each
 render 42 frames across south/north/east, six compiled sheets in total, computed sockets, 1× floor
@@ -142,7 +147,7 @@ user-only gates.** No agent or automated play awarded them.
 | Candidate stress | `pnpm art:stress-hero` green for dagger and heavy; all four regenerated 1×/black-test artifacts byte-identical to committed exhibits; candidate-only, with in-game motion and user Look still open |
 | Desktop | Exact current `pnpm desktop:build` and `pnpm smoke:desktop` are green on the first run across 23 checks and 6 launches |
 | Performance | SwiftShader exact-head probes: Warden render p50 1.2 ms / p95 2.2 ms; synthetic 32-enemy + 64-projectile render stress p50 24–25 ms / p95 31–32 ms with render-only hash unchanged. Pinned replay and dense sim each repeated 100× with stable hashes; stress figures are not a native-GPU or Fun claim |
-| Deterministic visual evidence | `pnpm shot ... --visualMs N` owns every render from before boot. Three independent exact-current live-bot captures at seed 7 / tick 400 + visual 500 ms are byte-identical, SHA-256 `b9e4fa9db6383cd281cb4d2cf57317af232167a831a4559cdb54a4279b928f3d`; this player-facing exhibit omits the replay diagnostic while the separate pinned-replay lane retains hash truth. Three title boots are byte-identical at `c1318840345230773edac472c8d31e25f78f4ce3b719954c83a85075abfc4bb4`; two independent captures match at each of the four descent phases. |
+| Deterministic visual evidence | `pnpm shot ... --visualMs N` owns every render from before boot and exits nonzero on page/console errors. Three independent exact-current live-bot captures at seed 7 / tick 400 + visual 500 ms are byte-identical, SHA-256 `b9e4fa9db6383cd281cb4d2cf57317af232167a831a4559cdb54a4279b928f3d`; this player-facing exhibit omits the replay diagnostic while the separate pinned-replay lane retains hash truth. Three title boots are byte-identical at `c1318840345230773edac472c8d31e25f78f4ce3b719954c83a85075abfc4bb4`; two independent captures match at each of the four descent phases. The exact replay strip captures all 12 requested frames at ticks 400–433 and repeats at SHA-256 `e8094445c4233d3427d3cb2f21ee32ff783ec03d2b9b4a0638862685c47b2a27`; the pose atlas captures 35/35 requested states. |
 | Viewport boundary evidence | 390×844 title SHA-256 `ed3d89b4a1a7225ce1100589116c275c75575a0593648811d3066cd01fc9b8d1`; 390×844 game `ebcc7c8c21b34bdd12d1ce29f1439aa953f863a8efc15f8d492e6d5659fd3969`; 900×506 title `becb27e095f6a2f2b0e3c4348b3de7344fc90e81e4e510c0d30ecd39855c7446` |
 
 The first fixed-clock capture implementation was not sufficient. A fresh five-run probe found two

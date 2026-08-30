@@ -370,6 +370,13 @@ try {
       await new Promise(r => setTimeout(r, 50))
     }
     const doc = JSON.parse(readFileSync(live, 'utf8')) as { revision: number; meta: { attempts: number; victories: number } }
+    // The atomic rename can become visible to this Node process a microtask before Electron delivers
+    // the completed IPC promise back to the renderer. Durability is the prerequisite, not proof that
+    // the renderer continuation has already run; now require its acknowledgement as a second outcome.
+    await page.waitForFunction(() => {
+      const p = (window as unknown as { __game: { presenter: { hud: { bannerText: string } } } }).__game.presenter
+      return p.hud.bannerText === 'SAVE IMPORTED'
+    }, null, { timeout: 5_000 })
     const finalBanner = await page.evaluate(() => {
       const p = (window as unknown as { __game: { presenter: { hud: { bannerText: string } } } }).__game.presenter
       return p.hud.bannerText

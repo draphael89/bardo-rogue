@@ -20,7 +20,12 @@ export function updateProjectiles(world: World): void {
     if (b.team === 1) {
       for (const e of world.enemies) {
         if (!e.active || e.state === 'dead') continue
-        if (Math.hypot(e.x - b.x, e.y - b.y) > b.radius + e.radius) continue
+        const dx = e.x - b.x, dy = e.y - b.y
+        const hitR = b.radius + e.radius
+        // A strict axis miss cannot touch the circle. Keep hypot for the edge/diagonal decision and
+        // for the historical NaN path, where its comparison deliberately falls through.
+        if (dx === dx && dy === dy && (dx > hitR || dx < -hitR || dy > hitR || dy < -hitR)) continue
+        if (Math.hypot(dx, dy) > hitR) continue
         const brandBefore = e.brand
         const source = b.kind === 'mirror' ? 'mirror' : b.kind === 'echo' ? 'echo' : 'arrow'
         const result = damageEnemy(world, e, b.damage, b.angle, tuning.bow.knockback, false, tuning.bow.hitstop, b.actionId, {
@@ -39,8 +44,13 @@ export function updateProjectiles(world: World): void {
       continue
     }
     if (p.state === 'dead') continue
-    const d = Math.hypot(p.x - b.x, p.y - b.y)
+    const dx = p.x - b.x, dy = p.y - b.y
     const hitR = b.radius + p.radius
+    const grazeR = hitR + tuning.bullet.grazePx
+    // A projectile outside the graze square cannot hit or graze the player. Keep hypot for every
+    // possible contact and for non-finite coordinates, whose comparisons historically fall through.
+    if (dx === dx && dy === dy && (dx > grazeR || dx < -grazeR || dy > grazeR || dy < -grazeR)) continue
+    const d = Math.hypot(dx, dy)
     if (d <= hitR) {
       const src = b.srcKind === 'player' ? 'none' : b.srcKind
       if (isPlayerDodgeInvulnerable(world)) {
@@ -49,7 +59,7 @@ export function updateProjectiles(world: World): void {
       }
       hurtPlayer(world, b.angle, b.damage, src, true, b.sentence)
       b.active = false
-    } else if (d <= hitR + tuning.bullet.grazePx) {
+    } else if (d <= grazeR) {
       noteNearMiss(world, b.angle, b.x, b.y, 'projectile')
     }
   }

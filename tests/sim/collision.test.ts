@@ -40,8 +40,9 @@ describe('collision invariants', () => {
     const w = createWorld(1, 'empty')
     const a = { x: w.player.x, y: w.player.y }
     const b = { x: w.player.x + 4, y: w.player.y }
-    separate(w.arena, a, 5, b, 5, 0.5, 0.5)
+    expect(separate(w.arena, a, 5, b, 5, 0.5, 0.5)).toBe(true)
     expect(Math.hypot(b.x - a.x, b.y - a.y)).toBeCloseTo(10, 8)
+    expect(separate(w.arena, a, 5, b, 5, 0.5, 0.5)).toBe(false)
   })
 
   it('separates exact-overlap bodies deterministically', () => {

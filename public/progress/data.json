@@ -1,10 +1,14 @@
 {
   "title": "Bardo Rogue",
   "subtitle": "First Gate: rooms-as-data, a generated route, a town that remembers",
-  "updated": "2026-08-30T03:57:00-04:00",
+  "updated": "2026-08-30T04:02:00-04:00",
   "now": "exact-head-closeout",
   "round": 7,
   "timeline": [
+    {
+      "t": "04:02",
+      "text": "Viewport proof is now a repeatable gate, not a folder of unrelated boots. One living page resizes through 640x360, 1400x600, 390x844, 1920x700, 900x506, and back to 640x360 in both title and paused-game phases. The target grows to 848/992 for wide views, returns to 640 for portrait, stays inside the physical viewport, keeps visible UI inside the internal target, and never advances tick 0. Honest limit: the 390px portrait view is complete and unclipped but too physically small for comfortable keyboard play; it is no-crop proof, not a Look or usability verdict."
+    },
     {
       "t": "03:57",
       "text": "Acheron finally meets the player as a shore. The room already promised a horizontal silt line, but it sat at the bottom edge and read as another strip of masonry. The lip now moves one row inward and the lower two rows become dark water, putting the player at the boundary without touching the fight circle, adding a prop, or changing collision. A same-solids test and exact overlay assertions hold the contract; independent deterministic exhibits are byte-identical. An ImageGen overpaint supplied the large-value premise but its ornate pixels, enlarged UI, and Hades-adjacent richness were rejected and remain reference-only."

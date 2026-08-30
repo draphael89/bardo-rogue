@@ -69,10 +69,12 @@ The curated exact-head title, arrival, descent, first-fight, and viewport frames
 
 Objective observations: the causeway centre now measures roughly twice the perimeter value; the
 four Bardo islands retain 82.6%–95.2% negative space; the Bardo frame remains below the highlight
-budget and retains a concentrated focal peak. UI panels remain legible at the tested sizes, real
-keyboard input reaches the first fight, and reduced motion snaps the descent instead of animating it.
+budget and retains a concentrated focal peak. UI panels remain comfortable at native size and above,
+real keyboard input reaches the first fight, and reduced motion snaps the descent instead of animating it.
 At 390×844 and 900×506, the sampled sky values now remain continuous across every target boundary;
 the tracked portrait frames preserve the complete title and Bardo rather than clipping either.
+The 390-pixel portrait fit is intact but physically small: it is routing and no-crop proof, not a
+claim of comfortable keyboard play or user acceptance at that width.
 At Acheron, the lower fight lane now reads as one silt lip over a two-tile water body; the same-solid
 test proves this is geographic dress rather than hidden collision, and its exact exhibit is
 byte-identical across independent boots at SHA-256
@@ -93,6 +95,7 @@ user-only gates.** No agent or automated play awarded them.
 | Pinned replay | `slice-kite-loop-s7.json` hash `1142161593`, won |
 | Web package | `pnpm build` green; shipped 2.110 MB vs 4.096 MB budget, 174 files |
 | Browser smoke | `pnpm smoke -- --url http://localhost:5201` green, real keyboard and both endings |
+| Viewport transitions | `pnpm smoke:viewport -- --url http://localhost:5201` green through 640×360 → 1400×600 → 390×844 → 1920×700 → 900×506 → 640×360 for both title and game HUD; target and UI bounds remain contained, tick stays 0 |
 | Room art | `pnpm room:gate` green, including dimensions, alpha, palette, material spans, negative space, value, highlights, and focality |
 | Regeneration | `pnpm palette` and `pnpm tiles` deterministic; no unexplained drift |
 | Shipping sprite gates | 78/3 waived general, 144/2 hero, 144/4 north, 40/1 north roll, 145/2 south, 40/1 south roll; zero blocking |

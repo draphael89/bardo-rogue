@@ -2,6 +2,18 @@ import { Container, Sprite, Texture } from 'pixi.js'
 import type { Atlas } from '../atlas'
 import type { ContactClass } from '../contact'
 import type { EnemyKind } from '@/sim/events'
+import { tuning } from '@/tuning'
+
+/**
+ * Snap a world coordinate so what is drawn there starts on a whole TARGET pixel.
+ *
+ * An authored sheet is cut 1:1 against `view.worldScale` (src/render/sheet.ts), so one source pixel
+ * is one target pixel — but only if the sprite's origin is one too. Rounding in WORLD space is not
+ * enough: an odd world x is 1.5 target px, so every second position puts each texel centre exactly
+ * on a texel boundary and leaves the sampler to break the tie. The camera already quantises its own
+ * pivot this way (presenter.ts); actor bodies are the other half of the same rule.
+ */
+export const snapToTarget = (v: number): number => Math.round(v * tuning.view.worldScale) / tuning.view.worldScale
 
 // Kenney Tiny Dungeon indices (atlas.tile / atlas.white, 12 columns).
 // The Oath-Bound shares the Fallen Hoplite's body on purpose: it is the same shade, still under

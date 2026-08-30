@@ -3,7 +3,7 @@ import type { World, Enemy } from '@/sim/world'
 import type { Container } from 'pixi.js'
 import { tuning } from '@/tuning'
 import { lerp } from '../anim'
-import { EntityView, SPRITE, WEAPON, type EnemyFrame, type Pose } from './shared'
+import { EntityView, SPRITE, WEAPON, snapToTarget, type EnemyFrame, type Pose } from './shared'
 import { bindBruteArt, updateBruteView } from './enemy-brute'
 import { updateCasterView } from './enemy-caster'
 import { updateChargerView } from './enemy-charger'
@@ -64,7 +64,7 @@ export function updateEnemyView(v: EntityView, e: Enemy, world: World, alpha: nu
   if (v.squash > 0) { const q = v.squash / tuning.juice.squashTicks; sx *= 1 + 0.3 * q; sy *= 1 - 0.3 * q }
   if (v.redFlash > 0) tint = 0xff5a5a
 
-  b.position.set(Math.round(x), Math.round(feetY - hop))
+  b.position.set(snapToTarget(x), snapToTarget(feetY - hop))
   b.scale.set(sx * e.facing, sy)
   b.rotation = rot
   b.tint = tint

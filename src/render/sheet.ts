@@ -12,6 +12,7 @@
 // opinion about (idle, death, ambient) do own their tick durations, because otherwise that timing
 // hides in per-view formulas where nobody can see it.
 import { Texture, Rectangle } from 'pixi.js'
+import { tuning } from '@/tuning'
 
 export interface SheetFrame {
   /** Cell index, row-major, in the sheet. */
@@ -197,9 +198,17 @@ export function validateSheetDef(def: SheetDef, where: string): void {
  */
 export function bindSheet(def: SheetDef, source: Texture, whiteSource: Texture): Sheet {
   const cache = new Map<string, SheetFrameView>()
+  // Authored art is drawn at TARGET resolution, so a cell must occupy `cell / worldScale` px of sim
+  // space and come back out the other side of the world container at 1:1. Without `orig` the cell was
+  // taken as sim px and resampled by 1.5 on the way to the screen: inside one sprite some source
+  // pixels became two target pixels and some became one, and because the sprite's position rounds in
+  // WORLD space that split moved as the character moved — the crawling outline. Tiles (24 -> 16) and
+  // props (48 -> 32) have always declared this (`sub()` in atlas.ts); characters were the hole.
+  const logical = def.cell / tuning.view.worldScale
   const cut = (tex: Texture, i: number): Texture => new Texture({
     source: tex.source,
     frame: new Rectangle((i % def.cols) * def.cell, Math.floor(i / def.cols) * def.cell, def.cell, def.cell),
+    orig: new Rectangle(0, 0, logical, logical),
   })
   return {
     def,

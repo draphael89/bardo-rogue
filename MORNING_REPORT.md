@@ -109,7 +109,7 @@ user-only gates.** No agent or automated play awarded them.
 | Pinned replay | `slice-kite-loop-s7.json` hash `1142161593`, won |
 | Web package | `pnpm build` green; shipped 2.110 MB vs 4.096 MB budget, 174 files |
 | Browser smoke | `pnpm smoke -- --url http://localhost:5201` green, real keyboard and both endings |
-| Viewport transitions | `pnpm smoke:viewport -- --url http://localhost:5201` green through 640×360 → 1400×600 → 390×844 → 1920×700 → 900×506 → 640×360 for both title and game HUD; target and UI bounds remain contained, tick stays 0 |
+| Viewport transitions | `pnpm smoke:viewport -- --url http://localhost:5201` green through 640×360 → 1400×600 → 390×844 → 1920×700 → 900×506 → 640×360 across title menu/Settings/Credits, game HUD, and pause menu/Settings; target and UI bounds remain contained, tick stays 0 |
 | Room art | `pnpm room:gate` owns every render and is green across Bardo, Acheron, Lethe, Landing, Cocytus, Antechamber, and Minos, including dimensions, alpha, palette, material spans, negative space, value, highlights, and focality; two complete outputs are byte-identical at SHA-256 `f4cd248824c4e574671d57692ac400816942acee56e11655c4dff32971711180` |
 | Realm separation | `pnpm realm-air -- --url http://localhost:5201` owns every render; three clean-room outputs are byte-identical. Median RGB distance 11.31, closest 2.95, widest 16.91, zero temperature violations; no arbitrary pass threshold invented |
 | Regeneration | `pnpm palette` and `pnpm tiles` deterministic; the 192×288 room sheet and 192×192 prop sheet regenerate byte-identically with no unexplained drift |

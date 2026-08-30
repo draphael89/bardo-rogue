@@ -1,5 +1,5 @@
 // Resize one living page through native, wide, portrait, ultra-wide, letterboxed, then native again.
-// Proves target rebuilds in BOTH directions and visible title/HUD bounds remain inside that target.
+// Proves target rebuilds in BOTH directions and every first-minute UI surface stays inside it.
 // usage: pnpm smoke:viewport -- --url http://localhost:5173
 import { chromium, type Page } from '@playwright/test'
 
@@ -17,8 +17,9 @@ const sizes = [
 ]
 
 interface Bounds { x: number; y: number; width: number; height: number }
+type Phase = 'title-menu' | 'title-settings' | 'title-credits' | 'game' | 'pause-menu' | 'pause-settings'
 interface Row {
-  phase: 'title' | 'game'
+  phase: Phase
   viewport: [number, number]
   target: [number, number]
   screen: [number, number, number, number]
@@ -34,14 +35,16 @@ function inside(label: string, bounds: Bounds, width: number, height: number): v
   }
 }
 
-async function resize(page: Page, size: { width: number; height: number }, phase: Row['phase']): Promise<Row> {
+async function resize(page: Page, size: { width: number; height: number }, phase: Phase): Promise<Row> {
   const before = await page.evaluate(() => (window as any).__game.loop.frameTimes.length)
   await page.setViewportSize(size)
   await page.waitForFunction(n => (window as any).__game.loop.frameTimes.length >= n + 2, before)
   const row = await page.evaluate((phase): Row => {
     const g = (window as any).__game
     const ra = g.presenter.ra
-    const bounds = phase === 'title' ? g.presenter.title.root.getBounds() : ra.layers.hud.getBounds()
+    const bounds = phase.startsWith('title')
+      ? g.presenter.title.root.getBounds()
+      : phase.startsWith('pause') ? g.presenter.reward.root.getBounds() : ra.layers.hud.getBounds()
     return {
       phase,
       viewport: [innerWidth, innerHeight],
@@ -60,7 +63,7 @@ async function resize(page: Page, size: { width: number; height: number }, phase
   inside(`${vw}x${vh} target`, { x, y, width: w, height: h }, vw, vh)
   inside(`${vw}x${vh} ${phase}`, row.ui, tw, th)
   if (row.tick !== 0) throw new Error(`${vw}x${vh}: resize advanced paused world to tick ${row.tick}`)
-  if (row.titleVisible !== (phase === 'title')) throw new Error(`${vw}x${vh}: wrong title visibility in ${phase} phase`)
+  if (row.titleVisible !== phase.startsWith('title')) throw new Error(`${vw}x${vh}: wrong title visibility in ${phase} phase`)
   return row
 }
 
@@ -73,9 +76,27 @@ await page.goto(`${url}/?scenario=loop&seed=1&mute=1&save=off`)
 await page.waitForFunction(() => !!(window as any).__game)
 
 const rows: Row[] = []
-for (const size of sizes) rows.push(await resize(page, size, 'title'))
+for (const size of sizes) rows.push(await resize(page, size, 'title-menu'))
+await page.evaluate(() => {
+  const title = (window as any).__game.presenter.title
+  title.setSoundGate(false); title.move(1); title.confirm()
+})
+for (const size of sizes) rows.push(await resize(page, size, 'title-settings'))
+await page.evaluate(() => {
+  const title = (window as any).__game.presenter.title
+  title.setShown(false); title.setShown(true); title.setSoundGate(false)
+  title.move(1); title.move(1); title.confirm()
+})
+for (const size of sizes) rows.push(await resize(page, size, 'title-credits'))
 await page.evaluate(() => { const g = (window as any).__game; g.title(false); g.pause(true) })
 for (const size of sizes) rows.push(await resize(page, size, 'game'))
+await page.evaluate(() => { const g = (window as any).__game; g.pause(false); g.shellPause(true) })
+for (const size of sizes) rows.push(await resize(page, size, 'pause-menu'))
+await page.evaluate(() => {
+  const reward = (window as any).__game.presenter.reward
+  reward.movePause(1, false); reward.confirmPause(false)
+})
+for (const size of sizes) rows.push(await resize(page, size, 'pause-settings'))
 
 await browser.close()
 if (errors.length) throw new Error(errors.join('\n'))

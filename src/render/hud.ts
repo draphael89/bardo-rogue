@@ -5,7 +5,7 @@ import type { EnemyKind, WardenAttackPattern } from '@/sim/events'
 import type { World } from '@/sim/world'
 import { hideWaveTally, remainingLabel, takenBy } from './shadeNames'
 import { minosLifeInk } from './minosInk'
-import { deathCarriedLadder, deathCarriedLine, deathClose, deathReachedLine, deathSentLine, deathTakenLine, hideFightChrome, hidePlaceCaption } from './titleMenu'
+import { deathCarriedLadder, deathCarriedLine, deathClose, deathReachedLine, deathSentLine, deathTakenLine, hideFightChrome, hidePlaceCaption, showFirstFightControls } from './titleMenu'
 import { BOONS, hasBoon } from '@/sim/boons'
 import { HUB_ID } from '@/sim/rooms'
 import { tuning } from '@/tuning'
@@ -263,6 +263,7 @@ export class Hud {
   private prevTick = -1
   private hintStart = -1
   private hintTicks = 260             // ~4.3 s of sim time
+  private firstLoopHintShown = false
   private padMode = false
   private padDirty = true
   private rigKey = ''
@@ -356,6 +357,14 @@ export class Hud {
     // wears the wave colours.
     this.bannerTone = /DIED/.test(text) ? 'death' : /CLEAR/.test(text) ? 'clear' : /LIFE/.test(text) ? 'gift' : 'wave'
     this.bannerStart = this.prevTick < 0 ? 0 : this.prevTick
+  }
+
+  // A replay/debug reset installs a new World in the same Presenter. The opening-fight legend is
+  // world history, not page history, so the new world's own attempts/route must decide it afresh.
+  resetForWorld(): void {
+    this.prevTick = -1
+    this.hintStart = -1
+    this.firstLoopHintShown = false
   }
 
   clearBanner() { this.bannerTicks = 0; this.hideBanner() }
@@ -1354,10 +1363,21 @@ export class Hud {
       diamond(g, x0 + dir * 19, y, C.goldDim, a)
     }
 
+    const firstLoopFight = showFirstFightControls(
+      world.scenario,
+      world.session.meta.attempts,
+      run?.roomHistory.length ?? 0,
+      world.roomPhase,
+    )
+    if (firstLoopFight && !this.firstLoopHintShown) {
+      this.firstLoopHintShown = true
+      this.hintStart = now
+    }
     const age = now - this.hintStart
     const alpha = age < this.hintTicks - 80 ? 0.8 : Math.max(0, (this.hintTicks - age) / 80) * 0.8
-    // The loop teaches with the sword, not a keycap plate. Wave/dummy scenarios keep the legend.
-    this.hintRow.alpha = this.chromeHidden || dead || world.scenario === 'loop' || world.roomPhase === 'town' || world.roomPhase === 'reward' || world.roomPhase === 'entering' ? 0 : alpha
+    // The authored scenarios keep the legend. The production loop spends it once, at the first
+    // moment every pictured verb is available, then gives the lower frame back to the room.
+    this.hintRow.alpha = this.chromeHidden || dead || (world.scenario === 'loop' && !firstLoopFight) || world.roomPhase === 'town' || world.roomPhase === 'reward' || world.roomPhase === 'entering' ? 0 : alpha
     this.hintRow.visible = this.hintRow.alpha > 0.02
   }
 

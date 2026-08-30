@@ -12,6 +12,7 @@
 // opinion about (idle, death, ambient) do own their tick durations, because otherwise that timing
 // hides in per-view formulas where nobody can see it.
 import { Texture, Rectangle } from 'pixi.js'
+import { tuning } from '@/tuning'
 
 export interface SheetFrame {
   /** Cell index, row-major, in the sheet. */
@@ -113,7 +114,13 @@ export interface SheetFrameView {
   /** Normalised anchor (0..1), which is what Pixi's `anchor` wants. */
   anchorX: number
   anchorY: number
-  /** Socket positions in cell pixels, relative to the cell's top-left. */
+  /**
+   * Socket positions in WORLD pixels, measured from the frame's own pivot (right/down positive) —
+   * the space every consumer actually works in. The sidecar authors them in cell pixels from the
+   * cell's top-left, but a cell is no longer a world square (`cut()` below cuts it to
+   * `cell / worldScale`), so handing those numbers out raw invites adding 64ths of a cell to a
+   * position measured in 42.67ths. Converted once, here, where the two spaces meet.
+   */
   sockets: Record<string, readonly [number, number]>
 }
 
@@ -189,6 +196,15 @@ export function validateSheetDef(def: SheetDef, where: string): void {
   }
 }
 
+/** Cell pixels from the top-left -> world pixels from the pivot. `logical / cell` is 1 / worldScale. */
+function worldSockets(f: SheetFrame, cell: number, logical: number): Record<string, readonly [number, number]> {
+  if (!f.sockets) return EMPTY_SOCKETS
+  const k = logical / cell
+  const out: Record<string, readonly [number, number]> = {}
+  for (const [name, [sx, sy]] of Object.entries(f.sockets)) out[name] = [(sx - f.pivot[0]) * k, (sy - f.pivot[1]) * k]
+  return out
+}
+
 /**
  * Bind a sheet definition to its loaded textures.
  *
@@ -197,9 +213,17 @@ export function validateSheetDef(def: SheetDef, where: string): void {
  */
 export function bindSheet(def: SheetDef, source: Texture, whiteSource: Texture): Sheet {
   const cache = new Map<string, SheetFrameView>()
+  // Authored art is drawn at TARGET resolution, so a cell must occupy `cell / worldScale` px of sim
+  // space and come back out the other side of the world container at 1:1. Without `orig` the cell was
+  // taken as sim px and resampled by 1.5 on the way to the screen: inside one sprite some source
+  // pixels became two target pixels and some became one, and because the sprite's position rounds in
+  // WORLD space that split moved as the character moved — the crawling outline. Tiles (24 -> 16) and
+  // props (48 -> 32) have always declared this (`sub()` in atlas.ts); characters were the hole.
+  const logical = def.cell / tuning.view.worldScale
   const cut = (tex: Texture, i: number): Texture => new Texture({
     source: tex.source,
     frame: new Rectangle((i % def.cols) * def.cell, Math.floor(i / def.cols) * def.cell, def.cell, def.cell),
+    orig: new Rectangle(0, 0, logical, logical),
   })
   return {
     def,
@@ -222,7 +246,7 @@ export function bindSheet(def: SheetDef, source: Texture, whiteSource: Texture):
         white: cut(whiteSource, f.i),
         anchorX: f.pivot[0] / def.cell,
         anchorY: f.pivot[1] / def.cell,
-        sockets: f.sockets ?? EMPTY_SOCKETS,
+        sockets: worldSockets(f, def.cell, logical),
       }
       cache.set(key, view)
       return view

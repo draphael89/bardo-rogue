@@ -10,39 +10,63 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { tuning } from '../../src/tuning'
-import { swingClipFrame, dodgeClipFrame, bruteAttackClipFrame, tickClipFrame, rollClipFrame, DODGE_START_TICKS } from '../../src/render/clipSelect'
+import { swingClipFrame, dodgeClipFrame, bruteAttackClipFrame, tickClipFrame, rollClipFrame, promiseFrame, DODGE_START_TICKS } from '../../src/render/clipSelect'
 import { validateClipRefs } from '../../tools/art/compile'
 import type { SheetDef } from '../../src/render/sheet'
 
-const hero = JSON.parse(readFileSync('public/assets/sprites/bardo_hero.json', 'utf8')) as SheetDef
-const brute = JSON.parse(readFileSync('public/assets/sprites/bardo_brute.json', 'utf8')) as SheetDef
-const HERO_SHEETS = ['bardo_hero', 'bardo_hero_north', 'bardo_hero_south'].map(n =>
-  [n, JSON.parse(readFileSync(`public/assets/sprites/${n}.json`, 'utf8')) as SheetDef] as const)
+const sheetOf = (n: string) => JSON.parse(readFileSync(`public/assets/sprites/${n}.json`, 'utf8')) as SheetDef
+const hero = sheetOf('bardo_veteran_greatsword_east')
+const brute = sheetOf('bardo_brute')
+const ARMED = ['bardo_veteran_greatsword_east', 'bardo_veteran_greatsword_north', 'bardo_veteran_greatsword_south']
+const UNARMED = ['bardo_veteran_unarmed_east', 'bardo_veteran_unarmed_north', 'bardo_veteran_unarmed_south']
+const HERO_SHEETS = ARMED.map(n => [n, sheetOf(n)] as const)
+
+// The vocabulary src/render/views/player.ts binds by name (requireHeroClips / requireRollClip /
+// heroFrameName). It is asserted at load in the browser, where no test runs; asserted here it fails
+// on the sidecar, in CI, before a sheet reaches a player.
+describe('the shipped sheets carry what the renderer asks for by name', () => {
+  for (const n of [...ARMED, ...UNARMED]) {
+    it(`${n}: idle/hurt/dead frames and the run + dodge clips`, () => {
+      const d = sheetOf(n)
+      for (const f of ['idle', 'hurt', 'dead']) expect(d.frames[f] ?? d.aliases?.[f]).toBeDefined()
+      expect(d.clips!.run.frames.length).toBeGreaterThan(1)
+      expect(d.clips!.dodge.frames).toHaveLength(3)
+    })
+  }
+  for (const n of ARMED) {
+    it(`${n}: the three swing chains the sim indexes`, () => {
+      const d = sheetOf(n)
+      for (const c of ['light1', 'light2', 'heavy']) expect(d.clips![c].frames).toHaveLength(5)
+    })
+  }
+  it('the unarmed family declares no swing chain — the sim cannot swing while !p.armed', () => {
+    for (const n of UNARMED) expect(Object.keys(sheetOf(n).clips!).sort()).toEqual(['dodge', 'run'])
+  })
+})
 
 describe('player swings', () => {
   // Every direction's sheet carries the same clip contract; the boundaries must hold on each — the
-  // south sheet's swapped light2 cells resolve through its own sidecar with no special case.
+  // south sheet's own light2 cells resolve through its own sidecar with no special case.
   const cases = [['light1', 0], ['light2', 1], ['heavy', 2]] as const
   for (const [sheetName, sheet] of HERO_SHEETS) {
     for (const [clipName, i] of cases) {
       const clip = sheet.clips![clipName]
       const w = tuning.player.attack.swings[i]
+      const ci = clip.frames.indexOf(clip.sim!.contact!)
       it(`${sheetName}/${clipName}: tick startup-1 is not contact; tick startup IS the asserted contact`, () => {
+        // The wind-up now spends more than one drawing, so "not yet contact" is the claim that
+        // matters on the tick before: which startup pose it holds is the clip's own business.
         expect(swingClipFrame(clip, w, w.startup - 1)).not.toBe(clip.sim!.contact)
-        expect(swingClipFrame(clip, w, w.startup - 1)).toBe(clip.frames[0])
+        expect(swingClipFrame(clip, w, 0)).toBe(clip.frames[0])
+        expect(swingClipFrame(clip, w, w.startup - 1)).toBe(clip.frames[ci - 1])
         expect(swingClipFrame(clip, w, w.startup)).toBe(clip.sim!.contact)
         expect(swingClipFrame(clip, w, w.startup + w.active - 1)).toBe(clip.sim!.contact)
-        expect(swingClipFrame(clip, w, w.startup + w.active)).toBe(clip.frames[clip.frames.length - 1])
+        // and the tail starts moving the moment damage stops, ending on the settle pose
+        expect(swingClipFrame(clip, w, w.startup + w.active)).toBe(clip.frames[ci + 1])
+        expect(swingClipFrame(clip, w, w.startup + w.active + w.recovery - 1)).toBe(clip.frames[clip.frames.length - 1])
       })
     }
   }
-  it('the heavy recovers into its own planted bookend, through the alias', () => {
-    const clip = hero.clips!.heavy
-    const w = tuning.player.attack.swings[2]
-    const rec = swingClipFrame(clip, w, w.startup + w.active)
-    expect(rec).toBe('heavyRecover')
-    expect(hero.aliases!.heavyRecover).toBe('heavyStart')
-  })
 })
 
 describe('brute attack', () => {
@@ -64,15 +88,16 @@ describe('dodge and run', () => {
   it('dodge launches, travels to the tuning travel window, then lands', () => {
     const clip = hero.clips!.dodge
     const w = tuning.player.dodge
-    expect(dodgeClipFrame(clip, w, 0)).toBe('dodgeStart')
-    expect(dodgeClipFrame(clip, w, DODGE_START_TICKS)).toBe('dodgeTravel')
-    expect(dodgeClipFrame(clip, w, w.travel)).toBe('dodgeLand')
+    expect(dodgeClipFrame(clip, w, 0)).toBe('dodge')
+    expect(dodgeClipFrame(clip, w, DODGE_START_TICKS)).toBe('fall')
+    expect(dodgeClipFrame(clip, w, w.travel)).toBe('land')
   })
-  it('run alternates on the clip-owned tick durations', () => {
+  it('run cycles on the clip-owned tick durations and comes back round', () => {
     const clip = hero.clips!.run
-    expect(tickClipFrame(clip, 0)).toBe('runA')
-    expect(tickClipFrame(clip, clip.ticks![0] / 60)).toBe('runB')
-    expect(tickClipFrame(clip, (clip.ticks![0] + clip.ticks![1]) / 60)).toBe('runA')
+    const total = clip.ticks!.reduce((a, b) => a + b, 0)
+    expect(tickClipFrame(clip, 0)).toBe('run0')
+    expect(tickClipFrame(clip, clip.ticks![0] / 60)).toBe('run1')
+    expect(tickClipFrame(clip, total / 60)).toBe('run0')
   })
 })
 
@@ -82,26 +107,25 @@ describe('a wrong-but-existing contact fails the build', () => {
     // that frame shows, so a contact assertion there is an assertion about nothing.
     const bad = structuredClone(hero)
     bad.clips!.dodge.sim!.contact = 'dodgeContact'
-    bad.clips!.dodge.frames = ['dodgeStart', 'dodgeContact', 'dodgeLand']
-    bad.frames.dodgeContact = { i: 15, pivot: [16, 30] }
-    delete (bad.frames as Record<string, unknown>).dead
+    bad.clips!.dodge.frames = ['dodge', 'dodgeContact', 'land']
+    bad.frames.dodgeContact = { i: 29, pivot: [32, 57] }
     expect(() => validateClipRefs(bad, 't')).toThrow(/no live phase/)
   })
 
   it('a contact name that does not read as a contact key is rejected', () => {
     const bad = structuredClone(hero)
-    bad.clips!.light1.sim!.contact = 'light1Start'
+    bad.clips!.light1.sim!.contact = 'light1Anticipate'
     expect(() => validateClipRefs(bad, 't')).toThrow(/not a contact\/hit\/strike\/impact key/)
   })
   it('a well-named contact that is structurally the startup frame is rejected', () => {
     const bad = structuredClone(hero)
-    bad.clips!.light1.frames = ['light1Contact', 'light1Start', 'light1Recover']
+    bad.clips!.light1.frames = ['light1Contact', 'light1Anticipate', 'light1Recover']
     bad.clips!.light1.sim!.contact = 'light1Contact'   // passes the name rule, IS frames[0]
     expect(() => validateClipRefs(bad, 't')).toThrow(/cannot be the wind-up pose/)
   })
   it('a contact asserted as the LAST frame is rejected — recovery would hold the impact pose', () => {
     const bad = structuredClone(hero)
-    bad.clips!.light1.frames = ['light1Start', 'light1Recover', 'light1Contact']
+    bad.clips!.light1.frames = ['light1Anticipate', 'light1Recover', 'light1Contact']
     bad.clips!.light1.sim!.contact = 'light1Contact'   // well named, not the wind-up — and still wrong
     expect(() => validateClipRefs(bad, 't')).toThrow(/never visibly end/)
   })
@@ -115,8 +139,8 @@ describe('a wrong-but-existing contact fails the build', () => {
 })
 
 describe('the vertical roll clip', () => {
-  for (const n of ['bardo_hero_north_roll', 'bardo_hero_south_roll']) {
-    const roll = JSON.parse(readFileSync(`public/assets/sprites/${n}.json`, 'utf8')) as SheetDef
+  for (const n of ['bardo_veteran_unarmed_north_roll', 'bardo_veteran_unarmed_south_roll']) {
+    const roll = sheetOf(n)
     it(`${n}: four airborne phases come from the sidecar, and the clip is declared airborne`, () => {
       const clip = roll.clips!.roll
       expect(clip.frames).toHaveLength(4)
@@ -200,19 +224,19 @@ describe('sub-phase frame selection', () => {
 
   it('the side hero has no roll sheet, so a side roll IS the three-frame dodge clip', () => {
     // north/south carry a four-frame airborne roll; side does not exist, which is the whole gap.
-    expect(() => readFileSync('public/assets/sprites/bardo_hero_side_roll.json', 'utf8')).toThrow()
+    expect(() => readFileSync('public/assets/sprites/bardo_veteran_unarmed_east_roll.json', 'utf8')).toThrow()
     expect(hero.clips!.dodge.frames).toHaveLength(3)
   })
 
-  it('the shipped hero heavy still shows only two drawings — the sheets are what is missing now', () => {
+  it('the shipped heavy now spends all five of its drawings, and plants on the commitment tick', () => {
     const clip = hero.clips!.heavy
     const s = tuning.player.attack.swings[2]
+    const promise = promiseFrame(tuning.player.attack.heavyCommitTick)
     const seen = new Set<string>()
-    for (let t = 0; t < s.startup + s.active + s.recovery; t++) {
-      seen.add(swingClipFrame(clip, s, t, tuning.player.attack.heavyCommitTick))
-    }
-    // heavyRecover aliases heavyStart in every hero sidecar, so a 43-tick action is two images.
-    expect(seen.size).toBe(3)
-    expect(hero.aliases!.heavyRecover).toBe('heavyStart')
+    for (let t = 0; t < s.startup + s.active + s.recovery; t++) seen.add(swingClipFrame(clip, s, t, promise))
+    expect(seen).toEqual(new Set(clip.frames))
+    // the plant IS the promise: the drawing changes on the displayed tick the sim stops taking a dodge
+    expect(swingClipFrame(clip, s, promise - 1, promise)).toBe('heavyAnticipate')
+    expect(swingClipFrame(clip, s, promise, promise)).toBe('heavyCommit')
   })
 })

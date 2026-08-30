@@ -9,6 +9,7 @@ export class Loop {
   frameTimes: number[] = []
   renderTimes: number[] = []
   tickTimes: number[] = []
+  frameCount = 0
   catchupDrops = 0
   lastFrameMs = 0
   private lastNow = 0
@@ -41,6 +42,7 @@ export class Loop {
       const alpha = this.paused ? 1 : Math.min(1, this.acc / TICK_MS)
       const tr = performance.now()
       this.hooks.render(alpha, dt / 1000)
+      this.frameCount++
       this.push(this.renderTimes, performance.now() - tr)
       this.lastFrameMs = performance.now() - t0
       this.push(this.frameTimes, this.lastFrameMs)

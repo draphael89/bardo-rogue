@@ -1,0 +1,421 @@
+# Bardo Rogue — overnight art and first-minute closeout
+
+**Date:** 2026-08-30
+**Branch:** `codex/bardo-first-sixty-seconds`
+**Recorded proof head before the final report updates:** `e914099a12d44376b867307cfd1d85bd09cc22a2`
+**Reconciled main:** `2b82d61c9103a34b9abdc535afe165efbad4f630`
+
+The branch now delivers a coherent first minute: the title belongs to the Bardo Gate; DESCEND makes
+one guarded in-engine passage to the unarmed body; the route from arrival, relic, rack, and first
+fight reads as one pilgrimage; and the first combat room teaches its controls without adding another
+modal. Room art is authored at the native 24-source-pixel contract while the simulation remains on
+its original 16px logical grid.
+
+## What changed
+
+- `e9889c9` — native 24px tile / 48px prop art, high-resolution bake, blocking room-art gate.
+- `6ce132f` — Gate-led title and 1.45s Gate-to-player descent, including reduced-motion and cancellation.
+- `624f71c` — dagger and heavy-armor Blender stress variants plus a draft hard-constraints contract.
+- `389271f` — native, landscape, portrait, and fullscreen viewport fit without shrinking the authored canvas.
+- `d9dd659` — broken inner arris on the Gate without changing collision or light count.
+- `4539e93` — merge reconciliation with `origin/main` at `2b82d61`.
+- `64fc801` — compact first-fight control legend.
+- `e7a9c2e` — Bardo procession inlay connecting arrival, junction, and Gate.
+- `a829d40` — Keeper light, cold braziers, pier damp, numen lantern, and baked causeway wear.
+- `7982567` — a code-authored fallen Veteran relic replaces the generic ossuary on the same solid cell.
+- `310537e`, `712adf4`, `d2d8e49` — fixed-clock title, descent, combat, and screenshot evidence.
+- `0c2abd4`, `e8b8ca9`, `ac5bb72` — Acheron shore, Cocytus weep, and Minos verdict dressing.
+- `455a4e9`, `d2b8904`, `b017a2d`, `f50ccb1` — deterministic realm/room evidence and live resize coverage across every first-minute UI surface.
+- `1a4093d` — dagger/heavy stress regeneration now fails on any drift from its committed evidence.
+- `c696f66` — exact room evidence covers every production layout and the real Styx/Phlegethon nodes.
+- `d9d7bd7` — sparse iron-link and wine-dark heat-seam motifs distinguish the alternate rivers.
+- `694eec1`, `6ff79ed` — room/realm evidence now installs the real seeded route and captures the fresh
+  Bardo before any run can change its first-minute state.
+- `d1bc886` — the tracked first fight is a deterministic player-facing frame, without replay chrome.
+- `ff0b14b` — browser smoke accepts bankless routes while still requiring the toll on every route
+  that actually reaches the Landing.
+- `f9e3521`, `f1cf1d6`, `d7648a4` — screenshot, strip, pose, room, and realm evidence now fail
+  loudly on browser errors, missing evidence, or skipped rooms, and document that failure boundary.
+- `3d028bc`, `fdc267e` — matrix, ad-hoc headless simulation, and loop performance probes now
+  quantize bot frames at the same input boundary as the live browser, recorder, and replay path.
+- `8efaedd` — the desktop import gate separately waits for durable bytes and the renderer's success
+  acknowledgement, closing a recurrent cross-process observation race without weakening either assertion.
+- `bef6808` — recursive Pixi teardown now releases owned Graphics contexts and the two offscreen
+  render roots are reused, bounding room-rebuild resources under a 200-descent browser soak.
+- `7c4384d` — the viewport gate first observes the exact resized target and only then accepts two
+  rendered frames, closing a stale-wide-frame race exposed by concurrent proof lanes.
+- `8306cc4` — damage-number pop scales now preserve the world parent's counter-scale, completing a
+  latent pixel-type finding from the Claude sweep at exact 2× → 1× target-pixel sizes.
+- `0213b34` — the remaining live PR review gaps are closed: descent input is drained before the
+  landing, HUD first-fight state resets with a replacement world, render proof waits use a monotonic
+  counter, Blender is configurable, and dagger/heavy stress clips bind their real timing families.
+- `e914099` — Blender discovery canonicalizes PATH symlinks before launch, preserving the app
+  bundle's Python and font roots instead of crashing before the candidate script can run.
+
+## The three inherited polish gaps
+
+1. **Letterbox stars:** closed after a runtime correction. A deterministic 390×844 probe disproved
+   the earlier source-level answer: the bars resolved to `(0,0,2)` beside a `(0,0,4)` target sky.
+   `src/render/starfield.ts` now starts both surfaces from the same authored void and star colours
+   before the shared frame grade. All four tested boundaries resolve to `(0,0,4)` at 390×844 and
+   900×506; `tests/render/starfield.test.ts` guards against reintroducing a gutter-only ambient pass.
+2. **East-door `-4`:** closed. `doorEnterInset: 4` lives in `src/tuning.ts` and `src/sim/rooms.ts`
+   reads the tuning value; there is no unexplained orientation-only literal.
+3. **Pinned rewritten-Bardo replay:** closed. `replays/slice-kite-loop-s7.json` is pinned in
+   `tests/sim/replay.test.ts` at hash `1142161593`. The exact replay wins in 3,461 ticks (57.7 s),
+   crosses all six combat rooms, lands 46 hits, cuts 17 bolts, and takes one hit.
+
+## Art custody
+
+Shipping art in this branch is code-authored and reproducible. The dagger and heavy-armor sheets are
+unapproved pipeline candidates, not player identity. ImageGen was used aggressively for composition,
+material, control-strip, procession, and fallen-relic studies; no generated pixels were promoted to
+`public/` or the approved catalogue. The admitted relic was redrawn through `tools/make-bardo-tiles.ts`
+using 10 canonical colours, binary alpha, and a 12-colour cap. The Hall of Minos study likewise
+stayed reference-only: its admitted result is one code-authored verdict stele and one transparent
+wax-red sentencing rule in the native sheets. A later four-realm ImageGen board was deliberately
+rejected as too ornate; only its material premise survived as low iron-link overlays for Styx/Oath
+Court and sparse wine-dark seams for Phlegethon. A final three-frame ImageGen paintover challenged
+the exact title, arrival, and combat hierarchy; it validated the restrained value path but proposed
+no change strong enough to justify churn. Its pixels also remain outside the repository. `pnpm art
+approve` was not run.
+
+The candidate constraints are in `docs/CHARACTER_HARD_CONSTRAINTS.md`. Dagger and heavy armor each
+render 42 frames across south/north/east, six compiled sheets in total, computed sockets, 1× floor
+sheets, and black tests. Their 1,062 automated gates have zero blocking failures. This proves the
+mechanical pipeline and equipment envelopes, not the final identity or Look. The evidence mannequin
+does not yet carry the contract's split crest, face slit, or persistent wine/gold identity marks;
+the hard-constraints document records that boundary explicitly.
+
+## Claude and PR review sweep
+
+The finished Claude session has no hidden or uncommitted art layer. Its material causeway, first-fight
+teaching, and Bardo procession commits are all in this branch. A deeper read of its older defect sweep
+found that damage-number creation had been counter-scaled but its update animation restored the raw
+scale; `8306cc4` closes that dormant path with focused tests and a real Pixi runtime probe.
+
+PR #28 carried ten inline review findings across earlier heads. Five were already closed by the current
+evidence/tooling work. `0213b34` closes the other five source paths plus the related dagger timing error:
+input pressed during the 1.45-second descent no longer fires on landing; a replacement world may show
+its own fresh first-fight legend; Blender resolves from `BLENDER`, `PATH`, or the macOS fallback; the
+shot, viewport, and route smokes wait on an uncapped render count; and regenerated dagger specs bind
+`player.attack.swings.0` while heavy remains on `.2`. A 20-second live shot filled the 240-sample timing
+ring and still completed, the full 36-state viewport gate passed, and the browser smoke observed a
+free player after pressing Space during the descent.
+
+A follow-up portability challenge invoked the macOS app-bundle binary through a PATH symlink. Blender
+lost its bundle-relative Python and fonts and exited 139 before the script ran. `e914099` resolves the
+discovered executable to its real path first; the same symlink-only environment then regenerated both
+variants byte-identically and passed all gates in the clean clone.
+
+## Attended observations
+
+The curated exact-head title, arrival, descent, first-fight, and viewport frames are tracked in
+`public/progress/shots/` as `title-menu.png`, `bardo-arrival-r7.png`, `descent-r7-*.png`, and
+`first-fight-r7.png`, `acheron-shore-r7.png`, `cocytus-weep-r7.png`, `minos-verdict-r7.png`, plus `viewport-390x844-*.png` and
+`viewport-900x506-title-r7.png`. The broader scratch study remains local and intentionally ignored under
+`shots/attended/`:
+
+- `first-minute/` and `keyboard-route/`: title, Settings, Credits, descent beats, rack, first fight,
+  and the exact-head teaching strip.
+- `veteran-relic/causeway-v2.png`: the final causeway; the body reads from low helm, shoulder, and
+  wine mantle while staying subordinate to the Keeper light.
+- `combat-*.png` and `replay-contact-strip.png`: Acheron, Lethe, Asphodel, Phlegethon, the
+  Antechamber, Minos, and contact cadence.
+- `viewport-*`: 390×844 portrait, 900×506, 1280×720, 1920×1080, and fullscreen.
+- `ui/`: title Settings/Credits and pause menu/Settings at native, portrait, and wide desktop sizes.
+- `exact-head-room-gates/`: exact room composites and numeric gate results.
+
+Objective observations: the causeway centre now measures roughly twice the perimeter value; the
+four Bardo islands retain 82.6%–95.2% negative space; the Bardo frame remains below the highlight
+budget and retains a concentrated focal peak. The exact room gate samples all 13 production-loop
+layouts once across the real first-gate, Fire Ford, and Styx Gate spines; the dedicated Styx and
+Phlegethon nodes are asserted separately from alternate dresses, and Bardo is captured before any
+run is installed so its HUD is the fresh first-minute state. UI panels remain comfortable at native size and above,
+real keyboard input reaches the first fight, and reduced motion snaps the descent instead of animating it.
+At 390×844 and 900×506, the sampled sky values now remain continuous across every target boundary;
+the tracked portrait frames preserve the complete title and Bardo rather than clipping either.
+The 390-pixel portrait fit is intact but physically small: it is routing and no-crop proof, not a
+claim of comfortable keyboard play or user acceptance at that width.
+All 91 shipped Ogg files decode successfully. The hottest decoded source peaks belong to creature
+and door cues that the production mapping attenuates before the already-owned SFX/UI buses; the
+announcer files are explicitly excluded from loading. This is source/mix-graph integrity evidence,
+not a listening verdict.
+At Acheron, the lower fight lane now reads as one silt lip over a two-tile water body; the same-solid
+test proves this is geographic dress rather than hidden collision, and its exact exhibit is
+byte-identical across independent boots at SHA-256
+`e3a4b425ab34c35545beb70b2038b936f75f3ee49e5103a75233c9ecfbddc9ff`.
+At Cocytus, a single cold reflection now belongs to the west-edge weep and expires before the dry
+fight circle; its floor and dark are paler and more cyan than Acheron's indigo river. The deterministic
+realm-air pass moves Acheron/Cocytus from distance 1.09 to 3.36 and outside the closest pair; median
+room separation rose from 10.54 to 11.32; after the final Minos dress the exact-head median is
+11.31, still with no wrong-temperature rooms. The exact
+combat exhibit is byte-identical at SHA-256
+`519384bda07ee327f77a42a855bddb82ae5161c96c7e46c5c759d02c94823902`.
+At Minos, the existing unequal scale now answers a broken verdict stele and a narrow wax-red sentence
+beneath the Judge. Both are non-solid dress behind the fight lanes; the stele spends no gold and the
+circle at `(13, 8)` remains bare. The exact tick-3,000 combat exhibit is byte-identical across clean
+boots at SHA-256 `2041adda274fce80d0c9dd1ebd22a62df9688dbfbd81a9c284f9aa3f926f704d`.
+At real 640×360 presentation scale, Styx's two iron fastenings remain readable beside the black-water
+banks without resembling pickups; Oath Court repeats the motif at opposite edges; Phlegethon's two
+dead-wine seams read as heat without borrowing bright ember, gold, or the central combat field.
+
+Subjective questions left deliberately open: whether the causeway has the desired emotional weight,
+whether the Veteran relic is poignant rather than merely legible, whether combat reads as satisfying
+at human speed, and whether the dagger/heavy identity deserves approval. **Look and Fun are OPEN,
+user-only gates.** No agent or automated play awarded them.
+
+## Exact-head proof ledger
+
+| Lane | Result |
+|---|---|
+| Typecheck | `pnpm typecheck` green |
+| Full suite | `pnpm test` — 80 files, 918 tests green |
+| Loop matrices | Exact-current production-input `pnpm matrix` — kite 100/100 resolved, 78 wins; naive 100/100 resolved, 0 wins. The extended exact-current 1–10,000 pass resolves 10,000/10,000 for both policies, with 7,917 skilled wins (79%) and zero mash wins; no seed stranded or returned unresolved across 20,000 attempts |
+| Pinned replay | `slice-kite-loop-s7.json` hash `1142161593`, won |
+| Web package | `pnpm build` green; shipped 2.110 MB vs 4.096 MB budget, 174 files |
+| Browser smoke | `pnpm smoke -- --url http://localhost:5201 --seed N` green with real keyboard and both endings on all six production route families: first-gate seed 1, Ash March seed 2, field-fork seed 4, late-shop seed 8, Styx Gate seed 10, and Fire Ford seed 31. A broader production-input soak passed 94 distinct compatible seed pairs (188 full runs) through hub, toll where present, offer, boss/victory or death, and return with zero browser errors. Toll rendering is required only on routes that actually reach the Landing; early deaths and bankless spines no longer create a false failure |
+| Viewport transitions | `pnpm smoke:viewport -- --url http://localhost:5201` green through 640×360 → 1400×600 → 390×844 → 1920×700 → 900×506 → 640×360 across title menu/Settings/Credits, game HUD, and pause menu/Settings; target and UI bounds remain contained, tick stays 0. Two complete gates also passed concurrently after the gate began requiring the resized target before counting its two proof frames. An additional exact-head challenge passed 120 title/game/pause transitions over 40 sizes from 180×120 and 1280×240 to 3440×1440, plus 96 transitions over the representative set at DPR 2 and 3, with no bounds, tick, target, or page errors; this remains routing proof, not a comfort claim at tiny sizes |
+| Room art | `pnpm room:gate` owns every render and is green across the fresh pre-run Bardo plus all 12 production route layouts, including the named Styx and Phlegethon nodes, dimensions, alpha, palette, material spans, negative space, value, highlights, focality, and browser errors; two complete outputs are byte-identical at SHA-256 `4464422c2d45fdd404d0ac49c3d645a6e4c971720c5413750e23a2549a8d4884` |
+| Realm separation | `pnpm realm-air -- --url http://localhost:5201 --seed N` installs the real seeded route before measuring it and owns every render. Exact repeat pairs are byte-identical for first-gate seed 1 (`ff8533e3…`, median 11.31), Fire Ford seed 31 (`9cb35419…`, 10.61), and Styx Gate seed 10 (`2bc3a662…`, 10.79); zero skipped rooms, browser errors, or temperature violations. No arbitrary pass threshold invented |
+| Regeneration | `pnpm palette`, `pnpm assets`, and `pnpm tiles` deterministic; the 192×288 room sheet and 192×192 prop sheet regenerate byte-identically with no unexplained drift |
+| Shipping sprite gates | 78/3 waived general, 144/2 hero, 144/4 north, 40/1 north roll, 145/2 south, 40/1 south roll; zero blocking |
+| Candidate stress | `pnpm art:stress-hero` green for dagger and heavy; all four regenerated 1×/black-test artifacts byte-identical to committed exhibits; generated dagger specs bind the light `.0` swing and heavy binds `.2`; candidate-only, with in-game motion and user Look still open |
+| Desktop | Exact current `pnpm desktop:build` and `pnpm smoke:desktop` are green across 23 checks and 6 launches. After correcting the import gate's cross-process observation race, 30 consecutive complete smokes (180 launches) passed with no recurrence |
+| Performance | Exact-current SwiftShader Warden probe: render p50 0.8 ms / p95 1.5 ms / p99 3.8 ms / max 9.4 ms, with the repeated sim hash identical. A separate 240-frame comparison at DPR 1/2/3 kept the exact same sim hash and p95 at 1.5/1.6/1.6 ms; isolated software-renderer maxima rose to 68.9/167.8/326.7 ms and are recorded rather than hidden by the percentiles. The earlier synthetic 32-enemy + 64-projectile render stress measured p50 24–25 ms / p95 31–32 ms with render-only hash unchanged. Pinned replay and dense sim each repeated 100× with stable hashes; stress figures are not a native-GPU or Fun claim |
+| Renderer longevity | One fresh page and persistent Pixi renderer completed 5,000 full production descents (18,313,112 ticks; 4,021 wins / 979 losses), with a real draw after every return and zero browser errors. After the first 1,000-run pool warm-up, forced-GC heap moved only 24.2 → 26.9 MB through run 5,000 instead of reaching the pre-fix 1.23 GB after 200 resets; live Graphics contexts stayed at 15, live texture sources at 69, batch roots at 6, and subtextures at 64. Pixi's dead-key registries compacted in cycles. The lifecycle regression locks explicit child-context teardown and reused offscreen roots |
+| Clean remote proof | A fresh clone of the pushed branch at `e914099a12d44376b867307cfd1d85bd09cc22a2` passed PATH-symlink dagger/heavy stress generation, typecheck, and 80/918 tests, then finished byte-clean against its remote. At its preceding code head it also passed build/check-build, the 100-seed matrix, and the pinned replay; the `cc99ea4` pass separately reran palette/assets/tiles regeneration byte-clean |
+| Deterministic visual evidence | `pnpm shot ... --visualMs N` owns every render from before boot and exits nonzero on page/console errors. Three independent exact-current live-bot captures at seed 7 / tick 400 + visual 500 ms are byte-identical, SHA-256 `b9e4fa9db6383cd281cb4d2cf57317af232167a831a4559cdb54a4279b928f3d`; this player-facing exhibit omits the replay diagnostic while the separate pinned-replay lane retains hash truth. Three title boots are byte-identical at `c1318840345230773edac472c8d31e25f78f4ce3b719954c83a85075abfc4bb4`; two independent captures match at each of the four descent phases. The exact replay strip captures all 12 requested frames at ticks 400–433 and repeats at SHA-256 `e8094445c4233d3427d3cb2f21ee32ff783ec03d2b9b4a0638862685c47b2a27`; the pose atlas captures 35/35 requested states. |
+| Viewport boundary evidence | 390×844 title SHA-256 `ed3d89b4a1a7225ce1100589116c275c75575a0593648811d3066cd01fc9b8d1`; 390×844 game `ebcc7c8c21b34bdd12d1ce29f1439aa953f863a8efc15f8d492e6d5659fd3969`; 900×506 title `becb27e095f6a2f2b0e3c4348b3de7344fc90e81e4e510c0d30ecd39855c7446` |
+
+The first fixed-clock capture implementation was not sufficient. A fresh five-run probe found two
+alternating first-fight hashes: an uncontrolled number of zero-time boot renders still consumed the
+seeded FX streams. The evidence lane now swallows rAF before boot and invokes the production render
+hook itself in fixed quanta. The older `096aca...` / `779fa...` screenshot hashes are invalidated;
+the hashes above are the clean-room replacements. This is a tooling correction, not a visual change.
+
+The extended soak also challenged two earlier metrics instead of preserving them as theatre. First,
+the matrix and ad-hoc bot runner had bypassed `quantizeFrame`, while the browser, recorder, and replay
+all use it. The first hash divergence is tick 18; seed 46 used to win only in the full-precision
+matrix, while the production browser loses in 4,332 ticks. The corrected headless run now matches
+that browser outcome and hash `2281899549`, and the corrected 1,000-seed matrix remains in band.
+Second, the desktop import check twice sampled `ROOM CLEARED` after the imported bytes were already
+visible on disk. Atomic rename visibility can precede delivery of the completed IPC promise by a
+microtask; the product was waiting correctly, but the test treated disk visibility as proof that the
+renderer continuation had already run. The gate still rejects success at 75 ms during the forced
+250 ms write, then separately requires the imported bytes and `SAVE IMPORTED`. Thirty consecutive
+complete smokes passed after the correction.
+
+A first Pixi probe forced 400 room rebuilds. `renderer.texture._managedTextures.items` grew from 50
+to 450 keys while live entries and live renderer-backed GPU sources remained flat at 50, correctly
+showing that raw registry-key growth alone is not a texture-leak signal. A deeper forced-GC heap soak
+then disproved the premature broader conclusion: recursive `{ children: true }` teardown was leaving
+owned `GraphicsContext` path/triangulation data alive, and Pixi's batch pipe was retaining one batcher
+for each disposable offscreen render root. Explicit `context: true` teardown plus one persistent tile
+bake root and one persistent decal-clear root cut the same reset slope by roughly 98%; the extended
+5,000-descent workload then stayed bounded as described in the ledger. The evidence kept the texture,
+Graphics-context, batch-root, and JS-heap claims separate rather than calling one counter the whole result.
+
+## Custody and release ledger
+
+- The recorded proof head and its reconciled `origin/main` are named above. The final local and
+  remote branch IDs are obtained with `git rev-parse HEAD` and
+  `git rev-parse origin/codex/bardo-first-sixty-seconds`; a commit cannot self-contain its own hash.
+- The branch was pushed only to its existing successor branch, as authorized. No destructive Git
+  operation was used.
+- PR #28 exists and is open. It was created by the separate live Claude session; this closeout did
+  not create, merge, close, or otherwise mutate it.
+- Merge: **not performed**. Deployment/publishing: **not performed**. Release: **not declared**.
+- Human Look acceptance: **OPEN**. Human Fun acceptance: **OPEN**.
+
+---
+
+# Addendum — the graphics overhaul run, and the two changes it took back
+
+**Date:** 2026-08-30, late
+**Branch:** `claude/game-graphics-overhaul-e99c1a`
+
+The user's question was the whole brief: *"How can we make the hero more beautiful and the opening
+area more beautiful? We still are using the kenney assets, no?"* This is what happened.
+
+## The honest answer first
+
+The **opening area is better**. The **hero is unchanged** — still Kenney stock tile 96, still a white
+blob, because `src/render/views/player.ts` only reaches for authored art when a blade is equipped and
+the whole opening is played unarmed. The unarmed body exists as a gated candidate and cannot ship
+without a human `pnpm art approve`. Nothing was smuggled into `art/approved/` or `public/assets/`.
+
+## Two changes were taken back after reading them at 1x
+
+The pass before this one built a new Gate and a new floor. Both measured better and both looked
+worse, and the eye wins.
+
+- **The Gate bake.** The rewrite recovered 13 px of apex that the old crown was clipping, gave the
+  slot a 1:4.5 aspect, and moved the frame's brightest static pixel onto the threshold. At 1x the
+  pylons and the arch face had come to share one value, so the pointed void between them stopped
+  reading as a void: the monument resolved into a flat rectangular slab with gold horizontal ticks —
+  a bookcase. Reverted to the committed arch, which has a stepped crown, ribbed unequal pylons and
+  an actual absence in the middle. The apex still clips ~3 px against world y 0; that is
+  pre-existing, it is §8.1 and §10.21, and it is the next real job on this monument. It is written
+  down here rather than fixed at 2am because the last agent to re-author this shape at speed lost
+  the arch.
+- **`bakeBardoGateSpill`, deleted.** Four hard plateaus of baked light marching south from the door.
+  At 1x it was a flat cream rectangle sitting on the plaza — a mis-placed floor tile, not light. The
+  authored shaft does this job properly and additively.
+- **Floor ramps LV[2] and LV[4], reverted.** LV[4] went to `grout / woodHi / coinBrass / boneDim /
+  gold`, five measured values one step apart against the old four — better on paper. But
+  `bardo_room.png` is the sheet all **fourteen** layouts pave from, so it did not land only on the
+  Bardo's embers: it put an olive-gold chip into Cocytus, whose `floorTint` is the palest and coldest
+  in the game, and it turned the Bardo plaza into khaki slabs butted against near-black ones. Warm
+  stopped being an intrusion and became half the floor, which cost the wine runner its status as
+  *the* warm thing in the room. LV[2] had a second, separate fault: its ramp put the warm on the
+  **shadow** face and the cool on the **lit** face, the exact reverse of §2.1 Law 4, and collapsed
+  body-to-lit to 0.0003 L — three distinct values where the file header claims five.
+
+The lesson is one line: **a ramp in `LV[]` is global, and per-room brightness has to come from the
+bake or the lightmap.** That is now written beside both ramps.
+
+## What shipped and stayed
+
+- **The light shaft.** Three authored 32×48 wedges (`shaft_01..03`) at 0.62/1.00/1.34 relative width
+  and 1.00/0.62/0.38 relative alpha, replacing two stretched Kenney `circle_noise` discs that ran at
+  an effective ~0.007 alpha — invisible, and §6.1/§10.11/§10.12 all at once. With the arch restored
+  the beam falls through a real opening onto the plaza, which is the concept sheet's own move.
+  `shaftAlpha` 0.13 → 0.30 after reading it at 1x; at 0.13 the beam was there and nobody could see it.
+- **Light hierarchy.** The Gate is the key at r140/s2.4; every other pool ranks under it. The
+  brightest pixel on both the title and the arrival frame is no longer a star.
+- **The landing.** Arrival is now *in* light: its own lamp, its own pool, warm value blocks on the
+  stone under the player's feet. The brass in that scatter went from two blocks in three to one —
+  at two in three the pool read as sand rather than firelight on slate.
+- **Hub depth** (`ambientDarkness` 0.44, `vignette` 0.40) as an opt-in preset override, so the other
+  thirteen layouts keep the tuning default.
+
+## Findings closed
+
+Seventeen review findings across four lenses. Fourteen fixed, three declined with reasons — the full
+per-finding ledger is in the PR description. Three worth repeating here:
+
+- The shaft sprites were destroyed and re-appended on every `rebind()`, so the beam drew *under* the
+  fog on first load and *over* it after any return through the Gate. They are now built once and only
+  aimed, and `Arena.shafts?: RoomShaft[]` became `Arena.shaft?: RoomShaft` so the type carries the
+  one-beam rule instead of a comment.
+- `tuning.juice.light.ambientDarkness` and `vignette` are dead knobs for the Bardo — the hub preset
+  overrides both. Said so in `tuning.ts` beside all three keys, since the same commit's `syncGrade()`
+  exists precisely because someone tuned a dead knob and concluded it was broken.
+- The `levelFor` comment claimed the un-pooled floor stayed "hash-mottled ... mostly level 1". It is
+  measured at **71.8 % level 0 / 17.2 % level 1 / 7.7 % / 3.2 %**, driven by the widened edge term,
+  not the hash. The A/B was captured both ways and the darker perimeter was kept deliberately; the
+  comment now records the measurement and names the one-character change back.
+
+## The hero, specifically
+
+`pnpm art:stress-hero` now runs **three** variants. The unarmed body — the one the opening is
+actually played in — passes **507/507 gates, zero waivers**, and its two exhibits are committed, so
+the lane is reproducible instead of resting on log lines in a gitignored cache. The script had a
+`weapon = "none"` branch that nothing could reach; it now has the call that reaches it.
+
+**Read the sheet at 4× before spending a Look decision on it.** The split crest passes §3.1 as two
+tabs with a void between them, and it reads as **horns** — the silhouette says minotaur, not fallen
+soldier. Every anchor is green and the character is still wrong. Fix the crest first.
+
+## Gates
+
+`pnpm typecheck` silent · `pnpm test` 918/918 in 80 files · `pnpm matrix -- --seeds 1-100`
+slice-kite 78/100, slice-naive 0/100, **0 seeds stranded** · `pnpm room:gate` **78/78**, Bardo
+frame-mean 0.044 (ceiling 0.300), highlight 0.10 % (ceiling 3.50 %), top-one focality 35.8 % at
+1.0 px (floor 4 % / 64 px) · `pnpm build` 2113 KB shipped, 177 files · `pnpm art:stress-hero` three
+variants green against six committed exhibits.
+
+**Replay hashes did not move.** `record-bots` was not run. `src/sim/arena.ts` changed, but only
+through `arena.level`, the props list and the presentation-only `shaft` field; `arena.solid` was not
+touched, and the four pinned fixtures pass inside the 918.
+
+## Still not beautiful
+
+1. The hero. Kenney tile 96 for the entire opening. This is the user's first question and it is still
+   open, because closing it needs a human approval this agent must not perform.
+2. The Gate's apex clips against the frame's top edge. §8.1 says no room ever touches it.
+3. The `keeperLamp` prop is a grey disc with a white candle. At 1x it reads as a lollipop, and there
+   are now two of them on the causeway.
+4. Caster, charger, warden and several weapon sprites are still Kenney. The rooms are not.
+
+---
+
+# Run: the hero the renderer can actually load (2026-08-30, late)
+
+## What was wrong, and it was not the art
+
+The staged hero was immaculate and **uninstallable**. `src/render/views/player.ts` asks a hero sheet
+for clips `run, dodge, light1, light2, heavy` and frames `idle, hurt, dead`, and asks for separate
+`bardo_hero_{north,south}_roll` sheets carrying a `roll` clip of four or more frames. The candidate
+shipped `light0, light1, heavy`, named its death frame `death`, and had **no roll sheet in any
+facing**. `requireHeroClips` and `requireRollClip` would both have thrown at load — a sheet that
+compiles green, passes 507 gates, and then kills the renderer the first time the player dodges.
+
+Both halves are closed **in the generator**. No compiled asset was hand-edited.
+
+- The rename went through `mannequin.py` and `assemble.mjs` in one pass — `light1→light2` before
+  `light0→light1`, so the two cannot collide — plus `death→dead`.
+- The roll is new art: `ROLL_TURN` / `ROLL_TUMBLE` / `ROLL_LIMBS` in `mannequin.py`, a 2×2 sheet
+  emitter in `assemble.mjs`, and two more compiles in `hero-final.sh`.
+  **104/104 gates, zero waivers.**
+
+## Three things the roll measured that were not obvious
+
+1. **A harder curl makes the sprite taller, not rounder.** The body foreshortens hardest around 60°
+   off vertical — the camera's pitch — and folding a body that is already end-on swings its head up
+   the screen. Four iterations went into a tighter and tighter ball before the measurements said the
+   curl was the problem. The turn carries the shape; the curl stays mild.
+2. **The tumble needs a per-facing sign.** The key light belongs to the room, not to the hero. One
+   shared sign put south at Weber 1.26–1.32 and north at 0.71–0.81 against a 1.00 floor; flipping it
+   merely swapped which facing failed `ground-separation`. The roll is now the one pose family
+   authored per facing.
+3. **The roll is unarmed-only**, and that is the live contract rather than a concession: `player.ts`
+   binds one roll pair by direction and never by weapon. Armed it also fails outright — a greatsword
+   through the tuck throws `bladeTip` outside the 64 px cell, and the carry rule forbids hiding the
+   blade to fix it.
+
+## The Oath-Bound: an honest half-fix
+
+Its shield leaf was a *shaded* lane spanning `brickLo` **and** `brick` across the largest mass on the
+actor, which is what made an enemy the brightest thing in the game. The field is now a **flat mark at
+`brickLo`**, handing the sheet's bright line back to the steel rim — which is what the rim was
+authored to be. Measured both ways: sheet median mean-luminance **0.4122 → 0.3774, an 8.4 % cut**,
+78/78 gates still green, zero waivers.
+
+**It does not finish the job.** At 0.3928 the actor is still 1.41× the unarmed hero. Going lower
+needs the leaf below `brickLo`, which the palette lanes forbid without restructuring them — `ironHi`
+is the iron family's, and `slate`/`nave` belong to the floor and to the Judge. That is a design pass.
+I did not make it, and the package says so.
+
+## Declined, with reasons
+
+The warden, the caster and the charger were left alone. Each passes every automated gate and each
+fails the one test the gates cannot run — naming the actor at 1x on black. The warden is a stone
+altar (58×53, wider than tall, 5.2× the hero's area, IoU 0.77–0.79 against the Gate setpiece and
+0.98 between its own two facings). The caster is a pair of legs carrying a mallet, and it is 1.36×
+the hero's height, so the fragile ranged unit out-measures the player. The charger is a brass bar in
+125 opaque pixels. **None of these is a polish pass; all three need a new silhouette**, and a small
+edit that pretended otherwise would have been worse than leaving them staged.
+
+## Gates
+
+`pnpm typecheck` exit 0 · `pnpm test` **918/918** in 80 files, 3.23 s · `pnpm matrix -- --seeds
+1-100` slice-kite **78/100**, slice-naive **0/100**, 100/100 resolved, **0 seeds stranded** ·
+hero compile **507 + 104 + 1212** gates, 0 blocking, 4 waivers (all weapon-apex, each measured) ·
+actors warden 274 / caster 92 / charger 81 / oathbound 78 / dummy 22, all 0 blocking.
+
+**Replay hashes did not move, and `record-bots` was not run.** Every file this run touched is a
+build tool under `tools/spike/`, unreachable from `stepWorld` or `createWorld`. The 16 pinned
+fixtures pass unmodified inside the 918.
+
+## Still not beautiful
+
+1. **Every Kenney placeholder still ships.** `SPRITE` in `src/render/views/shared.ts` is still seven
+   indices into `tiny_dungeon.png`, and that file is still in the manifest after a green build.
+   Approving this package removes zero Kenney pixels — the wiring is a separate change, and only the
+   hero's replacement is ready for it.
+2. The Oath-Bound is still brighter than the hero.
+3. The warden, caster and charger are not figures yet.
+4. `tuck` and `apex` are close cousins in the south roll. It reads as a tumble; it is not the equal
+   of the hand-drawn 16 px roll for personality.

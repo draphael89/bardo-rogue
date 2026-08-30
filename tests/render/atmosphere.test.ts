@@ -16,10 +16,6 @@ describe('per-layout air', () => {
 
   it('does not hang amber fog over iron or wine rooms', () => {
     expect(atmosphereFor('styx').fogTint).not.toBe(atmosphereFor('landing').fogTint)
-    expect(atmosphereFor('styx').rayTint).toBe(0x6a7080)
-    expect(atmosphereFor('styx').rayTint).not.toBe(EMBER)
-    expect(atmosphereFor('phlegethon').rayTint).toBe(WINE)
-    expect(atmosphereFor('phlegethon').rayTint).not.toBe(EMBER)
     expect(atmosphereFor('minos').fogTint).toBe(WINE_DARK)
     expect(atmosphereFor('minos-east').fogTint).toBe(WINE_DARK)
     expect(atmosphereFor('threshold').fogTint).toBe(0x1c2e3c)
@@ -81,6 +77,13 @@ describe('a realm is a surface, not only a name', () => {
       expect(B(atmosphereFor(id).floorTint), `${id} floor`).toBeGreaterThan(R(atmosphereFor(id).floorTint))
       expect(B(atmosphereFor(id).ambientTint), `${id} dark`).toBeGreaterThan(R(atmosphereFor(id).ambientTint))
     }
+  })
+
+  it('keeps Cocytus paler and more cyan than the Acheron river', () => {
+    const river = atmosphereFor('threshold')
+    const ice = atmosphereFor('cocytus')
+    expect(G(ice.floorTint)).toBeGreaterThan(G(river.floorTint))
+    expect(B(ice.ambientTint) - R(ice.ambientTint)).toBeGreaterThan(B(river.ambientTint) - R(river.ambientTint))
   })
 
   it('spends brightness for hue, but only downward and only so far', () => {

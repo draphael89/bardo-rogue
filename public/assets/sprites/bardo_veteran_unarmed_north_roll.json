@@ -1,0 +1,140 @@
+{
+  "id": "actor.veteran.unarmed.north.roll",
+  "version": 1,
+  "kind": "character",
+  "cell": 64,
+  "cols": 2,
+  "rows": 2,
+  "palette": "bardo.canon",
+  "ramp": [
+    "mortar",
+    "seal0",
+    "iron",
+    "ironHi",
+    "purple0",
+    "purple2",
+    "purple3",
+    "boneLo",
+    "boneDim",
+    "bone",
+    "brickLo",
+    "brick",
+    "brickHi",
+    "cope",
+    "gold"
+  ],
+  "maxColors": 16,
+  "facing": "north",
+  "frames": {
+    "dive": {
+      "i": 0,
+      "pivot": [
+        32,
+        54
+      ],
+      "sockets": {
+        "handR": [
+          23,
+          30
+        ],
+        "handL": [
+          41,
+          30
+        ],
+        "head": [
+          32,
+          24
+        ]
+      }
+    },
+    "tuck": {
+      "i": 1,
+      "pivot": [
+        32,
+        54
+      ],
+      "sockets": {
+        "handR": [
+          24,
+          38
+        ],
+        "handL": [
+          40,
+          38
+        ],
+        "head": [
+          32,
+          29
+        ]
+      }
+    },
+    "apex": {
+      "i": 2,
+      "pivot": [
+        32,
+        54
+      ],
+      "sockets": {
+        "handR": [
+          25,
+          46
+        ],
+        "handL": [
+          39,
+          46
+        ],
+        "head": [
+          32,
+          39
+        ]
+      }
+    },
+    "extend": {
+      "i": 3,
+      "pivot": [
+        32,
+        54
+      ],
+      "sockets": {
+        "handR": [
+          17,
+          36
+        ],
+        "handL": [
+          47,
+          36
+        ],
+        "head": [
+          32,
+          27
+        ]
+      }
+    }
+  },
+  "clips": {
+    "roll": {
+      "frames": [
+        "dive",
+        "tuck",
+        "apex",
+        "extend"
+      ],
+      "timing": "sim",
+      "sim": {
+        "ref": "player.dodge"
+      },
+      "grounded": false
+    }
+  },
+  "source": {
+    "provider": "blender-mannequin-spike",
+    "model": "blender-eevee ortho pitch 20deg, legScale 1, weapon none, armor base, sun 1.07, ambient 1.75",
+    "approvedSource": "art/approved/bardo_veteran_unarmed_north_roll_v1.png",
+    "referenceHashes": [
+      "6788f7379947766a501ae69654136fd6dd40b5623d93f72c75fdd8074a839f79"
+    ],
+    "compiler": "bardo-art/1",
+    "sourceFile": "art/approved/bardo_veteran_unarmed_north_roll_v1.png",
+    "sourceHash": "6788f7379947766a"
+  }
+}

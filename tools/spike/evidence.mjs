@@ -22,6 +22,10 @@ const flag = (name, dflt) => {
 }
 const COMPILED = flag('compiled', '.art-cache/spike/compiled')
 const OUT = flag('out', '.art-cache/spike')
+const PREFIX = flag('prefix', 'spike_veteran')
+const LABEL = flag('label', 'greatsword')
+const BLACK_FILE = flag('black', 'blacktest.png')
+const CONTACT_FILE = flag('contact', 'contact-sheet.png')
 
 const FACINGS = ['south', 'north', 'east']
 const CELL = 64
@@ -30,9 +34,9 @@ const GREY = { r: 128, g: 128, b: 128 }
 
 const sheets = {}
 for (const f of FACINGS) {
-  const path = join(COMPILED, `spike_veteran_${f}.png`)
+  const path = join(COMPILED, `${PREFIX}_${f}.png`)
   const { data, info } = await sharp(path).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
-  const def = JSON.parse(readFileSync(join(COMPILED, `spike_veteran_${f}.json`), 'utf8'))
+  const def = JSON.parse(readFileSync(join(COMPILED, `${PREFIX}_${f}.json`), 'utf8'))
   sheets[f] = { data, width: info.width, def }
 }
 const FRAMES = Object.entries(sheets.south.def.frames).sort((a, b) => a[1].i - b[1].i).map(([n]) => n)
@@ -79,8 +83,8 @@ async function label(text, w, h = 16) {
     top += rowH
   }
   await sharp({ create: { width: W, height: top + 4, channels: 4, background: { ...GREY, alpha: 1 } } })
-    .composite(comp).png().toFile(join(OUT, 'blacktest.png'))
-  console.log(`black test -> ${join(OUT, 'blacktest.png')}`)
+    .composite(comp).png().toFile(join(OUT, BLACK_FILE))
+  console.log(`black test -> ${join(OUT, BLACK_FILE)}`)
 }
 
 // ---------------------------------------------------------------- contact sheet
@@ -99,15 +103,24 @@ async function label(text, w, h = 16) {
     }
     top += CELL + 8
   }
-  const swing = FRAMES.filter(n => n.startsWith('swing'))
-  for (const f of FACINGS) {
-    comp.push({ input: await label(`${f} — greatsword arc 4x: ${swing.join(' > ')}`, 900), left: 4, top })
-    top += 16
-    for (let i = 0; i < swing.length; i++) {
-      const idx = sheets[f].def.frames[swing[i]].i
-      comp.push({ input: await toPng(cellRaw(sheets[f], idx), S4), left: 4 + i * w4, top })
+  // The magnified strips are driven by the sidecar's own CLIPS, not by a name prefix. A family that
+  // owns three attack chains plus a dodge gets four labelled strips per facing, each in the clip's
+  // authored order and tagged with the sim window it binds — which is the thing a reader has to
+  // check: that the pose called "contact" is the one shown while damage is live.
+  const strips = Object.entries(sheets.south.def.clips ?? {})
+    .filter(([name]) => name !== 'run')
+    .map(([name, c]) => [name, c.frames, c.sim?.ref ?? c.timing])
+  if (!strips.length) strips.push([LABEL, FRAMES.slice(9), 'ticks'])
+  for (const [name, frames, ref] of strips) {
+    for (const f of FACINGS) {
+      comp.push({ input: await label(`${f} — clip "${name}" -> ${ref} — 4x: ${frames.join(' > ')}`, 1100), left: 4, top })
+      top += 16
+      for (let i = 0; i < frames.length; i++) {
+        const idx = sheets[f].def.frames[frames[i]].i
+        comp.push({ input: await toPng(cellRaw(sheets[f], idx), S4), left: 4 + i * w4, top })
+      }
+      top += CELL * S4 + 10
     }
-    top += CELL * S4 + 10
   }
   comp.push({ input: await label(`south idle / run4 — 4x`, 300), left: 4, top })
   top += 16
@@ -117,6 +130,6 @@ async function label(text, w, h = 16) {
   }
   top += CELL * S4 + 8
   await sharp({ create: { width: W, height: top, channels: 4, background: { ...FLOOR, alpha: 1 } } })
-    .composite(comp).png().toFile(join(OUT, 'contact-sheet.png'))
-  console.log(`contact sheet -> ${join(OUT, 'contact-sheet.png')}`)
+    .composite(comp).png().toFile(join(OUT, CONTACT_FILE))
+  console.log(`contact sheet -> ${join(OUT, CONTACT_FILE)}`)
 }

@@ -1,0 +1,260 @@
+{
+  "id": "actor.warden.south",
+  "kind": "character",
+  "input": ".art-cache/actors/warden/master-south.png",
+  "output": ".art-cache/actors/warden/compiled/bardo_warden_south.png",
+  "sidecar": ".art-cache/actors/warden/compiled/bardo_warden_south.json",
+  "cell": 72,
+  "cols": 4,
+  "rows": 4,
+  "maxColors": 16,
+  "palette": [
+    "mortar",
+    "seal0",
+    "nave0",
+    "nave1",
+    "nave2",
+    "boneLo",
+    "boneDim",
+    "bone",
+    "gold"
+  ],
+  "facing": "south",
+  "fit": "grid",
+  "chromaKey": false,
+  "coverage": 0.5,
+  "valueLift": false,
+  "salience": {
+    "minShare": 0.22,
+    "minDelta": 0.16
+  },
+  "frames": [
+    {
+      "name": "idle",
+      "i": 0,
+      "pivot": [
+        36,
+        66
+      ],
+      "sockets": {
+        "mask": [
+          36,
+          25
+        ]
+      }
+    },
+    {
+      "name": "chaseA",
+      "i": 1,
+      "pivot": [
+        36,
+        66
+      ],
+      "sockets": {
+        "mask": [
+          36,
+          25
+        ]
+      }
+    },
+    {
+      "name": "chaseB",
+      "i": 2,
+      "pivot": [
+        36,
+        66
+      ],
+      "sockets": {
+        "mask": [
+          36,
+          25
+        ]
+      }
+    },
+    {
+      "name": "windSlamGather",
+      "i": 3,
+      "pivot": [
+        36,
+        66
+      ],
+      "sockets": {
+        "mask": [
+          36,
+          22
+        ]
+      }
+    },
+    {
+      "name": "windSlamCommit",
+      "i": 4,
+      "pivot": [
+        36,
+        66
+      ],
+      "sockets": {
+        "mask": [
+          36,
+          20
+        ]
+      }
+    },
+    {
+      "name": "slamContact",
+      "i": 5,
+      "pivot": [
+        36,
+        66
+      ],
+      "sockets": {
+        "mask": [
+          36,
+          30
+        ]
+      }
+    },
+    {
+      "name": "slamRecover",
+      "i": 6,
+      "pivot": [
+        36,
+        66
+      ],
+      "sockets": {
+        "mask": [
+          36,
+          27
+        ]
+      }
+    },
+    {
+      "name": "windRing",
+      "i": 7,
+      "pivot": [
+        36,
+        66
+      ],
+      "sockets": {
+        "mask": [
+          36,
+          25
+        ]
+      }
+    },
+    {
+      "name": "ringRelease",
+      "i": 8,
+      "pivot": [
+        36,
+        66
+      ],
+      "sockets": {
+        "mask": [
+          36,
+          25
+        ]
+      }
+    },
+    {
+      "name": "windFan",
+      "i": 9,
+      "pivot": [
+        36,
+        66
+      ],
+      "sockets": {
+        "mask": [
+          35,
+          25
+        ]
+      }
+    },
+    {
+      "name": "fanRelease",
+      "i": 10,
+      "pivot": [
+        36,
+        66
+      ],
+      "sockets": {
+        "mask": [
+          37,
+          25
+        ]
+      }
+    },
+    {
+      "name": "phase",
+      "i": 11,
+      "pivot": [
+        36,
+        66
+      ],
+      "sockets": {
+        "mask": [
+          36,
+          24
+        ]
+      }
+    },
+    {
+      "name": "hurt",
+      "i": 12,
+      "pivot": [
+        36,
+        66
+      ],
+      "sockets": {
+        "mask": [
+          36,
+          27
+        ]
+      }
+    },
+    {
+      "name": "stagger",
+      "i": 13,
+      "pivot": [
+        36,
+        66
+      ],
+      "sockets": {
+        "mask": [
+          36,
+          26
+        ]
+      }
+    }
+  ],
+  "clips": {
+    "slam": {
+      "frames": [
+        "windSlamGather",
+        "windSlamCommit",
+        "slamContact",
+        "slamRecover"
+      ],
+      "timing": "sim",
+      "sim": {
+        "ref": "warden"
+      }
+    },
+    "chase": {
+      "frames": [
+        "chaseA",
+        "chaseB"
+      ],
+      "timing": "ticks",
+      "ticks": [
+        8,
+        8
+      ],
+      "loop": true
+    }
+  },
+  "provenance": {
+    "provider": "blender-mannequin-spike",
+    "model": "blender-eevee ortho pitch 20deg, actor warden, cell 72, sun 1.07, ambient 1.75"
+  },
+  "registrationNote": "Pivots and sockets are COMPUTED from projected rig bones (rig.json), not judged. Candidate output only: .art-cache/actors, never public/assets."
+}

@@ -454,23 +454,9 @@ export const tuning = {
       // A head-on wall ends travel immediately. It needs a firmer, local answer than the normal
       // foot plant, but stays far below taking damage so collision never impersonates a hit.
       wallTrauma: 0.09, wallKick: 1.15, wallDust: 5, wallSparks: 3,
-      // The roll's own animation table. Each row owns dodge-state ticks from `tick` up to the next
-      // row: an authored 16 px pose (drawn in src/render/views/player.ts, not a transform of the
-      // standing sprite), how far that pose leans into the travel, and how close to the floor it
-      // sits. `key: ''` hands the body back to the standing sprite. Ticks are dodge-state ticks, so
-      // these move with `player.dodge.travel`/`total` — launch, dive, the two tuck halves that show
-      // the body actually turning over, the extend into the brake, the plant, and the rise.
-      pose: [
-        { tick: 0, key: 'launch', leanDeg: 9, hop: 0 },
-        { tick: 1, key: 'dive', leanDeg: 22, hop: 1 },   // hold the flat dive through the beam
-        { tick: 6, key: 'tuckA', leanDeg: 6, hop: -1 },  // curl only after the column is cleared
-        { tick: 8, key: 'tuckB', leanDeg: -7, hop: -1 },
-        { tick: 10, key: 'extend', leanDeg: 10, hop: 0 },
-        { tick: 12, key: 'plant', leanDeg: 4, hop: 0 },
-        { tick: 14, key: 'absorb', leanDeg: 2, hop: 0 },
-        { tick: 16, key: 'rise', leanDeg: 1, hop: 0 },
-        { tick: 19, key: '', leanDeg: 0, hop: 0 },
-      ] as { tick: number; key: string; leanDeg: number; hop: number }[],
+      // The roll's poses are no longer a table here. The authored roll sheets carry their own frames
+      // and the renderer derives which one is up from dodge-state ticks against `player.dodge`
+      // (src/render/clipSelect.ts), so a timing edit belongs there, not in a parallel list here.
     },
     // Poise break. Only the heavy breaks a brute, so only that one earns the camera.
     stagger: { trauma: 0.10, bruteTrauma: 0.26, bruteZoom: 1.02, bruteFlash: 0.10 },
@@ -513,27 +499,37 @@ export const tuning = {
     },
     damageNumbers: false,
     light: {
+      // THIRTEEN LAYOUTS, NOT FOURTEEN. `ambientDarkness`, `ambientTint` and `vignette` are all
+      // fallbacks: a preset in `atmospherePresets.ts` may override any of them per room, and the
+      // hub does override all three (0.44 / indigo / 0.40). So editing the three numbers below
+      // and reloading into the Bardo changes nothing — tune HUB in atmospherePresets.ts instead.
       ambientDarkness: 0.28,  // 0 = untouched, 1 = black at the arena edge
       ambientTint: 0x1e1c38, // indigo void; warm floor is graded out, ember stays on the lights
       vignette: 0.32,        // how much brighter the arena centre is than the edge
-      brazierRadius: 108, brazierFlicker: 0.30, brazierTint: 0xff7a18,
+      brazierFlicker: 0.30,
       playerLightRadius: 32, playerLightAlpha: 0.12,
       flameRate: 16,         // flame particles per second per brazier
       deathFadeSec: 1.6,     // slow red vignette after playerDeath
-      doorRadius: 64, doorFlicker: 0.10, doorTint: 0xffe8c0, doorOpenTint: 0xd4b060, doorAlpha: 0.36,
-      windowRadius: 88, windowFlicker: 0.10, windowTint: 0xc8d8ff, windowAlpha: 0.70,
+      doorRadius: 64, doorFlicker: 0.10, doorOpenTint: 0xd4b060, doorAlpha: 0.36,
+      windowFlicker: 0.10, windowAlpha: 0.70,
     },
     atmosphere: {
       moteCount: 28, moteSpeed: 7, moteAlpha: 0.55, moteTint: 0xffe4b0,
       fogCount: 5, fogAlpha: 0.10, fogTint: 0x5a6080,
-      rayCount: 2, rayAlpha: 0.06, rayTint: 0xffd8a0,
-      doorGlowRadius: 36, doorGlowAlpha: 0.10, doorGlowTint: 0xffe8b8, doorOpenTint: 0xd4b060,
+      // The one beam in the game, through the Bardo's Gate. It replaced rayCount/rayAlpha/rayTint,
+      // which drove two stretched Kenney noise discs at an effective ~0.007 alpha.
+      shaftAlpha: 0.30,
+      doorGlowRadius: 36, doorGlowAlpha: 0.10,
     },
     grade: {
       strength: 1,
       shadowR: 0.07, shadowG: 0.08, shadowB: 0.20,
       highlightR: 0.98, highlightG: 0.94, highlightB: 0.90,
       contrast: 1.06, sat: 0.82,
+      // How hard the shadow lift pulls dark pixels toward `shadow*`. This lived as a literal 0.30
+      // inside the grade's GLSL string, where no tuner could find it and no live edit could reach
+      // it. Value unchanged; only its address moved.
+      shadowLift: 0.30,
     },
   },
 }

@@ -95,7 +95,7 @@ Value, not hue, is the load-bearing axis. Every colour belongs to a band. Bands 
 | `ember` | `#FF7A18` | B3 | Flame body. |
 | `emberHi` | `#FFCC56` | B5 | Flame core. |
 | `emberLo` | `#B03010` | B2 | Flame shadow, scorch. |
-| `numenDim` | `#1A4A48` | B1 | Numinous shadow. Bardo only (§1.3.6). |
+| `numenDim` | `#1A4A48` | B2 | Numinous shadow. Bardo only (§1.3.6). |
 | `numen` | `#2E8A80` | B3 | Numinous body — the star pool, a Seal's live edge, the Ferryman's lantern glass. |
 | `numenHi` | `#7FE8D8` | B5 | Numinous core. 1–2 px. |
 

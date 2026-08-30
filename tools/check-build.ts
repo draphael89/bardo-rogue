@@ -19,9 +19,14 @@ const VIDEO = /\.(mp4|mov|webm|mkv|avi)$/i
 // Runtime files the game loads by HARDCODED path (src/render/atlas.ts), so the manifest check
 // cannot protect them: `pnpm assets` regenerating the manifest never mentions them, and without
 // this list their deletion would pass the gate and boot to a missing-texture failure.
+// This list is the ONLY place they are enumerated. They used to be hand-added to manifest.json as
+// well, which is a second list nothing writes and nothing reads — it went stale the first time a
+// sheet was renamed and failed the build for a file the game never fetches by that route.
 const AUTHORED_SHEETS = [
-  'bardo_hero', 'bardo_hero_north', 'bardo_hero_north_roll',
-  'bardo_hero_south', 'bardo_hero_south_roll', 'bardo_brute',
+  'bardo_veteran_unarmed_east', 'bardo_veteran_unarmed_north', 'bardo_veteran_unarmed_south',
+  'bardo_veteran_unarmed_north_roll', 'bardo_veteran_unarmed_south_roll',
+  'bardo_veteran_greatsword_east', 'bardo_veteran_greatsword_north', 'bardo_veteran_greatsword_south',
+  'bardo_brute',
 ]
 const HARDCODED_RUNTIME = AUTHORED_SHEETS.flatMap(name => [
   `assets/sprites/${name}.png`,

@@ -9,17 +9,29 @@ import { tuning } from '@/tuning'
 // and the letterbox continues the in-frame pattern. The hash is the sim's own hash2 (arena.ts) —
 // one set of constants — with this file's salts.
 export const VOID_BLACK = 0x08070e
+// THE SKY IS RANKED, AND IT USED TO OUT-RANK THE GATE. `star` (L 0.769) and `goldStar` (L 0.892)
+// are the two brightest colours in canon, and every star was painted at one of them, at full alpha,
+// over the darkest surface in the game. The measured consequence: the frame's brightest pixel was a
+// star at 0.897 and over half the top-1 % set was off-floor — no amount of gold on a threshold wins
+// a frame whose brightest pixel is in the sky (§3.2.5). One star in twelve keeps the old ranks; the
+// other eleven sit at 0.51, which is still clearly a star against a 0.03 void and no longer
+// competes with the district. All four are canon, so the palette and AA gates do not move, and
+// `eachStar` still serves both the in-frame and letterbox paths — §2.8's one sky, by construction.
 const STAR_COLD = 0xb0c4ff
 const STAR_WARM = 0xffe2a0
+const DIM_COLD = 0x76849a
+const DIM_WARM = 0x90806c
 const CELL = 16
-const SALT = { star: 51, dx: 52, dy: 53, warm: 54 }
+const SALT = { star: 51, dx: 52, dy: 53, warm: 54, bright: 55 }
 
 function starAt(i: number, j: number): { dx: number; dy: number; color: number } | null {
   if (hash2(i, j, SALT.star) < 0.5) return null
+  const warm = hash2(i, j, SALT.warm) < 1 / 3
+  const bright = hash2(i, j, SALT.bright) < 1 / 12
   return {
     dx: Math.floor(hash2(i, j, SALT.dx) * CELL),
     dy: Math.floor(hash2(i, j, SALT.dy) * CELL),
-    color: hash2(i, j, SALT.warm) < 1 / 3 ? STAR_WARM : STAR_COLD,
+    color: bright ? (warm ? STAR_WARM : STAR_COLD) : (warm ? DIM_WARM : DIM_COLD),
   }
 }
 
@@ -58,27 +70,16 @@ export function drawVoidUnderlay(g: Graphics, roomRect: { x: number; y: number; 
  * the target grid (each star is one target pixel, `s` CSS px square), so the frame edge is
  * invisible in the sky.
  */
-// The letterbox lies outside the render target, so the lightmap's resting ambient multiply
-// (lerp(1, tint/255, ambientDarkness) per channel) never reaches it. Bake that factor into the
-// letterbox's own colors so a star 1px outside the frame edge matches one 1px inside. The canonical
-// indigo stands in for per-room presets, and the death fade still diverges in the bars — accepted:
-// the bars sit outside the grade of attention, and the resting mismatch was the visible artifact.
-function ambientRest(c: number): number {
-  const L = tuning.juice.light
-  let out = 0
-  for (const sh of [16, 8, 0]) {
-    const ch = (c >> sh) & 255, ach = (L.ambientTint >> sh) & 255
-    out |= Math.round(ch * (1 - L.ambientDarkness + (ach / 255) * L.ambientDarkness)) << sh
-  }
-  return out
-}
-
 export function drawLetterboxVoid(g: Graphics, canvasW: number, canvasH: number, frameX: number, frameY: number, s: number): void {
   const { width, height } = tuning.view
   g.clear()
   // Four gutter rects around the screen sprite, never a full-canvas quad: the sprite overdraws
   // the middle completely, so painting it here was dead fill (7.5MPx per frame at 16:9, 2x DPR).
-  const fill = ambientRest(VOID_BLACK)
+  // The screen-space underlay is not a child of the lit world. Applying the world's resting
+  // ambient a second time only to the gutters made the actual frame edge measurable: the portrait
+  // target resolved its sky to (0,0,4) after the shared grade while the bars resolved to (0,0,2).
+  // Both surfaces enter the shared frame grade from the same authored void instead.
+  const fill = VOID_BLACK
   const fw = width * s, fh = height * s
   const x1 = frameX + fw, y1 = frameY + fh
   if (frameY > 0) g.rect(0, 0, canvasW, frameY).fill({ color: fill, alpha: 1 })
@@ -87,6 +88,6 @@ export function drawLetterboxVoid(g: Graphics, canvasW: number, canvasH: number,
   if (x1 < canvasW) g.rect(x1, frameY, canvasW - x1, fh).fill({ color: fill, alpha: 1 })
   eachStar(-frameX / s, -frameY / s, (canvasW - frameX) / s, (canvasH - frameY) / s, (x, y, color) => {
     if (x >= 0 && y >= 0 && x < width && y < height) return   // under the target's own sky
-    g.rect(frameX + x * s, frameY + y * s, s, s).fill({ color: ambientRest(color), alpha: 1 })
+    g.rect(frameX + x * s, frameY + y * s, s, s).fill({ color, alpha: 1 })
   })
 }

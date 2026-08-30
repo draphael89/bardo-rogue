@@ -3,6 +3,7 @@ import type { World } from '@/sim/world'
 import { tuning } from '@/tuning'
 import {
   backTitle, confirmTitle, titleDescend, townTally, wrapTitleFocus,
+  titleDescentEase, TITLE_DESCENT_SEC,
   type TitleAct, type TitlePage,
 } from './titleMenu'
 import { label, placeCentered, placeLeft, P, type TypeTier } from './ui'
@@ -29,6 +30,8 @@ export class TitleOverlay {
   private music = 1
   private sfx = 1
   private t = 0
+  private descentT = 0
+  private descending = false
 
   constructor(layer: Container) {
     this.root.visible = false
@@ -48,6 +51,29 @@ export class TitleOverlay {
     this.page = 'menu'
     this.focus = 0
     this.key = ''
+    this.resetTransition()
+  }
+
+  resetTransition(): void {
+    this.descentT = 0
+    this.descending = false
+    this.root.alpha = 1
+  }
+
+  beginDescent(): void {
+    this.descentT = this.reducedEffects ? TITLE_DESCENT_SEC : 0
+    this.descending = true
+    this.key = ''
+  }
+
+  get descentComplete(): boolean { return this.descending && this.descentT >= TITLE_DESCENT_SEC }
+
+  cameraFocus(world: World): { x: number; y: number } | null {
+    if (!this.shown || world.arena.kind !== 'bardo') return null
+    const from = world.arena.focal
+    const to = world.player
+    const u = this.descending ? titleDescentEase(this.descentT / TITLE_DESCENT_SEC) : 0
+    return { x: from.x + (to.x - from.x) * u, y: from.y + (to.y - from.y) * u }
   }
 
   setSoundGate(gated: boolean): void {
@@ -107,9 +133,13 @@ export class TitleOverlay {
   update(world: World, dtSec: number): void {
     if (!this.shown) return
     this.t += dtSec
+    if (this.descending) {
+      this.descentT = Math.min(TITLE_DESCENT_SEC, this.descentT + dtSec)
+      this.root.alpha = 1 - titleDescentEase(this.descentT / TITLE_DESCENT_SEC)
+    }
     if (this.noteT > 0) { this.noteT -= dtSec; if (this.noteT <= 0) { this.note = ''; this.key = '' } }
     const m = world.session.meta
-    const next = `${tuning.view.width}|${m.attempts}|${m.victories}|${m.remembrances}|${this.soundGate}|${this.page}|${this.focus}|${this.reducedEffects ? 1 : 0}|${this.master}|${this.music}|${this.sfx}|${this.note}`
+    const next = `${tuning.view.width}|${m.attempts}|${m.victories}|${m.remembrances}|${this.soundGate}|${this.page}|${this.focus}|${this.reducedEffects ? 1 : 0}|${this.master}|${this.music}|${this.sfx}|${this.note}|${this.descending}`
     // The card is static; only the prompt breathes. Twice a second is not often, but this is the
     // first screen the game ever shows and it was destroying eleven display objects and rasterising
     // ten new text textures on every beat to recolour one label — a hitch landing exactly on the
@@ -136,28 +166,28 @@ export class TitleOverlay {
     const m = world.session.meta
     const returning = m.attempts > 0
 
-    // A veil, not a blackout: the room has to stay legible under it or there was no point holding
-    // the title over the room at all. 0.62 buried the rack and the body; 0.48 keeps the Bardo the
-    // picture and the type the frame.
-    g.rect(0, 0, W, H).fill({ color: P.void, alpha: 0.48 })
-    // Two rails frame the type and nothing else. They stop short of the edges so the room breathes
-    // past them.
-    const inset = 46
-    g.rect(inset, 40, W - inset * 2, 1).fill({ color: P.gold, alpha: 0.5 })
-    g.rect(inset, H - 52, W - inset * 2, 1).fill({ color: P.gold, alpha: 0.5 })
-
-    const epigraph = label('THE SPACE BETWEEN DEATH AND WHAT COMES NEXT', 'meta', P.dim)
-    placeCentered(epigraph, W / 2, 54); this.add(epigraph)
-
-    // The name, letterspaced by hand: one Text per glyph so the tracking lands on whole pixels
-    // instead of asking the font for a fractional advance.
-    this.drawName(W / 2, 92)
-
-    g.rect(W / 2 - 58, 116, 116, 1).fill({ color: P.red, alpha: 0.85 })
-
-    if (this.soundGate) {
-      this.paintSoundGate(W, H)
-      return
+    // Menu and sound gate are a local typographic band in the left void, never a veil over the
+    // Gate. Settings and Credits become their own compact steles because they need concentration,
+    // not ownership of the whole frame.
+    const local = this.soundGate || this.page === 'menu'
+    if (local) {
+      const bandW = Math.min(258, Math.round(W * 0.41))
+      g.rect(0, 0, bandW, H).fill({ color: P.void, alpha: 0.86 })
+      g.rect(bandW, 34, 1, 108).fill({ color: P.gold, alpha: 0.34 })
+      g.rect(36, 40, 178, 1).fill({ color: P.gold, alpha: 0.56 })
+      const epigraph = label('THE SPACE BETWEEN DEATHS', 'meta', P.dim)
+      placeLeft(epigraph, 36, 54); this.add(epigraph)
+      this.drawNameLeft(36, 87)
+      g.rect(36, 110, 104, 1).fill({ color: P.red, alpha: 0.85 })
+      if (this.soundGate) { this.paintSoundGate(W, H); return }
+    } else {
+      const sw = 252, sh = this.page === 'settings' ? 224 : 182
+      const sx = Math.round((W - sw) / 2), sy = Math.round((H - sh) / 2)
+      g.rect(sx, sy, sw, sh).fill({ color: P.void, alpha: 0.92 })
+      g.rect(sx, sy, sw, 1).fill({ color: P.gold, alpha: 0.62 })
+      g.rect(sx, sy + sh - 1, sw, 1).fill({ color: P.gold, alpha: 0.32 })
+      const heading = label(this.page === 'settings' ? 'SETTINGS' : 'CREDITS', 'meta', P.gold)
+      placeCentered(heading, W / 2, sy + 20); this.add(heading)
     }
     switch (this.page) {
       case 'menu': this.paintMenu(W, H, returning, m.attempts, m.victories, m.remembrances); break
@@ -173,7 +203,7 @@ export class TitleOverlay {
     this.paintPremise(36)
     const prompt = label('WAKE THE ROOM', 'head', 0xffffff)
     prompt.tint = this.beat ? P.gold : P.bone
-    placeCentered(prompt, W / 2, H - 74); this.add(prompt)
+    placeLeft(prompt, 36, 184); this.add(prompt)
     this.prompt = prompt
   }
 
@@ -195,14 +225,14 @@ export class TitleOverlay {
 
   private paintSettings(W: number, H: number): void {
     const still = this.reducedEffects ? 'THE ROOM IS STILL' : 'STILL THE ROOM'
-    this.paintRow(W / 2, 140, still, this.focus === 0)
-    this.paintMeter(W / 2, 158, 'MASTER', this.master, this.focus === 1)
-    this.paintMeter(W / 2, 176, 'MUSIC', this.music, this.focus === 2)
-    this.paintMeter(W / 2, 194, 'SOUND', this.sfx, this.focus === 3)
-    this.paintRow(W / 2, 212, 'FULLSCREEN', this.focus === 4)
-    this.paintRow(W / 2, 230, 'RISE', this.focus === 5)
+    this.paintRow(W / 2, 112, still, this.focus === 0)
+    this.paintMeter(W / 2, 134, 'MASTER', this.master, this.focus === 1)
+    this.paintMeter(W / 2, 156, 'MUSIC', this.music, this.focus === 2)
+    this.paintMeter(W / 2, 178, 'SOUND', this.sfx, this.focus === 3)
+    this.paintRow(W / 2, 202, 'FULLSCREEN', this.focus === 4)
+    this.paintRow(W / 2, 224, 'RISE', this.focus === 5)
     const foot = label(this.note || 'THE ROOM LISTENS', 'meta', this.note ? P.gold : P.dim)
-    placeCentered(foot, W / 2, H - 38); this.add(foot)
+    placeCentered(foot, W / 2, 252); this.add(foot)
   }
 
   private paintMeter(cx: number, y: number, name: string, value: number, selected: boolean): void {
@@ -232,15 +262,15 @@ export class TitleOverlay {
       ['THE UNBURIED  ·  THE JUDGE', 'body', P.bone],
       ['AND YOU', 'body', P.bone],
     ]
-    let y = 142
+    let y = 132
     for (const [text, tier, color] of lines) {
       const row = label(text, tier, color)
       placeCentered(row, W / 2, y); this.add(row)
       y += tier === 'meta' ? 18 : 16
     }
-    this.paintRow(W / 2, 204, 'RISE', true)
+    this.paintRow(W / 2, 196, 'RISE', true)
     const foot = label('THE FIRST GATE', 'meta', P.dim)
-    placeCentered(foot, W / 2, H - 38); this.add(foot)
+    placeCentered(foot, W / 2, 222); this.add(foot)
   }
 
   private paintPremise(col: number): void {
@@ -278,13 +308,12 @@ export class TitleOverlay {
   // BARDO, hand-tracked. At this size the display face's own spacing is too tight for the word to
   // read as a monument rather than a label. The tracking came down with the size (34 -> 32, the
   // nearest size Kenney Pixel is actually drawn for) so the word keeps the same open rhythm.
-  private drawName(cx: number, y: number): void {
+  private drawNameLeft(x0: number, y: number): void {
     const letters = [...'BARDO']
     const track = 10
     const glyphs = letters.map(ch => label(ch, 'monument', P.bone))
     const widths = glyphs.map(t => Math.round(t.width))
-    const total = widths.reduce((a, b) => a + b, 0) + track * (letters.length - 1)
-    let x = Math.round(cx - total / 2)
+    let x = Math.round(x0)
     // The x is already whole; the y has to be too, so the anchor is left at the corner and the
     // middling done here. A 0.5 anchor on an odd glyph box puts the whole word on a half row.
     glyphs.forEach((t, i) => {

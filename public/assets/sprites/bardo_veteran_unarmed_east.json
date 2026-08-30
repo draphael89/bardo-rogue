@@ -1,0 +1,374 @@
+{
+  "id": "actor.veteran.unarmed.east",
+  "version": 1,
+  "kind": "character",
+  "cell": 64,
+  "cols": 4,
+  "rows": 4,
+  "palette": "bardo.canon",
+  "ramp": [
+    "mortar",
+    "seal0",
+    "iron",
+    "ironHi",
+    "purple0",
+    "purple2",
+    "purple3",
+    "boneLo",
+    "boneDim",
+    "bone",
+    "brickLo",
+    "brick",
+    "brickHi",
+    "cope",
+    "gold"
+  ],
+  "maxColors": 16,
+  "facing": "east",
+  "mirror": true,
+  "frames": {
+    "idle": {
+      "i": 0,
+      "pivot": [
+        32,
+        60
+      ],
+      "sockets": {
+        "handR": [
+          34,
+          47
+        ],
+        "handL": [
+          34,
+          51
+        ],
+        "head": [
+          36,
+          31
+        ]
+      }
+    },
+    "run0": {
+      "i": 1,
+      "pivot": [
+        31,
+        58
+      ],
+      "sockets": {
+        "handR": [
+          38,
+          44
+        ],
+        "handL": [
+          38,
+          49
+        ],
+        "head": [
+          37,
+          30
+        ]
+      }
+    },
+    "run1": {
+      "i": 2,
+      "pivot": [
+        30,
+        58
+      ],
+      "sockets": {
+        "handR": [
+          33,
+          45
+        ],
+        "handL": [
+          39,
+          48
+        ],
+        "head": [
+          35,
+          30
+        ]
+      }
+    },
+    "run2": {
+      "i": 3,
+      "pivot": [
+        29,
+        58
+      ],
+      "sockets": {
+        "handR": [
+          31,
+          46
+        ],
+        "handL": [
+          40,
+          48
+        ],
+        "head": [
+          34,
+          30
+        ]
+      }
+    },
+    "run3": {
+      "i": 4,
+      "pivot": [
+        30,
+        58
+      ],
+      "sockets": {
+        "handR": [
+          33,
+          45
+        ],
+        "handL": [
+          39,
+          48
+        ],
+        "head": [
+          35,
+          30
+        ]
+      }
+    },
+    "run4": {
+      "i": 5,
+      "pivot": [
+        31,
+        58
+      ],
+      "sockets": {
+        "handR": [
+          38,
+          44
+        ],
+        "handL": [
+          38,
+          49
+        ],
+        "head": [
+          37,
+          30
+        ]
+      }
+    },
+    "run5": {
+      "i": 6,
+      "pivot": [
+        30,
+        58
+      ],
+      "sockets": {
+        "handR": [
+          39,
+          44
+        ],
+        "handL": [
+          33,
+          49
+        ],
+        "head": [
+          35,
+          30
+        ]
+      }
+    },
+    "run6": {
+      "i": 7,
+      "pivot": [
+        29,
+        58
+      ],
+      "sockets": {
+        "handR": [
+          40,
+          44
+        ],
+        "handL": [
+          31,
+          50
+        ],
+        "head": [
+          34,
+          30
+        ]
+      }
+    },
+    "run7": {
+      "i": 8,
+      "pivot": [
+        30,
+        58
+      ],
+      "sockets": {
+        "handR": [
+          39,
+          44
+        ],
+        "handL": [
+          33,
+          49
+        ],
+        "head": [
+          35,
+          30
+        ]
+      }
+    },
+    "hurt": {
+      "i": 9,
+      "pivot": [
+        32,
+        57
+      ],
+      "sockets": {
+        "handR": [
+          35,
+          35
+        ],
+        "handL": [
+          34,
+          46
+        ],
+        "head": [
+          30,
+          29
+        ]
+      }
+    },
+    "dead": {
+      "i": 10,
+      "pivot": [
+        26,
+        57
+      ],
+      "sockets": {
+        "handR": [
+          40,
+          44
+        ],
+        "handL": [
+          43,
+          50
+        ],
+        "head": [
+          36,
+          38
+        ]
+      }
+    },
+    "dodge": {
+      "i": 11,
+      "pivot": [
+        26,
+        57
+      ],
+      "sockets": {
+        "handR": [
+          43,
+          42
+        ],
+        "handL": [
+          43,
+          48
+        ],
+        "head": [
+          37,
+          36
+        ]
+      }
+    },
+    "fall": {
+      "i": 12,
+      "pivot": [
+        25,
+        57
+      ],
+      "sockets": {
+        "handR": [
+          44,
+          28
+        ],
+        "handL": [
+          44,
+          34
+        ],
+        "head": [
+          37,
+          29
+        ]
+      }
+    },
+    "land": {
+      "i": 13,
+      "pivot": [
+        28,
+        57
+      ],
+      "sockets": {
+        "handR": [
+          41,
+          43
+        ],
+        "handL": [
+          38,
+          51
+        ],
+        "head": [
+          38,
+          34
+        ]
+      }
+    }
+  },
+  "clips": {
+    "run": {
+      "frames": [
+        "run0",
+        "run1",
+        "run2",
+        "run3",
+        "run4",
+        "run5",
+        "run6",
+        "run7"
+      ],
+      "timing": "ticks",
+      "ticks": [
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4
+      ],
+      "loop": true
+    },
+    "dodge": {
+      "frames": [
+        "dodge",
+        "fall",
+        "land"
+      ],
+      "timing": "sim",
+      "sim": {
+        "ref": "player.dodge"
+      },
+      "grounded": false
+    }
+  },
+  "source": {
+    "provider": "blender-mannequin-spike",
+    "model": "blender-eevee ortho pitch 20deg, legScale 1, weapon none, armor base, sun 1.07, ambient 1.75",
+    "approvedSource": "art/approved/bardo_veteran_unarmed_east_v1.png",
+    "referenceHashes": [
+      "9cc23763afa4899542c301232ed9069204e4580b9d3e75c941a7aa116c59878d"
+    ],
+    "compiler": "bardo-art/1",
+    "sourceFile": "art/approved/bardo_veteran_unarmed_east_v1.png",
+    "sourceHash": "9cc23763afa48995"
+  }
+}

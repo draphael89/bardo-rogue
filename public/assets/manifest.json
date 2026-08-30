@@ -2,13 +2,7 @@
   "sprites": [
     "tiny_dungeon.png",
     "bardo_room.png",
-    "bardo_props.png",
-    "bardo_hero.png",
-    "bardo_hero_north.png",
-    "bardo_hero_north_roll.png",
-    "bardo_hero_south.png",
-    "bardo_hero_south_roll.png",
-    "bardo_brute.png"
+    "bardo_props.png"
   ],
   "particles": [
     "circle_01.png",
@@ -23,6 +17,9 @@
     "fog_03.png",
     "fog_04.png",
     "fog_05.png",
+    "shaft_01.png",
+    "shaft_02.png",
+    "shaft_03.png",
     "smoke_01.png",
     "smoke_02.png",
     "smoke_03.png",

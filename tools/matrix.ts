@@ -8,6 +8,7 @@ import { createWorld } from '../src/sim/scenarios'
 import { stepWorld } from '../src/sim/step'
 import { makeBot, type BotName } from '../src/sim/bots'
 import { Metrics } from '../src/sim/metrics'
+import { quantizeFrame } from '../src/sim/replay'
 
 const args = Object.fromEntries(process.argv.slice(2).map((a, i, arr) => a.startsWith('--') ? [a.slice(2), arr[i + 1] ?? '1'] : []).filter(x => x.length))
 const [s0, s1] = (args.seeds ?? '1-100').split('-').map(Number)
@@ -56,7 +57,10 @@ for (const spec of SPECS) {
     const metrics = new Metrics()
     let resolved: string | null = null
     for (let i = 0; i < ticks; i++) {
-      stepWorld(world, bot(world))
+      // Match the browser's one input boundary exactly. main.ts quantizes live and bot frames
+      // before the sim sees them; skipping that here lets full-precision bot vectors describe a
+      // subtly different run (seed 46 used to win here and lose in the browser by tick 4332).
+      stepWorld(world, quantizeFrame(bot(world)))
       metrics.consume(world, world.events)
       world.events.length = 0
       const run = world.session.run

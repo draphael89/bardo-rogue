@@ -24,15 +24,18 @@ export const T = {
   doorClosed: 71, doorOpen: 72, windowL: 73, windowR: 74, relief: 75,
   pillarTop: 76, pillarBase: 77,
   crackA: 78, crackB: 79, pit: 80,
-  silt: 81, water: 82, grate: 83, reed: 84, poppy: 85, coin: 86, beam: 87,
+  silt: 81, water: 82, grate: 83, reed: 84, poppy: 85, coin: 86, beam: 87, verdict: 88,
+  oathLink: 89, heatSeam: 90,
 } as const
 
-// Indices into the bardo_props sheet (4 columns, 32×32). The first four cells are one
-// 64×64 object: the sunken bell.
+// Indices into the bardo_props sheet (4 columns, 48×48 source / 32×32 logical). The first four
+// cells are one 96×96 source / 64×64 logical object: the sunken bell.
 export const PROP = {
   bellNW: 0, bellNE: 1, bellSW: 2, bellSE: 3,
   brazier: 4, ossuary: 5, shard: 6, pew: 7,
   reed: 8, prow: 9, pole: 10, pan: 11,
+  keeperLamp: 12, brazierCold: 13, veteranRelic: 14,
+  verdictStele: 15,
 } as const
 
 export type RoomKind = 'bardo' | 'threshold' | 'crossing' | 'shore'
@@ -88,6 +91,21 @@ export interface IslandRect { c0: number; r0: number; c1: number; r1: number }
 // A light source authored with the room, not with the renderer: the room decides where the
 // key is and how far it reaches; tuning owns the flicker and the tint ramp (§3.2).
 export interface RoomLight { x: number; y: number; radius: number; strength: number; tint?: number }
+/**
+ * A visible beam falling THROUGH an aperture, as opposed to a `RoomLight`, which is a source that
+ * darkens less around itself. A room declares one only where the architecture actually has a hole
+ * in it; the Bardo's Gate is the only one in the game. Presentation-only and not hashed, like every
+ * other field on this interface except `solid`, `cols`, `rows` and the shrine.
+ *
+ * SINGULAR, and the type is the rule: a second beam in the same room would make the first one
+ * scenery. It also keeps the renderer honest — three sprites built once and aimed, rather than a
+ * pool rebuilt per room, which is how the beam ended up drawing over the fog it belongs under.
+ *
+ * `halfWidth` is the beam's half-width in world px where it MEETS THE FLOOR, not the aperture's:
+ * the authored PNG is a trapezoid that opens as it falls, so this is the room's one knob for how
+ * wide its light spreads and it is tuned by eye against the monument the light comes through.
+ */
+export interface RoomShaft { x: number; y: number; lenTiles: number; halfWidth: number; strength: number }
 export interface Arena {
   kind: RoomKind
   cols: number; rows: number
@@ -100,6 +118,7 @@ export interface Arena {
   playerStart: { x: number; y: number }
   braziers: RoomLight[]  // warm sources: [0] is the key (§3.2.1)
   windows: RoomLight[]   // cold sources
+  shaft?: RoomShaft      // the beam through this room's aperture, if it has one. At most one.
   // The bell tore the floor open on its way in. This is the one large non-axis-aligned
   // graphic form in the room (§5.3.2) and tilemap.ts bakes the gouge along it.
   furrow: { x0: number; y0: number; x1: number; y1: number }
@@ -512,30 +531,68 @@ function buildBardo(rng: Rng): Arena {
   const smith = { x: 15.5 * TILE, y: 22.5 * TILE }
   const forgeFire = { x: 18 * TILE, y: 21.2 * TILE }
   const bell = { x: 51 * TILE, y: 20 * TILE }                   // the reliquary, upright on the Shrine
-  const causeEmber = { x: 28.5 * TILE, y: 28.6 * TILE }
+  // The fire on the Keeper's column (§8.4.4): the causeway's key, kept burning for whoever lands.
+  const keeperFire = { x: 39.5 * TILE, y: 28.9 * TILE }
   // Battle scar across the arrival ground (§5.3.2): the causeway's one non-axis-aligned form.
   const furrow = { x0: 28 * TILE, y0: 30.8 * TILE, x1: 39 * TILE, y1: 28.6 * TILE }
 
   // ---- baked value hierarchy (§3.2.7): pools at each island's key, edges falling away ----
+  // RANKED, with a real gap between ranks (§3.2.4 via §8.4.6). The Gate pool and the Keeper's
+  // fire used to measure within 0.005 of each other — the destination and the doormat were the
+  // same value, and that equality WAS the defect. The Gate now carries four plateaus over ten
+  // tiles (level 4 out to 59 world px, level 2 out to 74); every other pool is a rank under it.
   const pools = [
-    { x: focal.x, y: focal.y, r: 120, s: 1.05 },
-    { x: forgeFire.x, y: forgeFire.y, r: 90, s: 1.0 },
-    { x: bell.x, y: bell.y, r: 80, s: 0.9 },
-    { x: causeEmber.x, y: causeEmber.y, r: 70, s: 0.85 },
+    { x: focal.x, y: focal.y, r: 136, s: 1.35 },
+    { x: forgeFire.x, y: forgeFire.y, r: 74, s: 0.98 },
+    { x: bell.x, y: bell.y, r: 66, s: 0.88 },
+    // The causeway pools twice: under the Keeper's fire, and where the pilgrim actually lands —
+    // arrival is IN light (§3.2.3), not beside it. The fire's pool is pulled west of the column
+    // so the two circles overlap above the level-2 threshold the whole way: one continuous lit
+    // ground from the column to the landing, no dark ring between the pools. The landing centre
+    // matches playerStart below.
+    { x: keeperFire.x - 30, y: keeperFire.y + 14, r: 96, s: 1.10 },
+    // THE LANDING, and it is the second-ranked pool for a reason: at the spawn the Gate focal is
+    // 415 px north and off-screen, so this is the only pool in that frame. A 1-tile level-4 core
+    // was measured at 1x and it was not arrival IN light, it was arrival beside a spark — the
+    // landing read DARKER after the pass than before it. At r78/s1.18 the core is 1.8 tiles and
+    // the level-2 ring 2.4, which is a pool a body stands inside. Its gold chips are also what
+    // carry `top-one-focality` at arrival.
+    { x: 33.5 * TILE, y: 30.5 * TILE, r: 78, s: 1.18 },
   ]
   // The pilgrimage wear line (§8.4.1): a level-2 ridge worn along the spine, slightly off-axis.
-  const spine = { x0: 33.5 * TILE, y0: 5 * TILE, x1: 32.8 * TILE, y1: 30 * TILE }
+  // It runs all the way into the landing, because that is where every walk has started (§2.2).
+  const spine = { x0: 33.5 * TILE, y0: 5 * TILE, x1: 32.8 * TILE, y1: 31.4 * TILE }
+  // The fainter fork the Ferryman's fares wear toward the pier — a broken trail, not a road.
+  const fork = { x0: 33 * TILE, y0: 30.2 * TILE, x1: 25.5 * TILE, y1: 29.6 * TILE }
   const levelFor = (R: IslandRect) => (c: number, r: number): number => {
     const px = (c + 0.5) * TILE, py = (r + 0.5) * TILE
     const dEdge = Math.min(c - R.c0, R.c1 - c, r - R.r0, R.r1 - r)
     let key = 0
     for (const p of pools) key = Math.max(key, (1 - Math.min(1, Math.hypot(px - p.x, py - p.y) / p.r)) * p.s)
-    key = Math.max(key, (1 - Math.min(1, distToSeg(px, py, spine.x0, spine.y0, spine.x1, spine.y1) / 26)) * 0.78)
-    const edge = Math.max(0, 1 - dEdge / 2) * 0.42
-    const lift = Math.max(0.52, key) - edge + hash2(c, r, 31) * 0.12 - 0.06
-    if (lift < 0.24) return 0
-    if (lift < 0.60) return 1
-    if (lift < 0.84) return 2
+    // The spine used to lift a 26 px ridge unbroken from row 5 to row 31 — a lit corridor from
+    // arrival to Gate, and the literal cause of "one band from wall to wall". At 11 px it only
+    // reaches the column the line actually runs down: a worn line, not a road.
+    key = Math.max(key, (1 - Math.min(1, distToSeg(px, py, spine.x0, spine.y0, spine.x1, spine.y1) / 11)) * 0.66)
+    key = Math.max(key, (1 - Math.min(1, distToSeg(px, py, fork.x0, fork.y0, fork.x1, fork.y1) / 13)) * 0.56)
+    const edge = Math.max(0, 1 - dEdge / 3) * 0.58
+    // The floor under this max() is what the un-pooled interior can never fall below, and at
+    // 0.52 it was level 1 everywhere: unlit stone could not reach B0 anywhere on an island, so
+    // the dark had nowhere to be dark.
+    //
+    // MEASURED, over all 465 paved cells, before -> after: level 0 18.3 -> 71.8 %, level 1
+    // 67.5 -> 17.2 %, level 2 11.1 -> 7.7 %, level 4 3.1 -> 3.2 %. That is a bigger move than
+    // it looks, and the `edge` term above drives it, not the hash: three of the four island
+    // interiors are 4-6 rows tall, so dEdge rarely passes 2 and `edge >= 0.193` holds most of
+    // an island under the 0.40 threshold on its own. The result is one smooth dark ring rather
+    // than the hash-mottled patchwork the floor carried before, which trades §2.1 Law 1's macro
+    // scale away over most of the district for §3.2.3's falling perimeter and the pools that
+    // stand out of it. That trade was read at 1x against the concept sheets and taken
+    // deliberately; `1 - dEdge / 2` here restores the mottle (46/37/6/11) if it is ever wanted
+    // back. Level 0 is the ONLY level whose share this controls -- the pools set the rest.
+    const lift = Math.max(0.42, key) - edge + hash2(c, r, 31) * 0.12 - 0.06
+    if (lift < 0.40) return 0
+    if (lift < 0.62) return 1
+    if (lift < 0.76) return 2
     return 4
   }
   for (const R of islands) paveRect(s, interior(R), levelFor(R))
@@ -593,13 +650,22 @@ function buildBardo(rng: Rng): Arena {
   // PLAZA: braziers flank the Gate at differing Y (§5.2); the rack keeps clear floor to its east.
   furniture(31, 4, PROP.brazier)
   furniture(36, 5, PROP.brazier)
-  // CAUSEWAY: battlefield relics, the arrival ember, and the Keeper's broken column (§8.4.4).
-  furniture(28, 28, PROP.brazier)
-  furniture(29, 31, PROP.ossuary)
+  // CAUSEWAY: battlefield relics reading "someone left" (§8.2.4) — a brazier gone cold, the
+  // toppled pew, the ossuary against the south wall — and the Keeper's column, the island's
+  // focal object (§8.4.6): it carries the one fire still kept, takes the key, occludes, casts.
+  // Same solid cells as ever; only what stands on them changed.
+  furniture(28, 28, PROP.brazierCold)
+  // The concept's fallen knight, translated without a corpse: empty Veteran iron and a torn mantle.
+  // It replaces the generic ossuary on the same hard cell, so the story changes and collision does not.
+  furniture(29, 31, PROP.veteranRelic)
   furniture(37, 28, PROP.pew)
-  base[idx(39, 30)] = T.pillarBase
-  solid[idx(39, 30)] = 1
-  props.push({ x: 39 * TILE, y: 29 * TILE, tile: T.pillarTop, sortY: 31 * TILE, sheet: 'room' })
+  furniture(39, 30, PROP.keeperLamp)
+  // The landing's own lamp, ~34 world px from playerStart. `hard = false`: no solid write, so no
+  // hash cost, and it reuses an existing prop index so the sheet stays exactly 4x4.
+  // ROW 29, NOT ROW 30. Reusing the lamp sprite is thrift; standing the copy on row 30, four
+  // tiles from the lamp already at (39, 30), was a mirrored pair on a shared Y — the same §5.2
+  // rule the plaza braziers two blocks up are staggered to obey.
+  furniture(35, 29, PROP.keeperLamp, false)
   // FORGE: the Smith's ground; the forge fire has a body, and quenched slag sits by the west wall.
   furniture(18, 21, PROP.brazier)
   furniture(11, 24, PROP.shard)
@@ -620,7 +686,7 @@ function buildBardo(rng: Rng): Arena {
   base[idx(4, 15)] = T.capSouth
   base[idx(5, 15)] = T.capSouth
   props.push({ x: 4 * TILE, y: 11 * TILE, tile: T.pillarTop, sortY: 16 * TILE, sheet: 'room' })
-  furniture(6, 15, PROP.brazier)
+  furniture(6, 15, PROP.brazierCold)
   // East: the dark arch island beyond the chained stub, a sealed door in a foreign mass.
   for (let r = 17; r <= 20; r++) for (let c = 59; c <= 62; c++) base[idx(c, r)] = r === 17 ? T.wallFace : T.wallFaceB
   base[idx(60, 19)] = T.doorClosed
@@ -633,22 +699,40 @@ function buildBardo(rng: Rng): Arena {
   return {
     kind: 'bardo', cols, rows, base, overlay, solid, props, door, doors,
     playerStart: { x: 33.5 * TILE, y: 30.5 * TILE },
+    // COUPLED TO `pools` ABOVE, and it must stay coupled. The lightmap only ever DARKENS
+    // (light.ts multiplies), so a pool painted wider than its lamp reaches gets dimmed back at
+    // its own edges and the failure reads as "the bake did not work". Baked level-2 ring vs
+    // lightmap radius: 74 vs 140 at the Gate, 42 vs 92 at the Keeper, 39 vs 84 at the landing.
     braziers: [
       // [0] is the key (§3.2.1): the Gate, gold — a crossing's colour (§8.2.2). Light climbs
-      // northward along the line: dim arrival ember, working forge fire, votive, then the Gate.
-      { x: 31 * TILE + 8, y: 4.8 * TILE, radius: 116, strength: 1.7, tint: 0xffd9a0 },
-      { x: 36 * TILE + 8, y: 5.2 * TILE, radius: 72, strength: 0.8, tint: 0xffd9a0 },
-      { x: forgeFire.x, y: forgeFire.y, radius: 86, strength: 1.3, tint: 0xff7a18 },
-      { x: 46 * TILE, y: 21.8 * TILE, radius: 48, strength: 0.6, tint: 0xd4b060 },
-      { x: causeEmber.x, y: causeEmber.y, radius: 56, strength: 0.5 },
-      { x: 20.5 * TILE, y: 29.6 * TILE, radius: 40, strength: 0.45, tint: 0xd4b060 },
+      // northward along the line: the Keeper's arrival fire, working forge, votive, then the Gate.
+      { x: 31 * TILE + 8, y: 4.8 * TILE, radius: 140, strength: 2.4, tint: 0xffd9a0 },
+      { x: 36 * TILE + 8, y: 5.2 * TILE, radius: 72, strength: 0.80, tint: 0xffd9a0 },
+      { x: forgeFire.x, y: forgeFire.y, radius: 72, strength: 0.95, tint: 0xff7a18 },
+      { x: 46 * TILE, y: 21.8 * TILE, radius: 40, strength: 0.45, tint: 0xd4b060 },
+      // The causeway's own key (§8.4.6): the cresset on the Keeper's column. It was r128, which
+      // is what flooded the causeway wall to wall; at r92 it lights its own column and the
+      // ground around it and stops, and the landing gets its own lamp instead.
+      { x: keeperFire.x, y: keeperFire.y, radius: 92, strength: 1.45, tint: 0xffc078 },
+      // The landing lamp: arrival is IN light (§3.2.3), and now the light has an object in frame.
+      // Tracks the prop at (35, 29), half a tile below its foot.
+      { x: 35.5 * TILE, y: 29.5 * TILE, radius: 84, strength: 1.20, tint: 0xffab5c },
     ],
     windows: [
-      { x: 37.5 * TILE, y: 3.5 * TILE, radius: 60, strength: 0.6 },
-      { x: 47.5 * TILE, y: 17.5 * TILE, radius: 56, strength: 0.55 },
-      { x: bell.x, y: bell.y, radius: 64, strength: 0.5 },
-      { x: 39.5 * TILE, y: 29.4 * TILE, radius: 30, strength: 0.4 },
+      { x: 37.5 * TILE, y: 3.5 * TILE, radius: 52, strength: 0.42 },
+      { x: 47.5 * TILE, y: 17.5 * TILE, radius: 48, strength: 0.36 },
+      { x: bell.x, y: bell.y, radius: 54, strength: 0.34 },
+      // The Ferryman's lantern (§1.3.6): numen glass on the pier pole. A cold source — it marks
+      // the crossing to the beyond, so it does not join the braziers' warm family. §1 wants
+      // exactly ONE cold accent used scarcely, so this tint never changes and nothing joins it.
+      { x: 20.5 * TILE, y: 28.2 * TILE, radius: 34, strength: 0.70, tint: 0x2e8a80 },
     ],
+    // The one shaft in the game, falling through the Gate's own portal (§8.2.1). `y` is the
+    // APERTURE and not the door leaf: the beam starts inside the opening the masonry already has
+    // (world y 21..56) and dies on the plaza six tiles south, so its bright half is seen against
+    // the portal's own black and only its dim foot lands on lit stone. `halfWidth` is tuned so
+    // the widest of the three veils meets the floor no wider than the plaza it crosses.
+    shaft: { x: 33.5 * TILE, y: 2.2 * TILE, lenTiles: 6, halfWidth: 36, strength: 1 },
     furrow, focal, rack, rackTaken: false, smith, smithNear: false,
     islands,
     inner: { x0: 9 * TILE, y0: 4 * TILE, x1: 57 * TILE, y1: 32 * TILE },

@@ -53,8 +53,11 @@ findings come in two tiers: objective failures never pass, and judged findings b
 unless the spec carries a waiver naming the exact gate id and the reason.
 Candidates never write into `public/assets`.
 
-Authored sheets are addressed by **semantic frame name**, not cell index: `atlas.sheet('bardo_hero').frame('light1Contact')`
-returns the texture, its white silhouette, its foot pivot and its sockets from the sidecar. Combat
+Authored sheets are addressed by **semantic frame name**, not cell index:
+`atlas.sheet('bardo_veteran_greatsword_east').frame('light1Contact')`
+returns the texture, its white silhouette, its foot pivot and its sockets from the sidecar. A sheet
+is cut 1:1 against `view.worldScale` (`src/render/sheet.ts`), so one source pixel is one target
+pixel — the same contract `atlas.ts` gives tiles and props. Combat
 clips carry no timing of their own — the renderer derives the frame from `stateTick` against
 `tuning.ts`, which is what stops art desyncing from a hitbox. Do not reintroduce pivot tables in view files.
 

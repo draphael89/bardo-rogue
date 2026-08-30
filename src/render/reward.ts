@@ -300,7 +300,8 @@ export class RewardOverlay {
     this.g.destroy()
     this.scrim.destroy()
     for (const t of this.texts) t.destroy()
-    for (const c of this.cards) c.box.destroy({ children: true })
+    // Recursive Pixi teardown does not destroy child Graphics contexts unless asked explicitly.
+    for (const c of this.cards) c.box.destroy({ children: true, context: true })
     this.texts = []
     this.cards = []
     this.act = null

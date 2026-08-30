@@ -80,10 +80,10 @@ async function play(page: Page, spec: PathSpec): Promise<void> {
   // raw string because tsx's esbuild pass decorates any NAMED function inside page.evaluate with a
   // `__name` helper that does not exist in the page — a string reaches the browser untransformed.
   await page.evaluate(`window.__renderHere = (loop) => new Promise((res) => {
-    const f0 = loop.frameTimes.length
+    const f0 = loop.frameCount
     const t0 = performance.now()
     const poll = () => {
-      if (loop.frameTimes.length >= f0 + 2) return res(true)
+      if (loop.frameCount >= f0 + 2) return res(true)
       if (performance.now() - t0 > 8000) return res(false)
       requestAnimationFrame(poll)
     }
@@ -138,9 +138,10 @@ async function play(page: Page, spec: PathSpec): Promise<void> {
     return { seenRooms, sawReward, sawRite, tollAnswer, maxHpAfterToll, resolved, killedBy, boons, rendered, ticks: s.tick, meta: s.session.meta, done: false }
   }, MAX_TICKS)
 
-  // Which screens this path must have rendered real frames over. The death path dies at the
-  // Landing, so the boss and the victory card belong to the winning path alone.
-  const mustRender = ['the hub', 'the toll', 'an offer',
+  // Which screens this path must have rendered real frames over. A naive path may die before the
+  // Landing, and two legal spines omit the bank entirely, so the toll belongs only to a route that
+  // actually reached it. The boss and victory card still belong to the winning path alone.
+  const mustRender = ['the hub', ...(outcome.seenRooms.includes('black-step') ? ['the toll'] : []), 'an offer',
     ...(spec.expect === 'won' ? ['the boss mid-fight', 'the victory card'] : ['the death card'])]
   for (const state of mustRender) {
     check(outcome.rendered[state] === true, `renders frames over ${state}`)
@@ -167,8 +168,8 @@ async function play(page: Page, spec: PathSpec): Promise<void> {
 
   // Frames must actually render after all that room churn: a presenter that threw would freeze here.
   await page.evaluate(() => { (window as any).__game.pause(false) })
-  const f0 = await page.evaluate(() => (window as any).__game.loop.frameTimes.length)
-  await page.waitForFunction((n) => (window as any).__game.loop.frameTimes.length >= n + 3, f0, { timeout: 15000 })
+  const f0 = await page.evaluate(() => (window as any).__game.loop.frameCount)
+  await page.waitForFunction((n) => (window as any).__game.loop.frameCount >= n + 3, f0, { timeout: 15000 })
   check(true, 'still rendering after the return')
 
   check(errors.length === 0, `no console errors${errors.length ? `: ${errors.slice(0, 3).join(' | ')}` : ''}`)
@@ -195,8 +196,8 @@ async function bootTitle(page: Page): Promise<void> {
     return { title: !!g.presenter.title.visible, paused: !!g.loop.paused }
   })
   check(held.title && held.paused, 'the title holds over the hub with the simulation stopped')
-  const f0 = await page.evaluate(() => (window as any).__game.loop.frameTimes.length)
-  await page.waitForFunction((n) => (window as any).__game.loop.frameTimes.length >= n + 2, f0, { timeout: 15000 })
+  const f0 = await page.evaluate(() => (window as any).__game.loop.frameCount)
+  await page.waitForFunction((n) => (window as any).__game.loop.frameCount >= n + 2, f0, { timeout: 15000 })
   check(true, 'renders frames under the title')
 
   // Installing a replay through the live API is a measurement path just like booting with ?bot=.
@@ -242,9 +243,16 @@ async function bootTitle(page: Page): Promise<void> {
   await page.goto(`${url}/?scenario=loop&seed=${seed}&mute=1&save=off`)
   await page.waitForFunction(() => !!(window as unknown as { __game?: unknown }).__game, null, { timeout: 30000 })
   await page.keyboard.press('Enter')
+  await page.waitForTimeout(100)
+  await page.keyboard.press('Space')
   await page.waitForFunction(() => !(window as any).__game.presenter.title.visible, null, { timeout: 5000 })
-  const after = await page.evaluate(() => ({ paused: !!(window as any).__game.loop.paused }))
+  await page.waitForFunction(() => (window as any).__game.world.tick > 0, null, { timeout: 5000 })
+  const after = await page.evaluate(() => {
+    const g = (window as any).__game
+    return { paused: !!g.loop.paused, playerState: g.world.player.state }
+  })
   check(!after.paused, 'Enter dismisses the title and the game runs — not the pause card')
+  check(after.playerState === 'free', 'combat input pressed during descent is not carried onto the landing')
   await page.keyboard.press('KeyP')
   await page.evaluate(() => {
     const g = (window as any).__game

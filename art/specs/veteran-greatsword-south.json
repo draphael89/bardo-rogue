@@ -1,0 +1,1001 @@
+{
+  "id": "actor.veteran.greatsword.south",
+  "kind": "character",
+  "input": "art/approved/bardo_veteran_greatsword_south_v1.png",
+  "output": "public/assets/sprites/bardo_veteran_greatsword_south.png",
+  "sidecar": "public/assets/sprites/bardo_veteran_greatsword_south.json",
+  "cell": 64,
+  "cols": 6,
+  "rows": 5,
+  "maxColors": 16,
+  "palette": [
+    "mortar",
+    "seal0",
+    "iron",
+    "ironHi",
+    "purple0",
+    "purple2",
+    "purple3",
+    "boneLo",
+    "boneDim",
+    "bone",
+    "brickLo",
+    "brick",
+    "brickHi",
+    "cope",
+    "gold"
+  ],
+  "facing": "south",
+  "fit": "grid",
+  "chromaKey": false,
+  "coverage": 0.5,
+  "valueLift": false,
+  "salience": {
+    "minShare": 0.22,
+    "minDelta": 0.16
+  },
+  "frames": [
+    {
+      "name": "idle",
+      "i": 0,
+      "sockets": {
+        "handR": [
+          41,
+          37
+        ],
+        "handL": [
+          23,
+          50
+        ],
+        "head": [
+          30,
+          32
+        ],
+        "bladeTip": [
+          42,
+          14
+        ],
+        "bladeMid": [
+          41,
+          24
+        ]
+      },
+      "pivot": [
+        30,
+        60
+      ]
+    },
+    {
+      "name": "run0",
+      "i": 1,
+      "sockets": {
+        "handR": [
+          40,
+          35
+        ],
+        "handL": [
+          24,
+          49
+        ],
+        "head": [
+          30,
+          31
+        ],
+        "bladeTip": [
+          42,
+          12
+        ],
+        "bladeMid": [
+          41,
+          23
+        ]
+      },
+      "pivot": [
+        30,
+        58
+      ]
+    },
+    {
+      "name": "run1",
+      "i": 2,
+      "sockets": {
+        "handR": [
+          40,
+          36
+        ],
+        "handL": [
+          24,
+          49
+        ],
+        "head": [
+          30,
+          32
+        ],
+        "bladeTip": [
+          42,
+          12
+        ],
+        "bladeMid": [
+          41,
+          23
+        ]
+      },
+      "pivot": [
+        30,
+        58
+      ]
+    },
+    {
+      "name": "run2",
+      "i": 3,
+      "sockets": {
+        "handR": [
+          40,
+          36
+        ],
+        "handL": [
+          24,
+          49
+        ],
+        "head": [
+          30,
+          32
+        ],
+        "bladeTip": [
+          42,
+          13
+        ],
+        "bladeMid": [
+          41,
+          23
+        ]
+      },
+      "pivot": [
+        30,
+        58
+      ]
+    },
+    {
+      "name": "run3",
+      "i": 4,
+      "sockets": {
+        "handR": [
+          40,
+          36
+        ],
+        "handL": [
+          24,
+          49
+        ],
+        "head": [
+          30,
+          32
+        ],
+        "bladeTip": [
+          42,
+          12
+        ],
+        "bladeMid": [
+          41,
+          23
+        ]
+      },
+      "pivot": [
+        30,
+        58
+      ]
+    },
+    {
+      "name": "run4",
+      "i": 5,
+      "sockets": {
+        "handR": [
+          40,
+          35
+        ],
+        "handL": [
+          24,
+          49
+        ],
+        "head": [
+          30,
+          31
+        ],
+        "bladeTip": [
+          42,
+          12
+        ],
+        "bladeMid": [
+          41,
+          23
+        ]
+      },
+      "pivot": [
+        30,
+        58
+      ]
+    },
+    {
+      "name": "run5",
+      "i": 6,
+      "sockets": {
+        "handR": [
+          40,
+          36
+        ],
+        "handL": [
+          24,
+          48
+        ],
+        "head": [
+          30,
+          32
+        ],
+        "bladeTip": [
+          42,
+          12
+        ],
+        "bladeMid": [
+          41,
+          23
+        ]
+      },
+      "pivot": [
+        30,
+        58
+      ]
+    },
+    {
+      "name": "run6",
+      "i": 7,
+      "sockets": {
+        "handR": [
+          40,
+          36
+        ],
+        "handL": [
+          24,
+          48
+        ],
+        "head": [
+          30,
+          32
+        ],
+        "bladeTip": [
+          42,
+          13
+        ],
+        "bladeMid": [
+          41,
+          24
+        ]
+      },
+      "pivot": [
+        30,
+        58
+      ]
+    },
+    {
+      "name": "run7",
+      "i": 8,
+      "sockets": {
+        "handR": [
+          40,
+          36
+        ],
+        "handL": [
+          24,
+          48
+        ],
+        "head": [
+          30,
+          32
+        ],
+        "bladeTip": [
+          42,
+          12
+        ],
+        "bladeMid": [
+          41,
+          23
+        ]
+      },
+      "pivot": [
+        30,
+        58
+      ]
+    },
+    {
+      "name": "hurt",
+      "i": 9,
+      "sockets": {
+        "handR": [
+          45,
+          34
+        ],
+        "handL": [
+          19,
+          41
+        ],
+        "head": [
+          35,
+          28
+        ],
+        "bladeTip": [
+          47,
+          11
+        ],
+        "bladeMid": [
+          46,
+          21
+        ]
+      },
+      "pivot": [
+        35,
+        57
+      ]
+    },
+    {
+      "name": "dead",
+      "i": 10,
+      "sockets": {
+        "handR": [
+          41,
+          42
+        ],
+        "handL": [
+          23,
+          54
+        ],
+        "head": [
+          33,
+          43
+        ],
+        "bladeTip": [
+          43,
+          19
+        ],
+        "bladeMid": [
+          42,
+          29
+        ]
+      },
+      "pivot": [
+        30,
+        57
+      ]
+    },
+    {
+      "name": "dodge",
+      "i": 11,
+      "sockets": {
+        "handR": [
+          41,
+          41
+        ],
+        "handL": [
+          23,
+          51
+        ],
+        "head": [
+          31,
+          40
+        ],
+        "bladeTip": [
+          43,
+          18
+        ],
+        "bladeMid": [
+          42,
+          28
+        ]
+      },
+      "pivot": [
+        31,
+        57
+      ]
+    },
+    {
+      "name": "fall",
+      "i": 12,
+      "sockets": {
+        "handR": [
+          41,
+          32
+        ],
+        "handL": [
+          23,
+          37
+        ],
+        "head": [
+          31,
+          33
+        ],
+        "bladeTip": [
+          43,
+          9
+        ],
+        "bladeMid": [
+          42,
+          19
+        ]
+      },
+      "pivot": [
+        31,
+        57
+      ]
+    },
+    {
+      "name": "land",
+      "i": 13,
+      "sockets": {
+        "handR": [
+          45,
+          39
+        ],
+        "handL": [
+          19,
+          49
+        ],
+        "head": [
+          34,
+          37
+        ],
+        "bladeTip": [
+          46,
+          16
+        ],
+        "bladeMid": [
+          45,
+          26
+        ]
+      },
+      "pivot": [
+        34,
+        57
+      ]
+    },
+    {
+      "name": "light1Anticipate",
+      "i": 14,
+      "sockets": {
+        "handR": [
+          34,
+          33
+        ],
+        "handL": [
+          25,
+          38
+        ],
+        "head": [
+          19,
+          30
+        ],
+        "bladeTip": [
+          55,
+          22
+        ],
+        "bladeMid": [
+          46,
+          27
+        ]
+      },
+      "pivot": [
+        17,
+        57
+      ]
+    },
+    {
+      "name": "light1Commit",
+      "i": 15,
+      "sockets": {
+        "handR": [
+          35,
+          38
+        ],
+        "handL": [
+          22,
+          40
+        ],
+        "head": [
+          19,
+          31
+        ],
+        "bladeTip": [
+          53,
+          38
+        ],
+        "bladeMid": [
+          45,
+          38
+        ]
+      },
+      "pivot": [
+        19,
+        57
+      ]
+    },
+    {
+      "name": "light1Contact",
+      "i": 16,
+      "sockets": {
+        "handR": [
+          35,
+          45
+        ],
+        "handL": [
+          33,
+          43
+        ],
+        "head": [
+          34,
+          32
+        ],
+        "bladeTip": [
+          21,
+          48
+        ],
+        "bladeMid": [
+          27,
+          46
+        ]
+      },
+      "pivot": [
+        35,
+        57
+      ]
+    },
+    {
+      "name": "light1Follow",
+      "i": 17,
+      "sockets": {
+        "handR": [
+          35,
+          43
+        ],
+        "handL": [
+          36,
+          46
+        ],
+        "head": [
+          41,
+          32
+        ],
+        "bladeTip": [
+          13,
+          42
+        ],
+        "bladeMid": [
+          23,
+          42
+        ]
+      },
+      "pivot": [
+        43,
+        57
+      ]
+    },
+    {
+      "name": "light1Recover",
+      "i": 18,
+      "sockets": {
+        "handR": [
+          35,
+          40
+        ],
+        "handL": [
+          33,
+          48
+        ],
+        "head": [
+          35,
+          31
+        ],
+        "bladeTip": [
+          20,
+          25
+        ],
+        "bladeMid": [
+          27,
+          32
+        ]
+      },
+      "pivot": [
+        36,
+        57
+      ]
+    },
+    {
+      "name": "light2Anticipate",
+      "i": 19,
+      "sockets": {
+        "handR": [
+          35,
+          44
+        ],
+        "handL": [
+          35,
+          46
+        ],
+        "head": [
+          41,
+          32
+        ],
+        "bladeTip": [
+          12,
+          51
+        ],
+        "bladeMid": [
+          23,
+          48
+        ]
+      },
+      "pivot": [
+        44,
+        57
+      ]
+    },
+    {
+      "name": "light2Commit",
+      "i": 20,
+      "sockets": {
+        "handR": [
+          33,
+          42
+        ],
+        "handL": [
+          28,
+          42
+        ],
+        "head": [
+          36,
+          32
+        ],
+        "bladeTip": [
+          19,
+          47
+        ],
+        "bladeMid": [
+          25,
+          45
+        ]
+      },
+      "pivot": [
+        37,
+        57
+      ]
+    },
+    {
+      "name": "light2Contact",
+      "i": 21,
+      "sockets": {
+        "handR": [
+          34,
+          40
+        ],
+        "handL": [
+          20,
+          44
+        ],
+        "head": [
+          24,
+          32
+        ],
+        "bladeTip": [
+          50,
+          42
+        ],
+        "bladeMid": [
+          43,
+          41
+        ]
+      },
+      "pivot": [
+        22,
+        57
+      ]
+    },
+    {
+      "name": "light2Follow",
+      "i": 22,
+      "sockets": {
+        "handR": [
+          33,
+          37
+        ],
+        "handL": [
+          21,
+          44
+        ],
+        "head": [
+          19,
+          31
+        ],
+        "bladeTip": [
+          56,
+          30
+        ],
+        "bladeMid": [
+          45,
+          33
+        ]
+      },
+      "pivot": [
+        16,
+        57
+      ]
+    },
+    {
+      "name": "light2Recover",
+      "i": 23,
+      "sockets": {
+        "handR": [
+          40,
+          36
+        ],
+        "handL": [
+          28,
+          49
+        ],
+        "head": [
+          30,
+          31
+        ],
+        "bladeTip": [
+          34,
+          14
+        ],
+        "bladeMid": [
+          37,
+          24
+        ]
+      },
+      "pivot": [
+        30,
+        57
+      ]
+    },
+    {
+      "name": "heavyAnticipate",
+      "i": 24,
+      "sockets": {
+        "handR": [
+          35,
+          25
+        ],
+        "handL": [
+          32,
+          29
+        ],
+        "head": [
+          25,
+          31
+        ],
+        "bladeTip": [
+          49,
+          5
+        ],
+        "bladeMid": [
+          43,
+          14
+        ]
+      },
+      "pivot": [
+        23,
+        57
+      ]
+    },
+    {
+      "name": "heavyCommit",
+      "i": 25,
+      "sockets": {
+        "handR": [
+          32,
+          25
+        ],
+        "handL": [
+          25,
+          25
+        ],
+        "head": [
+          24,
+          31
+        ],
+        "bladeTip": [
+          49,
+          19
+        ],
+        "bladeMid": [
+          41,
+          22
+        ]
+      },
+      "pivot": [
+        23,
+        57
+      ]
+    },
+    {
+      "name": "heavyContact",
+      "i": 26,
+      "sockets": {
+        "handR": [
+          36,
+          47
+        ],
+        "handL": [
+          36,
+          47
+        ],
+        "head": [
+          34,
+          32
+        ],
+        "bladeTip": [
+          20,
+          61
+        ],
+        "bladeMid": [
+          27,
+          54
+        ]
+      },
+      "pivot": [
+        36,
+        57
+      ]
+    },
+    {
+      "name": "heavyFollow",
+      "i": 27,
+      "sockets": {
+        "handR": [
+          35,
+          47
+        ],
+        "handL": [
+          35,
+          48
+        ],
+        "head": [
+          39,
+          32
+        ],
+        "bladeTip": [
+          14,
+          57
+        ],
+        "bladeMid": [
+          24,
+          53
+        ]
+      },
+      "pivot": [
+        42,
+        57
+      ]
+    },
+    {
+      "name": "heavyRecover",
+      "i": 28,
+      "sockets": {
+        "handR": [
+          36,
+          47
+        ],
+        "handL": [
+          36,
+          48
+        ],
+        "head": [
+          38,
+          31
+        ],
+        "bladeTip": [
+          18,
+          61
+        ],
+        "bladeMid": [
+          26,
+          55
+        ]
+      },
+      "pivot": [
+        38,
+        57
+      ]
+    }
+  ],
+  "clips": {
+    "run": {
+      "frames": [
+        "run0",
+        "run1",
+        "run2",
+        "run3",
+        "run4",
+        "run5",
+        "run6",
+        "run7"
+      ],
+      "timing": "ticks",
+      "ticks": [
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4
+      ],
+      "loop": true
+    },
+    "dodge": {
+      "frames": [
+        "dodge",
+        "fall",
+        "land"
+      ],
+      "timing": "sim",
+      "sim": {
+        "ref": "player.dodge"
+      },
+      "grounded": false
+    },
+    "light1": {
+      "frames": [
+        "light1Anticipate",
+        "light1Commit",
+        "light1Contact",
+        "light1Follow",
+        "light1Recover"
+      ],
+      "timing": "sim",
+      "sim": {
+        "ref": "player.attack.swings.0",
+        "contact": "light1Contact"
+      }
+    },
+    "light2": {
+      "frames": [
+        "light2Anticipate",
+        "light2Commit",
+        "light2Contact",
+        "light2Follow",
+        "light2Recover"
+      ],
+      "timing": "sim",
+      "sim": {
+        "ref": "player.attack.swings.1",
+        "contact": "light2Contact"
+      }
+    },
+    "heavy": {
+      "frames": [
+        "heavyAnticipate",
+        "heavyCommit",
+        "heavyContact",
+        "heavyFollow",
+        "heavyRecover"
+      ],
+      "timing": "sim",
+      "sim": {
+        "ref": "player.attack.swings.2",
+        "contact": "heavyContact"
+      }
+    }
+  },
+  "waivers": [
+    {
+      "gate": "frame:heavyAnticipate:height",
+      "reason": "The raised weapon apex IS the tell (SS4.1 weapon-apex waiver, as on the brute). Measured on THIS render with the blade hidden, the figure alone measures 39.5px at the grid scale, 66% of this frame's content bbox — inside the 52px content cap, so every pixel of the overage is blade. That figure spans whatever the pose raises, arms included, and is NOT the standing-body number the 40px cap governs; the standing measurement is idle, reported separately. Trimming the blade to satisfy the cap is the mistake SS11.1 records."
+    }
+  ],
+  "provenance": {
+    "provider": "blender-mannequin-spike",
+    "model": "blender-eevee ortho pitch 20deg, legScale 1",
+    "approvedSource": "art/approved/bardo_veteran_greatsword_south_v1.png"
+  },
+  "registrationNote": "Pivots, anchorX and sockets are COMPUTED from projected rig bones (rig.json), not judged. Compiled from the approved master under art/approved; the receipt beside it is verified on every production compile."
+}

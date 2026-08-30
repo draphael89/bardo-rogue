@@ -1,0 +1,26 @@
+{
+  "subject": "THE GATE of the Bardo. One monumental MEGALITH doorway of plain dark stone standing alone against empty void. Built of a few HUGE undressed slabs stacked like a dolmen — two immense square jambs, one deep flat lintel laid across them, a low crown of two plain blocks on top. NOT small brick coursing: each block is enormous, several blocks make the whole gate, and their joints are thin black lines. The opening between the jambs is a straight-sided VERTICAL SLOT with a FLAT head, one part wide to four parts high. The slot is filled edge to edge, TOP TO BOTTOM, with deep indigo night sky and a scatter of single-pixel stars — the sky runs all the way down to the sill with no floor, no path, no light, no water and no room behind it. The stone is dark, cold and bare: hard black occlusion under the lintel and in every joint, and the value steps darker toward the base. Muted gold appears ONLY as a thin BROKEN line cut into the two vertical edges of the slot, stopping partway up, plus one small mark on the sill. One crown block is missing and one jamb slab has fallen out leaving a square notch. A single torn strip of wine-dark cloth hangs from one lintel corner. STRICTLY FORBIDDEN: no columns, no capitals, no bases, no plinths, no fluting, no mouldings, no cornices, no keystone, no voussoirs, no small brick coursing, no gold on the jamb faces, no gold frame around the opening, no vines, no plants, no ground, no Greek key, no runes, no ankh, no glyphs, no letters. Its power is proportion, mass and darkness, not ornament.",
+  "size": 192,
+  "kind": "prop",
+  "view": "side",
+  "count": 4,
+  "palette": [
+    "void",
+    "mortar",
+    "slate0",
+    "nave0",
+    "nave1",
+    "nave2",
+    "goldDim",
+    "gold",
+    "sky",
+    "star",
+    "goldStar",
+    "purple1"
+  ],
+  "paletteNote": "TWELVE names, the exact prop budget, and the two names this ramp does NOT contain are the whole lesson of the round. Round 1 declared fourteen, including brickLo (B3 0.492) and goldHot (B5 0.820); every candidate spent them the same way — brickLo washed the jamb faces until the stone was the brightest thing in frame (SS10.15), and gold+goldHot resolved into a continuous frame around the opening, which is gold as trim and not as a crossing mark (SS8.2.2, SS10.22). Four rounds of prose forbidding it did not work; one img2img pass told to REMOVE the gold put back MORE of it. Deleting the two colours from the forced palette fixed both faults on the next generation, because the provider's palette lock is exact and a colour that is not in the lock cannot be drawn. The ramp that remains: nave0>nave1>nave2 is the stone body with slate0 as its shadow face and nave2 (B3 0.404) as the ceiling, so no stone pixel can enter the wall-cope band SS2.3 reserves for a 1px cap; void/mortar are the joints and the hard occlusion under the lintel (SS2.1 Law 3); goldDim>gold is a two-step threshold mark, small-area only; sky+star+goldStar is the SS8.2.1 opening at the doc's two-in-three cold, one-in-three warm mix; purple1 is the single torn banner, one value because cloth here is a note, not a subject. NO numen: the Gate is stone, not a Seal — SS1.3.6 keeps that ramp for what touches the beyond, and spending it here would make the crossing look sealed rather than open.",
+  "references": [
+    "art/reference/concepts/playbardo-concept-02-death-is-the-door.png"
+  ],
+  "note": "Set-piece lane (SS12.1 generated: large props). Authored at 144x192 inside a 192 canvas so the mass is about 53% of the 640x360 frame height and reads at 1x beside the hero's 37px standing body. Candidate only: .art-cache/setpieces, never art/approved or public/assets. Generated through the PixelLab MCP because PIXELLAB_SECRET is unset in the shell; the prompt is still assembled by buildPrompt() so provenance holds."
+}

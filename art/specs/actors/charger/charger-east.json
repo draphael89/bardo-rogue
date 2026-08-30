@@ -1,0 +1,164 @@
+{
+  "id": "actor.charger.east",
+  "kind": "character",
+  "input": ".art-cache/actors/charger/master-east.png",
+  "output": ".art-cache/actors/charger/compiled/bardo_charger_east.png",
+  "sidecar": ".art-cache/actors/charger/compiled/bardo_charger_east.json",
+  "cell": 36,
+  "cols": 4,
+  "rows": 2,
+  "maxColors": 16,
+  "palette": [
+    "mortar",
+    "iron",
+    "ironHi",
+    "naveWarm",
+    "coinBrass",
+    "boneLo",
+    "boneDim",
+    "bone"
+  ],
+  "facing": "east",
+  "mirror": true,
+  "fit": "grid",
+  "chromaKey": false,
+  "coverage": 0.5,
+  "valueLift": false,
+  "salience": {
+    "minShare": 0.22,
+    "minDelta": 0.16
+  },
+  "frames": [
+    {
+      "name": "idle",
+      "i": 0,
+      "pivot": [
+        18,
+        33
+      ],
+      "sockets": {
+        "heel": [
+          26,
+          16
+        ]
+      }
+    },
+    {
+      "name": "hoverA",
+      "i": 1,
+      "pivot": [
+        18,
+        33
+      ],
+      "sockets": {
+        "heel": [
+          27,
+          16
+        ]
+      }
+    },
+    {
+      "name": "hoverB",
+      "i": 2,
+      "pivot": [
+        18,
+        33
+      ],
+      "sockets": {
+        "heel": [
+          27,
+          16
+        ]
+      }
+    },
+    {
+      "name": "coilDraw",
+      "i": 3,
+      "pivot": [
+        18,
+        33
+      ],
+      "sockets": {
+        "heel": [
+          25,
+          15
+        ]
+      }
+    },
+    {
+      "name": "coilLock",
+      "i": 4,
+      "pivot": [
+        18,
+        33
+      ],
+      "sockets": {
+        "heel": [
+          20,
+          12
+        ]
+      }
+    },
+    {
+      "name": "lunge",
+      "i": 5,
+      "pivot": [
+        18,
+        33
+      ],
+      "sockets": {
+        "heel": [
+          29,
+          24
+        ]
+      }
+    },
+    {
+      "name": "skid",
+      "i": 6,
+      "pivot": [
+        18,
+        33
+      ],
+      "sockets": {
+        "heel": [
+          26,
+          18
+        ]
+      }
+    },
+    {
+      "name": "hurt",
+      "i": 7,
+      "pivot": [
+        18,
+        33
+      ],
+      "sockets": {
+        "heel": [
+          21,
+          16
+        ]
+      }
+    }
+  ],
+  "clips": {
+    "dash": {
+      "frames": [
+        "coilDraw",
+        "coilLock",
+        "lunge",
+        "skid"
+      ],
+      "timing": "sim",
+      "sim": {
+        "ref": "charger"
+      }
+    }
+  },
+  "provenance": {
+    "provider": "blender-mannequin-spike",
+    "model": "blender-eevee ortho pitch 20deg, actor charger, cell 36, sun 1.07, ambient 1.75"
+  },
+  "registrationNote": "Pivots and sockets are COMPUTED from projected rig bones (rig.json), not judged. Candidate output only: .art-cache/actors, never public/assets."
+}

@@ -1,0 +1,22 @@
+{
+  "subject": "A SEAL ARCH standing over the chained bridge of the Bardo hub, read as SHADOW ONLY. A tall stone arch seen face-on, almost entirely in silhouette against the void: a single flat near-black mass with no interior shading, no lit face and no readable surface. Woven interlace knotwork fills the arch's head, but it is cut as NEGATIVE SPACE only — holes through the black mass in a plaited over-under band, so the pattern is read by the gaps and never by a drawn line. The knotwork is foreign to this place and must not resolve into any legible symbol, letter, rune or figure: it is a strangeness glimpsed, not an inscription. The arch's inner edge carries one thin cold blue-green live line where the seal still holds, brightest at the crown and dying out before it reaches the ground. A heavy chain crosses the opening at chest height, slack, with one link broken. The arch's feet are lost in the dark. No gold anywhere: this crossing is shut.",
+  "size": 160,
+  "kind": "prop",
+  "view": "side",
+  "count": 4,
+  "palette": [
+    "void",
+    "mortar",
+    "seal0",
+    "slate0",
+    "nave0",
+    "numenDim",
+    "numen",
+    "numenHi"
+  ],
+  "paletteNote": "Eight names against a twelve budget, and the shortfall is the point: SS8.4.3 says a Seal is silhouette only, because legible foreign iconography would break the pantheon-neutral rule one clause above it. void>mortar>seal0 is the mass, three near-black steps so the shape has form without ever leaving B0 — this is the one asset in the game allowed to sit inside a single band, because a silhouette IS the subject and SS1.3.3's three-band rule is asking for form the Seal must not have. slate0 and nave0 are the two pixels of rim where the void behind the arch is lighter than the arch itself, which is what stops it reading as a hole in the sheet. numenDim>numen>numenHi is the live seal line, the ONLY chroma in the piece and the exact SS1.3.6 use: what touches the beyond, in the Bardo, at B4/B5 small area. NO gold: SS8.2.2 gives gold to crossings you may make, and this one is shut.",
+  "references": [
+    "art/reference/concepts/playbardo-concept-02-death-is-the-door.png"
+  ],
+  "note": "Set-piece lane (SS12.1 generated: large props). The hardest of the three to generate, because every image model wants to light and detail a subject and this one is defined by refusing both. Judge it with the SS4.2 black test FIRST: if the knotwork does not read as gaps in a black mass at 1x, the candidate has failed regardless of how it looks magnified. Candidate only: .art-cache/setpieces."
+}

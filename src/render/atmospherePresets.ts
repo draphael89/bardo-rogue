@@ -1,11 +1,9 @@
 import type { LayoutId } from '@/sim/layouts'
 
-/** Render-only air. Dress already changes the floor; this is the fog, rays, motes, and light fallbacks. */
+/** Render-only air. Dress already changes the floor; this is the fog, motes, and light fallbacks. */
 export interface AtmospherePreset {
   fogTint: number
   fogAlphaMul: number
-  rayTint: number
-  rayAlphaMul: number
   /** Shut door. The open door stays gold — that is the walkable signal. */
   doorGlowTint: number
   doorOpenTint: number
@@ -49,13 +47,24 @@ export interface AtmospherePreset {
    * under the chrome.
    */
   ambientTint: number
+
+  /**
+   * Optional per-room overrides for `juice.light.ambientDarkness` and `juice.light.vignette` --
+   * the same opt-in shape `ambientTint` above uses, and the guard that keeps this pass inside the
+   * hub. Both tuning values are GLOBAL: they have exactly one reader each and are shared by all
+   * fourteen layouts, and `vignette` also floors the death fade in every room where a player can
+   * die. The Bardo is the one room where that interaction is moot, so the hub declares its own
+   * depth here and every other preset omits both and keeps the tuning value. `pnpm realm-air`
+   * over the other thirteen layouts is how that opt-in is proved rather than asserted.
+   */
+  ambientDarkness?: number
+  vignette?: number
 }
 
 const GOLD_OPEN = 0xd4b060
 
 const RIVER: AtmospherePreset = {
   fogTint: 0x1c2e3c, fogAlphaMul: 1.1,
-  rayTint: 0xc8d8ff, rayAlphaMul: 0.45,
   doorGlowTint: 0xc8d0d8, doorOpenTint: GOLD_OPEN,
   moteTint: 0xd0dce8, moteAccent: 0xc8d0ff, keyTint: 0xc8d8ff,
   floorTint: 0xb4d8ff,   // the Acheron runs cold and blue
@@ -64,7 +73,6 @@ const RIVER: AtmospherePreset = {
 
 const FIELD: AtmospherePreset = {
   fogTint: 0x2a2430, fogAlphaMul: 0.95,
-  rayTint: 0xc8b8a0, rayAlphaMul: 0.55,
   doorGlowTint: 0x8a7a68, doorOpenTint: GOLD_OPEN,
   moteTint: 0xd8c8b0, moteAccent: 0xe8d8c0, keyTint: 0xc8b8a0,
   floorTint: 0xffe8c4,   // ash and dry poppy: warm grey, almost bone
@@ -73,7 +81,6 @@ const FIELD: AtmospherePreset = {
 
 const WATER: AtmospherePreset = {
   fogTint: 0x1a2834, fogAlphaMul: 1.05,
-  rayTint: 0xa8c0d0, rayAlphaMul: 0.40,
   doorGlowTint: 0x6a8090, doorOpenTint: GOLD_OPEN,
   moteTint: 0xb0c4d0, moteAccent: 0xc8d8e0, keyTint: 0xa8c0d0,
   floorTint: 0xa8d0f8,   // still water, a shade deeper than the river
@@ -82,7 +89,6 @@ const WATER: AtmospherePreset = {
 
 const GOLD_BANK: AtmospherePreset = {
   fogTint: 0x3a3428, fogAlphaMul: 0.85,
-  rayTint: 0xf0d080, rayAlphaMul: 1.15,
   doorGlowTint: 0xd4b060, doorOpenTint: GOLD_OPEN,
   moteTint: 0xffe090, moteAccent: 0xf0d080, keyTint: GOLD_OPEN,
   floorTint: 0xffd484,   // the ferryman's bank is lit money
@@ -91,7 +97,6 @@ const GOLD_BANK: AtmospherePreset = {
 
 const WINE_HALL: AtmospherePreset = {
   fogTint: 0x3a1428, fogAlphaMul: 0.9,
-  rayTint: 0xb03010, rayAlphaMul: 0.7,
   doorGlowTint: 0x8a2410, doorOpenTint: GOLD_OPEN,
   moteTint: 0xc08060, moteAccent: 0x6a2038, keyTint: 0xb03010,
   floorTint: 0xffb0a8,   // the judge holds wine: red decisively clear of blue
@@ -100,7 +105,6 @@ const WINE_HALL: AtmospherePreset = {
 
 const WINE_FIRE: AtmospherePreset = {
   fogTint: 0x3a1810, fogAlphaMul: 1.0,
-  rayTint: 0xb03010, rayAlphaMul: 0.9,
   doorGlowTint: 0x8a2410, doorOpenTint: GOLD_OPEN,
   moteTint: 0xc06040, moteAccent: 0xb03010, keyTint: 0xb03010,
   floorTint: 0xffa878,   // Phlegethon burns: wine pushed to ember
@@ -109,7 +113,6 @@ const WINE_FIRE: AtmospherePreset = {
 
 const IRON: AtmospherePreset = {
   fogTint: 0x2a3038, fogAlphaMul: 1.15,
-  rayTint: 0x6a7080, rayAlphaMul: 0.35,
   doorGlowTint: 0x4a5058, doorOpenTint: GOLD_OPEN,
   moteTint: 0x9098a8, moteAccent: 0x6a7080, keyTint: 0x6a7080,
   floorTint: 0xd0dcec,   // iron reads neutral steel, faintly cool
@@ -118,16 +121,14 @@ const IRON: AtmospherePreset = {
 
 const ICE: AtmospherePreset = {
   fogTint: 0x1c2838, fogAlphaMul: 1.2,
-  rayTint: 0x8aa0b8, rayAlphaMul: 0.4,
   doorGlowTint: 0x5a7088, doorOpenTint: GOLD_OPEN,
   moteTint: 0xb0c4d4, moteAccent: 0xc8d8e8, keyTint: 0x8aa0b8,
-  floorTint: 0xc4ecff,   // Cocytus is the palest floor and the coldest
-  ambientTint: 0x1a3040,   // the coldest dark
+  floorTint: 0xc8f8ff,   // Cocytus is the palest floor and the coldest
+  ambientTint: 0x123c5c,   // the coldest dark: cyan water, decisively not Acheron's indigo river
 }
 
 const BRONZE: AtmospherePreset = {
   fogTint: 0x2a2218, fogAlphaMul: 0.95,
-  rayTint: 0x8a6a38, rayAlphaMul: 0.55,
   doorGlowTint: 0x6a5030, doorOpenTint: GOLD_OPEN,
   moteTint: 0xc0a070, moteAccent: 0x8a6a38, keyTint: 0x8a6a38,
   floorTint: 0xffd8a0,   // the Antechamber is bronze, a duller gold
@@ -136,11 +137,15 @@ const BRONZE: AtmospherePreset = {
 
 const HUB: AtmospherePreset = {
   fogTint: 0x1e1c38, fogAlphaMul: 0.8,
-  rayTint: 0xc8d0ff, rayAlphaMul: 0.3,
   doorGlowTint: 0x4a4860, doorOpenTint: GOLD_OPEN,
   moteTint: 0xc8d0e0, moteAccent: 0xc8d0ff, keyTint: 0xc8d0ff,
   floorTint: 0xffffff,   // the Bardo is the reference floor; every realm is read against it
   ambientTint: 0x1e1c38,   // the indigo void every other realm was wearing
+  // The hub's dark goes deeper than the shared default so its pools mean something. Every pool
+  // already sits at the multiply's ceiling, so this is pure CONTRAST: it moves the perimeter and
+  // leaves the light alone, and it moves frame-mean in the safe direction.
+  ambientDarkness: 0.44,
+  vignette: 0.40,
 }
 
 const ATMOSPHERE: Record<LayoutId, AtmospherePreset> = {

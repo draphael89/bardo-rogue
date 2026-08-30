@@ -1,0 +1,60 @@
+{
+  "id": "actor.dummy.south",
+  "kind": "character",
+  "input": ".art-cache/actors/dummy/master-south.png",
+  "output": ".art-cache/actors/dummy/compiled/bardo_dummy_south.png",
+  "sidecar": ".art-cache/actors/dummy/compiled/bardo_dummy_south.json",
+  "cell": 64,
+  "cols": 2,
+  "rows": 1,
+  "maxColors": 16,
+  "palette": [
+    "mortar",
+    "seal0",
+    "iron",
+    "ironHi",
+    "purple0",
+    "purple2",
+    "purple3",
+    "boneLo",
+    "boneDim",
+    "bone",
+    "brickLo",
+    "brick",
+    "brickHi",
+    "cope",
+    "gold"
+  ],
+  "facing": "south",
+  "fit": "grid",
+  "chromaKey": false,
+  "coverage": 0.5,
+  "valueLift": false,
+  "salience": {
+    "minShare": 0.22,
+    "minDelta": 0.16
+  },
+  "frames": [
+    {
+      "name": "idle",
+      "i": 0,
+      "pivot": [
+        32,
+        60
+      ]
+    },
+    {
+      "name": "struck",
+      "i": 1,
+      "pivot": [
+        32,
+        60
+      ]
+    }
+  ],
+  "provenance": {
+    "provider": "blender-mannequin-spike",
+    "model": "blender-eevee ortho pitch 20deg, actor dummy, cell 64, sun 1.07, ambient 1.75"
+  },
+  "registrationNote": "Pivots and sockets are COMPUTED from projected rig bones (rig.json), not judged. Candidate output only: .art-cache/actors, never public/assets."
+}

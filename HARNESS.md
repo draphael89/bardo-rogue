@@ -23,11 +23,14 @@ per tick: `stepWorld(world, inputFrame)`.
 | `pnpm perf:sim -- --mode replay|loop|dense ...` | Repeated deterministic simulation timings with a golden hash/outcome check (`tools/perf-sim.ts`) |
 | `pnpm perf:render -- --profile warden|dense ...` | Clean Browser/Pixi timings; optional `--cpu`/`--heap` attribution runs separately. Requires the Warden to be active after warmup, rejects page errors, repeats its hash, and asserts dense render purity (`tools/perf-render.ts`; needs a server). |
 | `pnpm smoke` | Drives both endings of the production loop in a real browser and asserts the golden path (`tools/smoke.ts`; needs a server) |
-| `pnpm realm-air -- --url <server> [--seed n] [--min-median m] [--shots 1]` | Measures whether a realm actually changes the room: mean RGB of every node's play area, pairwise separation, and whether each realm reads the temperature the ledger claims (`tools/realm-air.ts`; needs a server). Bare, it reports; with `--min-median` it exits non-zero. |
+| `pnpm smoke:viewport -- --url <server>` | Resizes one living page through native, wide, portrait, ultra-wide, letterboxed, and back across title menu/Settings/Credits, game HUD, and pause menu/Settings; gates target/UI containment and paused-state preservation (`tools/viewport-smoke.ts`; needs a server). |
+| `pnpm realm-air -- --url <server> [--seed n] [--visual-frames n] [--min-median m] [--shots 1]` | Owns every render, then measures whether a realm actually changes the room: mean RGB of every node's play area, pairwise separation, and whether each realm reads the temperature the ledger claims (`tools/realm-air.ts`; needs a server). Bare, it reports; with `--min-median` it exits non-zero. |
 | `pnpm record-bot -- --bot kite --scenario full --seed 1 --out replays/x.json` | Record one bot run |
 | `pnpm poses` | Pose sheet of key animation frames (`tools/poses.ts`) |
 | `pnpm strip -- ...` | Frame strip of anything that moves, for judging motion (`tools/strip.ts`; writes a JSON state/event sidecar beside the PNG) |
 | `pnpm assets` / `pnpm tiles` | Regenerate `public/assets/` (Kenney subset, then the original bardo tilesets). Both rewrite `manifest.json`; run `tiles` **after** `assets` or the bardo sprites drop out. |
+| `pnpm room:gate -- [--url <server>] [--shot-dir <dir>] [--out <json>]` | Blocks room-source dimension, palette, alpha, material-span, and Bardo negative-space drift. The live lane owns every render and proves native composite dimensions plus exact 1x value/highlight/focality budgets from Bardo through the seven-room representative spine (`tools/room-art-gates.ts`). |
+| `pnpm art:stress-hero` | Candidate-only Blender proof: renders dagger grammar and heavy-armor geometry from the Veteran rig, compiles six sheets through the real gates, and writes 1x/black evidence under `.art-cache/spike/stress/`. Never approves or touches shipping assets. |
 | `pnpm build` | Web build, then `tools/check-build.ts` gates the payload (no evidence, no video, no missing asset, within budget) |
 | `pnpm check:build` | Re-run the built-payload gate against the current `dist/` |
 | `pnpm art` / `pnpm palette` / `pnpm fx` | Run the authored-art gates, canonical-palette gate, or rebuild the Bardo FX sheets |
@@ -105,7 +108,13 @@ Available once the page has booted (`await page.waitForFunction(() => !!window._
   runs free and the reported tick can overshoot by up to 4.
 - `--eval` runs JS in the page after the ticks and before the screenshot. Set `window.__out = {...}` to get values back
   in the printed JSON (`extra`). The JSON also has `state` (from `__game.state()`), `stats`, and console `errors`.
-- Then Read the PNG. It is 1920x1080; the 640x360 render target is upscaled 3x.
+- `--press Enter --waitMs 700 --postEval "window.__out = ..."` drives and observes a real-time UI
+  transition after deterministic setup. `--postEval` runs after the wait, immediately before capture.
+- `--postWaitMs 1000` waits again after `--postEval`; use it to prove a cancelled async transition
+  stays cancelled instead of completing late.
+- Then read the PNG. The default is 1920x1080 with the 640x360 render target upscaled 3x. Pass
+  `--oneX 1` for the art-review lane: the browser and PNG are exactly 640x360, and the command
+  fails if capture dimensions drift.
 
 ## Record and replay
 

@@ -1,9 +1,9 @@
 {
-  "id": "spike.veteran.east",
+  "id": "spike.veteran-unarmed.east",
   "kind": "character",
-  "input": ".art-cache/spike/master-east.png",
-  "output": ".art-cache/spike/compiled/spike_veteran_east.png",
-  "sidecar": ".art-cache/spike/compiled/spike_veteran_east.json",
+  "input": ".art-cache/spike/hero-final/unarmed/master-east.png",
+  "output": ".art-cache/spike/hero-final/unarmed/compiled/spike_veteran_unarmed_east.png",
+  "sidecar": ".art-cache/spike/hero-final/unarmed/compiled/spike_veteran_unarmed_east.json",
   "cell": 64,
   "cols": 4,
   "rows": 4,
@@ -13,31 +13,24 @@
     "seal0",
     "iron",
     "ironHi",
-    "slate1",
-    "slate2",
-    "slate3",
-    "slateHi",
+    "purple0",
+    "purple2",
+    "purple3",
+    "boneLo",
+    "boneDim",
+    "bone",
     "brickLo",
     "brick",
     "brickHi",
     "cope",
-    "boneLo",
-    "boneDim",
-    "bone"
+    "gold"
   ],
   "facing": "east",
   "mirror": true,
-  "fit": "shared",
-  "register": [
-    27,
-    60
-  ],
-  "margin": 1,
+  "fit": "grid",
   "chromaKey": false,
   "coverage": 0.5,
-  "valueLift": {
-    "targetMean": 0.31
-  },
+  "valueLift": false,
   "salience": {
     "minShare": 0.22,
     "minDelta": 0.16
@@ -48,286 +41,308 @@
       "i": 0,
       "sockets": {
         "handR": [
-          0.407,
-          0.603
+          34,
+          47
         ],
         "handL": [
-          0.407,
-          0.726
+          34,
+          51
         ],
         "head": [
-          0.538,
-          0.208
+          36,
+          31
         ]
       },
-      "anchorX": 0.254
+      "pivot": [
+        32,
+        60
+      ]
     },
     {
       "name": "run0",
       "i": 1,
       "sockets": {
         "handR": [
-          0.667,
-          0.587
+          38,
+          44
         ],
         "handL": [
-          0.667,
-          0.693
+          38,
+          49
         ],
         "head": [
-          0.611,
-          0.207
+          37,
+          30
         ]
       },
-      "anchorX": 0.329
+      "pivot": [
+        31,
+        58
+      ]
     },
     {
       "name": "run1",
       "i": 2,
       "sockets": {
         "handR": [
-          0.521,
-          0.589
+          33,
+          45
         ],
         "handL": [
-          0.852,
-          0.661
+          39,
+          48
         ],
         "head": [
-          0.639,
-          0.206
+          35,
+          30
         ]
       },
-      "anchorX": 0.377
+      "pivot": [
+        30,
+        58
+      ]
     },
     {
       "name": "run2",
       "i": 3,
       "sockets": {
         "handR": [
-          0.531,
-          0.612
+          31,
+          46
         ],
         "handL": [
-          0.927,
-          0.672
+          40,
+          48
         ],
         "head": [
-          0.691,
-          0.213
+          34,
+          30
         ]
       },
-      "anchorX": 0.467
+      "pivot": [
+        29,
+        58
+      ]
     },
     {
       "name": "run3",
       "i": 4,
       "sockets": {
         "handR": [
-          0.576,
-          0.625
+          33,
+          45
         ],
         "handL": [
-          0.869,
-          0.7
+          39,
+          48
         ],
         "head": [
-          0.68,
-          0.218
+          35,
+          30
         ]
       },
-      "anchorX": 0.448
+      "pivot": [
+        30,
+        58
+      ]
     },
     {
       "name": "run4",
       "i": 5,
       "sockets": {
         "handR": [
-          0.667,
-          0.585
+          38,
+          44
         ],
         "handL": [
-          0.667,
-          0.691
+          38,
+          49
         ],
         "head": [
-          0.611,
-          0.207
+          37,
+          30
         ]
       },
-      "anchorX": 0.329
+      "pivot": [
+        31,
+        58
+      ]
     },
     {
       "name": "run5",
       "i": 6,
       "sockets": {
         "handR": [
-          0.852,
-          0.574
+          39,
+          44
         ],
         "handL": [
-          0.521,
-          0.719
+          33,
+          49
         ],
         "head": [
-          0.639,
-          0.211
+          35,
+          30
         ]
       },
-      "anchorX": 0.377
+      "pivot": [
+        30,
+        58
+      ]
     },
     {
       "name": "run6",
       "i": 7,
       "sockets": {
         "handR": [
-          0.927,
-          0.569
+          40,
+          44
         ],
         "handL": [
-          0.531,
-          0.732
+          31,
+          50
         ],
         "head": [
-          0.691,
-          0.217
+          34,
+          30
         ]
       },
-      "anchorX": 0.467
+      "pivot": [
+        29,
+        58
+      ]
     },
     {
       "name": "run7",
       "i": 8,
       "sockets": {
         "handR": [
-          0.869,
-          0.576
+          39,
+          44
         ],
         "handL": [
-          0.576,
-          0.721
+          33,
+          49
         ],
         "head": [
-          0.68,
-          0.212
+          35,
+          30
         ]
       },
-      "anchorX": 0.448
+      "pivot": [
+        30,
+        58
+      ]
     },
     {
-      "name": "swingAnticipate",
+      "name": "hurt",
       "i": 9,
       "sockets": {
         "handR": [
-          0.304,
-          0.387
+          35,
+          35
         ],
         "handL": [
-          0.764,
-          0.406
+          34,
+          46
         ],
-        "bladeTip": [
-          0.052,
-          0.025
-        ],
-        "bladeMid": [
-          0.166,
-          0.188
+        "head": [
+          30,
+          29
         ]
       },
-      "anchorX": 0.731
+      "pivot": [
+        32,
+        57
+      ]
     },
     {
-      "name": "swingCommit",
+      "name": "dead",
       "i": 10,
       "sockets": {
         "handR": [
-          0.401,
-          0.311
+          40,
+          44
         ],
         "handL": [
-          0.399,
-          0.352
+          43,
+          50
         ],
-        "bladeTip": [
-          0.928,
-          0.033
-        ],
-        "bladeMid": [
-          0.69,
-          0.158
+        "head": [
+          36,
+          38
         ]
       },
-      "anchorX": 0.145
+      "pivot": [
+        26,
+        57
+      ]
     },
     {
-      "name": "swingImpact",
+      "name": "dodge",
       "i": 11,
       "sockets": {
         "handR": [
-          0.533,
-          0.466
+          43,
+          42
         ],
         "handL": [
-          0.323,
-          0.51
+          43,
+          48
         ],
-        "bladeTip": [
-          0.957,
-          0.82
-        ],
-        "bladeMid": [
-          0.766,
-          0.66
+        "head": [
+          37,
+          36
         ]
       },
-      "anchorX": 0.075
+      "pivot": [
+        26,
+        57
+      ]
     },
     {
-      "name": "swingFollow",
+      "name": "fall",
       "i": 12,
       "sockets": {
         "handR": [
-          0.562,
-          0.566
+          44,
+          28
         ],
         "handL": [
-          0.248,
-          0.678
+          44,
+          34
         ],
-        "bladeTip": [
-          0.942,
-          0.917
-        ],
-        "bladeMid": [
-          0.771,
-          0.759
+        "head": [
+          37,
+          29
         ]
       },
-      "anchorX": 0.096
+      "pivot": [
+        25,
+        57
+      ]
     },
     {
-      "name": "swingRecover",
+      "name": "land",
       "i": 13,
       "sockets": {
         "handR": [
-          0.464,
-          0.564
+          41,
+          43
         ],
         "handL": [
-          0.306,
-          0.628
+          38,
+          51
         ],
-        "bladeTip": [
-          0.942,
-          0.962
-        ],
-        "bladeMid": [
-          0.726,
-          0.783
+        "head": [
+          38,
+          34
         ]
       },
-      "anchorX": 0.138
+      "pivot": [
+        28,
+        57
+      ]
     }
   ],
   "clips": {
@@ -355,34 +370,23 @@
       ],
       "loop": true
     },
-    "heavy": {
+    "dodge": {
       "frames": [
-        "swingAnticipate",
-        "swingCommit",
-        "swingImpact",
-        "swingFollow",
-        "swingRecover"
+        "dodge",
+        "fall",
+        "land"
       ],
       "timing": "sim",
       "sim": {
-        "ref": "player.attack.swings.2",
-        "contact": "swingImpact"
-      }
+        "ref": "player.dodge"
+      },
+      "grounded": false
     }
   },
-  "waivers": [
-    {
-      "gate": "frame:swingAnticipate:height",
-      "reason": "The raised greatsword apex IS the tell (SS4.1 weapon-apex waiver, as on the brute): the body is ~33px, well under the cap; the overage is blade. Measured on this compile."
-    },
-    {
-      "gate": "frame:swingCommit:height",
-      "reason": "The raised greatsword apex IS the tell (SS4.1 weapon-apex waiver, as on the brute): the body is ~33px, well under the cap; the overage is blade. Measured on this compile."
-    }
-  ],
+  "waivers": [],
   "provenance": {
     "provider": "blender-mannequin-spike",
-    "model": "blender-eevee ortho pitch 20deg, legScale 1"
+    "model": "blender-eevee ortho pitch 20deg, legScale 1, weapon none, armor base, sun 1.07, ambient 1.75"
   },
   "registrationNote": "Pivots, anchorX and sockets are COMPUTED from projected rig bones (rig.json), not judged. Spike output only: .art-cache/spike, never public/assets."
 }

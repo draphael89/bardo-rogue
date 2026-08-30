@@ -46,7 +46,7 @@ function harness(pad?: FakePad) {
   const ra = {
     app: { canvas }, world: worldContainer, screen: { x: 0, y: 0 }, scale: 1,
   } as unknown as RenderApp
-  return { win, canvas, worldContainer, input: new InputSystem(ra) }
+  return { win, canvas, worldContainer, ra, input: new InputSystem(ra) }
 }
 
 afterEach(() => {
@@ -672,6 +672,30 @@ describe('mouse aim follows the live camera transform', () => {
     const el = Math.hypot(ex, ey)
     expect(f.aimX).toBeCloseTo(ex / el, 4)
     expect(f.aimY).toBeCloseTo(ey / el, 4)
+  })
+
+  it('still aims at that point through a fractional portrait fit and letterbox offset', () => {
+    const h = harness()
+    const w = createWorld(1, 'dummy')
+    const p = w.player
+    h.worldContainer.pivot.set(p.x, p.y)
+    h.worldContainer.position.set(320, 180)
+    h.ra.scale = 390 / 640
+    h.ra.screen.x = 0
+    h.ra.screen.y = 312
+
+    const target = new Point(p.x - 30, p.y + 20)
+    const inTarget = h.worldContainer.toGlobal(target, new Point())
+    h.canvas.fire('mousemove', {
+      clientX: h.ra.screen.x + inTarget.x * h.ra.scale,
+      clientY: h.ra.screen.y + inTarget.y * h.ra.scale,
+    })
+
+    const f = h.input.sample(w)
+    const ex = target.x - p.x, ey = target.y - p.y
+    const length = Math.hypot(ex, ey)
+    expect(f.aimX).toBeCloseTo(ex / length, 4)
+    expect(f.aimY).toBeCloseTo(ey / length, 4)
   })
 })
 

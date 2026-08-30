@@ -27,6 +27,7 @@ import { loadSave, saveFilename } from '@/platform/saveFile'
 import { titleNudge, townTally } from '@/render/titleMenu'
 import { nudgeSlider } from '@/sim/storage'
 import { applyPlaytestCondition, asPlaytestCondition, canRecordPlainReplay, conditionOfBundle, PLAYTEST_CONDITIONS, type PlaytestCondition } from '@/playtest'
+import { TitleFlow } from '@/titleFlow'
 
 async function boot() {
   const q = new URLSearchParams(location.search)
@@ -139,6 +140,14 @@ async function boot() {
   let debugPaused = false
   let metrics = new Metrics()
   const presenter = new Presenter(ra, atlas, world)
+  const titleFlow = new TitleFlow()
+  let titleToken = 0
+  const resetTitlePresenter = (): void => {
+    titleFlow.cancel()
+    titleToken = 0
+    presenter.title.resetTransition()
+    presenter.resetTitleFocus()
+  }
   presenter.setReducedEffects(reducedEffects)
   const applyMix = (): void => {
     audio.setLevel('master', storedMaster)
@@ -166,6 +175,11 @@ async function boot() {
   let cur = { seed, scenario, god }
 
   const reset = (s = cur.seed, sc = cur.scenario, opts: { god?: boolean; meta?: MetaState } = { god: cur.god }) => {
+    if (presenter.title.visible) {
+      resetTitlePresenter()
+      presenter.title.setSoundGate(false)
+      audio.setSuspended(true)
+    }
     cur = { seed: s, scenario: sc, god: !!opts.god }
     const suppliedMeta = Object.prototype.hasOwnProperty.call(opts, 'meta')
     // A reset throws the run away, and with it whatever that run bought and never wrote down.
@@ -387,6 +401,7 @@ async function boot() {
     })
     // A replay is a measurement, even when it is installed through the live debug API after boot.
     // Do not leave the first-impression title intercepting F/V/E/I while the replay owns input.
+    resetTitlePresenter()
     presenter.title.setSoundGate(false)
     presenter.title.setShown(false)
     // Recompute the hold after hiding the title: the initial title is what paused a fresh boot, but
@@ -418,9 +433,9 @@ async function boot() {
       const titleLeft = !!pad?.buttons[14]?.pressed
       const titleRight = !!pad?.buttons[15]?.pressed
       if (titleWasUp) {
-        if (presenter.title.soundGated) {
-          if (titleStartNow && !padTitlePrev) void dismissTitle()
-        } else {
+        if (titleFlow.phase === 'idle' && presenter.title.soundGated) {
+          if (titleStartNow && !padTitlePrev) void beginTitleDescent(false)
+        } else if (titleFlow.phase === 'idle') {
           if (titleUp && !padTitleUpPrev) presenter.title.move(-1)
           if (titleDown && !padTitleDownPrev) presenter.title.move(1)
           if (titleLeft && !padTitleLeftPrev) nudgeTitleLevel(-1)
@@ -473,6 +488,7 @@ async function boot() {
       presenter.reward.setLeaving(canGiveBack())
       presenter.routeMap.setPaused(userPaused)
       presenter.render(alpha, dt)
+      if (titleFlow.phase === 'descending' && presenter.title.descentComplete) finishTitleDescent()
       overlay.update(world, loop)
       updateRecText()
       ra.renderFrame()
@@ -527,8 +543,13 @@ async function boot() {
     mute: m => { audio.muted = m ?? !audio.muted; return audio.muted },
     title: show => {
       const want = show ?? !presenter.title.visible
-      if (want) { presenter.title.setShown(true); loop.paused = true; audio.setSuspended(true) }
-      else void dismissTitle()
+      if (want) {
+        resetTitlePresenter()
+        presenter.title.setSoundGate(false)
+        presenter.title.setShown(true)
+        loop.paused = true
+        audio.setSuspended(true)
+      } else hideTitleImmediately()
       return presenter.title.visible
     },
     debug: v => { overlay.setVisible(v ?? !overlay.visible); return overlay.visible },
@@ -685,6 +706,7 @@ async function boot() {
   // by a bot or a replay skips it - those are measurements, not first impressions.
   const wantsTitle = scenario === 'loop' && !botName && !resumed
   presenter.title.setShown(wantsTitle)
+  if (wantsTitle) presenter.resetTitleFocus()
 
   // One place decides what "paused" means, so the sim, the audio clock and the overlay can never
   // disagree. Pausing used to stop only the simulation: the bed kept playing behind the overlay and
@@ -717,29 +739,62 @@ async function boot() {
   // A gamepad button is not browser user activation. It may ask the browser to resume audio, but it
   // may not dismiss the title until the audio clock actually runs. A real key/click performs that
   // resume inside its activation; mute=1 bypasses the gate because silence was explicitly requested.
-  const dismissTitle = async (gesture = false): Promise<boolean> => {
+  const holdTitleAtGate = (soundGate: boolean): void => {
+    resetTitlePresenter()
+    presenter.title.setSoundGate(soundGate)
+    presenter.title.setShown(true)
+    loop.paused = true
+    audio.setSuspended(true)
+  }
+
+  const hideTitleImmediately = (): void => {
+    if (!presenter.title.visible) return
+    resetTitlePresenter()
+    presenter.title.setSoundGate(false)
+    presenter.title.setShown(false)
+    setPaused(userPaused)
+  }
+
+  const beginTitleDescent = async (gesture = false): Promise<boolean> => {
     if (!presenter.title.visible) return true
+    const token = titleFlow.beginUnlock()
+    if (token === null) return false
+    titleToken = token
     audio.setSuspended(false)
     if (!mute) {
       if (gesture) await audio.resumeFromGesture()
       else audio.tryUnlock()
+      if (!titleFlow.owns(token, 'unlocking')) return false
       if (audio.needsGesture) {
-        presenter.title.setSoundGate(true)
-        loop.paused = true
+        holdTitleAtGate(true)
         return false
       }
     }
+    if (!titleFlow.beginDescent(token)) return false
     presenter.title.setSoundGate(false)
-    presenter.title.setShown(false)
-    setPaused(userPaused)
+    presenter.title.beginDescent()
+    loop.paused = true
     return true
+  }
+
+  const finishTitleDescent = (): void => {
+    if (!titleFlow.finish(titleToken)) return
+    titleToken = 0
+    presenter.title.setShown(false)
+    presenter.resetTitleFocus()
+    // The input listeners stay live while the descent owns the paused loop. Anything pressed in
+    // that 1.45 s window is presentation input, not a buffered first combat action.
+    input.releaseHeldIntent()
+    setPaused(userPaused)
   }
   if (wantsTitle) setPaused(false)
 
   // Losing focus is a pause the player did not ask for but always wants: a tab switch should not
   // cost health, and it should not keep making noise from behind another window.
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden && !presenter.title.visible) setPaused(true)
+    if (!document.hidden) return
+    if (presenter.title.visible) holdTitleAtGate(presenter.title.soundGated)
+    else setPaused(true)
   })
 
   const applyReduced = (next: boolean) => {
@@ -781,9 +836,10 @@ async function boot() {
   }
 
   const answerTitle = (gesture: boolean): void => {
-    if (presenter.title.soundGated) { void dismissTitle(gesture); return }
+    if (titleFlow.phase !== 'idle') return
+    if (presenter.title.soundGated) { void beginTitleDescent(gesture); return }
     const act = presenter.title.confirm()
-    if (act === 'descend') void dismissTitle(gesture)
+    if (act === 'descend') void beginTitleDescent(gesture)
     else if (act === 'toggle-still') applyReduced(!reducedEffects)
     // The same host verb F carries; the row exists so the control is discoverable from Settings.
     // On a gamepad confirm (no user activation) the browser refuses; the settings foot says why.
@@ -808,7 +864,8 @@ async function boot() {
       // stray letter cannot descend, and so Escape on the gate cannot open the pause card.
       if (e.code !== 'F1' && e.code !== 'F2' && e.code !== 'F3') {
         e.preventDefault()
-        if (presenter.title.soundGated) { void dismissTitle(true); return }
+        if (titleFlow.phase !== 'idle') return
+        if (presenter.title.soundGated) { void beginTitleDescent(true); return }
         if (e.code === 'ArrowUp' || e.code === 'KeyW') { presenter.title.move(-1); return }
         if (e.code === 'ArrowDown' || e.code === 'KeyS') { presenter.title.move(1); return }
         if (e.code === 'ArrowLeft' || e.code === 'KeyA') { nudgeTitleLevel(-1); return }

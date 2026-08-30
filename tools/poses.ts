@@ -61,19 +61,25 @@ const POSES: Pose[] = [
   { name: 'spawn-marker', scenario: 'wave1', run: 'until(() => w().spawnQueue.length > 0 && w().spawnQueue[0].ticksLeft < 30, 400)', focus: 'enemy' },
   { name: 'spawn-burst', scenario: 'wave1', run: 'until(() => w().enemies.some(e => e.active), 400); g.step(3)', focus: 'enemy' },
 ]
+const selected = POSES.filter(pose => !only || only.some((o: string) => pose.name.includes(o)))
+if (selected.length === 0) {
+  console.error(`poses FAILED: --only selected no poses (${only?.join(',') ?? ''})`)
+  process.exit(2)
+}
 
 const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] })
 const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } })
 const errors: string[] = []
 page.on('pageerror', e => errors.push('pageerror: ' + e.message))
+page.on('console', message => { if (message.type() === 'error') errors.push('console: ' + message.text()) })
 await page.goto(`${url}/?scenario=empty&seed=1&mute=1&save=off`)   // never let a real save tint a pose sheet
 await page.waitForFunction(() => !!(window as unknown as { __game?: unknown }).__game, null, { timeout: 15000 })
 await page.evaluate((pre) => { (window as any).__PRELUDE = pre; const g = (window as any).__game; g.pause(true); g.presenter.hud.showBanner('', '', 0) }, PRELUDE)
 
 const CROP = 96 // view px around the focus point
 const tiles: Array<{ name: string; buf: Buffer }> = []
-for (const pose of POSES) {
-  if (only && !only.some((o: string) => pose.name.includes(o))) continue
+const failures: string[] = []
+for (const pose of selected) {
   const focus = pose.focus ?? 'player'
   const seed = pose.seed ?? 1
   try {
@@ -113,7 +119,9 @@ for (const pose of POSES) {
     tiles.push({ name: `${pose.name} (${clip.state})`, buf })
     console.log('posed', pose.name, clip.state)
   } catch (e) {
-    console.log('FAILED', pose.name, String(e).slice(0, 200))
+    const detail = `${pose.name}: ${String(e).slice(0, 200)}`
+    failures.push(detail)
+    console.log('FAILED', detail)
   }
 }
 await browser.close()
@@ -133,3 +141,7 @@ for (let i = 0; i < tiles.length; i++) {
 svg += '</svg>'
 await sharp(Buffer.from(svg)).composite(comps).png().toFile(out)
 console.log('wrote', out, 'poses:', tiles.length, errors.length ? errors : '')
+if (failures.length || errors.length || tiles.length !== selected.length) {
+  console.error(`poses FAILED: requested ${selected.length}, captured ${tiles.length}, pose failures ${failures.length}, browser errors ${errors.length}`)
+  process.exit(2)
+}

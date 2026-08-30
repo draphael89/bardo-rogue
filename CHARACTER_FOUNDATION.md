@@ -156,8 +156,13 @@ foundation, will we be grateful we chose it?**
    from the spike: deepen the combat crouch to the locked 0.90 factor; move pose truth from
    Python op-lists into Blender Actions; add IK/grip constraints; declare material→ramp locks.
    PixelLab and gpt-image remain accelerator/set-piece tiers.
-3. **Stress tests (open):** the Veteran rig carries a greatsword, a dagger, and heavy-armor
-   silhouette blocks before the hard-constraints spec is finalized.
-4. **Hard-constraints spec (open):** drafted from the spike's rig conventions, then locked by the
-   user — and only then does identity art (§2's recognizable person on top of the mannequin)
-   resume.
+3. **Stress tests: CANDIDATE PROOF COMPLETE (2026-08-30).** `pnpm art:stress-hero` rendered 42
+   frames each for dagger and heavy armor across south/north/east, computed registration, compiled
+   six sheets through 1,062 real gates, and emitted 1× floor/black evidence under
+   `.art-cache/spike/stress/`. The first dagger run correctly failed: its lunge touched the cell
+   edge and the greatsword's east shared-fit rule enlarged a compact body. Reframing and making fit
+   a weapon-family decision cleared the rerun with zero dagger waivers. Heavy armor cleared with
+   only the existing four greatsword-apex waivers. These are pipeline/silhouette proofs, not Look.
+4. **Hard-constraints spec: DRAFTED, USER LOCK OPEN.**
+   `docs/CHARACTER_HARD_CONSTRAINTS.md` converts the rig, weapon-family and armor evidence into a
+   candidate production contract. Identity art resumes only after the user locks or revises it.

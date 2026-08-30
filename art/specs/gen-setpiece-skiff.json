@@ -1,0 +1,26 @@
+{
+  "subject": "THE FERRYMAN'S SKIFF, moored at the void pier of the Bardo hub. A long narrow flat-bottomed boat of dark tarred plank, high sharp prow at one end, seen from the game's overhead action camera so the open hull reads as a shallow trough with its far gunwale above its near one. The planks are banded with worn iron straps at three points; a single iron cleat holds a slack rope to the pier edge. One pole leans in the hull. At the prow, a small square lantern with a cold blue-green glass core is the boat's only bright thing and the only place the numinous ramp appears. The hull is empty: nobody is aboard, and no oar is shipped. Something is unfinished: one plank is sprung at the stern and the rope is frayed. Pantheon-neutral and never named Charon: no coins, no skull, no eye, no carved figurehead, no lettering. The boat is working equipment left tied up, not a monument.",
+  "size": 128,
+  "kind": "prop",
+  "view": "high top-down",
+  "count": 4,
+  "palette": [
+    "void",
+    "mortar",
+    "woodLo",
+    "wood",
+    "woodHi",
+    "iron",
+    "ironHi",
+    "boneLo",
+    "numenDim",
+    "numen",
+    "numenHi",
+    "goldDim"
+  ],
+  "paletteNote": "Twelve names, the exact prop budget. woodLo>wood>woodHi is the tarred hull at B1-B2 with the plank ENDS as the only bright wood (SS2.7), broken 1px grain never full-length lines. iron>ironHi with mortar as its darkest outline value are the strap bands and the cleat — SS2.7 says iron banding is what makes wood read as furniture instead of a brown rectangle, and this hull is the test of that clause. boneLo is the rope and the pole, warm so it does not read as grey wire. numenDim>numen>numenHi is the lantern glass and nothing else: SS8.4.4 names the Ferryman's lantern as one of the three things the numen ramp is for, and SS1.3.6 caps it at a B4/B5 small area, so numenHi is 1-2 px of core. goldDim is a single bounce pixel where the lantern light lands on an iron strap, the only warm in the piece. NO purple: the wine ramp belongs to the hero and the Gate's banner, and a wine-draped ferry would read as ceremony rather than as working equipment.",
+  "references": [
+    "art/reference/concepts/playbardo-concept-02-death-is-the-door.png"
+  ],
+  "note": "Set-piece lane (SS12.1 generated: large props). Authored at 128x96 for the causeway's void pier, roughly three times the hero's standing width, so it masses the pier without breaking the SS8.1 island footprint. Candidate only: .art-cache/setpieces, never art/approved or public/assets."
+}

@@ -8,17 +8,21 @@ import { validateSheetDef, type SheetDef } from '../../src/render/sheet'
 import { compileSheet, validateClipRefs, type CompileReport, type CompileSpec } from '../../tools/art/compile'
 import { makeContext, runGates, summarise } from '../../tools/art/gates'
 import { canon, rgbToHex, type RGB } from '../../tools/art/palette'
+import { verifyApproval } from '../../tools/art/approve'
 import { authoredFxFrame, quantizeFxAlpha, quantizeFxRotation } from '../../src/render/fxUnits'
 import { heroFrameName } from '../../src/render/views/player'
 import { createWorld } from '../../src/sim/scenarios'
 import { ARM } from '../../src/sim/weapons'
 
 const SHEETS = [
-  'bardo_hero',
-  'bardo_hero_north',
-  'bardo_hero_north_roll',
-  'bardo_hero_south',
-  'bardo_hero_south_roll',
+  'bardo_veteran_unarmed_east',
+  'bardo_veteran_unarmed_north',
+  'bardo_veteran_unarmed_south',
+  'bardo_veteran_unarmed_north_roll',
+  'bardo_veteran_unarmed_south_roll',
+  'bardo_veteran_greatsword_east',
+  'bardo_veteran_greatsword_north',
+  'bardo_veteran_greatsword_south',
   'bardo_brute',
 ] as const
 const sheetPath = (n: string) => `public/assets/sprites/${n}.png`
@@ -328,7 +332,13 @@ describe('authored effect sprites', () => {
   })
   it('are hard-edged: no partial alpha except the glows and haze that §6.6 permits', async () => {
     const manifest = JSON.parse(readFileSync('public/assets/manifest.json', 'utf8')) as Record<string, string[]>
-    const stepped = new Set(['circle_03.png', 'circle_05.png', 'fog_01.png', 'fog_02.png', 'fog_03.png', 'fog_04.png', 'fog_05.png'])
+    // §6.6 names the exceptions: "god-rays and fog quantize: step their alpha to 4 levels". The
+    // shafts are the god-rays that clause is about, and the next test is what holds them to four.
+    const stepped = new Set([
+      'circle_03.png', 'circle_05.png',
+      'fog_01.png', 'fog_02.png', 'fog_03.png', 'fog_04.png', 'fog_05.png',
+      'shaft_01.png', 'shaft_02.png', 'shaft_03.png',
+    ])
     for (const file of manifest.particles) {
       if (stepped.has(file)) continue
       const { data } = await sharp(`public/assets/particles/${file}`).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
@@ -339,7 +349,7 @@ describe('authored effect sprites', () => {
   })
 
   it('step their alpha to a handful of levels where a falloff is allowed at all', async () => {
-    for (const file of ['circle_03.png', 'circle_05.png', 'fog_01.png']) {
+    for (const file of ['circle_03.png', 'circle_05.png', 'fog_01.png', 'shaft_01.png', 'shaft_02.png', 'shaft_03.png']) {
       const { data } = await sharp(`public/assets/particles/${file}`).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
       const levels = new Set<number>()
       for (let i = 3; i < data.length; i += 4) if (data[i] > 0) levels.add(data[i])
@@ -364,20 +374,29 @@ describe('authored effect sprites', () => {
 // only contract-checks the two authored character sheets. Palette discipline is the whole thesis of
 // this pipeline, so the lane that produces most of the screen cannot be the one lane exempt from it.
 describe('code-generated sheets', () => {
+  it('locks the native 24px room and 48px prop source contracts', async () => {
+    const room = await sharp('public/assets/sprites/bardo_room.png').metadata()
+    const props = await sharp('public/assets/sprites/bardo_props.png').metadata()
+    expect([room.width, room.height]).toEqual([8 * 24, 12 * 24])
+    expect([props.width, props.height]).toEqual([4 * 48, 4 * 48])
+  })
+
   for (const name of ['bardo_room', 'bardo_props']) {
     it(`${name} is entirely canon, with binary alpha`, async () => {
       const canonHex = new Set(Object.values(canon().colors).map(c => c.hex))
       const { data } = await sharp(`public/assets/sprites/${name}.png`).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
       const off = new Set<string>()
-      let partial = 0
+      let partial = 0, painted = 0
       for (let i = 0; i < data.length; i += 4) {
         if (data[i + 3] === 0) continue
+        painted++
         if (data[i + 3] < 255) partial++
         const hex = rgbToHex([data[i], data[i + 1], data[i + 2]])
         if (!canonHex.has(hex)) off.add(hex)
       }
       expect([...off], `${name} carries off-palette colour`).toEqual([])
       expect(partial, `${name} has anti-aliased pixels — §2.1 Law 5`).toBe(0)
+      expect(painted, `${name} is fully transparent`).toBeGreaterThan(0)
     })
   }
 })
@@ -430,18 +449,25 @@ describe('review findings', () => {
     expect(() => validateClipRefs(wrongContact, 'x')).toThrow(/not a contact\/hit\/strike\/impact key/)
   })
 
-  it('pins every shipped source to its own immutable prompt record', () => {
-    const promptFiles = new Set<string>()
+  it('pins every shipped source to the approved master it was compiled from', () => {
+    // The custody claim, not the generator's: whatever made the pixels, a shipped sheet must name a
+    // master under art/approved that still matches its own receipt. A rig-rendered sheet has no
+    // prompt to pin, so a prompt is checked only where one is claimed.
+    const masters = new Set<string>()
     for (const name of SHEETS) {
       const def = JSON.parse(readFileSync(sidecarPath(name), 'utf8')) as SheetDef
-      const promptFile = def.source!.promptFile!
-      const promptHash = def.source!.promptHash!
+      const master = def.source!.approvedSource!
+      expect(master, name).toMatch(/^art\/approved\/.+\.png$/)
+      expect(() => verifyApproval(master, name), name).not.toThrow()
+      expect(def.source!.sourceFile, name).toBe(master)
+      masters.add(master)
+      const promptFile = def.source!.promptFile
+      if (!promptFile) continue
       expect(promptFile, name).toMatch(/^art\/prompts\/.+\.txt$/)
-      expect(promptHash, name).toBe(createHash('sha256').update(readFileSync(promptFile)).digest('hex'))
+      expect(def.source!.promptHash, name).toBe(createHash('sha256').update(readFileSync(promptFile)).digest('hex'))
       expect(readFileSync(promptFile, 'utf8').trim().length, name).toBeGreaterThan(100)
-      promptFiles.add(promptFile)
     }
-    expect(promptFiles.size).toBe(SHEETS.length)
+    expect(masters.size).toBe(SHEETS.length)
   })
 
   it('every shipped sidecar names a tuning window that still exists', () => {
@@ -457,11 +483,11 @@ describe('review findings', () => {
     world.player.state = 'attack'
     world.player.swingIndex = 1
     world.player.stateTick = 4
-    const south = JSON.parse(readFileSync('public/assets/sprites/bardo_hero_south.json', 'utf8')) as SheetDef
+    const south = JSON.parse(readFileSync('public/assets/sprites/bardo_veteran_greatsword_south.json', 'utf8')) as SheetDef
     const southSheet = { def: south } as unknown as Parameters<typeof heroFrameName>[0]
     const runtimeKey = heroFrameName(southSheet, world.player, world, 0)
     expect(runtimeKey).toBe(south.clips!.light2.sim!.contact)
-    expect(south.frames[runtimeKey].i).toBe(9)
+    expect(south.frames[runtimeKey].i).toBe(21)
   })
 
   it('pose fit preserves aspect instead of stretching a cropped silhouette', async () => {

@@ -1,5 +1,5 @@
 import { Container, Sprite, RenderTexture, Graphics, type DestroyOptions, type Renderer } from 'pixi.js'
-import { TILE, T, interior, type Arena, type ArenaDoor, type ArenaShrine, type DoorMark, type ArenaOffering, type ArenaRack, doorOpens } from '@/sim/arena'
+import { TILE, T, PROP, interior, type Arena, type ArenaDoor, type ArenaShrine, type DoorMark, type ArenaOffering, type ArenaRack, doorOpens } from '@/sim/arena'
 import type { Atlas } from './atlas'
 import { OATH } from './oathMetal'
 import { tuning } from '@/tuning'
@@ -20,6 +20,12 @@ export interface TilemapView {
    */
   lightShrine(): void
 }
+
+// The simulation remains 16px. Room art is authored at the exact 24px density produced by the
+// 1.5x world render, then the baked composite is returned to logical world size. This means the
+// final target sees each authored source pixel exactly once: no enlarged 16px placeholders.
+export const ROOM_ART_SCALE = 3 / 2
+export const ROOM_ART_TILE = TILE * ROOM_ART_SCALE
 
 const MARK = {
   combat: 0xff6a18, combatCore: 0xffcc56, combatEdge: 0x3a1008,
@@ -475,11 +481,152 @@ const C = {
   nave0: 0x343c4c,
   naveWarm: 0x5c503a,
   emberLo: 0xb03010,
+  woodLo: 0x261a16,
+  wood: 0x3c2a22,
+  woodHi: 0x5c4230,
+  purple0: 0x2a0e1c,
+  boneLo: 0x5a4e42,
+  goldDim: 0x8c7040,
+  // Two canon names the map did not carry yet, for the warm marks the causeway bake scatters on
+  // ground the paving already says is lit. L 0.428 and 0.698: coinBrass stays under the 0.70
+  // highlight line even after the grade's 1.06 contrast, so a scatter of it costs the highlight
+  // budget nothing, and only the four single gold pixels beside the landing lamp are spent.
+  coinBrass: 0x8a6a38,
+  gold: 0xd4b060,
+  // The Seal's own names (§8.4.3, §1.3.6). `sky` is the opening onto the star-sky every threshold
+  // owes (§8.2.1); the numen pair is the one ramp allowed to say "a Seal's live edge" (§1.2) and it
+  // is spent here as PAINT, never as a light — the Ferryman's lantern stays the district's one cold
+  // source and nothing joins it (src/sim/arena.ts).
+  sky: 0x0e122c,
+  star: 0xb0c4ff,
+  iron: 0x26262e,
+  ironHi: 0x4c4c56,
+  numen: 0x2e8a80,
+  numenDim: 0x1a4a48,
 } as const
 
 function px(g: Graphics, x: number, y: number, w: number, h: number, color: number): void {
-  g.rect(Math.round(x), Math.round(y), Math.round(w), Math.round(h))
+  const x0 = Math.round(x * ROOM_ART_SCALE), y0 = Math.round(y * ROOM_ART_SCALE)
+  const x1 = Math.round((x + w) * ROOM_ART_SCALE), y1 = Math.round((y + h) * ROOM_ART_SCALE)
+  g.rect(x0, y0, Math.max(1, x1 - x0), Math.max(1, y1 - y0))
   g.fill({ color, alpha: 1 })
+}
+
+function artPx(g: Graphics, x: number, y: number, w: number, h: number, color: number): void {
+  g.rect(Math.round(x), Math.round(y), Math.max(1, Math.round(w)), Math.max(1, Math.round(h)))
+  g.fill({ color, alpha: 1 })
+}
+
+function wearHash(c: number, r: number, salt: number): number {
+  let n = Math.imul(c + 31, 374761393) ^ Math.imul(r + 47, 668265263) ^ Math.imul(salt, 1274126177)
+  n = Math.imul(n ^ (n >>> 13), 1274126177)
+  return n >>> 0
+}
+
+// Coordinate-authored wear breaks the atlas repeat without turning the floor into random noise.
+// Each accepted cell gets one compact low-point cluster, placed near a slab edge and drawn in true
+// source pixels. Overlays are composited afterwards, so a crack or realm material always wins.
+function bakeMaterialWear(g: Graphics, arena: Arena): void {
+  for (let r = 0; r < arena.rows; r++) for (let c = 0; c < arena.cols; c++) {
+    const tile = arena.base[r * arena.cols + c]
+    if (tile < 1 || tile > 60) continue
+    const h = wearHash(c, r, 91)
+    if (h % 5 > 1) continue
+    const x = c * ROOM_ART_TILE + 3 + (h >>> 5) % 16
+    const y = r * ROOM_ART_TILE + 3 + (h >>> 11) % 16
+    const w = 2 + (h >>> 17) % 4
+    artPx(g, x, y, w, 1, h & 1 ? C.grout : C.slate0)
+    if ((h >>> 23) % 3 === 0) artPx(g, x + 1, y + 1, Math.max(1, w - 2), 1, C.mortar)
+  }
+}
+
+// The title screenshot proved the Bardo's destination was a one-cell door in a horizontal wall:
+// functionally correct, compositionally anonymous. This render-only mass grows that existing door
+// into the Gate without changing one solid cell. It is deliberately dark masonry with a broken
+// warm inner edge, not a second light source or a gold portal pasted over the plaza.
+function bakeBardoGate(g: Graphics, arena: Arena): void {
+  if (arena.kind !== 'bardo') return
+  const cx = (arena.door.col + 0.5) * ROOM_ART_TILE
+  const foot = (arena.door.row + 1) * ROOM_ART_TILE
+  // One continuous silhouette first. The earlier study stacked five narrow towers and read as
+  // organ pipes; this one has two pylons, one crown, and one unmistakable absence in the middle.
+  artPx(g, cx - 52, foot - 82, 104, 70, C.mortar)
+  artPx(g, cx - 48, foot - 94, 22, 82, C.woodLo)
+  artPx(g, cx + 26, foot - 94, 22, 82, C.woodLo)
+  artPx(g, cx - 35, foot - 80, 70, 68, C.woodLo)
+  for (const [half, top, h] of [
+    [34, 80, 15], [29, 88, 16], [23, 96, 17], [16, 103, 17], [9, 109, 18],
+  ] as const) {
+    artPx(g, cx - half, foot - top, half * 2, h, C.woodLo)
+  }
+
+  // Re-cut the portal after the mass. Its stepped crown is the focal shape at 1x; the opening is
+  // intentionally unlit because the existing two braziers own every warm pixel in this view.
+  artPx(g, cx - 16, foot - 64, 32, 52, C.void)
+  for (const [half, top, h] of [
+    [15, 69, 8], [13, 75, 8], [10, 81, 8], [6, 86, 8],
+  ] as const) artPx(g, cx - half, foot - top, half * 2, h, C.void)
+
+  // Stone courses and a broken inner arris make the Gate masonry, not a flat UI icon. All accents
+  // stay below the braziers' value; the player still reads first once the camera arrives.
+  for (const y of [foot - 77, foot - 59, foot - 41, foot - 23]) {
+    artPx(g, cx - 47, y, 20, 2, C.mortar)
+    artPx(g, cx + 27, y, 20, 2, C.mortar)
+  }
+  artPx(g, cx - 44, foot - 88, 3, 70, C.woodHi)
+  artPx(g, cx + 41, foot - 88, 3, 70, C.void)
+  artPx(g, cx - 33, foot - 75, 3, 57, C.wood)
+  artPx(g, cx + 30, foot - 75, 3, 57, C.mortar)
+  for (const [x, y, w] of [
+    [cx - 14, foot - 67, 7], [cx - 7, foot - 74, 5],
+    [cx + 2, foot - 74, 5], [cx + 8, foot - 67, 6],
+  ] as const) artPx(g, x, y, w, 1, C.goldDim)
+  // One broken inner arris catches the Gate key from the west. Keeping the east edge dark makes
+  // this illumination rather than an outlined icon, while the gaps preserve the monument's age.
+  for (const [y, h] of [[foot - 59, 9], [foot - 45, 7], [foot - 33, 6]] as const) {
+    artPx(g, cx - 18, y, 1, h, C.goldDim)
+  }
+
+  // Torn ceremonial cloth: enough wine to tie the monument to the Bardo mat, never enough to
+  // compete with the runner. It hangs outside the opening so the destination remains black.
+  artPx(g, cx - 26, foot - 68, 6, 30, C.purple0)
+  artPx(g, cx + 20, foot - 65, 6, 26, C.purple0)
+  artPx(g, cx - 24, foot - 38, 2, 4, C.purple0)
+  artPx(g, cx + 22, foot - 39, 2, 5, C.purple0)
+  artPx(g, cx - 38, foot - 15, 76, 3, C.boneLo)
+  artPx(g, cx - 43, foot - 12, 86, 5, C.woodLo)
+  for (const [x, y, w] of [[-42, -53, 8], [28, -48, 9], [-30, -84, 7], [22, -86, 8]] as const) {
+    artPx(g, cx + x, foot + y, w, 2, C.void)
+  }
+}
+
+// The district is a pilgrimage before it is a menu. Value already carries the broad south-to-north
+// line; these seven broken threshold setts let the foot read it at 1x without becoming a quest
+// arrow. GoldDim is the crossing colour, spent in tiny pairs perpendicular to travel and left dark
+// through the middle where generations of feet wore it away. The furrow and grit bake after this,
+// so the battlefield can scar the line instead of the line painting over its history.
+function bakeBardoProcession(g: Graphics, arena: Arena): void {
+  if (arena.kind !== 'bardo') return
+  for (const [cx, cy, reach] of [
+    [33.4, 29.6, 6], // arrival ground
+    [33.2, 25.4, 5], // south bridge
+    [32.8, 22.2, 6], // three-way threshold
+    [33.1, 18.3, 5], // north bridge
+    [33.4, 15.2, 4],
+    [33.2, 11.0, 6], // first edge of the Gate runner
+    [33.5, 8.0, 5],
+  ] as const) {
+    const x = cx * TILE, y = cy * TILE
+    px(g, x - reach - 2, y, reach, 1, C.goldDim)
+    px(g, x + 3, y, reach, 1, C.goldDim)
+    // ONE coinBrass pixel beside each pair, and no more. The setts run midway between the player
+    // and the focal, so anything out here that enters the frame's top 1 % fails
+    // `bardo:top-one-focality` while still looking correct — the axis is held at B2 on purpose.
+    // No gold, no goldHot, no level 4 anywhere on this line. This is the first discipline that
+    // will slip under pressure, and it is the gate this pass is most likely to break.
+    px(g, x - reach - 3, y, 1, 1, C.coinBrass)
+    px(g, x + reach + 3, y, 1, 1, C.coinBrass)
+  }
 }
 
 // §2.1 Law 3. Wherever two surfaces meet, darken the joint. The wall tiles carry their own
@@ -507,6 +654,175 @@ function bakeOcclusion(g: Graphics, arena: Arena): void {
       if (wallAt(I.c1 + 1, r)) px(g, (I.c1 + 1) * TILE - 2, r * TILE, 2, TILE, C.void)
     }
   }
+}
+
+// §8.1 "Every space floats." The district asserted that and then drew a paper cutout: an island's
+// last row simply stopped and the starfield began, so a mass twenty tiles across read as a decal
+// laid on the sky. The concept sheet sells the float with ROCK — under every rim the stone breaks
+// off, hangs, and pinches out into the void before the stars start — and with the one lit edge a
+// top-down camera can see, which is the rim of the drop facing it.
+//
+// Drawn only where a cell has content and the cell below is void, so this can never touch walkable
+// ground, a wall face, or a bridge that paves through one. Shell rooms have no such edge — their
+// wall ring sits on the last row — so this is the island rooms' own pass and costs the other
+// thirteen layouts nothing.
+//
+// §3.2.7: the rim is warm ONLY inside a named fire's reach. A warm line drawn along an unlit edge
+// is the same litter the causeway pass keeps banning — it makes the island look outlined rather
+// than lit.
+function bakeIslandUnderside(g: Graphics, arena: Arena): void {
+  const at = (c: number, r: number): number =>
+    c < 0 || r < 0 || c >= arena.cols || r >= arena.rows ? T.void : arena.base[r * arena.cols + c]
+  const warmAt = (wx: number, wy: number): boolean =>
+    arena.braziers.some(b => Math.hypot(wx - b.x, wy - b.y) < b.radius)
+  for (let r = 0; r < arena.rows - 1; r++) for (let c = 0; c < arena.cols; c++) {
+    if (at(c, r) === T.void || at(c, r + 1) !== T.void) continue
+    const top = (r + 1) * ROOM_ART_TILE
+    const warm = warmAt((c + 0.5) * TILE, (r + 1.4) * TILE)
+    for (let a = 0; a < ROOM_ART_TILE; a++) {
+      const gx = c * ROOM_ART_TILE + a
+      // Three frequencies, so the break reads as rock rather than as a dither: a coarse lobe over
+      // ~32 px, a block profile over ~8 px, a 1 px jitter, and a rare long spur.
+      const h = wearHash(gx, r, 211)
+      const lobe = wearHash(gx >> 5, r, 219) % 19
+      const block = wearHash(gx >> 3, r, 223) % 10
+      // Fingers, not lumps: 4 px wide and much longer than the mass, about one every 90 px.
+      const spur = wearHash(gx >> 2, r, 227) % 23 === 0 ? 14 + wearHash(gx >> 2, r, 229) % 22 : 0
+      const depth = 8 + lobe + block + (h % 4) + spur
+      // The lit lip, 2 px, on top of the fall, and BROKEN — an unbroken run of it read as a line
+      // ruled under the island rather than as light catching an uneven edge. This is the only warm
+      // the pass spends and it stays at B2; the fires still own every pixel above it.
+      if ((h >>> 3) % 4 !== 0) artPx(g, gx, top, 1, warm ? 2 : 1, warm ? C.naveWarm : C.slate1)
+      // The rock itself, falling through three steps. It has to be READABLE — cut first at
+      // grout/mortar it measured correct and rendered as nothing, because the lightmap multiplies
+      // and there is no lamp out here: B0 under a 0.5 ambient is the void it is standing against.
+      const a1 = 2 + Math.round(depth * 0.28), a2 = 2 + Math.round(depth * 0.62)
+      artPx(g, gx, top + 2, 1, a1 - 2, C.slate0)
+      artPx(g, gx, top + a1, 1, a2 - a1, C.seal0)
+      artPx(g, gx, top + a2, 1, Math.max(1, depth - a2), C.grout)
+      artPx(g, gx, top + depth - 1, 1, 1, C.mortar)
+      // A vertical striation every few columns keeps the mass from reading as one flat skirt.
+      if ((h >>> 7) % 5 === 0) artPx(g, gx, top + 2, 1, 2 + (h >>> 11) % 5, C.grout)
+      // The tail: a thinning scatter of loose stone under the break, so the mass DISSOLVES into
+      // the void instead of ending on a ruled edge. Three specks at most, and each one is checked
+      // against its own thinning odds, so the density falls with distance the way the concept's
+      // undersides do.
+      for (let k = 0; k < 3; k++) {
+        if ((wearHash(gx, r + k, 233) % 12) > 3 - k) continue
+        artPx(g, gx, top + depth + 2 + k * 4 + (h >>> 15) % 3, 1, 1 + (k === 0 ? 1 : 0), C.grout)
+      }
+    }
+  }
+}
+
+// THE EAST SEAL (§8.4.3). It foreshadows a waiting pantheon in SILHOUETTE ONLY, because legible
+// foreign iconography would break §8.4.2's pantheon-neutral hub — so nothing here is a rune, a
+// glyph, or a readable ornament. Three moves carry it, all of them shape:
+//
+//   1. VERTICAL STAVES where the whole district is horizontal running bond. One inversion of the
+//      masonry grammar, no symbols, and it reads foreign in a second from across the gap.
+//   2. A round-headed arch showing star-sky in its head (§8.2.1) and woven SHUT below it.
+//   3. One plaited band, cut entirely in shadow: the ribbons are the stone itself and only their
+//      grooves are drawn, so the knotwork is the DARK half of the pattern and never a lit ornament.
+//      That is the clause the generated lane could not hold — every control a provider exposes
+//      (detail, shading, outline) pushes toward legibility, while a loop of integer rects can
+//      promise a pattern never resolves into a glyph and satisfies §2.1 Law 5 by construction.
+//      That is why this is code and not a candidate, and why no generations were spent on it.
+//
+// The camera clamps at world x 768 (`clampFocus` over a 1024 px room), so this is only ever seen
+// from ten-odd tiles west, at the frame's edge. Everything is sized for that read.
+function bakeBardoSeal(g: Graphics, arena: Arena): void {
+  if (arena.kind !== 'bardo') return
+  const x0 = 59 * ROOM_ART_TILE, x1 = 63 * ROOM_ART_TILE   // the sealed mass, cols 59..62
+  const foot = 21 * ROOM_ART_TILE                          // its plinth row stays the district's
+  const top = 17 * ROOM_ART_TILE
+  const cx = 60.5 * ROOM_ART_TILE                          // on the sealed door, west of centre (§5.2)
+  const band = top + 20                                    // mid-line of the knot band
+  const spring = foot - 42, apex = spring - 18
+
+  // 1) The staves. Vertical grain where the whole district is horizontal running bond — one
+  //    inversion of the masonry grammar, no symbols. Widths run 9..17 px and the cut tops vary by
+  //    only a few, because the first cut of this towered and read as the rank of organ pipes the
+  //    Gate study already lost once.
+  for (let sx = x0; sx < x1;) {
+    const h = wearHash(sx, 17, 241)
+    const w = 9 + (h % 9)
+    const t = top + 2 + (h >>> 4) % 5
+    const body = (h >>> 9) % 3 === 0 ? C.nave0 : (h >>> 9) % 3 === 1 ? C.slate1 : C.seal0
+    artPx(g, sx, t, w - 1, foot - t, body)
+    artPx(g, sx + w - 1, t, 1, foot - t, C.mortar)                    // the joint between staves
+    if ((h >>> 17) % 3 === 0) artPx(g, sx + 2, t + 26 + (h >>> 19) % 40, w - 5, 2, C.grout)
+    sx += w
+  }
+
+  // 2) THE GABLE, and it is the whole silhouette. A steep pitched roof over a vertically grained
+  //    mass is Norse at a glance and is not one glyph, one rune or one legible ornament — §8.4.3
+  //    asks for a foreign shape and §8.4.2 forbids foreign iconography, and a roof pitch satisfies
+  //    both. The two slopes advance at different rates and the west eave is broken away (§8.2.4,
+  //    §5.2), so it is never a mirrored pediment.
+  for (let i = 0; i < 11; i++) {
+    const y = top - 4 - i * 4
+    const wW = Math.max(3, 44 - i * 4), wE = Math.max(2, 40 - i * 5)
+    artPx(g, cx - wW, y, wW + wE, 4, i > 7 ? C.seal0 : C.slate0)
+    artPx(g, cx - wW, y, 6, 4, C.slate1)                              // the rake, one connected run
+    if (i === 0) artPx(g, cx - wW, y, 15, 4, C.void)                  // the eave that fell (§8.2.4)
+  }
+  artPx(g, cx - 3, top - 50, 6, 7, C.iron)                            // the finial socket, empty
+
+  // 3) The knotwork: one horizontal band under the gable, and it is drawn ENTIRELY IN SHADOW. The
+  //    ribbon faces are the same value as the stone around them, so nothing here is a lit ornament;
+  //    the only marks are the grooves, and the over-strand's grooves cut the under-strand's face,
+  //    which is the whole of the over-under read. §8.4.3 literally — knotwork in shadow, silhouette
+  //    only, and a pattern that cannot resolve into a glyph. Two earlier cuts are why: two thin
+  //    strands on a numen field read at 1x as chain-link over a green door (exactly what the
+  //    generated lane produced), and three depth-shaded ribbons turned the band into herringbone
+  //    hatching that read as ornament, not shadow.
+  const AMP = 6, PERIOD = 22, TAU = Math.PI * 2
+  // The band's ground is slate0, not slate1: at slate1 it was the lightest continuous run on the
+  // whole mass and the knot stopped being shadow and started being a bright stripe.
+  artPx(g, x0 + 4, band - 11, x1 - x0 - 8, 22, C.slate0)
+  artPx(g, x0 + 4, band - 11, x1 - x0 - 8, 1, C.mortar)
+  artPx(g, x0 + 4, band + 10, x1 - x0 - 8, 1, C.mortar)
+  for (let x = x0 + 5; x < x1 - 5; x++) {
+    const sw = Math.sin((x / PERIOD) * TAU) * AMP
+    const aOver = Math.floor((x % (PERIOD * 2)) / PERIOD) === 0
+    for (const y of aOver ? [band - sw, band + sw] : [band + sw, band - sw]) {
+      const by = Math.round(y) - 4
+      artPx(g, x, by, 1, 8, C.mortar)                                 // the groove around the ribbon
+      artPx(g, x, by + 1, 1, 6, C.slate0)                             // the ribbon face: the stone itself
+    }
+  }
+
+  // 4) The arch, cut back through the staves and WALLED UP. Its head keeps the opening onto the
+  //    star-sky every threshold owes (§8.2.1); below the springing it is stone, with one incised
+  //    archivolt so the blocking reads as masonry rather than as a panel.
+  const half = (y: number): number => {
+    if (y >= spring) return 16
+    const dy = spring - y
+    return dy > 18 ? 0 : Math.round(Math.sqrt(324 - dy * dy) * 0.9)
+  }
+  for (let y = apex; y < foot; y++) {
+    const hw = half(y)
+    if (hw <= 0) continue
+    artPx(g, cx - hw - 6, y, 6, 1, C.nave0)                           // west jamb, the thick one
+    artPx(g, cx + hw, y, 5, 1, C.seal0)                               // east jamb
+    artPx(g, cx - hw, y, hw * 2, 1, y < spring ? C.sky : C.slate1)
+    if (y >= spring) { artPx(g, cx - hw, y, 2, 1, C.mortar); artPx(g, cx + hw - 2, y, 2, 1, C.mortar) }
+  }
+  for (const [ox, oy] of [[-6, 9], [5, 5]] as const) artPx(g, cx + ox, apex + oy, 1, 1, C.star)
+  for (let i = 0; i < 4; i++) artPx(g, cx - 14 + i * 8, spring + 8 + (i & 1) * 3, 6, 2, C.mortar)
+
+  // The live edge (§1.2): four pixels of numen in the deepest grooves on the west, low, where the
+  // chained beam outside comes in. PAINT, never a light — the district's one cold source stays the
+  // Ferryman's lantern and nothing joins it (src/sim/arena.ts).
+  for (const [ox, oy] of [[-13, -11], [-11, -8], [-15, -19], [-9, -6]] as const) {
+    artPx(g, cx + ox, foot + oy, 1, 1, oy > -10 ? C.numen : C.numenDim)
+  }
+  // The sill, and the anchor the beam stub outside is chained to.
+  artPx(g, cx - 24, foot - 6, 48, 5, C.iron)
+  artPx(g, cx - 24, foot - 6, 48, 1, C.ironHi)
+  artPx(g, cx - 30, foot - 30, 4, 3, C.iron)
+  artPx(g, cx - 34, foot - 29, 4, 1, C.ironHi)
 }
 
 // §5.3.2 the one large graphic form that is not axis-aligned to the tile grid: the gouge the
@@ -559,6 +875,126 @@ function bakeScorch(g: Graphics, arena: Arena): void {
     px(g, cx - core, yy, core * 2 + 1, h, C.mortar)
   }
   px(g, x - 5, y + 6, 10, 2, C.emberLo)
+}
+
+// The arrival causeway's evidence of use (§2.2, §5.3.3, §8.4.1): the pilgrimage wear scuffed
+// along the actual walk line — landing to bridge mouth — cold soot fanned around every fire
+// nobody relit (§8.2.4), and river damp tracked in from the Ferryman's pier. Bardo only; the
+// coordinates mirror buildBardo's causeway. Everything is a whole source pixel at alpha 1
+// (§2.1 Law 5), one step off the floor body, and jittered OFF the tile grid so the marks cross
+// slab and tile boundaries the way feet do.
+function bakeBardoCauseway(g: Graphics, arena: Arena): void {
+  if (arena.kind !== 'bardo') return
+  const S = ROOM_ART_SCALE
+  const floorAt = (wx: number, wy: number): boolean => {
+    const c = Math.floor(wx / TILE), r = Math.floor(wy / TILE)
+    if (c < 0 || r < 0 || c >= arena.cols || r >= arena.rows) return false
+    const t = arena.base[r * arena.cols + c]
+    return t >= 1 && t <= 60
+  }
+  // The baked VALUE LEVEL under a world point, or -1 off the floor. A warm mark may only land
+  // where the paving already says there is light (§3.2.7: the wear and the light have to agree).
+  // Read at 1x without this test, the warm blocks scattered across level-0 stone west of the
+  // landing and the causeway read as litter on a dark floor rather than as firelight on slabs —
+  // and the darker this pass made the un-pooled ground, the louder that litter got.
+  const levelAt = (wx: number, wy: number): number => {
+    const c = Math.floor(wx / TILE), r = Math.floor(wy / TILE)
+    if (c < 0 || r < 0 || c >= arena.cols || r >= arena.rows) return -1
+    const t = arena.base[r * arena.cols + c]
+    return t >= 1 && t <= 60 ? Math.floor((t - 1) / 12) : -1
+  }
+  // 0) The Keeper's fire, baked onto the stone (§3.2.7: bake the pool — the multiplied lightmap
+  //    can only reveal a baked colour, never exceed it, so the warmth must live in the art).
+  //    Two quantized rings of warm value blocks around the cresset's foot, denser near the fire,
+  //    block-scaled so they read as firelight on slabs rather than noise (§2.1 Law 1 macro).
+  //    The blocks sit one step over the pool body and stay B2-warm; the only brighter marks are
+  //    three 1 px goldDim glints hard by the column, inside the focal's own 64 px (§3.2.5).
+  const fire = { x: 39.5 * TILE, y: 30.6 * TILE }
+  const landing = { x: 33.5 * TILE, y: 30.5 * TILE }
+  for (let gy = 0; gy < 14; gy++) for (let gx = 0; gx < 30; gx++) {
+    const h = wearHash(gx, gy, 151)
+    const wx = 30 * TILE + gx * 6 + ((h >>> 4) % 5) - 2
+    const wy = 27.8 * TILE + gy * 6 + ((h >>> 10) % 5) - 2
+    const dFire = Math.hypot(wx - fire.x, wy - fire.y)
+    const dLand = Math.hypot(wx - landing.x, wy - landing.y)
+    const d = Math.min(dFire, dLand * 1.6)      // the landing's ring is tighter than the fire's
+    if (d > 92) continue
+    const keep = d < 34 ? (h & 7) < 6 : d < 62 ? (h & 7) < 3 : (h & 7) < 1
+    if (!keep || levelAt(wx, wy) < 2) continue
+    const w = 4 + (h >>> 14) % 6, ht = 2 + (h >>> 18) % 2
+    artPx(g, wx * S, wy * S, w, ht, (h >>> 20) % 3 === 0 ? C.nave0 : C.naveWarm)
+  }
+  // TWO glints, and they stay goldDim. They sit 96 world px from the spawn — outside the
+  // focality gate's own 64 px — so promoting them to gold grows the FAR half of the top-1 % set
+  // and is the single most likely way to fail `top-one-focality` at the arrival capture. The
+  // gold that gate needs goes on the landing instead, four pixels from the player's feet.
+  for (const [ox, oy] of [[-9, 2], [6, 6]] as const) {
+    artPx(g, (fire.x + ox) * S, (fire.y + oy) * S, 1, 1, C.goldDim)
+  }
+  // 0b) THE LANDING. Arrival is IN light (§3.2.3), and at the spawn the Gate focal is 415 world
+  //     px north and off-screen — so the frame's own bright pixels have to be here, under the
+  //     player's feet, or the focality gate has nothing near the player to find. One rank of warm
+  //     value blocks inside 18 world px of playerStart, and four single gold pixels beside the
+  //     landing lamp at (35, 29).
+  //     ONE BRASS BLOCK IN THREE, and the rest naveWarm. Two in three brass was read at 4x and
+  //     the pool was sand: coinBrass is a whole band over naveWarm, so at that density it stops
+  //     being firelight on slate and becomes a material of its own. The brass is the accent the
+  //     eye finds; naveWarm is what carries the warmth.
+  for (let gy = 0; gy < 11; gy++) for (let gx = 0; gx < 11; gx++) {
+    const h = wearHash(gx, gy, 167)
+    const wx = landing.x - 26 + gx * 5 + ((h >>> 4) % 3) - 1
+    const wy = landing.y - 26 + gy * 5 + ((h >>> 10) % 3) - 1
+    if (Math.hypot(wx - landing.x, wy - landing.y) > 26 || levelAt(wx, wy) < 2) continue
+    const w = 3 + (h >>> 14) % 4, ht = 2 + (h >>> 18) % 2
+    artPx(g, wx * S, wy * S, w, ht, (h >>> 20) % 3 === 0 ? C.coinBrass : C.naveWarm)
+  }
+  for (const [ox, oy] of [[18, -6], [22, -2], [16, 2], [24, 4]] as const) {
+    const wx = landing.x + ox, wy = landing.y + oy
+    if (floorAt(wx, wy)) artPx(g, wx * S, wy * S, 1, 1, C.gold)
+  }
+  // 1) The walk. Scuffs scatter densest on the line and thin off it — a soft edge made of hard
+  //    pixels. One step UP from the body (slate2); warm (naveWarm) inside the Keeper's pool,
+  //    which is how the wear and the light agree (§3.2.7); a sparse dark heel-gouge (grout).
+  const x0 = 33.5 * TILE, y0 = 31.5 * TILE, x1 = 32.9 * TILE, y1 = 24.5 * TILE
+  const steps = Math.round((y0 - y1) / 2)
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps
+    const h = wearHash(i, 7, 113)
+    const lat = ((h >>> 3) % 17) - 8
+    if (Math.abs(lat) > 3 && (h & 3) !== 0) continue
+    const wx = x0 + (x1 - x0) * t + lat
+    const wy = y0 + (y1 - y0) * t + ((h >>> 9) % 3) - 1
+    if (!floorAt(wx, wy)) continue
+    const warm = Math.hypot(wx - 39.5 * TILE, wy - 29.8 * TILE) < 52
+    const col = (h >>> 6) % 5 === 0 ? C.grout : warm ? C.naveWarm : C.slate2
+    artPx(g, wx * S, wy * S, 2 + ((h >>> 13) % 3), 1, col)
+  }
+  // 2) Cold soot fanned south and 15° right (§3.2.8) of every dead fire: it burned for years,
+  //    and then nobody came. Quantized hard-edged wedges (§6.6), all below the floor body.
+  for (const p of arena.props) {
+    if (p.sheet !== 'prop' || p.tile !== PROP.brazierCold) continue
+    const cx = p.x + 16
+    for (let i = 0; i < 4; i++) {
+      const t = i / 3
+      const half = Math.round(5 + t * 9)
+      const wy = p.sortY - 2 + i * 3
+      const wcx = cx + Math.round(t * 4)
+      if (!floorAt(wcx, wy)) continue
+      artPx(g, (wcx - half) * S, wy * S, (half * 2 + 1) * S, 2, C.grout)
+      artPx(g, (wcx - Math.round(half * 0.5)) * S, wy * S, (half + 1) * S, 2, C.mortar)
+    }
+  }
+  // 3) The damp the pier mouth tracks in: broken dark runs on the stone inside the west wall,
+  //    reaching east and thinning — the reason is the water, and the water is right there.
+  for (let i = 0; i < 14; i++) {
+    const h = wearHash(i, 3, 131)
+    const wx = 26.5 * TILE + (h % 26)
+    const wy = 29.5 * TILE - 6 + ((h >>> 8) % 14)
+    if (!floorAt(wx, wy)) continue
+    const w = 3 + (h >>> 16) % 5
+    artPx(g, wx * S, wy * S, w, 1, (h & 1) ? C.seal0 : C.mortar)
+    if ((h >>> 20) % 3 === 0) artPx(g, (wx + 1) * S, wy * S + 1, Math.max(2, w - 2), 1, C.grout)
+  }
 }
 
 // §3.2.8 cast shadows are fixed and hard: south, 15° right, length ≈ 0.4 × height,
@@ -620,8 +1056,8 @@ function bakeGrit(g: Graphics, arena: Arena): void {
  * the caller sets afterwards because there are two build sites (first mount and every room entry),
  * and a tint applied at one of them would give the realm a floor on arrival and lose it on rebuild.
  */
-export function buildTilemap(renderer: Renderer, atlas: Atlas, arena: Arena, floorTint = 0xffffff): TilemapView {
-  const c = new Container()
+export function buildTilemap(renderer: Renderer, atlas: Atlas, arena: Arena, floorTint: number, c: Container): TilemapView {
+  const overlays = new Container()
   for (let r = 0; r < arena.rows; r++) for (let col = 0; col < arena.cols; col++) {
     const i = r * arena.cols + col
     // Void cells stay TRANSPARENT in the bake (ADR 0001): the screen-space starfield underlay is
@@ -629,25 +1065,43 @@ export function buildTilemap(renderer: Renderer, atlas: Atlas, arena: Arena, flo
     // The invariant lives in the SHEET — tools/make-bardo-tiles.ts emits cell 0 alpha-0 — so the
     // bake needs no per-tile branch.
     const s = new Sprite(atlas.room(arena.base[i]))
-    s.position.set(col * TILE, r * TILE)
+    s.position.set(col * ROOM_ART_TILE, r * ROOM_ART_TILE)
+    s.scale.set(ROOM_ART_SCALE)
     c.addChild(s)
     const o = arena.overlay[i]
-    if (o >= 0) { const os = new Sprite(atlas.room(o)); os.position.set(col * TILE, r * TILE); c.addChild(os) }
+    if (o >= 0) {
+      const os = new Sprite(atlas.room(o))
+      os.position.set(col * ROOM_ART_TILE, r * ROOM_ART_TILE)
+      os.scale.set(ROOM_ART_SCALE)
+      overlays.addChild(os)
+    }
   }
+  const wear = new Graphics()
+  bakeMaterialWear(wear, arena)
+  c.addChild(wear, overlays)
   const g = new Graphics()
   bakeOcclusion(g, arena)
+  bakeIslandUnderside(g, arena)
+  bakeBardoProcession(g, arena)
   bakeFurrow(g, arena)
   // The soot fan is the sunken bell's; the bardo district authors its own use marks. Keyed on the
   // room's identity, not on islands-presence — a future walled room without a bell keeps its floor.
   if (arena.kind !== 'bardo') bakeScorch(g, arena)
   bakeGrit(g, arena)
+  bakeBardoCauseway(g, arena)
   bakePropShadows(g, arena)
+  bakeBardoGate(g, arena)
+  bakeBardoSeal(g, arena)
   c.addChild(g)
 
-  const rt = RenderTexture.create({ width: arena.cols * TILE, height: arena.rows * TILE, scaleMode: 'nearest' })
+  const rt = RenderTexture.create({ width: arena.cols * ROOM_ART_TILE, height: arena.rows * ROOM_ART_TILE, scaleMode: 'nearest' })
   renderer.render({ container: c, target: rt, clear: true })
-  c.destroy({ children: true })
+  // Keep the render root (and its Pixi InstructionSet/batcher cache), but release everything drawn
+  // through it. Pixi only destroys an owned GraphicsContext when `context` is explicit here:
+  // `{ children: true }` alone strands every baked path/triangulation buffer on each room rebuild.
+  for (const child of c.removeChildren()) child.destroy({ children: true, context: true })
   const sprite = new Sprite(rt)
+  sprite.scale.set(1 / ROOM_ART_SCALE)
   // The stone only. The starfield underlay and the door cluster are separate surfaces, so the void
   // stays void and the open door stays gold.
   sprite.tint = floorTint
@@ -666,7 +1120,7 @@ export function buildTilemap(renderer: Renderer, atlas: Atlas, arena: Arena, flo
   if (shrine) door.addChild(shrine.root)
   const nativeDestroy = door.destroy.bind(door)
   door.destroy = (options?: boolean | DestroyOptions) => {
-    nativeDestroy(typeof options === 'boolean' ? { children: true } : { children: true, ...options })
+    nativeDestroy(typeof options === 'boolean' ? { children: true, context: true } : { children: true, context: true, ...options })
   }
 
   return {

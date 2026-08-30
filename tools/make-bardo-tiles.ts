@@ -1,4 +1,4 @@
-// Original 16×16 room sheet + 32×32 furniture for The Threshold. Not Kenney. Run: pnpm tiles
+// Native 24×24 room sheet + 48×48 furniture for The Threshold. Not Kenney. Run: pnpm tiles
 //
 // Built to ART_DIRECTION.md:
 //  §1.2  every colour is a canon palette entry; nothing off-palette, no pure black/white
@@ -15,7 +15,13 @@ import { writeFileSync, readFileSync, existsSync } from 'node:fs'
 import sharp from 'sharp'
 
 const COLS = 8
+// Simulation and layout stay on the original 16px grid. The source art has a separate, explicit
+// 24px contract so the 1.5x world render presents one authored source pixel as one target pixel.
+// Most legacy primitives below still speak the stable logical grid and are rasterised into the
+// denser cell; the floor quarry is authored directly at source resolution because it owns most of
+// every frame and benefits most from true one-pixel joints and chips.
 const SIZE = 16
+const ROOM_CELL = 24
 
 type C = readonly [number, number, number]
 
@@ -54,6 +60,11 @@ const P = {
   emberHi: [255, 204, 86] as C,
   emberLo: [176, 48, 16] as C,
   sky: [14, 18, 44] as C,
+  // §1.3.6 the numen ramp: Bardo only, only on what touches the beyond. Here: the Ferryman's
+  // lantern glass, the one carrier this sheet owns.
+  numenDim: [26, 74, 72] as C,
+  numen: [46, 138, 128] as C,
+  numenHi: [127, 232, 216] as C,
   // the open door is a hole you walk through, not a window of stars (run lane, kept verbatim)
   well: [4, 3, 10] as C,
   wellHi: [12, 8, 22] as C,
@@ -78,21 +89,32 @@ function hash(x: number, y: number, s: number): number {
 const chance = (x: number, y: number, s: number, n: number) => (hash(x, y, s) % 100) < n
 
 function makeTile() {
-  const d = new Uint8Array(SIZE * SIZE * 4)
-  const set = (x: number, y: number, c: C, a = 255) => {
-    if (x < 0 || y < 0 || x >= SIZE || y >= SIZE) return
-    const i = (y * SIZE + x) * 4
+  const d = new Uint8Array(ROOM_CELL * ROOM_CELL * 4)
+  const pixel = (x: number, y: number, c: C, a = 255) => {
+    if (x < 0 || y < 0 || x >= ROOM_CELL || y >= ROOM_CELL) return
+    const i = (y * ROOM_CELL + x) * 4
     d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; d[i + 3] = a
   }
+  const set = (x: number, y: number, c: C, a = 255) => {
+    if (x < 0 || y < 0 || x >= SIZE || y >= SIZE) return
+    const x0 = Math.round(x * ROOM_CELL / SIZE), x1 = Math.round((x + 1) * ROOM_CELL / SIZE)
+    const y0 = Math.round(y * ROOM_CELL / SIZE), y1 = Math.round((y + 1) * ROOM_CELL / SIZE)
+    for (let yy = y0; yy < y1; yy++) for (let xx = x0; xx < x1; xx++) pixel(xx, yy, c, a)
+  }
   const fill = (c: C, a = 255) => { for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++) set(x, y, c, a) }
-  return { d, set, fill }
+  return { d, set, fill, pixel }
 }
 
 // ---------------------------------------------------------------------------
 // §2.2 floor stone. Three quarries; each is a 5-value ramp, so a tile holds
 // joint / shadow face / body / lit face / chip and nothing else (§1.3.1).
 // ---------------------------------------------------------------------------
-interface Ramp { joint: C; dark: C; body: C; lit: C; chip: C }
+// `key` marks the ONE level that stands inside a light key and therefore keeps §2.2's fifth
+// value, the chip. It is a named flag rather than a colour sentinel because the guard used to
+// read `chip === P.slate3` — a test that silently stops drawing the chip the moment level 4's
+// ramp is re-authored, and that cannot be told apart from level 3, whose chip differs from its
+// lit face for unrelated reasons.
+interface Ramp { joint: C; dark: C; body: C; lit: C; chip: C; key?: true }
 
 // Five value LEVELS, not five materials. §2.1 Law 1 macro scale: the floor's largest
 // variation is between whole slabs, so arena.ts paints levels in patches that cross many
@@ -126,7 +148,13 @@ const LV: Ramp[] = [
      architecture out of the frame's top brightness rank, and a slate3 lit face out here put
      the floor's own marks into the top 1 % of luminance, six tiles from the fight. The pool
      reads as one step up anyway because its lit face turns WARM instead of lighter, which is
-     §2.1 Law 4's other half: 60 deg of hue at equal value separates as well as two bands. */
+     §2.1 Law 4's other half: 60 deg of hue at equal value separates as well as two bands.
+     THIS RAMP WAS ONCE FLIPPED to a warm body under a cool lit face (naveWarm / nave1). Two
+     things were wrong with it and both are worth remembering. Law 4 runs one way — the LIT
+     face shifts warm toward the key and the SHADOW face shifts cool toward ambientTint — and
+     the flip put cool slate on the brightest facet of every warm pool. It also collapsed the
+     step: naveWarm 0.3175 against nave1 0.3178 is no value at all, so the level carried three
+     distinct values against §2.2's five. Read at 1x it turned the plaza khaki. */
   { joint: P.seal0, dark: P.slate1, body: P.slate2, lit: P.naveWarm, chip: P.nave1 },
   /* 3 basalt: the old floor the bell tore open. It is a wound, so it is the one floor
      allowed to fall to B0 — there is nothing in it to lose (§5.3.2). */
@@ -134,8 +162,18 @@ const LV: Ramp[] = [
   /* 4 ember-lit stone at the bell: the key's own pool (§3.2.2), the only floor above B1 and
      the only one carrying §2.2's full ramp up to a B4 chip — and it sits under the focal
      object, which is where §3.2.5 wants the brightest static pixels to be. naveWarm is the
-     floor's only warm (§1.2). */
-  { joint: P.slate0, dark: P.slate1, body: P.slate2, lit: P.naveWarm, chip: P.slate3 },
+     floor's only warm (§1.2).
+     THIS RAMP WAS ONCE BRASS: grout / woodHi / coinBrass / boneDim / gold, a full band
+     brighter, and on paper it was the better ramp — five measured values one step apart
+     against this one's four. It shipped for one night and was read at 1x. `bardo_room.png`
+     is the sheet ALL FOURTEEN layouts pave from, so it did not land only on the Bardo's
+     embers: it put an olive-gold chip into Cocytus, whose floorTint is the palest and coldest
+     in the game, and it turned the Bardo plaza itself into khaki slabs butted against
+     near-black ones. Warm stopped being an intrusion and became half the floor, which cost
+     the wine runner its status as THE warm thing in the room. If this level is ever re-lit,
+     the brightness has to come from the bake or the lightmap, which are per-room; a ramp here
+     is not. */
+  { joint: P.slate0, dark: P.slate1, body: P.slate2, lit: P.naveWarm, chip: P.slate3, key: true },
 ]
 
 // One cell of a slab that is 2 or 3 tiles wide and ALWAYS 2 tiles tall. The slab crosses
@@ -145,7 +183,7 @@ const LV: Ramp[] = [
 function slabPiece(f: Ramp, hx: 'L' | 'M' | 'R', vy: 'T' | 'B', v: 0 | 1): Uint8Array {
   const t = makeTile()
   const s = 40 + v * 13 + (hx === 'L' ? 1 : hx === 'R' ? 5 : 0) + (vy === 'T' ? 0 : 3)
-  for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++) t.set(x, y, f.body)
+  for (let y = 0; y < ROOM_CELL; y++) for (let x = 0; x < ROOM_CELL; x++) t.pixel(x, y, f.body)
   // meso: SOLID value blocks, 3-6 px wide and 2-3 px tall, one step off the body. The old
   // version stamped these through a 58 % per-pixel coin flip, which is 1 px dither by
   // another name: it put more edge energy on an empty floor patch than a caster sprite
@@ -158,26 +196,34 @@ function slabPiece(f: Ramp, hx: 'L' | 'M' | 'R', vy: 'T' | 'B', v: 0 | 1): Uint8
   // offsets that differ per piece, leaves the floor quiet enough to spend nothing on itself.
   const blocks: Array<[C, number]> = [[f.dark, 0], [f.lit, 1]]
   for (const [col, b] of blocks) {
-    const w = 4 + hash(b, 3, s) % 4
-    const h = 2 + hash(b, 4, s) % 2
-    const bx = 2 + hash(b, 1, s) % (13 - w), by = 2 + hash(b, 2, s) % (12 - h)
-    for (let y = by; y < by + h; y++) for (let x = bx; x < bx + w; x++) t.set(x, y, col)
+    const w = 6 + hash(b, 3, s) % 5
+    const h = 3 + hash(b, 4, s) % 3
+    const bx = 3 + hash(b, 1, s) % (21 - w), by = 3 + hash(b, 2, s) % (20 - h)
+    for (let y = by; y < by + h; y++) for (let x = bx; x < bx + w; x++) t.pixel(x, y, col)
   }
   // §2.2 joints are 1 px and LOW contrast: a groove (joint plus one step of core shadow on
   // the SOUTH edge only, §2.1 Law 2), never a drawn grid. The wobble moves in 5 px runs, so
   // the joint is a line that wanders rather than a row of 1 px teeth.
-  const wob = (i: number, k: number) => (hash(Math.floor(i / 5), k, s) % 3 === 0 ? 1 : 0)
-  if (vy === 'T') for (let x = 0; x < SIZE; x++) t.set(x, wob(x, 3), f.joint)
-  if (vy === 'B') for (let x = 0; x < SIZE; x++) { const b = wob(x, 7); t.set(x, 15 - b, f.joint); t.set(x, 14 - b, f.dark) }
-  if (hx === 'L') for (let y = 0; y < SIZE; y++) t.set(wob(y, 11), y, f.joint)
-  if (hx === 'R') for (let y = 0; y < SIZE; y++) t.set(15 - wob(y, 13), y, f.joint)
+  const wob = (i: number, k: number) => (hash(Math.floor(i / 7), k, s) % 3 === 0 ? 1 : 0)
+  if (vy === 'T') for (let x = 0; x < ROOM_CELL; x++) t.pixel(x, wob(x, 3), f.joint)
+  if (vy === 'B') for (let x = 0; x < ROOM_CELL; x++) { const b = wob(x, 7); t.pixel(x, 23 - b, f.joint); t.pixel(x, 22 - b, f.dark) }
+  if (hx === 'L') for (let y = 0; y < ROOM_CELL; y++) t.pixel(wob(y, 11), y, f.joint)
+  if (hx === 'R') for (let y = 0; y < ROOM_CELL; y++) t.pixel(23 - wob(y, 13), y, f.joint)
+  // Native 1px erosion: sparse paired nicks instead of enlarged 16px-era flecks. These sit at
+  // low points and never form a uniform screen-wide noise field.
+  for (let i = 0; i < 2; i++) {
+    const x = 3 + hash(i, 17, s) % 17, y = 4 + hash(i, 19, s) % 15
+    t.pixel(x, y, i ? f.dark : f.lit)
+    if (hash(i, 23, s) % 2 === 0) t.pixel(x + 1, y, i ? f.dark : f.lit)
+  }
   // The chip is §2.2's fifth value and it belongs to a slab standing in the key. On the
   // ambient floor it was a 3 px B2 mark stamped at a fixed offset in every second cell, and
-  // it was the single most legible repeat in the room. Level 4 is the ember pool at the
-  // bell, so that is the only floor that keeps it.
-  if (v === 1 && f.chip === P.slate3) {
+  // it was the single most legible repeat in the room. Level 4 is the floor standing in a
+  // key, so that is the only floor that keeps it — `key`, not a colour sentinel.
+  if (v === 1 && f.key) {
     const cx = hx === 'R' ? 10 : hx === 'M' ? 7 : 4, cy = vy === 'T' ? 4 : 10
-    t.set(cx, cy, f.chip); t.set(cx + 1, cy, f.chip); t.set(cx, cy + 1, f.chip)
+    const ax = Math.round(cx * ROOM_CELL / SIZE), ay = Math.round(cy * ROOM_CELL / SIZE)
+    t.pixel(ax, ay, f.chip); t.pixel(ax + 1, ay, f.chip); t.pixel(ax, ay + 1, f.chip)
   }
   return t.d
 }
@@ -188,25 +234,34 @@ function slabPiece(f: Ramp, hx: 'L' | 'M' | 'R', vy: 'T' | 'B', v: 0 | 1): Uint8
 // ---------------------------------------------------------------------------
 function matTile(part: 'body' | 'north' | 'south'): Uint8Array {
   const t = makeTile()
-  for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++) {
-    const w = ((x >> 1) + (y >> 1)) & 1            // woven micro pattern, 4 px repeat
-    let col: C = w ? P.purple1 : P.purple0
-    if (chance(x, y, 61, 6)) col = P.purple2       // worn nap catching the key
-    t.set(x, y, col)
+  for (let y = 0; y < ROOM_CELL; y++) for (let x = 0; x < ROOM_CELL; x++) {
+    // A quiet 3px weave at source density. The old logical weave expanded into alternating
+    // 3/4px squares and read as a checkerboard before it read as cloth.
+    const weave = ((Math.floor(x / 3) + Math.floor(y / 3)) & 1) === 0
+    t.pixel(x, y, weave ? P.purple0 : P.purple1)
   }
-  // folds: a 1 px dark line with a 1 px lighter line beside it, converging on the pinned end
-  for (const [fx, sign] of [[4, 1], [9, -1], [12, 1]] as const) {
-    for (let y = 0; y < SIZE; y++) {
-      const x = fx + ((y >> 2) * sign)
-      t.set(x, y, P.purple0)
-      t.set(x + 1, y, P.purple2)
+  // Three broken folds converge rather than forming vertical rails.
+  for (const [fx, sign] of [[5, 1], [13, -1], [18, 1]] as const) {
+    for (let y = 1; y < ROOM_CELL - 1; y++) {
+      if ((y + fx) % 7 === 0) continue
+      const x = fx + Math.floor(y / 6) * sign
+      t.pixel(x, y, P.purple0)
+      if (y % 3 !== 0) t.pixel(x + 1, y, P.purple2)
     }
+  }
+  for (const [x, y] of [[3, 8], [7, 17], [20, 5]] as const) {
+    t.pixel(x, y, P.purple2); t.pixel(x + 1, y, P.purple2)
   }
   // The fringe is a different material (§2.5) but it is not a light: boneDim is B3 and on a
   // B1 floor it put a two-tile bright bar into the frame's top 1 % of luminance, four tiles
   // from the fight (§3.2.5). boneLo is the warm B2 hollow value and still reads as bone.
-  if (part === 'north') for (let x = 0; x < SIZE; x++) { t.set(x, 0, P.woodLo); t.set(x, 1, P.boneLo); t.set(x, 2, P.purple0) }
-  if (part === 'south') for (let x = 0; x < SIZE; x++) { t.set(x, 15, P.woodLo); t.set(x, 14, P.boneLo); t.set(x, 13, P.purple0) }
+  if (part === 'north') for (let x = 0; x < ROOM_CELL; x++) {
+    t.pixel(x, 0, P.woodLo); t.pixel(x, 1, P.boneLo); t.pixel(x, 2, P.purple0)
+  }
+  if (part === 'south') for (let x = 0; x < ROOM_CELL; x++) {
+    t.pixel(x, 23, P.woodLo); t.pixel(x, 22, P.boneLo); t.pixel(x, 21, P.purple0)
+    if (x % 4 === 1) t.pixel(x, 23, P.boneLo)
+  }
   return t.d
 }
 
@@ -243,25 +298,28 @@ function capNorth(): Uint8Array {
 // occlusion strip falling into the floor (§2.1 Law 3).
 function wallFace(variant: 'a' | 'b'): Uint8Array {
   const t = makeTile()
-  for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++) {
+  for (let y = 0; y < ROOM_CELL; y++) for (let x = 0; x < ROOM_CELL; x++) {
     let col: C = P.wood
-    if (y <= 1) col = P.boneLo
-    else if (y === 2) col = P.woodHi
+    if (y <= 2) col = P.boneLo
+    else if (y === 3) col = P.woodHi
     else {
-      const row = Math.floor((y - 3) / 4)
-      const ox = (row & 1) * 5
-      const hx = (x + ox) % 10, hy = (y - 3) % 4
+      const row = Math.floor((y - 4) / 6)
+      const ox = (row & 1) * 7
+      const hx = (x + ox) % 15, hy = (y - 4) % 6
       col = P.wood
       if (hy === 0) col = P.mortar                 // course joint
       else if (hy === 1) col = P.boneLo            // one band up: the lit course face
-      else if (hy === 3) col = P.woodLo
+      else if (hy >= 4) col = P.woodLo
       if (hx === 0) col = P.mortar
-      if (variant === 'b' && hy === 2 && hx > 5) col = P.woodLo
+      if (variant === 'b' && hy === 3 && hx > 8) col = P.woodLo
     }
     if (chance(x, y, 83, 5) && y > 3) col = P.woodLo
-    t.set(x, y, col)
+    t.pixel(x, y, col)
   }
-  for (let x = 0; x < SIZE; x++) { t.set(x, 13, P.woodLo); t.set(x, 14, P.mortar); t.set(x, 15, P.grout) }
+  for (let x = 0; x < ROOM_CELL; x++) {
+    t.pixel(x, 20, P.woodLo); t.pixel(x, 21, P.woodLo)
+    t.pixel(x, 22, P.mortar); t.pixel(x, 23, P.grout)
+  }
   return t.d
 }
 
@@ -418,8 +476,9 @@ function crackTile(k: 0 | 1): Uint8Array {
   // energy of the overlay for no read at 1x, so the lip appears every third step only, and
   // one step up from the floor body rather than four (§2.2 low-contrast joints).
   pts.forEach(([x, y], i) => {
-    t.set(x, y, P.mortar)
-    if (i % 3 === 1) t.set(x, y - 1, P.slate1)
+    const ax = Math.round(x * ROOM_CELL / SIZE), ay = Math.round(y * ROOM_CELL / SIZE)
+    t.pixel(ax, ay, P.mortar)
+    if (i % 3 === 1) t.pixel(ax, ay - 1, P.slate1)
   })
   return t.d
 }
@@ -432,9 +491,9 @@ function pitTile(): Uint8Array {
   // Solid clusters, not a 55 % coin flip over a 3x3: the coin flip is salt-and-pepper and
   // §2.1 Law 1 bans uniform 1 px noise outright. Two values, both BELOW the floor body — a
   // low point is a hollow, and a bright fleck on top of one reads as sparkle (§10.8).
-  for (const [bx, by, w, h] of [[3, 10, 3, 2], [5, 12, 2, 2], [9, 8, 3, 2], [11, 10, 2, 3]] as const) {
-    for (let y = by; y < by + h; y++) for (let x = bx; x < bx + w; x++) t.set(x, y, P.grout)
-    t.set(bx, by, P.mortar); t.set(bx + w - 1, by + h - 1, P.mortar)
+  for (const [bx, by, w, h] of [[4, 15, 5, 2], [8, 18, 3, 3], [14, 11, 5, 2], [17, 15, 3, 4]] as const) {
+    for (let y = by; y < by + h; y++) for (let x = bx; x < bx + w; x++) t.pixel(x, y, P.grout)
+    t.pixel(bx, by, P.mortar); t.pixel(bx + w - 1, by + h - 1, P.mortar)
   }
   return t.d
 }
@@ -443,35 +502,38 @@ function pitTile(): Uint8Array {
 function siltTile(): Uint8Array {
   const t = makeTile()
   t.fill(P.void, 0)
-  for (let y = 9; y < 16; y++) for (let x = 0; x < SIZE; x++) {
-    const col: C = y === 9 ? P.ashFieldLit : y > 13 ? P.riverShadow : chance(x, y, 71, 28) ? P.ashField : P.riverBody
-    t.set(x, y, col)
+  for (let y = 13; y < ROOM_CELL; y++) for (let x = 0; x < ROOM_CELL; x++) {
+    const col: C = y === 13 ? P.ashFieldLit : y > 20 ? P.riverShadow : y % 4 === 0 ? P.ashField : P.riverBody
+    t.pixel(x, y, col)
+  }
+  for (const [x0, x1, y] of [[2, 11, 16], [9, 21, 19], [1, 8, 22]] as const) {
+    for (let x = x0; x <= x1; x++) t.pixel(x, y, P.ashField)
   }
   return t.d
 }
 
 function waterTile(): Uint8Array {
   const t = makeTile()
-  t.fill(P.riverShadow)
-  for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++) {
-    if (chance(x, y, 73, 18)) t.set(x, y, P.riverBody)
-    if (y % 5 === 2 && chance(x, y, 74, 40)) t.set(x, y, P.riverLit)
+  for (let y = 0; y < ROOM_CELL; y++) for (let x = 0; x < ROOM_CELL; x++) {
+    t.pixel(x, y, y > 16 ? P.riverShadow : P.riverBody)
   }
-  for (let x = 2; x < 14; x++) if (x % 3 !== 1) t.set(x, 4, P.riverLit)
+  // Long, broken horizontal reflections. No per-pixel scatter: Lethe is still water.
+  for (const [x0, x1, y, col] of [
+    [2, 12, 5, P.riverLit], [15, 21, 5, P.riverLit],
+    [0, 7, 11, P.riverShadow], [10, 19, 11, P.riverLit],
+    [4, 15, 18, P.riverBody], [18, 23, 18, P.riverLit],
+  ] as const) for (let x = x0; x <= x1; x++) t.pixel(x, y, col)
   return t.d
 }
 
 function grateTile(): Uint8Array {
   const t = makeTile()
   // Overlay cells replace, they do not composite — the water has to live in this tile.
-  t.fill(P.riverShadow)
-  for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++) {
-    if (chance(x, y, 73, 14)) t.set(x, y, P.riverBody)
-  }
-  for (let x = 1; x < 15; x++) { t.set(x, 3, P.iron); t.set(x, 11, P.iron) }
-  for (let y = 2; y < 14; y++) { t.set(4, y, P.iron); t.set(11, y, P.iron) }
-  t.set(4, 3, P.ironHi); t.set(11, 3, P.ironHi)
-  t.set(1, 11, P.mortar); t.set(14, 11, P.mortar)
+  for (let y = 0; y < ROOM_CELL; y++) for (let x = 0; x < ROOM_CELL; x++) t.pixel(x, y, y < 12 ? P.riverBody : P.riverShadow)
+  for (let x = 2; x < 22; x++) { t.pixel(x, 5, P.iron); t.pixel(x, 17, P.iron) }
+  for (let y = 3; y < 21; y++) { t.pixel(6, y, P.iron); t.pixel(17, y, P.iron) }
+  t.pixel(6, 5, P.ironHi); t.pixel(17, 5, P.ironHi)
+  t.pixel(2, 17, P.mortar); t.pixel(21, 17, P.mortar)
   return t.d
 }
 
@@ -518,6 +580,64 @@ function beamTile(): Uint8Array {
   return t.d
 }
 
+// The sentence beneath Minos: a narrow wax-red rule, not a carpet and not a glowing hazard. It is
+// transparent over the floor and broken at a deliberate cadence, so five cells read as one ritual
+// mark without becoming a UI divider. Wine carries the verdict; iron pins keep it archaeological.
+function verdictTile(): Uint8Array {
+  const t = makeTile()
+  t.fill(P.void, 0)
+  for (let x = 0; x < ROOM_CELL; x++) {
+    if ((x >= 6 && x <= 8) || (x >= 18 && x <= 20)) continue
+    t.pixel(x, 13, P.purple1)
+    if (x % 6 >= 2 && x % 6 <= 4) t.pixel(x, 12, P.poppy)
+  }
+  for (const x of [2, 15, 23]) {
+    t.pixel(x, 11, P.ironHi); t.pixel(x, 12, P.iron); t.pixel(x, 13, P.mortar)
+  }
+  t.pixel(11, 12, P.poppyHot)
+  return t.d
+}
+
+// Two low iron links. This is a floor-fastening motif, not a collectible icon or a bright chain
+// prop: it stays inside B1/B2, casts one short southern shadow, and leaves most of its cell empty.
+function oathLinkTile(): Uint8Array {
+  const t = makeTile()
+  t.fill(P.void, 0)
+  const link = (x0: number, lit: boolean) => {
+    const hi = lit ? P.ironHi : P.iron
+    for (let x = x0 + 3; x <= x0 + 7; x++) {
+      t.pixel(x, 8, hi); t.pixel(x, 9, P.iron)
+      t.pixel(x, 15, P.iron); t.pixel(x, 16, P.mortar)
+    }
+    for (let y = 10; y <= 14; y++) {
+      t.pixel(x0 + 1, y, hi); t.pixel(x0 + 2, y, P.iron)
+      t.pixel(x0 + 8, y, P.iron); t.pixel(x0 + 9, y, P.mortar)
+    }
+  }
+  link(1, true)
+  link(11, false)
+  // The overlap has to read as one link passing through another, not as two tiny rings.
+  t.pixel(11, 11, P.ironHi); t.pixel(12, 12, P.ironHi)
+  t.pixel(10, 13, P.mortar); t.pixel(13, 13, P.iron)
+  return t.d
+}
+
+// A dead-hot fracture, not lava. The seam is sparse, wine-dark, and never uses ember/gold; a
+// player or tell owns every higher value in this cell.
+function heatSeamTile(): Uint8Array {
+  const t = makeTile()
+  t.fill(P.void, 0)
+  const path = [[2, 18], [4, 17], [6, 15], [8, 14], [10, 12], [12, 11], [14, 9], [16, 8], [18, 6], [21, 5]] as const
+  for (const [i, [x, y]] of path.entries()) {
+    t.pixel(x, y, i % 3 === 1 ? P.poppy : P.purple1)
+    if (i % 2 === 0) t.pixel(x + 1, y, P.purple0)
+  }
+  for (const [x, y, dx] of [[8, 14, -3], [15, 8, 3]] as const) {
+    for (let i = 1; i <= 2; i++) t.pixel(x + dx * i, y - i, P.purple1)
+  }
+  return t.d
+}
+
 // TRANSPARENT (ADR 0001): the screen-space starfield underlay is the sky between an island
 // room's masses, and an opaque baked void tile would freeze a second one. The sheet carries
 // the invariant, so the renderer bakes every base cell with no per-tile branch.
@@ -544,28 +664,30 @@ tiles.push(
   /* 78 */ crackTile(0), /* 79 */ crackTile(1), /* 80 */ pitTile(),
   /* 81 */ siltTile(), /* 82 */ waterTile(), /* 83 */ grateTile(),
   /* 84 */ reedTile(), /* 85 */ poppyTile(), /* 86 */ coinTile(), /* 87 */ beamTile(),
+  /* 88 */ verdictTile(),
+  /* 89 */ oathLinkTile(), /* 90 */ heatSeamTile(),
 )
 
 const ROWS = Math.ceil(tiles.length / COLS)
-const sheet = Buffer.alloc(COLS * SIZE * ROWS * SIZE * 4)
+const sheet = Buffer.alloc(COLS * ROOM_CELL * ROWS * ROOM_CELL * 4)
 for (let i = 0; i < tiles.length; i++) {
   const col = i % COLS, row = Math.floor(i / COLS)
   const src = tiles[i]
-  for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++) {
-    const si = (y * SIZE + x) * 4
-    const dx = col * SIZE + x, dy = row * SIZE + y
-    const di = (dy * COLS * SIZE + dx) * 4
+  for (let y = 0; y < ROOM_CELL; y++) for (let x = 0; x < ROOM_CELL; x++) {
+    const si = (y * ROOM_CELL + x) * 4
+    const dx = col * ROOM_CELL + x, dy = row * ROOM_CELL + y
+    const di = (dy * COLS * ROOM_CELL + dx) * 4
     sheet[di] = src[si]; sheet[di + 1] = src[si + 1]; sheet[di + 2] = src[si + 2]; sheet[di + 3] = src[si + 3]
   }
 }
 
 const out = 'public/assets/sprites/bardo_room.png'
-await sharp(sheet, { raw: { width: COLS * SIZE, height: ROWS * SIZE, channels: 4 } }).png().toFile(out)
-console.log('wrote', out, COLS * SIZE, 'x', ROWS * SIZE, '(' + tiles.length + ' tiles)')
+await sharp(sheet, { raw: { width: COLS * ROOM_CELL, height: ROWS * ROOM_CELL, channels: 4 } }).png().toFile(out)
+console.log('wrote', out, COLS * ROOM_CELL, 'x', ROWS * ROOM_CELL, '(' + tiles.length + ' tiles)')
 
 const preview = 'public/progress/shots/tiles-r4.png'
-await sharp(sheet, { raw: { width: COLS * SIZE, height: ROWS * SIZE, channels: 4 } })
-  .resize(COLS * SIZE * 8, ROWS * SIZE * 8, { kernel: 'nearest' })
+await sharp(sheet, { raw: { width: COLS * ROOM_CELL, height: ROWS * ROOM_CELL, channels: 4 } })
+  .resize(COLS * ROOM_CELL * 6, ROWS * ROOM_CELL * 6, { kernel: 'nearest' })
   .png()
   .toFile(preview)
 console.log('wrote', preview)
@@ -580,20 +702,28 @@ if (existsSync(manPath)) {
 }
 
 // ===========================================================================
-// 32×32 furniture. Four cells of it are one 64×64 object: the sunken bell, the
+// 48×48 source furniture, expressed on the stable 32px logical grid. Four cells of it are one
+// 64×64 logical object: the sunken bell, the
 // room's focal mass (§5.1). Every piece answers "who put it there and why".
 // ===========================================================================
 const P32 = 32
+const PROP_CELL = 48
 const PCOLS = 4
 
 function make32() {
-  const d = new Uint8Array(P32 * P32 * 4)
-  const set = (x: number, y: number, c: C, a = 255) => {
-    if (x < 0 || y < 0 || x >= P32 || y >= P32) return
-    const i = (y * P32 + x) * 4
+  const d = new Uint8Array(PROP_CELL * PROP_CELL * 4)
+  const pixel = (x: number, y: number, c: C, a = 255) => {
+    if (x < 0 || y < 0 || x >= PROP_CELL || y >= PROP_CELL) return
+    const i = (y * PROP_CELL + x) * 4
     d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; d[i + 3] = a
   }
-  return { d, set }
+  const set = (x: number, y: number, c: C, a = 255) => {
+    if (x < 0 || y < 0 || x >= P32 || y >= P32) return
+    const x0 = Math.round(x * PROP_CELL / P32), x1 = Math.round((x + 1) * PROP_CELL / P32)
+    const y0 = Math.round(y * PROP_CELL / P32), y1 = Math.round((y + 1) * PROP_CELL / P32)
+    for (let yy = y0; yy < y1; yy++) for (let xx = x0; xx < x1; xx++) pixel(xx, yy, c, a)
+  }
+  return { d, set, pixel }
 }
 
 // --- the focal object: a great cracked bell, fallen and half-sunk, embers in the split.
@@ -710,10 +840,11 @@ function bell64(): Uint8Array[] {
 
   const cells: Uint8Array[] = []
   for (const [ox, oy] of [[0, 0], [32, 0], [0, 32], [32, 32]] as const) {
-    const c = new Uint8Array(P32 * P32 * 4)
-    for (let y = 0; y < P32; y++) for (let x = 0; x < P32; x++) {
-      const si = ((y + oy) * W + (x + ox)) * 4
-      const di = (y * P32 + x) * 4
+    const c = new Uint8Array(PROP_CELL * PROP_CELL * 4)
+    for (let y = 0; y < PROP_CELL; y++) for (let x = 0; x < PROP_CELL; x++) {
+      const sx = Math.floor(x * P32 / PROP_CELL), sy = Math.floor(y * P32 / PROP_CELL)
+      const si = ((sy + oy) * W + (sx + ox)) * 4
+      const di = (y * PROP_CELL + x) * 4
       c[di] = d[si]; c[di + 1] = d[si + 1]; c[di + 2] = d[si + 2]; c[di + 3] = d[si + 3]
     }
     cells.push(c)
@@ -879,6 +1010,9 @@ function prow32(): Uint8Array {
   return d
 }
 
+// The Ferryman's mooring pole. The lantern at its head is the one numen carrier on this sheet
+// (§1.3.6): an iron cage around glass that holds the beyond, not a flame. Cold light for a cold
+// crossing; the warm fires belong to the islands.
 function pole32(): Uint8Array {
   const { d, set } = make32()
   for (let y = 2; y < 31; y++) {
@@ -888,11 +1022,204 @@ function pole32(): Uint8Array {
   }
   for (let y = 4; y < 10; y++) for (let x = 11; x < 21; x++) {
     const dx = (x - 15.5) / 4.6, dy = (y - 6.5) / 2.8
-    if (dx * dx + dy * dy > 1) continue
-    set(x, y, chance(x, y, 81, 30) ? P.gold : P.goldDim)
+    const r2 = dx * dx + dy * dy
+    if (r2 > 1) continue
+    if (r2 > 0.58) { set(x, y, P.iron); continue }        // the cage, in its own dark metal (§2.4)
+    set(x, y, y > 7 ? P.numenDim : P.numen)               // the glass: never shaded, two flat values (§2.8)
   }
-  set(15, 6, P.goldHot)
+  set(15, 6, P.numenHi); set(16, 6, P.numenHi)            // B5 core, 2 px (§1.2 budget)
+  set(12, 5, P.ironHi)                                    // one worn catch on the cage, key side
   set(14, 31, P.grout); set(16, 31, P.grout)
+  return d
+}
+
+// The Keeper's column (§8.4.4, §8.4.6): the arrival causeway's focal object. A broken column of
+// the same warm stone as the walls, an iron cresset set into the break, and the one fire on the
+// island that is still kept burning — the causeway's key light (§3.2.2). §4.2: in solid black it
+// is a column with a bowl of fire on a jagged crown; nothing else on the sheet has that head.
+function keeperLamp32(): Uint8Array {
+  const { d, set } = make32()
+  // contact shadow, south and 15° right (§3.2.8)
+  for (let x = 9; x < 25; x++) set(x, 30, P.grout)
+  for (let x = 12; x < 27; x++) set(x, 31, P.grout)
+  // plinth: two steps, lit on the north edge, falling to shadow east (§2.1 Law 2)
+  for (let y = 26; y < 30; y++) for (let x = 9; x < 24; x++) {
+    let col: C = P.wood
+    if (y === 26) col = P.boneLo
+    else if (x < 11) col = P.woodHi
+    else if (x > 20 || y === 29) col = P.woodLo
+    if (chance(x, y, 57, 8)) col = P.woodLo
+    set(x, y, col)
+  }
+  // shaft: 8 px, lit west edge, core shadow east, broken fluting in 1 px runs
+  for (let y = 9; y < 26; y++) {
+    set(12, y, P.boneLo)
+    set(13, y, P.woodHi)
+    for (let x = 14; x < 18; x++) set(x, y, P.wood)
+    set(18, y, P.woodLo)
+    set(19, y, P.mortar)
+    if (y % 5 < 2) set(15, y, P.woodLo)                   // fluting, broken, never full-length (§2.7)
+    if (chance(2, y, 58, 22)) set(16, y, P.woodLo)
+  }
+  set(17, 18, P.mortar); set(17, 19, P.mortar); set(16, 20, P.mortar)   // one crack, with a start and an end
+  // the broken crown: a jagged top the cresset was socketed into
+  for (const [x, y] of [[12, 8], [13, 7], [14, 8], [15, 7], [16, 8], [17, 7], [18, 8]] as const) {
+    set(x, y, P.boneLo)
+  }
+  // the cresset: iron dish, extremes touching (§2.4), underside falling to shadow
+  for (let x = 11; x < 21; x++) { set(x, 5, P.iron); set(x, 6, P.iron) }
+  for (let x = 12; x < 20; x++) set(x, 7, P.mortar)
+  set(11, 5, P.ironHi); set(12, 5, P.ironHi); set(15, 5, P.ironHi)      // worn rim, segmented
+  // the fire: coals, body, one hot core. The island's brightest static pixels sit here (§3.2.5).
+  for (let x = 13; x < 19; x++) set(x, 4, P.emberLo)
+  set(14, 4, P.ember); set(17, 4, P.ember)
+  for (let x = 14; x < 17; x++) set(x, 3, P.ember)
+  set(15, 2, P.emberHi); set(15, 1, P.emberHi)
+  set(14, 2, P.ember); set(16, 2, P.emberLo)
+  return d
+}
+
+// The same bowl as brazier32 with the fire long dead (§8.2.4: the bardo shows that someone left).
+// Cold coals under a skin of ash; the metal keeps its worn rim so it still reads as iron (§2.4).
+function brazierCold32(): Uint8Array {
+  const { d, set } = make32()
+  for (let x = 8; x < 28; x++) set(x, 30, P.grout)              // hard contact shadow, offset right
+  for (let x = 10; x < 26; x++) set(x, 29, P.grout)
+  for (const lx of [11, 16, 21]) for (let y = 20; y < 30; y++) {
+    const x = lx + Math.round((y - 20) * (lx === 16 ? 0 : lx < 16 ? -0.25 : 0.25))
+    set(x, y, P.boneLo); set(x + 1, y, P.woodLo)
+  }
+  for (let y = 12; y < 22; y++) for (let x = 6; x < 27; x++) {
+    const dx = (x - 16.2) / 10.4, dy = (y - 13) / 8.5
+    if (dx * dx + dy * dy > 1) continue
+    let col: C = P.iron
+    if (x < 9) col = P.ironHi
+    else if (x > 23) col = P.mortar
+    if (y > 19) col = P.mortar
+    if (chance(x, y, 44, 9)) col = P.mortar
+    set(x, y, col)
+  }
+  for (let x = 7; x < 26; x++) { set(x, 12, P.ironHi); set(x, 13, P.iron) }
+  for (let x = 8; x < 25; x += 6) set(x, 12, P.ironHi)           // worn rim, segmented (§2.4)
+  // the dead bed: charcoal at the bottom of its value range, no warm anywhere
+  for (let y = 13; y < 18; y++) for (let x = 9; x < 24; x++) {
+    const dx = (x - 16.2) / 7.2, dy = (y - 14) / 4.2
+    if (dx * dx + dy * dy > 1) continue
+    set(x, y, chance(x, y, 46, 34) ? P.void : P.mortar)
+  }
+  set(13, 15, P.boneLo); set(19, 16, P.boneLo)                   // two flecks of ash, nothing more
+  return d
+}
+
+// The Veteran nobody carried home (§8.2.4): empty armour, not a body. A low collapsed triangle
+// undercuts the Keeper's upright column; the split helm crest and diagonal broken scabbard make the
+// silhouette legible in solid black. Wine cloth owns the ground, iron owns the weight, and two tiny
+// bone catches mark the split crest and broken end. No gold: this is a death, not a crossing.
+function veteranRelic32(): Uint8Array {
+  const { d, set, pixel } = make32()
+  // Contact shadow: hard, south and slightly right (§3.2.8), kept inside the cell.
+  for (let x = 5; x <= 27; x++) set(x, 27, P.grout)
+  for (let x = 8; x <= 29; x++) set(x, 28, P.mortar)
+
+  // Torn mantle under every piece. An asymmetric stepped mass, never a rectangular mat.
+  for (let y = 12; y <= 25; y++) {
+    const left = y < 17 ? 4 : y < 22 ? 6 : 9
+    const right = y < 16 ? 24 : y < 21 ? 28 : 25
+    for (let x = left; x <= right; x++) {
+      const torn = (y >= 23 && (x + y) % 4 === 0) || (x === right && y % 3 === 0)
+      if (!torn) set(x, y, x < 8 || y > 22 ? P.purple0 : (x + y) % 7 === 0 ? P.purple2 : P.purple1)
+    }
+  }
+
+  // Dented helm, tipped toward the viewer. The empty slit is the void — identity left behind.
+  for (let y = 5; y <= 16; y++) for (let x = 6; x <= 17; x++) {
+    const dx = (x - 11.5) / 6.2, dy = (y - 10.5) / 6.1
+    if (dx * dx + dy * dy > 1) continue
+    let col: C = P.iron
+    if (x <= 8 || y <= 7) col = P.ironHi
+    if (x >= 15 || y >= 15) col = P.mortar
+    set(x, y, col)
+  }
+  for (let x = 8; x <= 15; x++) set(x, 11, P.void)
+  set(8, 12, P.void); set(15, 12, P.void)
+  for (let y = 2; y <= 8; y++) { set(11, y, P.iron); set(12, y, y < 5 ? P.ironHi : P.iron) }
+  set(10, 4, P.mortar); set(13, 6, P.mortar)                 // the crest is split, not ceremonial
+
+  // One collapsed shoulder plate, rotated away from the helm; its chipped outer rim catches north.
+  for (let y = 9; y <= 19; y++) for (let x = 18; x <= 29; x++) {
+    const dx = (x - 23.5) / 6.4, dy = (y - 14) / 5.6
+    if (dx * dx + dy * dy > 1) continue
+    let col: C = P.iron
+    if (x <= 20 || y <= 11) col = P.ironHi
+    if (x >= 28 || y >= 18) col = P.mortar
+    set(x, y, col)
+  }
+  set(21, 11, P.mortar); set(22, 11, P.mortar); set(27, 15, P.mortar)
+
+  // The gauntlet is a small clenched fan below the helm, five fingers with gaps rather than a blob.
+  for (let x = 8; x <= 14; x++) set(x, 18, P.iron)
+  for (let i = 0; i < 4; i++) {
+    set(9 + i, 19 + (i & 1), P.ironHi)
+    set(10 + i, 21 + (i & 1), P.iron)
+  }
+  set(8, 20, P.mortar); set(14, 22, P.mortar)
+
+  // Broken scabbard crosses the pile and points out of it. Extremes touch along its worn spine.
+  for (let i = 0; i < 14; i++) {
+    const x = 13 + i, y = 17 + Math.floor(i * 0.62)
+    set(x, y, P.iron)
+    if (i < 10) set(x, y - 1, i % 4 === 0 ? P.ironHi : P.iron)
+  }
+  set(26, 25, P.boneLo); set(27, 25, P.boneLo)
+
+  // True 48px-source nicks: single final pixels the stable logical scaffold could not express.
+  pixel(18, 4, P.boneDim); pixel(19, 5, P.boneDim)              // crest catch: identity at 1x
+  pixel(13, 10, P.ironHi); pixel(14, 10, P.ironHi)
+  pixel(32, 17, P.ironHi); pixel(34, 19, P.ironHi)
+  pixel(19, 31, P.ironHi); pixel(39, 37, P.boneLo)
+  return d
+}
+
+// A broken verdict tablet in the Hall of Minos. It is evidence, not decoration: an austere stone
+// stele whose incised balance has been struck through in wine wax. The asymmetric crown and one
+// missing corner keep it archaeological instead of heraldic; no gold, because judgment is not a
+// crossing or a reward. The tablet stays dark enough to sit behind the fight.
+function verdictStele32(): Uint8Array {
+  const { d, set, pixel } = make32()
+  for (let x = 6; x <= 27; x++) set(x, 30, P.grout)
+  for (let x = 8; x <= 25; x++) set(x, 29, P.mortar)
+  // Two-step foot, with the north/left key and east/south terminator kept explicit.
+  for (let y = 25; y <= 28; y++) for (let x = 7; x <= 25; x++) {
+    let col: C = P.slate0
+    if (y === 25 || x <= 8) col = P.slate2
+    if (y === 28 || x >= 24) col = P.mortar
+    set(x, y, col)
+  }
+  // The slab: broken higher at west, bitten away at the north-east corner.
+  for (let y = 5; y <= 24; y++) {
+    const left = y < 7 ? 11 : y < 9 ? 9 : 8
+    const right = y < 6 ? 17 : y < 8 ? 21 : y < 11 ? 23 : 24
+    for (let x = left; x <= right; x++) {
+      let col: C = P.slate1
+      if (x === left || y === 5) col = P.slate2
+      if (x >= right - 1 || y === 24) col = P.slate0
+      if ((x === 10 && y >= 17) || (x === 20 && y >= 8 && y <= 10)) col = P.mortar
+      set(x, y, col)
+    }
+  }
+  // An incised balance: iron shadow under a cold worn edge, deliberately incomplete.
+  for (let y = 10; y <= 20; y++) { set(15, y, P.ironHi); set(16, y, P.iron) }
+  for (let x = 10; x <= 21; x++) { set(x, 12, P.ironHi); set(x, 13, P.iron) }
+  for (const x of [10, 21]) {
+    set(x, 14, P.iron); set(x, 15, P.iron)
+    for (let dx = -2; dx <= 2; dx++) set(x + dx, 17, dx === -2 ? P.ironHi : P.iron)
+  }
+  // The surviving verdict: one wax strike, warm enough to read but never as bright as combat.
+  for (let i = 0; i < 6; i++) { set(17 + i, 19 + Math.floor(i / 2), P.poppy); set(17 + i, 20 + Math.floor(i / 2), P.purple1) }
+  set(20, 20, P.poppyHot)
+  // Native-source fractures keep the face from reading as a UI icon.
+  pixel(18, 14, P.slate3); pixel(19, 15, P.slate3)
+  pixel(34, 34, P.mortar); pixel(35, 35, P.mortar); pixel(34, 36, P.slate0)
   return d
 }
 
@@ -914,23 +1241,25 @@ const props32 = [
   bellCells[0], bellCells[1], bellCells[2], bellCells[3],
   brazier32(), ossuary32(), shard32(), pew32(),
   reed32(), prow32(), pole32(), pan32(),
+  keeperLamp32(), brazierCold32(), veteranRelic32(),
+  verdictStele32(),
 ]
 const pRows = Math.ceil(props32.length / PCOLS)
-const pSheet = Buffer.alloc(PCOLS * P32 * pRows * P32 * 4)
+const pSheet = Buffer.alloc(PCOLS * PROP_CELL * pRows * PROP_CELL * 4)
 for (let i = 0; i < props32.length; i++) {
   const col = i % PCOLS, row = Math.floor(i / PCOLS)
   const src = props32[i]
-  for (let y = 0; y < P32; y++) for (let x = 0; x < P32; x++) {
-    const si = (y * P32 + x) * 4
-    const dx = col * P32 + x, dy = row * P32 + y
-    const di = (dy * PCOLS * P32 + dx) * 4
+  for (let y = 0; y < PROP_CELL; y++) for (let x = 0; x < PROP_CELL; x++) {
+    const si = (y * PROP_CELL + x) * 4
+    const dx = col * PROP_CELL + x, dy = row * PROP_CELL + y
+    const di = (dy * PCOLS * PROP_CELL + dx) * 4
     pSheet[di] = src[si]; pSheet[di + 1] = src[si + 1]; pSheet[di + 2] = src[si + 2]; pSheet[di + 3] = src[si + 3]
   }
 }
 const pout = 'public/assets/sprites/bardo_props.png'
-await sharp(pSheet, { raw: { width: PCOLS * P32, height: pRows * P32, channels: 4 } }).png().toFile(pout)
-console.log('wrote', pout, PCOLS * P32, 'x', pRows * P32)
-await sharp(pSheet, { raw: { width: PCOLS * P32, height: pRows * P32, channels: 4 } })
-  .resize(PCOLS * P32 * 4, pRows * P32 * 4, { kernel: 'nearest' })
+await sharp(pSheet, { raw: { width: PCOLS * PROP_CELL, height: pRows * PROP_CELL, channels: 4 } }).png().toFile(pout)
+console.log('wrote', pout, PCOLS * PROP_CELL, 'x', pRows * PROP_CELL)
+await sharp(pSheet, { raw: { width: PCOLS * PROP_CELL, height: pRows * PROP_CELL, channels: 4 } })
+  .resize(PCOLS * PROP_CELL * 4, pRows * PROP_CELL * 4, { kernel: 'nearest' })
   .png()
   .toFile('public/progress/shots/props-r9.png')

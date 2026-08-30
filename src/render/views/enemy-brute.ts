@@ -125,10 +125,12 @@ export function updateBruteView(v: EntityView, e: Enemy, f: EnemyFrame, out: Pos
     if (v.weapon) v.weapon.visible = false
     const authoredHead = frame.sockets.maulHead
     if (authoredHead) {
+      // World px from the feet pivot (render/sheet.ts converts them), so they add straight onto the
+      // body's own world position. Measured in cell px the charge hung 5-11px clear above the sprite
+      // for the whole wind-up, which is the float this socket exists to prevent.
       const feetY = f.y + e.radius + 1
-      const cell = art.def.cell
-      head.x = Math.round(f.x + (authoredHead[0] - frame.anchorX * cell) * e.facing)
-      head.y = Math.round(feetY + authoredHead[1] - frame.anchorY * cell)
+      head.x = Math.round(f.x + authoredHead[0] * e.facing)
+      head.y = Math.round(feetY + authoredHead[1])
     }
     // Each semantic frame already contains body, hands, and maul. The old transforms would bend the
     // complete drawing back into a puppet and move the contact pose away from the real hit tick.

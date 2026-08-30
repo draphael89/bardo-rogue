@@ -3,11 +3,71 @@
   "subtitle": "First Gate: one consequential fork, a town that remembers",
   "updated": "2026-08-30T16:24:30-04:00",
   "now": "chosen-sentence-human-gate",
-  "round": 3,
+  "round": 8,
   "timeline": [
     {
       "t": "16:11",
       "text": "The Chosen Sentence reaches its human gate. Every live descent uses the First Gate; its physical fork says CUT or COMMIT and carries that choice through an authored branch, the Cocytus echo and reward, Minos's opener, and one Smith line on return. Remembrances count rooms cleared, not doors crossed, and a lost run can no longer keep burning or killing behind its verdict. 906 tests pass; build and browser smoke pass; 100/100 seeds resolve with kite 80% and naive 0%. The larger map stays held until attended play proves this choice is readable and worth replaying."
+    },
+    {
+      "t": "14:20",
+      "text": "The hero is now a candidate the renderer can actually load. The staged sheets were immaculate and uninstallable: player.ts asks for clips run/dodge/light1/light2/heavy, frames idle/hurt/dead, and separate north and south roll sheets carrying a four-frame roll clip, while the candidate shipped light0/light1/heavy, a frame named death, and no roll sheet in any facing - it would have compiled green, passed 507 gates and then thrown at load. Both halves are closed in the generator, never by editing a compiled asset: a single-pass rename, and a new vertical roll at 104/104 gates with zero waivers. The roll taught three things it had to measure rather than guess - a harder curl makes the sprite taller instead of rounder near the camera's own foreshortening angle; the tumble needs a per-facing sign, because the key light belongs to the room and one shared sign left north at Weber 0.71-0.81 against a 1.00 floor; and the roll is unarmed-only, which is the live contract, and armed it throws the blade outside the cell anyway. The Oath-Bound's shield field became a flat mark instead of a shaded lane, cutting its median luminance 8.4% and handing the sheet's bright line back to the steel rim - an honest half-fix that still leaves an enemy brighter than the hero. The warden, caster and charger were left alone on purpose: each passes every automated gate and each fails the one test the gates cannot run, and all three need a new silhouette, not polish. The wiring has since happened, for the hero alone: EntityView.tile is nullable and createPlayerView passes null, so the player's body is authored with nothing behind it - a view that failed to bind draws a hole, which is a bug report, not a knight, which is a regression that ships. The caster, charger, warden, Oath-Bound and dummy are still tiny_dungeon.png indices, as are the weapon sprites, and the player's own bow still borrows one. Typecheck exit 0, suite 930/930, matrix 78/0 with zero stranded seeds, replay hashes unmoved and record-bots correctly not run."
+    },
+    {
+      "t": "11:25",
+      "text": "The Bardo's light now has a source and a rank. The Gate is the key; every other pool sits under it; and the arrival landing gained its own lamp and pool, so the player spawns inside light instead of beside it. Three authored 32x48 wedges replace two stretched Kenney noise discs that were running at an effective 0.007 alpha, and the beam falls through the Gate's own opening onto the plaza. The brightest pixel of the title and the arrival frame is no longer a star. Two changes from the same pass were taken back after reading them at 1x: a re-authored Gate whose pylons and arch face came to share one value, so the monument resolved into a flat slab instead of an arch; and a baked light spill that read as a cream sticker on the plaza. The floor ramps went back with them, because bardo_room.png is the sheet all fourteen layouts pave from and a brass ramp authored for the Bardo's embers also put an olive-gold chip into Cocytus, the coldest floor in the game. The unarmed hero body is now a reproducible gated candidate at 507/507, zero waivers, with committed exhibits; its crest reads as horns and should be fixed before anyone spends a Look decision on it. The human approval has since been given, so the hero in the shipping build is the authored Veteran and Kenney tile 96 no longer draws the player in any facing. Room gate 78/78, suite 930/930, matrix 78/0 with zero stranded seeds, replay hashes unmoved."
+    },
+    {
+      "t": "05:21",
+      "text": "The proof now follows production routing instead of a convenient fixture. Fresh Bardo is captured before any run exists; room and realm probes install their actual seeded spine before naming a node; and browser smoke has driven real keyboard input plus victory and death across all six route families. Bankless Ash March no longer fails for lacking a Landing toll, while every route that reaches the Landing must still render it. The player-facing first-fight exhibit is byte-stable without replay chrome. These are routing, rendering, and regression claims only; Look, sound, and Fun remain human calls."
+    },
+    {
+      "t": "04:59",
+      "text": "The alternate spines now carry a low-volume material signature instead of relying on tint alone. Styx fastens its black-water banks with two iron oath links; the Oath Court echoes that broken contract at opposite edges; Phlegethon carries two dead-wine heat seams with no ember, orange, gold, or mark inside the dry fight circle. The 24px overlays are code-authored, canonical, binary-alpha, non-solid, and byte-stable across regeneration. All 13 production layouts pass the deterministic room gate twice identically, including real named Styx and Phlegethon nodes. ImageGen supplied an intentionally over-rich comparison board; its ash piles, giant chains, lava language, and pixels were rejected in favor of these sparse motifs."
+    },
+    {
+      "t": "04:24",
+      "text": "The Hall of Minos no longer relies on the boss name to become a court. Its existing unequal scale now answers one broken verdict stele and a narrow wax-red sentencing rule beneath the Judge. Both additions are code-authored at the locked 24px/48px source contracts, canonical, binary-alpha, non-solid, and held behind the fight lanes; the dry circle at (13,8) stays untouched and the stele spends no gold. A deterministic tick-3000 combat exhibit matches byte-for-byte across clean boots. ImageGen supplied the bilateral-court premise, while its ornate masonry, enlarged UI, and generated pixels were rejected and remain reference-only."
+    },
+    {
+      "t": "04:07",
+      "text": "The exact replay timeline holds across Lethe, the Landing, Cocytus, the Oath-Bound, Minos, verdict, and return, but a corrected deterministic realm probe found one weak pair: Acheron and Cocytus were only 1.09 RGB units apart. Cocytus now widens its existing west-edge weep by one tile, gives that edge one pale cold reflection, and wears a paler cyan surface that expires before the dry fight circle. Acheron/Cocytus moves to 3.36 and median separation rises from 10.54 to 11.32; no room reads the wrong temperature. Three clean-room realm outputs are byte-identical, exact dress/air tests pin the distinction, and a deterministic combat exhibit is tracked. ImageGen supplied the vertical-value premise, while its generated pixels and generic ice spectacle remain reference-only."
+    },
+    {
+      "t": "04:02",
+      "text": "Viewport proof is now a repeatable gate, not a folder of unrelated boots. One living page resizes through 640x360, 1400x600, 390x844, 1920x700, 900x506, and back to 640x360 in both title and paused-game phases. The target grows to 848/992 for wide views, returns to 640 for portrait, stays inside the physical viewport, keeps visible UI inside the internal target, and never advances tick 0. Honest limit: the 390px portrait view is complete and unclipped but too physically small for comfortable keyboard play; it is no-crop proof, not a Look or usability verdict."
+    },
+    {
+      "t": "03:57",
+      "text": "Acheron finally meets the player as a shore. The room already promised a horizontal silt line, but it sat at the bottom edge and read as another strip of masonry. The lip now moves one row inward and the lower two rows become dark water, putting the player at the boundary without touching the fight circle, adding a prop, or changing collision. A same-solids test and exact overlay assertions hold the contract; independent deterministic exhibits are byte-identical. An ImageGen overpaint supplied the large-value premise but its ornate pixels, enlarged UI, and Hades-adjacent richness were rejected and remain reference-only."
+    },
+    {
+      "t": "03:54",
+      "text": "The fixed-clock screenshot claim failed a fresh five-run challenge: the first-fight PNG alternated between two hashes even though sim tick and visible time matched. The cause was an uncontrolled number of zero-time boot renders consuming the seeded FX streams. The evidence lane now swallows rAF before boot and drives the production render hook itself in fixed quanta. Five first-fight boots, three title boots, two Bardo arrivals, and two captures at each of four descent phases are byte-identical within their cases. All tracked visual evidence and its hashes were regenerated; the older title and fight hashes are explicitly invalidated rather than preserved as metric theater."
+    },
+    {
+      "t": "03:42",
+      "text": "A deterministic portrait probe overturned the source-level answer for the letterbox seam. At 390x844 the old gutters resolved to (0,0,2) beside a (0,0,4) target sky: pre-darkening only the screen-space bars was not equivalent to lighting the world. The gutters and target now begin with the same authored void and star colours before the shared frame grade. Every sampled boundary matches at 390x844 and 900x506, three representative viewport frames are tracked, the screenshot harness accepts exact custom viewport pairs, and a focused regression test forbids gutter-only ambient colours. The full suite is 910/910. This is runtime proof of continuity, not a user Look verdict."
+    },
+    {
+      "t": "03:29",
+      "text": "The evidence now obeys the same determinism discipline as the simulation. The ordinary screenshot harness let atmosphere, lighting, idle poses, and the title descent advance by however many live frames happened before capture, so two tick-zero PNGs were not byte-identical. A narrow --visualMs lane freezes browser time at boot and advances it in fixed 50 ms quanta. Independent title boots pinned at 500 ms now produce the same SHA-256; pinning replay tick 400 and visual time 500 ms does the same for the active first fight. The exact title, arrival, four descent phases, and first-fight teaching frame are tracked in the progress gallery instead of living only in ignored scratch shots."
+    },
+    {
+      "t": "03:14",
+      "text": "The arrival causeway now answers the Gate before the player moves: a Keeper lamp puts the landing inside warm light, cold braziers and soot hold the dead shore, the pier carries a numen lantern, and wear crosses tile boundaries toward the north. One generic ossuary became a fallen Veteran relic on the same already-solid cell: low helm, shoulder, and wine mantle read as a body rather than scatter without changing collision. The new prop is code-authored, 10 canonical colours, binary alpha, and below the 12-colour cap; the ImageGen overpaint and relic study remained references only. All 909 tests, pinned replays, room gates, and the 100/100 matrices remain green. Look and Fun are still the user's calls."
+    },
+    {
+      "t": "02:03",
+      "text": "Weapon 20 and armor set 30 get a real production answer. One Blender rig now renders base greatsword, dagger-specific body grammar, and silhouette-changing heavy armor without touching approved or shipping art. Dagger and heavy each produced 42 frames across south/north/east, six compiled sheets, computed sockets, 1x floor sheets and black tests: 1,062 gates, zero blocking. The first dagger run failed honestly on cell-edge contact and on reusing a long-weapon east fit for a compact family; the fixes are now written into the draft hard-constraints contract. Two ImageGen studies are committed as references only. The original greatsword catalogue re-rendered in 10 seconds and remained byte-identical at its specs. Human Look lock is still open."
+    },
+    {
+      "t": "01:52",
+      "text": "The first frame belongs to the Gate. The title is now a local left-hand inscription instead of a veil over the room; Settings and Credits are compact steles. DESCEND makes one guarded 1.45s camera passage from the monument to the unarmed body, holds simulation at tick 0, suppresses stray input, snaps for reduced motion, and cannot complete after reset or replay. The Gate itself gained one render-only stepped arch and dark opening without changing a solid cell or adding a light. Live cancellation proof stayed reset after the old transition would have finished; all 882 tests and the room gate are green."
+    },
+    {
+      "t": "01:35",
+      "text": "The target finally sees authored room pixels, not a 16px source enlarged by the 1.5x world. Room cells are 24px, props 48px, simulation remains unchanged, and the bake runs at native density before returning to logical size. A new blocking gate checks source and live-composite dimensions, canon palette, binary alpha, material spans, all four Bardo islands' negative space, frame value/highlight budgets, and full top-1% focality. Exact 640x360 before/after frames are named in shots; Look and Fun are still human calls."
     },
     {
       "t": "23:05",
@@ -1028,6 +1088,10 @@
     {
       "t": "07:58",
       "text": "An eight-angle adversarial review of Phase 0 found ten findings; eight fixed, two investigated and rejected with evidence. The worst was a seam the tests could not see: the shell pause stops sample(), so the Enter that chose RESUME was still latched and confirmed the boon offer underneath. Also fixed: a held pad A could never open the pause card, abandon and playtest recording were mutually incoherent (now interlocked), the schema bump had broken the desktop smoke, and the master slider answered on a different loudness curve than the two beside it."
+    },
+    {
+      "t": "02:59",
+      "text": "The arrival causeway art pass: the first frame of gameplay now lands in light. The Keeper's column became a lamp column (new prop) whose cresset is the island's key — its pool is baked into the stone as quantized warm value blocks running from the column to the landing, so the pilgrim arrives on firelit ground a full band over the perimeter (measured: pool 0.21 B2 vs 0.11 B1; before, the centre was DARKER than the edge). The pilgrimage wear line runs into the landing as baked scuffs crossing tile boundaries; a cold brazier with its soot fan and the pier-damp stains say someone left; the Ferryman's pole carries a numen-glass lantern — the ramp's first machine-form entries in canon.json. Sim-neutral: every pinned hash stands, all room gates green."
     }
   ],
   "pieces": [

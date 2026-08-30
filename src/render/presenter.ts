@@ -8,6 +8,7 @@ import type { EnemyKind, HitSource, SimEvent } from '@/sim/events'
 import { tuning } from '@/tuning'
 import { EntityView, createPlayerView, createEnemyView, updatePlayerView, updateEnemyView, makePropSprite, BoltView, ArrowView, EchoView, MirrorBoltView, drawAimLine, drawSwingArc, drawSwingTip, drawBowAim } from './views'
 import { updatePlayerRim } from './views/player'
+import { snapToTarget } from './views/shared'
 import { promiseFrame } from './clipSelect'
 import { ARM, armOf } from '@/sim/weapons'
 import { buildTilemap, SHRINE_INK, type TilemapView } from './tilemap'
@@ -22,7 +23,7 @@ import { PostFx } from './postfx'
 import { DamageNumbers } from './damageNumbers'
 import { Atmosphere } from './atmosphere'
 import { seedFx } from './fxRng'
-import { BOONS } from '@/sim/boons'
+import { BOONS, swingReach } from '@/sim/boons'
 import { ActionFeedbackGate, applyActionFeedbackLifecycle, crowdScreenMultiplier, guardedHitScreenScale, hasHostileFloorThreat, wardenAttackFeedback } from './feedback'
 import { guardUp } from '@/sim/enemies/oathbound'
 import { RewardOverlay } from './reward'
@@ -102,6 +103,9 @@ export class Presenter {
   // The one you left. The kind is still a Hoplite; this set is how the room knows which body waded in.
   private huntIds = new Set<number>()
   private propSprites: Sprite[] = []
+  // Pixi caches a batcher per render-root InstructionSet and never evicts that cache. Reusing one
+  // offscreen root keeps room bakes bounded while its children are rebuilt for each arena.
+  private tileBakeRoot = new Container()
   private reducedEffects = false
   private hardLock = new HardLockFeedback()
   // Last valid floor-space pose lets target loss release outward instead of popping with no cause.
@@ -116,7 +120,7 @@ export class Presenter {
     const L = ra.layers
     L.underlay.addChild(this.voidG)
     this.rebuildVoid()
-    this.tilemap = buildTilemap(ra.app.renderer, atlas, world.arena, floorTintFor(world))
+    this.tilemap = buildTilemap(ra.app.renderer, atlas, world.arena, floorTintFor(world), this.tileBakeRoot)
     L.floor.addChild(this.tilemap.sprite, this.tilemap.door)
     for (const p of world.arena.props) {
       const s = makePropSprite(atlas, p)
@@ -139,10 +143,15 @@ export class Presenter {
     // Above the reward overlay in z-order: the title is the one thing that covers everything.
     this.title = new TitleOverlay(L.hud)
     // juice hooks
-    this.lighting = new Lighting(ra, atlas, this.particles, ra.app.renderer, world.arena)
+    this.lighting = new Lighting(ra, atlas, this.particles, ra.app.renderer, world.arena, this.tilemap.sprite)
     this.postfx = new PostFx(ra)
     this.damageNumbers = new DamageNumbers(L.fx)
     this.tilemap.setDoorOpen(world.doorOpen)
+  }
+
+  resetTitleFocus(): void {
+    this.camera.rest()
+    this.camera.snapFollow()
   }
 
   setReducedEffects(reduced: boolean) {
@@ -168,6 +177,7 @@ export class Presenter {
   // Called when the world object is replaced (restart).
   bindWorld(world: World) {
     this.world = world
+    this.hud.resetForWorld()
     // presentation randomness restarts with the run, so the same seed replays the same sparks
     seedFx(world.seed)
     for (const v of this.enemyViews.values()) v.destroy(); this.enemyViews.clear()
@@ -299,7 +309,6 @@ export class Presenter {
         case 'playerHurt':
           this.camera.addTrauma(J.traumaHurt); this.camera.kick(ev.angle, 4)
           this.particles.hitSparks(ev.x, ev.y, ev.angle, 6, 0xff6060)
-          this.playerView.squash = J.squashTicks
           this.flash(0.25, 0xff2020)
           this.postfx.pulse(); this.lastHurtAngle = ev.angle // juice hook
           break
@@ -880,12 +889,18 @@ export class Presenter {
       this.particles.dust(p.x, p.y + 5, p.swingAngle + Math.PI, J.swing.heavyPlantDust)
     }
     if (p.stateTick < promise) return
-    const w = this.playerView.weapon
-    if (!w) return
+    // The blade is IN the authored drawing on every armed cell, so no sprite is positioned for it:
+    // reading `playerView.weapon.position` put the whole cue at world (0,0) — the room's top-left
+    // corner — and let contactReaction's recoil random-walk that point for the rest of the session.
+    // Derive it from the swing the plant is committing to instead: the hilt sits at the arc's hole,
+    // the tip at this swing's reach, both on the swing line, so the glow gathers mid-blade.
+    const mid = (tuning.juice.arc.hole + swingReach(this.world, s).radius) / 2
+    const bx = p.x + Math.cos(p.swingAngle) * mid
+    const by = p.y + Math.sin(p.swingAngle) * mid * 0.9   // the arc's own floor-plane squash
     const u = (p.stateTick - promise) / (s.startup - promise)
-    this.particles.chargeGlow(w.position.x, w.position.y, 7 + 13 * Math.max(0, Math.min(1, u)))
+    this.particles.chargeGlow(bx, by, 7 + 13 * Math.max(0, Math.min(1, u)))
     this.emberAcc += J.swing.heavyEmberRate * dtSec
-    while (this.emberAcc >= 1) { this.emberAcc -= 1; this.particles.ember(w.position.x, w.position.y) }
+    while (this.emberAcc >= 1) { this.emberAcc -= 1; this.particles.ember(bx, by) }
   }
 
   /**
@@ -921,8 +936,15 @@ export class Presenter {
     else {
       const rx = Math.round(this.recoilX), ry = Math.round(this.recoilY)
       const v = this.playerView
-      v.body.position.set(v.body.position.x + rx, v.body.position.y + ry)
-      if (v.weapon) v.weapon.position.set(v.weapon.position.x + rx, v.weapon.position.y + ry)
+      // Back onto the target grid. The views place a body with snapToTarget, and one whole WORLD px
+      // is 1.5 target px, so an odd jolt left the sprite on a half target pixel and put the crawling
+      // outline back for exactly the frames after a landed hit.
+      v.body.position.set(snapToTarget(v.body.position.x + rx), snapToTarget(v.body.position.y + ry))
+      // Only while something is drawing that sprite. The blade lives in the authored cells, so with
+      // it equipped updatePlayerView only hides the weapon and never places it — and a recoil added
+      // to a position nobody rewrites walks away from the origin for the rest of the session. The
+      // bow assigns an absolute position every frame it is visible, which is where this belongs.
+      if (v.weapon?.visible) v.weapon.position.set(v.weapon.position.x + rx, v.weapon.position.y + ry)
     }
   }
 
@@ -1000,9 +1022,15 @@ export class Presenter {
     const reaction = enemyReactionTransform({
       ratio: q, hitClass: v.hitClass, hitKind: v.hitKind, hitHeavy: v.hitHeavy, hitAngle: v.hitAngle,
     })
-    v.body.position.x += reaction.dx
-    v.body.position.y += reaction.dy - reaction.lift
-    v.body.rotation += reaction.bodyLean
+    // Snapped for the same reason as the player's recoil above: the shove is measured in world px,
+    // and the body was placed on the target grid.
+    v.body.position.x = snapToTarget(v.body.position.x + reaction.dx)
+    v.body.position.y = snapToTarget(v.body.position.y + reaction.dy - reaction.lift)
+    // The shove is kept for every kind — being knocked off the blade is the reaction. The LEAN is
+    // for puppets only: 17 degrees on an authored hurt frame resamples the drawing for the whole
+    // hit-stop, which is the same defect as the squash next door (views/enemies.ts) on the other
+    // channel. Those bodies answer the blow with a drawing; they must not be bent as well.
+    if (!EntityView.authoredHitReaction(v.hitKind)) v.body.rotation += reaction.bodyLean
     if (v.weapon) {
       v.weapon.position.x += reaction.dx
       v.weapon.position.y += reaction.dy - reaction.lift
@@ -1057,12 +1085,13 @@ export class Presenter {
     // The baked floor is this sprite's own RenderTexture and nobody else's. pixi's plain destroy()
     // keeps it alive (autoGarbageCollect is off), stranding ~2.4MB of GPU floor per room entry.
     // ONLY the tilemap sprite destroys its texture — door and props share atlas textures.
+    this.lighting.releaseRoomMask()
     this.tilemap.sprite.destroy({ texture: true, textureSource: true })
     this.tilemap.door.destroy()
     for (const s of this.propSprites) s.destroy()
     this.propSprites = []
     this.rebuildVoid()
-    this.tilemap = buildTilemap(this.ra.app.renderer, this.atlas, this.world.arena, floorTintFor(this.world))
+    this.tilemap = buildTilemap(this.ra.app.renderer, this.atlas, this.world.arena, floorTintFor(this.world), this.tileBakeRoot)
     L.floor.addChild(this.tilemap.sprite, this.tilemap.door)
     for (const p of this.world.arena.props) {
       const s = makePropSprite(this.atlas, p)
@@ -1070,7 +1099,7 @@ export class Presenter {
       L.entities.addChild(s)
     }
     this.particles.bindArena(this.world.arena)
-    this.lighting.rebind(this.world.arena)
+    this.lighting.rebind(this.world.arena, this.tilemap.sprite)
     this.atmosphere.rebind(this.world.arena, this.world.rooms[this.world.roomIndex]?.layout ?? 'threshold')
     this.tilemap.setDoorOpen(this.world.doorOpen)
   }
@@ -1184,7 +1213,6 @@ export class Presenter {
       v.update(lerp(b.px, b.x, slowAlpha), lerp(b.py, b.y, slowAlpha), b.angle, this.time)
       this.stampTrail(v, b, dtSec, tuning.juice.trail.arrowPx, (x, y) => this.particles.echoTrail(x, y))
     }
-    if (w.freeze <= 0 && this.playerView.squash > 0) this.playerView.squash -= dtSec * 60
     updatePlayerView(this.playerView, p, w, alpha, this.time)
     if (!p.armed && this.playerView.weapon) this.playerView.weapon.visible = false
     this.contactReaction(dtSec)
@@ -1239,12 +1267,13 @@ export class Presenter {
     // Rounding happens in TARGET pixels: the pivot is quantised to the target grid (round(v*S)/S)
     // and the translation rounded whole, so integer world positions land on whole target pixels.
     const aimX = Math.cos(p.aimAngle), aimY = Math.sin(p.aimAngle)
-    this.camera.update(dtSec, aimX, aimY)
+    const titleFocus = this.title.cameraFocus(w)
+    this.camera.update(dtSec, titleFocus ? 0 : aimX, titleFocus ? 0 : aimY)
     const V = tuning.view, S = V.worldScale
     const pxi = lerp(p.px, p.x, alpha), pyi = lerp(p.py, p.y, alpha)
-    this.camera.follow(pxi, pyi, dtSec)
-    const fx = clampFocus(this.camera.followX, w.arena.cols * TILE, V.width / S)
-    const fy = clampFocus(this.camera.followY, w.arena.rows * TILE, V.height / S)
+    if (!titleFocus) this.camera.follow(pxi, pyi, dtSec)
+    const fx = clampFocus(titleFocus?.x ?? this.camera.followX, w.arena.cols * TILE, V.width / S)
+    const fy = clampFocus(titleFocus?.y ?? this.camera.followY, w.arena.rows * TILE, V.height / S)
     const tx = Math.round(V.width / 2 - fx * S), ty = Math.round(V.height / 2 - fy * S)
     const pxq = Math.round(pxi * S) / S, pyq = Math.round(pyi * S) / S
     this.ra.world.pivot.set(pxq, pyq)

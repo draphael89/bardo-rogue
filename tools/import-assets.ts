@@ -80,7 +80,7 @@ for (const f of ['kenney_pixel-webfont.woff2', 'kenney_mini_square_mono-webfont.
   copyFileSync(join(tmp, f), out(`fonts/${f}`)); manifest.fonts.push(f)
 }
 
-writeFileSync(out('manifest.json'), JSON.stringify(manifest, null, 2))
+writeFileSync(out('manifest.json'), JSON.stringify(manifest, null, 2) + '\n')
 console.log('assets imported:', Object.fromEntries(Object.entries(manifest).map(([k, v]) => [k, v.length])))
 
 function range(prefix: string, a: number, b: number) { const r: string[] = []; for (let i = a; i <= b; i++) r.push(`${prefix}${i}`); return r }

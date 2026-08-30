@@ -6,7 +6,7 @@ import { createWorld } from '../src/sim/scenarios'
 import { stepWorld } from '../src/sim/step'
 import { makeBot, type BotName } from '../src/sim/bots'
 import { Metrics } from '../src/sim/metrics'
-import { replayFromJson, runReplay } from '../src/sim/replay'
+import { quantizeFrame, replayFromJson, runReplay } from '../src/sim/replay'
 import { applyPlaytestCondition, asPlaytestCondition, conditionOfBundle, PLAYTEST_CONDITIONS } from '../src/playtest'
 
 const args = Object.fromEntries(process.argv.slice(2).map((a, i, arr) => a.startsWith('--') ? [a.slice(2), arr[i + 1]] : []).filter(x => x.length))
@@ -53,7 +53,9 @@ for (let seed = s0; seed <= (s1 ?? s0); seed++) {
   let maxTickUs = 0
   for (let i = 0; i < ticks; i++) {
     const a = performance.now()
-    stepWorld(world, b(world))
+    // Browser play, recording, and replay all cross this boundary. Keep ad-hoc bot measurements on
+    // the same byte-sized inputs instead of granting the headless bot extra vector precision.
+    stepWorld(world, quantizeFrame(b(world)))
     maxTickUs = Math.max(maxTickUs, (performance.now() - a) * 1000)
     m.consume(world, world.events)
     world.events.length = 0

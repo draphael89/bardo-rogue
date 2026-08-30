@@ -32,6 +32,79 @@ map, economy, encounter-director, or environmental-rule proposals before that ev
 
 ## STATUS — what has since been built
 
+**The hero the renderer can load (2026-08-30, late).** The staged hero candidate was immaculate and
+uninstallable: `src/render/views/player.ts` demands clips `run, dodge, light1, light2, heavy`, frames
+`idle, hurt, dead`, and separate `bardo_hero_{north,south}_roll` sheets with a four-frame `roll`
+clip, while the candidate shipped `light0, light1, heavy`, a frame named `death`, and no roll sheet
+at all — so it would have compiled green, passed 507 gates and then thrown at load. Both halves are
+closed in the generator, never by editing a compiled asset: a single-pass rename in `mannequin.py`
+and `assemble.mjs`, and a new vertical roll (`ROLL_TURN`/`ROLL_TUMBLE`/`ROLL_LIMBS` plus a 2x2 sheet
+emitter) that clears 104/104 gates with zero waivers. The roll measured three things worth keeping —
+a harder curl makes the sprite taller rather than rounder near the camera's 60-degree foreshortening;
+the tumble needs a per-facing sign because the key light belongs to the room and one shared sign put
+north at Weber 0.71-0.81 against a 1.00 floor; and the roll is unarmed-only, which is the live
+contract rather than a concession. The Oath-Bound's shield leaf became a flat `brickLo` mark instead
+of a shaded `brickLo`/`brick` lane, cutting sheet median luminance 0.4122 -> 0.3774 (8.4%) with 78/78
+still green — an honest half-fix that leaves the actor brighter than the hero. The warden, caster and
+charger were deliberately left alone: each passes every automated gate and each fails the one test
+the gates cannot run, and all three need a new silhouette rather than a polish pass. Typecheck exit
+0, 930/930, matrix 78/0 with zero stranded seeds, replay hashes unmoved and `record-bots` correctly
+not run. **The wiring has since happened, for the hero alone.** `EntityView.tile` is nullable and
+`createPlayerView` passes null, so the player's body is authored with no Kenney fallback behind it: a
+view that failed to bind draws a hole, which is a bug report, rather than a knight, which is a
+regression that ships. The caster, charger, warden, Oath-Bound and dummy are still `tiny_dungeon.png`
+indices, as are the weapon sprites — the player's own bow still borrows one.
+
+**Art cycle checkpoints (2026-08-30, `codex/bardo-first-sixty-seconds`).** Room source art now has a
+locked 24px tile / 48px prop contract while simulation and layout remain 16px / 32px logical. The
+static room composite is baked at native art density and returned to logical world size, so the
+640×360 target sees one source pixel per target pixel at the 1.5× world scale. `pnpm room:gate`
+blocks wrong dimensions, partial alpha, palette drift, collapsed material spans, Bardo island
+negative-space loss, composite-size drift, value-budget drift, and top-one-percent focality. Named
+1× before/after frames are in `shots/`. The title then became a local left inscription which leaves
+the Bardo Gate visible, with compact Settings/Credits steles and one guarded, reduced-motion-aware
+Gate-to-player descent. The Gate gained render-only architectural mass; collision and replay state
+remain untouched. Live cancellation proof survives beyond the old completion time, the room gate is
+green, and the suite is 911/911. The locked Veteran rig now also carries dagger-specific attack
+grammar and silhouette-changing heavy armor: 42 frames each, three facings, computed registration,
+1,062 total real gates with zero blocking, and committed 1×/black-test exhibits. The failed first
+dagger compile established that shared fit is a long-weapon decision, not an east-facing default.
+`docs/CHARACTER_HARD_CONSTRAINTS.md` is drafted from that evidence but explicitly awaits the user's
+lock. The arrival causeway now stages a warm Keeper light against cold abandoned braziers, damp pier
+stone, and a numen lantern; a code-authored fallen Veteran relic replaces the generic ossuary on the
+same already-solid cell. The relic stays within the canonical palette, binary-alpha, and colour-cap
+contracts, while ImageGen studies remain reference-only. Acheron's lower lane now resolves the
+art bible's promised shore as one silt lip over a two-tile dark-water body without changing any
+solid. Cocytus now gives its west-edge weep one cold reflection that expires before the dry fight
+circle, and a paler cyan surface distinct from Acheron's indigo. The deterministic measured median
+realm separation is 11.31 with no wrong-temperature rooms. Look and Fun
+remain human gates. The
+Hall of Minos now keeps its unequal scale but gains a broken, goldless verdict stele and a narrow
+wax-red sentence behind the boss, without marking the fight circle or changing collision. The
+alternate spines now carry sparse code-authored material motifs rather than tint alone: iron oath
+links at Styx and the Oath Court, dead-wine heat seams at Phlegethon, all outside the fight circle.
+letterbox and target sky now enter the shared frame grade from identical authored colours; exact
+390×844 and 900×506 probes keep all four target boundaries continuous. The attended evidence and
+exact-head ledger are recorded in `MORNING_REPORT.md`.
+
+**Graphics overhaul, `claude/game-graphics-overhaul-e99c1a`.** The Bardo's light now has a source and
+a rank: the Gate is the key at r140/s2.4, every other pool sits a rank under it, and the arrival
+landing has its own lamp and its own pool so the player spawns *inside* light rather than beside it.
+Three authored 32×48 wedges (`shaft_01..03`) replace two stretched Kenney noise discs that were
+running at an effective ~0.007 alpha, and the beam falls through the Gate's own opening onto the
+plaza. The brightest pixel of both the title and the arrival frame is no longer a star. **Two changes
+from the same pass were taken back after reading them at 1×**: a re-authored Gate bake whose pylons
+and arch face came to share one value, so the monument resolved into a flat slab instead of an arch;
+and a `bakeBardoGateSpill` whose four baked plateaus read as a cream sticker on the plaza. The
+level-2 and level-4 floor ramps were reverted with them — `bardo_room.png` is the sheet all fourteen
+layouts pave from, so a brass ramp authored for the Bardo's embers also put an olive-gold chip into
+Cocytus, the coldest floor in the game. `pnpm art:stress-hero` now gates three variants including the
+**unarmed** body (507/507, zero waivers, two committed exhibits) — the one the whole opening is
+played in, and the one whose crest currently reads as horns. Room gate **78/78**; suite **930/930**;
+matrix 78/0 with zero stranded seeds; replay hashes unmoved. The human `pnpm art approve` has since
+been given: **the hero in the shipping build is the authored Veteran**, and Kenney tile 96 no longer
+draws the player in any facing.
+
 The sections below are the plan as written. This block records what was executed against it, so the
 document does not become the next stale audit. Tests: **275 passing**; `pnpm matrix` 100/100 seeds
 resolve on both loop bots (kite 93%, naive 0%); `pnpm smoke` boots the title with a real keypress,

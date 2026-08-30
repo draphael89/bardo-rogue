@@ -35,6 +35,12 @@ export interface RenderApp {
 // evidence crop keeps its coordinates.
 export function fitViewWidth(override = 0): number {
   if (override >= 640) return Math.round(override / 16) * 16
+  if (override > 0) {
+    // The pre-ADR-0002 capture protocol forced ?view=480. Swallowing that silently turns a stale
+    // recipe into a phantom layout regression; say so, and hold the floor deterministically.
+    console.warn(`view override ${override} is below the 640 floor (ADR 0002); using 640`)
+    return 640
+  }
   const aspect = window.innerWidth / Math.max(1, window.innerHeight)
   return Math.max(640, Math.min(1024, Math.round((tuning.view.height * aspect) / 16) * 16))
 }

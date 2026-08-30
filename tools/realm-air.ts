@@ -44,6 +44,7 @@ await page.addInitScript({ content: `{
 }` })
 const errors: string[] = []
 page.on('pageerror', e => errors.push('pageerror: ' + e.message))
+page.on('console', message => { if (message.type() === 'error') errors.push('console: ' + message.text()) })
 await page.goto(`${url}/?scenario=loop&seed=${seed}&mute=1&save=off&view=640`)
 await page.waitForFunction(() => !!(window as unknown as { __game?: unknown }).__game, null, { timeout: 15000, polling: 50 })
 
@@ -124,7 +125,8 @@ const violations = rooms.flatMap(r => {
   return []
 })
 const minMedian = args['min-median'] === undefined ? null : +args['min-median']
-const failed = violations.length > 0 || (minMedian !== null && median.d < minMedian)
+const failed = violations.length > 0 || skipped.length > 0 || errors.length > 0
+  || (minMedian !== null && median.d < minMedian)
 
 console.log(JSON.stringify({
   seed,
@@ -153,7 +155,7 @@ console.log(JSON.stringify({
 
 // Only exits non-zero when a bar was actually asked for, so the bare command stays a measurement.
 if (failed) {
-  console.error(`realm-air FAILED: ${violations.length} realm(s) read the wrong temperature` +
+  console.error(`realm-air FAILED: ${violations.length} temperature violation(s), ${skipped.length} skipped room(s), ${errors.length} browser error(s)` +
     (minMedian !== null && median.d < minMedian ? `; median separation ${median.d.toFixed(2)} is under ${minMedian}` : ''))
   process.exit(1)
 }

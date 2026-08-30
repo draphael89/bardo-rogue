@@ -206,3 +206,4 @@ const sidecar = {
 }
 writeFileSync(`${out}.json`, JSON.stringify(sidecar, null, 2))
 console.log(JSON.stringify({ out, json: `${out}.json`, size: `${W}x${H}`, frames: shots.length, ticks: `${firstTick}..${lastTick}`, events: sidecar.events.length, errors }, null, 2))
+if (errors.length) process.exit(2)

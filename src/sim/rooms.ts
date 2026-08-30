@@ -9,6 +9,7 @@ import type { World } from './world'
 import { clearBulletTime } from './combat'
 import { recordRoomEntry, restoreRunHealth, smithWaiting, startRun, storeRunHealth, type RoomReward } from './session'
 import { beginRoomFight, offerRite, type RiteId } from './rites'
+import { contractForDestination } from './contracts'
 
 export interface RoomExit {
   dir: DoorDir
@@ -186,6 +187,12 @@ export function tryEnterDoor(world: World): void {
     if (overlapsDoor(p.x, p.y, d)) {
       const leavingTown = world.scenario === 'loop' && room.id === HUB_ID
       if (leavingTown && !startRun(world, ex.to)) return
+      // The first physical fork is the contract. Record it at the same authority that accepts the
+      // door overlap, so previews, the echo, rewards, checkpoints, and Minos all read one choice.
+      if (!leavingTown && room.id === 'threshold' && world.session.run?.result === 'active' && !world.session.run.contract) {
+        const contract = contractForDestination(ex.to)
+        if (contract) world.session.run.contract = contract.id
+      }
       world.roomPhase = 'transitioning'
       world.phaseTick = world.tick
       // The catalog hub still points at Acheron. A live map may open on Styx.

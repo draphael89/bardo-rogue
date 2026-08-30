@@ -176,12 +176,10 @@ function aimAt(inp: InputFrame, world: World, e: Enemy): number {
 }
 
 function wardenProjectileThreatensPlayer(world: World, e: Enemy, pattern: 'ring' | 'fan'): boolean {
-  const contract = wardenProjectileContract(pattern, e.actionPhase)
-  for (let volley = 0; volley < contract.volleys; volley++) {
-    for (let i = 0; i < contract.count; i++) {
-      const angle = wardenProjectileAngle(contract, e.aimAngle, e.patternCursor, i, volley)
-      if (wardenLaneThreatensPoint(world.arena, e.x, e.y, angle, contract, world.player.x, world.player.y)) return true
-    }
+  const contract = wardenProjectileContract(pattern)
+  for (let i = 0; i < contract.count; i++) {
+    const angle = wardenProjectileAngle(contract, e.aimAngle, e.patternCursor, i)
+    if (wardenLaneThreatensPoint(world.arena, e.x, e.y, angle, contract, world.player.x, world.player.y)) return true
   }
   return false
 }

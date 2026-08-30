@@ -1,5 +1,7 @@
 // Input recording + replay. Pure: a replay is its initial session snapshot plus input frames, and
-// replaying those frames is fully deterministic.
+// replaying those frames is fully deterministic within the same content revision. V1 is a
+// regression artifact, not a cross-version save; HARNESS.md requires re-recording after intended
+// sim/content changes and the fixture hashes make that drift explicit.
 import { createWorld } from './scenarios'
 import { stepWorld } from './step'
 import { hashWorld } from './hash'

@@ -169,6 +169,26 @@ describe('the Smith', () => {
     expect(world.events.some(e => e.type === 'smithSpoke' && e.beat === 'owned')).toBe(true)
   })
 
+  it.each(['commit', 'cut'] as const)('remembers the %s sentence once on the next return', contract => {
+    const world = inTown()
+    prepareWeapon(world, 'blade')
+    startRun(world, 'threshold')
+    world.session.run!.contract = contract
+    expect(abandonRun(world)).toBe(true)
+    walkToSmith(world)
+    expect(world.events.find(e => e.type === 'smithSpoke')).toMatchObject({
+      beat: contract,
+      line: SMITH_LINES[contract],
+    })
+    expect(world.session.lastAttempt).toBeNull()
+
+    world.events.length = 0
+    world.player.x += 80
+    stepWorld(world, emptyInput())
+    walkToSmith(world)
+    expect(world.events.some(e => e.type === 'smithSpoke' && e.beat === contract)).toBe(false)
+  })
+
   it('does not speak again until you step away', () => {
     const world = inTown()
     walkToSmith(world)
@@ -201,7 +221,7 @@ describe('offer reforging', () => {
     expect(world.session.run!.rerolls).toBe(0)
   })
 
-  it('names what you kept when the Bardo takes you back', () => {
+  it('names only cleared-room keeps when the Bardo takes you back', () => {
     const world = createWorld(2, 'loop')
     prepareWeapon(world, 'blade')
     startRun(world, 'threshold')
@@ -213,8 +233,8 @@ describe('offer reforging', () => {
     expect(home).toMatchObject({
       type: 'returned',
       name: 'THE BARDO',
-      kept: 1,
-      remembrances: 1,
+      kept: 0,
+      remembrances: 0,
       smithWaiting: false,
     })
     world.session.meta.remembrances = tuning.economy.smith.rerollCost

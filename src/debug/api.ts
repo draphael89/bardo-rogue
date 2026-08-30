@@ -110,6 +110,7 @@ export function installApi(host: {
           preparedWeapon: w.session.preparedWeapon,
           remembrances: w.session.meta.remembrances,
           lastBanked: w.session.lastBanked,
+          lastAttempt: w.session.lastAttempt ? { ...w.session.lastAttempt } : null,
           meta: { ...w.session.meta },
           run: w.session.run ? {
             seed: w.session.run.seed,
@@ -119,6 +120,8 @@ export function installApi(host: {
             roomId: w.session.run.roomId,
             history: w.session.run.roomHistory.map(v => v.id),
             result: w.session.run.result,
+            contract: w.session.run.contract,
+            clearedRoomIds: [...w.session.run.clearedRoomIds],
             boons: w.session.run.boons.map(b => b.id),
             killedBy: w.session.run.killedBy,
             killedRanged: w.session.run.killedRanged,

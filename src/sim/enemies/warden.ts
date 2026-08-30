@@ -42,10 +42,7 @@ export function wardenCompanion(pattern: number, phase: number): WardenPattern |
 export function wardenAttackTicks(e: Enemy): number {
   const W = tuning.warden
   if (e.pattern === WARDEN_PATTERN.ring) return W.ringAttackTicks
-  if (e.pattern === WARDEN_PATTERN.fan) {
-    const volleys = wardenProjectileContract('fan', wardenActionPhase(e)).volleys
-    return W.fanAttackTicks + (volleys - 1) * W.fanVolleyGap
-  }
+  if (e.pattern === WARDEN_PATTERN.fan) return W.fanAttackTicks
   return W.slamTicks
 }
 
@@ -87,16 +84,16 @@ function fireBolt(world: World, e: Enemy, angle: number, contract: WardenProject
 }
 
 function looseRing(world: World, e: Enemy): void {
-  const contract = wardenProjectileContract('ring', wardenActionPhase(e))
+  const contract = wardenProjectileContract('ring')
   for (let i = 0; i < contract.count; i++) {
     fireBolt(world, e, wardenProjectileAngle(contract, e.aimAngle, e.patternCursor, i), contract)
   }
 }
 
-function looseFan(world: World, e: Enemy, volley: number): void {
-  const contract = wardenProjectileContract('fan', wardenActionPhase(e))
+function looseFan(world: World, e: Enemy): void {
+  const contract = wardenProjectileContract('fan')
   for (let i = 0; i < contract.count; i++) {
-    fireBolt(world, e, wardenProjectileAngle(contract, e.aimAngle, e.patternCursor, i, volley), contract)
+    fireBolt(world, e, wardenProjectileAngle(contract, e.aimAngle, e.patternCursor, i), contract)
   }
 }
 
@@ -104,7 +101,7 @@ function fireCompanion(world: World, e: Enemy): void {
   const companion = wardenCompanion(e.pattern, wardenActionPhase(e))
   if (companion === null) return
   if (companion === WARDEN_PATTERN.ring) looseRing(world, e)
-  else if (companion === WARDEN_PATTERN.fan) looseFan(world, e, 0)
+  else if (companion === WARDEN_PATTERN.fan) looseFan(world, e)
   else if (companion === WARDEN_PATTERN.slam) {
     const W = tuning.warden
     if (!e.hitDone && e.stateTick > 0 && e.stateTick <= W.slamTicks) {
@@ -128,11 +125,7 @@ function updateAttack(world: World, e: Enemy): void {
     if (e.patternStep === 0 && e.stateTick > 0) { looseRing(world, e); e.patternStep = 1 }
     if (e.patternStep === 1 && e.stateTick > 0) { fireCompanion(world, e); e.patternStep = 2 }
   } else if (e.pattern === WARDEN_PATTERN.fan) {
-    const volleys = wardenProjectileContract('fan', wardenActionPhase(e)).volleys
-    while (e.patternStep < volleys && e.stateTick >= 1 + e.patternStep * W.fanVolleyGap) {
-      looseFan(world, e, e.patternStep)
-      e.patternStep++
-    }
+    if (e.patternStep === 0 && e.stateTick > 0) { looseFan(world, e); e.patternStep = 1 }
     fireCompanion(world, e)
   }
   if (e.stateTick >= wardenAttackTicks(e)) { e.state = 'recover'; e.stateTick = 0 }

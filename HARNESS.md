@@ -52,7 +52,7 @@ A stock combat scenario stops 2 s after clear or death; the production `loop` st
 
 `http://localhost:5173/?scenario=wave2&seed=7&debug=1&mute=1&god=1&bot=kite`
 
-- `scenario`: `loop` is the default production game: Bardo rack → Greek gate → six chambers → Minos → Bardo. The attempt seed picks one of six spines: early shop, late shop, a fork at the Field of Asphodel, the fire ford (Landing then Phlegethon), the Styx gate (first fight is the oath river), or the ash march (both rivers, no bank). Debug scenarios remain: `empty`, `dummy`, `blessed`, `bow`, `boss`, `brute-only`, `caster-only`, `charger-swarm`, `wave1`, `wave2`, `wave3`, `full`, `run`, and `shore`.
+- `scenario`: `loop` is the default production game: Bardo rack → Greek gate → six chambers → Minos → Bardo. Every live attempt uses the authored First Gate spine; the physical CUT / COMMIT fork changes its branch phrase, Cocytus echo and reward, and Minos opener. The seed still controls truthful same-kind dress and whether the utility stop is Charon or the Unburied. Debug scenarios remain: `empty`, `dummy`, `blessed`, `bow`, `boss`, `brute-only`, `caster-only`, `charger-swarm`, `wave1`, `wave2`, `wave3`, `full`, `run`, and `shore`.
 - Death or victory then confirm: `loop` returns to the Bardo in the same world and clears run power. Legacy `run` also returns on death. Stock combat scenarios still set `wantsRestart` and rebuild the same fight.
 - `seed`: integer, default 1. Same seed + same inputs = same run.
 - `save=off`: run against a fresh profile and write nothing. `pnpm shot` and `pnpm poses` pass it by
@@ -109,12 +109,12 @@ Available once the page has booted (`await page.waitForFunction(() => !!window._
 
 ## Record and replay
 
-A replay is `{ v: 1, seed, scenario, god?, meta?: MetaStateV1, frames: InputFrame[] }` (`src/sim/replay.ts`). On disk it is run-length
+A replay is `{ v: 1, seed, scenario, god?, meta?: MetaStateV1, frames: InputFrame[] }` (`src/sim/replay.ts`). Replay v1 deliberately records inputs, not a content revision: it is a same-build regression artifact, not a portable archival save. Re-record fixtures after intentional simulation or content changes; their pinned hashes expose drift in the current tree. On disk it is run-length
 encoded: `runs: [moveX, moveY, aimX, aimY, flags, count]` with axes as ints x10000 and flags bits
 `1 aimSoft, 2 attack, 4 dodge, 8 restart, 16 attackHeld, 32 confirm, 64 choice-left, 128 choice-right, 256 heavy, 512 reroll`
 (the table in `src/sim/replay.ts` is the source of truth; `pnpm test` fails if this line drifts from it). The browser quantizes every frame to 1/10000 before the sim sees it, so
-what was played and what is stored are identical. A `loop` replay's hash depends on its `meta`, because `hashWorld` folds
-attempts and victories in for that scenario; the pinned fixtures are all non-`loop` and carry none.
+what was played and what is stored are identical. A `loop` replay's hash also depends on its initial `meta`, because
+`hashWorld` folds attempts and victories in for that scenario; a loop replay that omits it starts from the default profile.
 
 The workflow at `ci/github-actions.yml` is a parked template, not active CI. Until a separately
 authorised move to `.github/workflows/ci.yml`, run the documented typecheck, test, build, matrix,

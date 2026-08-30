@@ -3,8 +3,9 @@ import { setDoorWalkable } from './arena'
 import { BOON, type BoonId, type Deity } from './boons'
 import { ARM, grantArm, type ArmId } from './weapons'
 import type { RiteId } from './rites'
+import { isContractId, type ContractId } from './contracts'
 import { Rng } from './rng'
-import { FIRST_GATE, buildSliceRooms, installRoute, mapFromRooms, templateForSeed, type RouteNodeKind, type RunMap } from './route'
+import { FIRST_GATE, buildSliceRooms, installRoute, mapFromRooms, templateById, templateForSeed, type RouteNodeKind, type RunMap } from './route'
 import { enterRoomById } from './rooms'
 import type { MysteryChoice, MysteryOffer, RewardFamily, RewardOffer, RiteAnswer, RiteOffer, RoomPhase, RoomVisit, ShopGood, ShopOffer } from './session'
 import type { World } from './world'
@@ -68,6 +69,7 @@ export interface RunCheckpoint {
   version: 1
   seed: number
   weapon: ArmId
+  contract: ContractId | null
   roomId: string
   hp: number
   maxHp: number
@@ -77,6 +79,7 @@ export interface RunCheckpoint {
   boonBits: number
   boons: CheckpointBoon[]
   history: CheckpointVisit[]
+  clearedRoomIds: string[]
   riteAnswer: RiteAnswer
   riteBoonOwed: boolean
   riteDebt: boolean
@@ -147,6 +150,7 @@ export function captureCheckpoint(world: World): RunCheckpoint | null {
     version: 1,
     seed: run.seed,
     weapon: run.weapon,
+    contract: run.contract,
     roomId: run.roomId,
     hp: run.hp,
     maxHp: run.maxHp,
@@ -158,6 +162,7 @@ export function captureCheckpoint(world: World): RunCheckpoint | null {
     boonBits: run.boonBits,
     boons: run.boons.map(b => ({ id: b.id, stacks: b.stacks })),
     history: cloneHistory(run.roomHistory),
+    clearedRoomIds: [...run.clearedRoomIds],
     riteAnswer: run.riteAnswer,
     riteBoonOwed: run.riteBoonOwed,
     // Still OWED, not merely still flagged. enterRoom runs beginRoomFight -- which clears these two
@@ -195,9 +200,11 @@ export function restoreCheckpoint(world: World, snap: RunCheckpoint): boolean {
   // down — after the run is installed, the player armed and the route replaced — left the caller
   // holding a live run it had just been told did not restore: the player stood in the Bardo while
   // the host reported an attempt in progress, and abandoning banked that stale run's depth.
-  const template = templateForSeed(snap.seed)
+  const template = snap.map ? templateById(snap.map.template) : templateForSeed(snap.seed)
+  if (!template) return false
   const rooms = buildSliceRooms(template, new Rng(snap.seed))
   if (!rooms.some(r => r.id === snap.roomId)) return false
+  if (snap.clearedRoomIds.some(id => !rooms.some(r => r.id === id) || !snap.history.some(v => v.id === id))) return false
   // A content update can leave snap.roomId present while moving the doors around it. The rebuilt
   // rooms are what door traversal and the map overlay actually read, so a changed topology would
   // walk the player down a route their snapshot never generated -- silently, and only for saves
@@ -208,6 +215,7 @@ export function restoreCheckpoint(world: World, snap: RunCheckpoint): boolean {
   world.session.run = {
     seed: snap.seed,
     weapon: snap.weapon,
+    contract: snap.contract,
     boons: snap.boons.map(b => ({ id: b.id, stacks: b.stacks })),
     boonBits: snap.boonBits,
     hp: snap.hp,
@@ -215,6 +223,7 @@ export function restoreCheckpoint(world: World, snap: RunCheckpoint): boolean {
     depth: snap.depth,
     roomId: snap.roomId,
     roomHistory: cloneHistory(snap.history),
+    clearedRoomIds: [...snap.clearedRoomIds],
     pendingReward: null,
     pendingShop: null,
     pendingMystery: null,
@@ -244,7 +253,7 @@ export function restoreCheckpoint(world: World, snap: RunCheckpoint): boolean {
   installRoute(world, rooms, template)
   world.rng = Rng.fromState(snap.boundaryRng)
   if (snap.map) world.session.run.map = {
-    template: snap.map.template === FIRST_GATE.id ? FIRST_GATE.id : snap.map.template,
+    template: snap.map.template,
     nodes: snap.map.nodes.map(n => ({
       id: n.id,
       kind: n.kind,
@@ -391,6 +400,18 @@ function parseAnswer(v: unknown): RiteAnswer | undefined {
   return undefined
 }
 
+function inferFirstGateContract(history: readonly CheckpointVisit[], map: CheckpointMap | null, roomId: string): ContractId | null | undefined {
+  // Contract fields were added without changing checkpoint v1. Only the live first-gate topology
+  // owns this choice; the five retired spines resume with their original, contract-free content.
+  if (map && map.template !== FIRST_GATE.id) return null
+  const cut = roomId === 'veil-path' || history.some(v => v.id === 'veil-path')
+  const commit = roomId === 'blade-path' || history.some(v => v.id === 'blade-path')
+  if (cut && commit) return undefined
+  if (cut) return 'cut'
+  if (commit) return 'commit'
+  return null
+}
+
 /** Unknown JSON → a checkpoint or null. Damage drops the run, never the profile. */
 export function parseCheckpoint(input: unknown): RunCheckpoint | null {
   if (input == null) return null
@@ -404,6 +425,11 @@ export function parseCheckpoint(input: unknown): RunCheckpoint | null {
   const roomId = id(input.roomId)
   if (seed === null || hp === null || maxHp === null || depth === null || boonBits === null || boundaryRng === null) return null
   if (!roomId || !isArm(input.weapon)) return null
+  let contract: ContractId | null = null
+  if (input.contract !== undefined && input.contract !== null) {
+    if (!isContractId(input.contract)) return null
+    contract = input.contract
+  }
   if (hp < 0 || maxHp < 1 || depth < 0) return null
   if (typeof input.phase !== 'string' || !Object.prototype.hasOwnProperty.call(PHASE, input.phase)) return null
   const riteAnswer = parseAnswer(input.riteAnswer)
@@ -425,12 +451,33 @@ export function parseCheckpoint(input: unknown): RunCheckpoint | null {
     if (!visit) return null
     history.push(visit)
   }
+  const clearedRoomIds: string[] = []
+  if (input.clearedRoomIds !== undefined) {
+    if (!Array.isArray(input.clearedRoomIds)) return null
+    for (const raw of input.clearedRoomIds) {
+      const room = id(raw)
+      if (!room) return null
+      if (!clearedRoomIds.includes(room)) clearedRoomIds.push(room)
+    }
+  } else {
+    // Checkpoints are persisted only on roomEnter. The last visit is therefore the room about to
+    // replay, while every earlier unique visit completed before its exit could be crossed.
+    if (history.length === 0 || history[history.length - 1]!.id !== roomId) return null
+    for (const visit of history.slice(0, -1)) {
+      if (!clearedRoomIds.includes(visit.id)) clearedRoomIds.push(visit.id)
+    }
+  }
   const map = parseMap(input.map)
   const pendingReward = parseReward(input.pendingReward)
   const pendingRite = parseRite(input.pendingRite)
   const pendingShop = parseShop(input.pendingShop)
   const pendingMystery = parseMystery(input.pendingMystery)
   if (map === undefined || pendingReward === undefined || pendingRite === undefined || pendingShop === undefined || pendingMystery === undefined) return null
+  if (contract === null) {
+    const inferred = inferFirstGateContract(history, map, roomId)
+    if (inferred === undefined) return null
+    contract = inferred
+  }
   const mysteryHunt = input.mysteryHunt === undefined ? false : flag(input.mysteryHunt)
   if (mysteryHunt === null) return null
   const obols = input.obols === undefined ? 0 : int(input.obols)
@@ -448,6 +495,7 @@ export function parseCheckpoint(input: unknown): RunCheckpoint | null {
     version: 1,
     seed,
     weapon: input.weapon,
+    contract,
     roomId,
     hp,
     maxHp,
@@ -456,6 +504,7 @@ export function parseCheckpoint(input: unknown): RunCheckpoint | null {
     boonBits,
     boons,
     history,
+    clearedRoomIds,
     riteAnswer,
     riteBoonOwed,
     riteDebt,
@@ -480,6 +529,7 @@ export function normalizeCheckpoint(cp: RunCheckpoint): RunCheckpoint {
     version: 1,
     seed: cp.seed,
     weapon: cp.weapon,
+    contract: cp.contract,
     roomId: cp.roomId,
     hp: cp.hp,
     maxHp: cp.maxHp,
@@ -488,6 +538,7 @@ export function normalizeCheckpoint(cp: RunCheckpoint): RunCheckpoint {
     boonBits: cp.boonBits,
     boons: cp.boons.map(b => ({ id: b.id, stacks: b.stacks })),
     history: cloneHistory(cp.history),
+    clearedRoomIds: [...new Set(cp.clearedRoomIds)],
     riteAnswer: cp.riteAnswer,
     riteBoonOwed: cp.riteBoonOwed,
     riteDebt: cp.riteDebt,

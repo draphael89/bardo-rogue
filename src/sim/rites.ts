@@ -3,6 +3,8 @@ import type { InputFrame } from './input'
 import type { World } from './world'
 import { startWaves, queueSpawn } from './waves'
 import { parkForModal } from './session'
+import { SLICE_ECHO_COMMIT, SLICE_ECHO_CUT } from './content/waves'
+import { contractById } from './contracts'
 
 // A rite is the run's one non-combat beat: something the realm asks of you between fights.
 //
@@ -124,15 +126,22 @@ export function updateRite(world: World, input: InputFrame): void {
  */
 export function beginRoomFight(world: World): void {
   const room = world.rooms[world.roomIndex]
+  const contract = world.session.run?.contract
+  // Cocytus is the authored echo of the first fork. The room remains one catalog entry; the run's
+  // explicit contract chooses its phrase and makes its second reward keep the original promise.
+  const waves = room.id === 'cocytus' && contract
+    ? (contract === 'commit' ? SLICE_ECHO_COMMIT : SLICE_ECHO_CUT)
+    : room.waves
+  if (room.id === 'cocytus' && contract) room.reward = contractById(contract).family
   // Only into a room that is going to run waves: a body queued into a room with no wave tracking
   // would arrive after the door had already opened, with nothing left to clear it.
-  if (room.boss && room.waves?.length) collectDebt(world)
+  if (room.boss && waves?.length) collectDebt(world)
   // Gated on the boss room exactly as the debt is. LEAVE HIM promises "He follows you to the judge"
   // (mystery.ts), but an ungated collect consumed the hunt in whichever combat room came next --
   // Cocytus or the Antechamber -- so the one consequence the choice sells never reached Minos.
-  if (room.boss && room.waves?.length) collectHunt(world)
-  if (room.waves?.length) {
-    startWaves(world, room.waves)
+  if (room.boss && waves?.length) collectHunt(world)
+  if (waves?.length) {
+    startWaves(world, waves)
     world.roomPhase = 'fighting'
   } else {
     world.roomPhase = room.exits?.length ? 'exits' : 'resolved'

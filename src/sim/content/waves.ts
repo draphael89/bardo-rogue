@@ -61,25 +61,29 @@ export const CROSSING_RUN_WAVES: WaveDef[] = [
   ] }] },
 ]
 
-// The production slice is authored as distinct questions, not escalating piles.
-// Room 1 teaches commitment; the branches test movement or priority; the Landing is the
-// breath; the Reach combines the verbs; the Antechamber teaches the shield alone, then Minos.
-// Delays are short enough to preserve momentum but long enough for each arrival tell to register.
+// The production slice is authored as distinct questions, not escalating piles. Acheron calibrates
+// the blade, then the first fork asks the player to choose a sentence: COMMIT or CUT. That sentence
+// is taught here and echoed once in Cocytus before the solo shield exam and Minos. Each phrase is
+// authored from the existing bodies; no runtime director is allowed to turn it into enemy soup.
 export const SLICE_ROOM_1: WaveDef[] = [{ groups: [{ delay: 0, spawns: [
   { kind: 'brute', x: 8, y: 5 },
   { kind: 'brute', x: 19, y: 6 },
 ] }] }]
 
 export const SLICE_ROOM_2_VEIL: WaveDef[] = [{ groups: [
-  { delay: 0, spawns: [{ kind: 'caster', x: 13, y: 4 }] },
-  { delay: 55, spawns: [{ kind: 'charger', x: 4, y: 9 }] },
-  { delay: 32, spawns: [{ kind: 'charger', x: 22, y: 10 }] },
+  // CUT: read and cross a firing line, then prove the answer against a body that holds ground.
+  { delay: 0, spawns: [
+    { kind: 'caster', x: 4, y: 4 },
+    { kind: 'caster', x: 22, y: 9 },
+  ] },
+  { delay: 24, whenRemainingAtMost: 0, spawns: [{ kind: 'brute', x: 13, y: 5 }] },
 ] }]
 
 export const SLICE_ROOM_2_BLADE: WaveDef[] = [{ groups: [
-  { delay: 0, spawns: [
-    { kind: 'brute', x: 13, y: 5 },
-    { kind: 'caster', x: 4, y: 4 },
+  // COMMIT: hold against one body, then carry that commitment through a screened back line.
+  { delay: 0, spawns: [{ kind: 'brute', x: 13, y: 5 }] },
+  { delay: 24, whenRemainingAtMost: 0, spawns: [
+    { kind: 'brute', x: 9, y: 5 },
     { kind: 'caster', x: 22, y: 4 },
   ] },
 ] }]
@@ -105,6 +109,27 @@ export const SLICE_COCYTUS: WaveDef[] = [{ groups: [
   { delay: 36, whenRemainingAtMost: 1, spawns: [
     { kind: 'charger', x: 22, y: 10 },
     { kind: 'caster', x: 21, y: 4 },
+  ] },
+] }]
+
+/** COMMIT returns as a screen-rush, then takes the screen away and asks for one clean hold. */
+export const SLICE_ECHO_COMMIT: WaveDef[] = [{ groups: [
+  { delay: 0, spawns: [
+    { kind: 'brute', x: 13, y: 5 },
+    { kind: 'charger', x: 22, y: 10 },
+  ] },
+  { delay: 24, whenRemainingAtMost: 0, spawns: [{ kind: 'brute', x: 8, y: 5 }] },
+] }]
+
+/** CUT returns behind a screen, then removes it and crosses two readable dash lanes. */
+export const SLICE_ECHO_CUT: WaveDef[] = [{ groups: [
+  { delay: 0, spawns: [
+    { kind: 'brute', x: 9, y: 5 },
+    { kind: 'caster', x: 21, y: 4 },
+  ] },
+  { delay: 24, whenRemainingAtMost: 0, spawns: [
+    { kind: 'charger', x: 5, y: 10 },
+    { kind: 'charger', x: 21, y: 10 },
   ] },
 ] }]
 

@@ -6,6 +6,8 @@ import { Rng } from '@/sim/rng'
 import { serializeSave, parseSave, defaultSave } from '@/sim/save'
 import { createWorld } from '@/sim/scenarios'
 import { prepareWeapon, startRun } from '@/sim/session'
+import { buildSliceRooms, FIXED_ROUTE, installRoute, LATE_SHOP } from '@/sim/route'
+import { SLICE_ECHO_CUT } from '@/sim/content/waves'
 
 function beginFirstCombat(seed = 11) {
   const world = createWorld(seed, 'loop')
@@ -64,6 +66,76 @@ describe('node-boundary checkpoint', () => {
     expect(parsed.save.checkpoint?.roomId).toBe(live.rooms[live.roomIndex]!.id)
     expect(parsed.save.checkpoint?.map?.nodes.map(n => n.id)).toEqual(snap.map?.nodes.map(n => n.id))
     expect(serializeSave(parsed.save)).toBe(raw)
+  })
+
+  it('round-trips the chosen contract and unique clear ledger', () => {
+    const live = beginFirstCombat()
+    live.session.run!.contract = 'commit'
+    live.session.run!.clearedRoomIds = ['threshold']
+    const snap = captureCheckpoint(live)!
+    const parsed = parseCheckpoint({ ...snap, clearedRoomIds: ['threshold', 'threshold'] })!
+    expect(parsed.contract).toBe('commit')
+    expect(parsed.clearedRoomIds).toEqual(['threshold'])
+
+    const fresh = createWorld(11, 'loop')
+    expect(restoreCheckpoint(fresh, parsed)).toBe(true)
+    expect(fresh.session.run?.contract).toBe('commit')
+    expect(fresh.session.run?.clearedRoomIds).toEqual(['threshold'])
+  })
+
+  it('defaults fields missing from an older checkpoint', () => {
+    const snap = captureCheckpoint(beginFirstCombat())!
+    const { contract: _contract, clearedRoomIds: _clears, ...older } = snap
+    expect(parseCheckpoint(older)).toMatchObject({ contract: null, clearedRoomIds: [] })
+  })
+
+  it('infers the chosen sentence and prior clears from a first-gate checkpoint written before those fields', () => {
+    const live = beginFirstCombat()
+    enterRoomById(live, 'veil-path')
+    enterRoomById(live, 'black-step')
+    enterRoomById(live, 'cocytus')
+    const { contract: _contract, clearedRoomIds: _clears, ...older } = captureCheckpoint(live)!
+
+    const parsed = parseCheckpoint(older)!
+    expect(parsed.contract).toBe('cut')
+    expect(parsed.clearedRoomIds).toEqual(['threshold', 'veil-path', 'black-step'])
+
+    const fresh = createWorld(11, 'loop')
+    expect(restoreCheckpoint(fresh, parsed)).toBe(true)
+    expect(fresh.session.run?.contract).toBe('cut')
+    expect(fresh.waveDefs).toBe(SLICE_ECHO_CUT)
+    expect(fresh.rooms[fresh.roomIndex]?.reward).toBe('veil')
+  })
+
+  it('finishes a checkpoint from a retired route on that route without inventing a contract', () => {
+    const live = createWorld(23, 'loop')
+    prepareWeapon(live, 'blade')
+    startRun(live, 'threshold')
+    installRoute(live, buildSliceRooms(LATE_SHOP, FIXED_ROUTE), LATE_SHOP)
+    enterRoomById(live, 'threshold')
+    enterRoomById(live, 'veil-path')
+    enterRoomById(live, 'cocytus')
+    const { contract: _contract, clearedRoomIds: _clears, ...older } = captureCheckpoint(live)!
+    const parsed = parseCheckpoint(older)!
+
+    expect(parsed.contract).toBeNull()
+    expect(parsed.clearedRoomIds).toEqual(['threshold', 'veil-path'])
+    const fresh = createWorld(23, 'loop')
+    expect(restoreCheckpoint(fresh, parsed)).toBe(true)
+    expect(fresh.session.run?.map?.template).toBe(LATE_SHOP.id)
+    expect(fresh.rooms[fresh.roomIndex]?.id).toBe('cocytus')
+  })
+
+  it('hashes both the contract and ordered clear ledger', () => {
+    const a = beginFirstCombat(17)
+    const b = beginFirstCombat(17)
+    expect(hashWorld(a)).toBe(hashWorld(b))
+    a.session.run!.contract = 'cut'
+    expect(hashWorld(a)).not.toBe(hashWorld(b))
+    b.session.run!.contract = 'cut'
+    expect(hashWorld(a)).toBe(hashWorld(b))
+    a.session.run!.clearedRoomIds.push('threshold')
+    expect(hashWorld(a)).not.toBe(hashWorld(b))
   })
 
   it('drops a damaged checkpoint and keeps the profile', () => {

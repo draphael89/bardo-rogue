@@ -25,5 +25,8 @@ export function updateEnemies(world: World): void {
       default: { const _n: never = e.kind; void _n }
     }
     applyEnemyKnockback(world, e)
+    // An attack above may have ended the run. Do not tick a later body's status or AI behind the
+    // terminal event on this same simulation tick.
+    if (world.scenario === 'loop' && world.session.run && world.session.run.result !== 'active') return
   }
 }

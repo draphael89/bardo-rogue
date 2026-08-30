@@ -59,6 +59,9 @@ export function updateProjectiles(world: World): void {
       }
       hurtPlayer(world, b.angle, b.damage, src, true, b.sentence)
       b.active = false
+      // A lethal bolt ends the attempt at this contact. Later pool slots must not move, expire, or
+      // emit wall hits behind the runLost event on the same tick.
+      if (world.scenario === 'loop' && world.session.run && world.session.run.result !== 'active') return
     } else if (d <= grazeR) {
       noteNearMiss(world, b.angle, b.x, b.y, 'projectile')
     }

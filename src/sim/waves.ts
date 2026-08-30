@@ -4,9 +4,10 @@ import { TILE, setDoorWalkable } from './arena'
 import { clearBulletTime } from './combat'
 import { overlapsSolid } from './collision'
 import { grantClearObols } from './economy'
-import { finishRun } from './session'
+import { finishRun, recordRoomClear } from './session'
 import { placeShrine } from './shrine'
 import type { SpawnDef, WaveDef, WaveGroup } from './content/waves'
+import { contractById } from './contracts'
 
 export type { SpawnDef, WaveGroup, WaveDef } from './content/waves'
 export {
@@ -52,6 +53,12 @@ export function updateSpawnQueue(world: World): void {
     if (s.ticksLeft <= 0) {
       const spawned = world.spawnEnemy(s.kind, s.x, s.y)
       if (!spawned) continue
+      // The first fork's final clause: COMMIT begins with Minos's body, CUT with his veil. From the
+      // second action onward both use the existing deterministic three-pattern sentence.
+      const contract = world.session.run?.contract
+      if (spawned.kind === 'warden' && contract) {
+        spawned.patternCursor = contractById(contract).minosOpening === 'ring' ? 1 : 0
+      }
       // The account is read out when the body is standing in the room, not when its mark went down
       // two and a half seconds earlier under a room-name banner nobody could see past.
       if (s.debt) {
@@ -134,6 +141,7 @@ export function updateWaves(world: World): void {
       const production = world.scenario === 'loop'
       const reward = production ? room.reward : undefined
       const victory = production && !!room.boss
+      if (production) recordRoomClear(world, room.id)
       // The flag means "the way onward is open", so it is only ever raised when there IS a way
       // onward. Raising it in an exit-less debug room made the clear play a door-opening sound and
       // flare the door glow over doors that (correctly) stayed shut.

@@ -2,7 +2,7 @@ import { tuning } from '@/tuning'
 import { applyTownHealth } from './session'
 import type { World } from './world'
 
-export type SmithBeat = 'stranger' | 'afterDeath' | 'afterVictory' | 'unburied' | 'sold' | 'vesselWait' | 'vesselSold' | 'owned'
+export type SmithBeat = 'stranger' | 'afterDeath' | 'afterVictory' | 'unburied' | 'commit' | 'cut' | 'sold' | 'vesselWait' | 'vesselSold' | 'owned'
 
 const KEPT_WORDS = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten'] as const
 
@@ -17,6 +17,8 @@ export const SMITH_LINES: Record<SmithBeat, string> = {
   afterDeath: 'You came back thinner. The anvil still spends.',
   afterVictory: 'Minos named you. I do not.',
   unburied: 'You left one on the bank. He will not stay there.',
+  commit: 'You chose the weight. The judge keeps the circle.',
+  cut: 'You chose the crossing. The judge keeps the veil.',
   sold: 'Once a descent I will turn the offer. After that you live with it.',
   get vesselWait() {
     return `${keptCount(tuning.economy.smith.vesselCost)} of what you kept. A cup that does not spill on the way home.`
@@ -30,6 +32,7 @@ function beatOf(world: World, bought: 'reroll' | 'vessel' | null): SmithBeat {
   // The one you left is the first thing he is allowed to say. A cup bought on the same
   // step still stays; its line waits for the next approach.
   if (world.session.lastMystery === 'leave') return 'unburied'
+  if (world.session.lastAttempt?.contract) return world.session.lastAttempt.contract
   if (bought === 'reroll') return 'sold'
   if (bought === 'vessel') return 'vesselSold'
   if (m.rerollUnlocked && m.vesselUnlocked) return 'owned'
@@ -73,5 +76,6 @@ export function tryTalkSmith(world: World): void {
   }
   const beat = beatOf(world, bought)
   if (beat === 'unburied') world.session.lastMystery = null
+  if (beat === 'commit' || beat === 'cut') world.session.lastAttempt = null
   world.emit({ type: 'smithSpoke', beat, line: SMITH_LINES[beat], x: smith.x, y: smith.y })
 }

@@ -7,6 +7,7 @@ import { SLOW_FULL, type World } from './world'
 import { ARM, grantArm } from './weapons'
 import { Rng, STREAM, streamSeed } from './rng'
 import { buildSliceRooms, installRoute, templateForSeed, type RunMap } from './route'
+import type { ContractId } from './contracts'
 import { tuning } from '@/tuning'
 
 // 'claiming' is the beat between the last body dropping and a god standing on the screen: the room
@@ -56,6 +57,12 @@ export interface MysteryOffer {
 /** How the run answered the realm's one rite. `null` until it has been asked and answered. */
 export type RiteAnswer = null | 'paid' | 'refused'
 
+export interface AttemptSummary {
+  contract: ContractId | null
+  result: Exclude<RunResult, 'active'>
+  killedBy: DeathKind
+}
+
 export interface RunState {
   seed: number
   weapon: ArmId
@@ -91,6 +98,10 @@ export interface RunState {
   boundaryRng: number
   /** One reforging of a boon offer, earned from the Smith. */
   rerolls: number
+  /** The sentence chosen at the first authored fork. */
+  contract: ContractId | null
+  /** Authored rooms whose final wave actually cleared, in clear order. */
+  clearedRoomIds: string[]
 }
 
 export interface MetaStateV1 {
@@ -111,6 +122,8 @@ export interface GameSessionState {
   lastBanked: number
   /** What you told the Unburied, if you met him. Town reads this once. */
   lastMystery: MysteryChoice | null
+  /** Compact account of the finished descent. Town reads this once. */
+  lastAttempt: AttemptSummary | null
 }
 
 export function defaultMetaState(): MetaStateV1 {
@@ -150,6 +163,7 @@ export function makeSessionState(meta: MetaStateV1 = defaultMetaState()): GameSe
     run: null,
     lastBanked: 0,
     lastMystery: null,
+    lastAttempt: null,
   }
 }
 
@@ -171,6 +185,7 @@ export function startRun(world: World, firstRoomId: string): boolean {
   world.session.meta.attempts = attempt
   world.session.lastBanked = 0
   world.session.lastMystery = null
+  world.session.lastAttempt = null
   world.player.hp = world.player.maxHp = townMaxHp(world.session.meta)
   world.session.run = {
     seed: runSeed,
@@ -199,6 +214,8 @@ export function startRun(world: World, firstRoomId: string): boolean {
     map: null,
     boundaryRng: 0,
     rerolls: world.session.meta.rerollUnlocked ? 1 : 0,
+    contract: null,
+    clearedRoomIds: [],
   }
   world.rng = new Rng(runSeed)
   world.boonBits = 0
@@ -240,15 +257,26 @@ export function recordRoomEntry(world: World, id: string, via?: DoorMark): void 
   run.roomHistory.push({ id, enteredTick: world.tick, ...(via ? { via } : {}) })
 }
 
+/** Record one authored room only when its final wave clears. Replays and saves preserve the order. */
+export function recordRoomClear(world: World, id: string): boolean {
+  const run = world.session.run
+  if (!run || run.result !== 'active') return false
+  if (world.rooms[world.roomIndex]?.id !== id) return false
+  if (run.clearedRoomIds.includes(id)) return false
+  run.clearedRoomIds.push(id)
+  return true
+}
+
 export function finishRun(world: World, result: Exclude<RunResult, 'active'>): void {
   const run = world.session.run
   if (!run || run.result !== 'active') return
   run.result = result
   if (result === 'won') world.session.meta.victories++
-  const gained = run.depth * tuning.economy.remembrancePerDepth
+  const gained = run.clearedRoomIds.length * tuning.economy.remembrancePerDepth
     + (result === 'won' ? tuning.economy.remembranceOnVictory : 0)
   world.session.meta.remembrances += gained
   world.session.lastBanked = gained
+  world.session.lastAttempt = { contract: run.contract, result, killedBy: run.killedBy }
   world.roomPhase = 'resolved'
   world.phaseTick = world.tick
   world.emit({ type: 'remembrancesBanked', amount: gained, total: world.session.meta.remembrances })

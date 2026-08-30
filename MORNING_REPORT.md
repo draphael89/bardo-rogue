@@ -110,12 +110,13 @@ user-only gates.** No agent or automated play awarded them.
 | Web package | `pnpm build` green; shipped 2.110 MB vs 4.096 MB budget, 174 files |
 | Browser smoke | `pnpm smoke -- --url http://localhost:5201` green, real keyboard and both endings |
 | Viewport transitions | `pnpm smoke:viewport -- --url http://localhost:5201` green through 640×360 → 1400×600 → 390×844 → 1920×700 → 900×506 → 640×360 for both title and game HUD; target and UI bounds remain contained, tick stays 0 |
-| Room art | `pnpm room:gate` green, including dimensions, alpha, palette, material spans, negative space, value, highlights, and focality |
+| Room art | `pnpm room:gate` owns every render and is green across Bardo, Acheron, Lethe, Landing, Cocytus, Antechamber, and Minos, including dimensions, alpha, palette, material spans, negative space, value, highlights, and focality; two complete outputs are byte-identical at SHA-256 `f4cd248824c4e574671d57692ac400816942acee56e11655c4dff32971711180` |
 | Realm separation | `pnpm realm-air -- --url http://localhost:5201` owns every render; three clean-room outputs are byte-identical. Median RGB distance 11.31, closest 2.95, widest 16.91, zero temperature violations; no arbitrary pass threshold invented |
 | Regeneration | `pnpm palette` and `pnpm tiles` deterministic; the 192×288 room sheet and 192×192 prop sheet regenerate byte-identically with no unexplained drift |
 | Shipping sprite gates | 78/3 waived general, 144/2 hero, 144/4 north, 40/1 north roll, 145/2 south, 40/1 south roll; zero blocking |
 | Candidate stress | `pnpm art:stress-hero` green for dagger and heavy; all four regenerated 1×/black-test artifacts byte-identical to committed exhibits; candidate-only, with in-game motion and user Look still open |
 | Desktop | `pnpm desktop:build` green; isolated `pnpm smoke:desktop` green across 23 checks and 6 launches |
+| Performance | SwiftShader exact-head probes: Warden render p50 1.2 ms / p95 2.2 ms; synthetic 32-enemy + 64-projectile render stress p50 24–25 ms / p95 31–32 ms with render-only hash unchanged. Pinned replay and dense sim each repeated 100× with stable hashes; stress figures are not a native-GPU or Fun claim |
 | Deterministic visual evidence | `pnpm shot ... --visualMs N` owns every render from before boot. Five independent pinned-replay captures at tick 400 + visual 500 ms are byte-identical, SHA-256 `abebb71e7b498e456847a8596f3f091e44234df6ca6877cb4841ff5501a78063`; three title boots are byte-identical at `c1318840345230773edac472c8d31e25f78f4ce3b719954c83a85075abfc4bb4`; two independent captures match at each of the four descent phases. |
 | Viewport boundary evidence | 390×844 title SHA-256 `ed3d89b4a1a7225ce1100589116c275c75575a0593648811d3066cd01fc9b8d1`; 390×844 game `ebcc7c8c21b34bdd12d1ce29f1439aa953f863a8efc15f8d492e6d5659fd3969`; 900×506 title `becb27e095f6a2f2b0e3c4348b3de7344fc90e81e4e510c0d30ecd39855c7446` |
 

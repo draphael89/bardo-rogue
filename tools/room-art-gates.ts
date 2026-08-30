@@ -4,7 +4,7 @@
 //   pnpm room:gate -- --url http://localhost:5201 --shot-dir shots/room-gates
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import { chromium, type Page } from '@playwright/test'
+import { chromium } from '@playwright/test'
 import sharp from 'sharp'
 import { canon, luminance, rgbToHex, type RGB } from './art/palette'
 import { buildArena, interior, PROP, T, TILE, type Arena } from '../src/sim/arena'
@@ -126,28 +126,41 @@ async function frameMetrics(png: Buffer, points: Array<{ x: number; y: number }>
   }
 }
 
-async function settle(page: Page): Promise<void> {
-  await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))))
-}
-
 async function runtime(url: string, shotDir?: string): Promise<RuntimeRoom[]> {
   const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] })
   const page = await browser.newPage({ viewport: { width: 640, height: 360 }, deviceScaleFactor: 1 })
+  // Own every render from before boot. A fixed sim state is not a fixed image when free-running
+  // zero-dt frames still consume seeded FX and change the room light sampled by the gate.
+  await page.addInitScript({ content: `{
+    Object.defineProperty(performance, 'now', { configurable: true, value: () => 0 });
+    window.requestAnimationFrame = callback => { window.__roomGateRaf = callback; return 1; };
+    window.cancelAnimationFrame = () => {};
+  }` })
   await page.goto(url + (url.includes('?') ? '&' : '?') + 'scenario=loop&seed=1&view=640', { waitUntil: 'networkidle' })
-  await page.waitForFunction(() => !!(window as unknown as { __game?: unknown }).__game)
+  await page.waitForFunction(() => !!(window as unknown as { __game?: unknown }).__game, null, { polling: 50 })
+  await page.evaluate(() => {
+    const g = (window as unknown as { __game: any }).__game
+    g.pause(true)
+    g.loop.stop()
+    const hooks = g.loop.hooks
+    if (typeof hooks?.render !== 'function') throw new Error('room-art-gates: Loop.hooks.render is unreachable')
+    ;(window as any).__roomGateRender = () => hooks.render(1, 1 / 60)
+  })
   const rooms: RuntimeRoom[] = []
-  for (const id of ['bardo', 'threshold', 'veil-path']) {
-    await page.evaluate((roomId) => {
+  for (const id of ['bardo', 'threshold', 'veil-path', 'black-step', 'cocytus', 'antechamber', 'warden']) {
+    const actual = await page.evaluate((roomId) => {
       const g = (window as unknown as { __game: any }).__game
       g.title(false)
       if (roomId !== 'bardo') { g.gotoRoom(roomId, { skipRite: true }); g.step(1) }
+      for (let i = 0; i < 40; i++) (window as any).__roomGateRender()
+      return g.state().room.id as string
     }, id)
-    await settle(page)
+    if (actual !== id) throw new Error(`room-art-gates: requested ${id}, remained in ${actual}`)
     // Audio permission can finish booting after __game exists and raise WAKE THE ROOM. The room
     // frame gate is not allowed to pass on bright title typography, so hide once more after boot's
     // async boundary and only then sample the live composite.
     await page.evaluate(() => (window as unknown as { __game: any }).__game.title(false))
-    await settle(page)
+    await page.evaluate(() => (window as any).__roomGateRender())
     const room = await page.evaluate((roomId) => {
       const g = (window as unknown as { __game: any }).__game
       const p = g.presenter

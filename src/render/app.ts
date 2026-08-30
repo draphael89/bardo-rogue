@@ -45,8 +45,8 @@ export function fitViewWidth(override = 0): number {
   return Math.max(640, Math.min(1024, Math.round((tuning.view.height * aspect) / 16) * 16))
 }
 
-export function fitPhysicalScale(w: number, h: number, width: number, height: number, dpr: number): number {
-  const fit = Math.min(w * dpr / width, h * dpr / height)
+export function physicalFitScale(fit: number): number {
+  if (!Number.isFinite(fit) || fit <= 0) return 1
   if (fit < 1) return fit
   const integer = Math.floor(fit)
   return integer / fit < 0.7 ? fit : integer
@@ -110,7 +110,8 @@ export async function createRenderApp(parent: HTMLElement, viewOverride = 0): Pr
       // Below native size, fitting beats cropping: a small window must still expose the whole title
       // and playfield. At native size and above, prefer whole physical pixels unless that would waste
       // more than ~30% of the window.
-      const phys = fitPhysicalScale(w, h, width, height, dpr)
+      const fit = Math.min(w * dpr / width, h * dpr / height)
+      const phys = physicalFitScale(fit)
       const s = phys / dpr
       ra.scale = s
       app.renderer.resize(w, h)

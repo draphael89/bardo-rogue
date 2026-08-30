@@ -29,7 +29,7 @@
       const w = g.world;
       for (let i=0; i<32; i++) w.spawnEnemy('dummy', 75+(i%8)*38, 65+Math.floor(i/8)*34);
       while (w.projectiles.length < bolts) w.projectiles.push({ ...w.projectiles[0], active: false });
-      for (let i=0; i<bolts; i++) w.fireProjectile(72+(i%20)*14, 55+Math.floor(i/20)*13, i*.3, 0, 2, 100000);
+      for (let i=0; i<bolts; i++) w.fireProjectile(72+(i%20)*14, 55+Math.floor(i/20)*13, i*.3, 0, 2, 100000, 0, 1, 0, 'bolt', 'caster');
       g.presenter.particles.hitSparks(208,120,0,1500,0xffffff);
       for (const p of g.presenter.particles.live) { p.life=p.maxLife=100000; p.vx=p.vy=0; p.rot=0; }
       for (const filters of [true, false]) {

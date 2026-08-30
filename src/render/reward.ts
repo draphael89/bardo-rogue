@@ -10,6 +10,7 @@ import { tuning } from '@/tuning'
 import { backPause, buildStripLadder, clampPauseFocus, duoFooter, meetingVeil, offerAct, offerCardHeight, offerSpoken, pauseFooter, pauseNudge, resolvePause, shopAct, shopSpoken, showBuildStrip, townTally, victoryKeptLine, wrapPauseFocus, type PauseAct, type PausePage, type TitleNudge } from './titleMenu'
 import { fadeToBlack, label, placeCentered, placeLeft, placeRight, typeBehindPlate, wrappedCentered, wrappedExtent, P } from './ui'
 import { clamp01 } from './anim'
+import { modalInputArmed } from '@/sim/rewards'
 
 // The fight band's own row: under the life plate (y 2..28), above the play area's own business.
 const STRIP_Y = 30
@@ -199,13 +200,13 @@ export class RewardOverlay {
    */
   private reveal(world: World): void {
     const R = tuning.juice.modalReveal
+    const age = world.tick - world.phaseTick
     if (!this.animates || this.reducedEffects) {
       this.scrim.alpha = 1; this.body.tint = 0xffffff; this.g.alpha = 1
       for (const c of this.cards) { c.box.tint = 0xffffff; c.box.y = 0; c.plate.alpha = 1 }
-      this.setArmed(true)
+      this.setArmed(!this.animates || modalInputArmed(world))
       return
     }
-    const age = world.tick - world.phaseTick
     // The room you just walked up to stays legible under the veil for the first beat, so the arrival
     // lands on the room rather than on a scrim that was already there.
     const t0 = clamp01(age / R.scrimTicks)
@@ -225,7 +226,7 @@ export class RewardOverlay {
       // off the grid, which is the whole reason the type in here reads at all.
       box.y = Math.round((1 - t) * R.cardRise)
     })
-    this.setArmed(age >= tuning.run.modalArmTicks)
+    this.setArmed(modalInputArmed(world))
   }
 
   // The prompt is the only thing on screen that says whether an answer will be taken, so it is dim

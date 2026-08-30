@@ -47,3 +47,9 @@ export function conditionOfBundle(doc: unknown): PlaytestCondition | null {
   if (typeof pt !== 'object' || pt === null) return null
   return asPlaytestCondition((pt as { condition?: unknown }).condition)
 }
+
+// no-heavy is present in the recorded frames; no-dash changes tuning and therefore requires the
+// bundle wrapper. A plain Replay produced while that condition is installed would be mislabeled.
+export function canRecordPlainReplay(condition: PlaytestCondition | null): boolean {
+  return condition !== 'no-dash'
+}

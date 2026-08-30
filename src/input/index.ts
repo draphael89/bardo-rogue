@@ -257,7 +257,7 @@ export class InputSystem {
       lastAimX: this.lastAim.x, lastAimY: this.lastAim.y,
     })
     f.aimX = aim.x; f.aimY = aim.y; f.aimSoft = aim.soft
-    this.lastAim = { x: aim.x, y: aim.y }
+    if (!modal) this.lastAim = { x: aim.x, y: aim.y }
     f.attack = attack; f.attackHeld = attackHeld; f.heavy = heavy; f.dodge = dodge; f.restart = restart
     // Both modal screens take the same two keys and swallow everything else, so the sword can never
     // be swung at a menu. `entering` is the rite; `reward` is the offer.

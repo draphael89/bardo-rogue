@@ -54,12 +54,14 @@ export async function loadSave(
     // Write the recovered document straight back. On the browser that rotates the CORRUPT blob into
     // the backup slot -- preserving it for inspection -- and either way it puts good bytes in the
     // live slot before any gameplay write can rotate the good backup away underneath us.
-    if (opts.repair !== false && !preservationFailed) {
+    if (opts.repair !== false && !live.failed && !preservationFailed) {
       try { await store.write(profileId, serializeSave(backup.save)) } catch { /* recovered in memory regardless */ }
     }
     return {
       save: backup.save,
-      writable: !preservationFailed,
+      writable: !live.failed && !preservationFailed,
+      // The backup is readable progress even when the live read failed. Keep that source so the
+      // shell can still export the recovered copy; `writable` independently keeps it read-only.
       source: 'backup',
       ...(preservationFailed ? { preservationFailed: true as const } : {}),
     }

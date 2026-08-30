@@ -88,6 +88,14 @@ function bowTexture(key: string): Texture {
 
 const savedSword = new WeakMap<EntityView, Texture>()
 
+export function bowRecoveryPosition(x: number, y: number, aim: number, facing: number, u: number): { x: number; y: number } {
+  const reach = lerp(8, 4, u)
+  return {
+    x: x + Math.cos(aim) * reach * (1 - u) - facing * 5 * u,
+    y: y + Math.sin(aim) * reach * 0.8 * (1 - u) - 2 * u,
+  }
+}
+
 export function updateBow(v: EntityView, p: Player, x: number, y: number, alpha: number, time: number): void {
   const w = v.weapon!
   if (!p.armed) { w.visible = false; return }
@@ -112,9 +120,9 @@ export function updateBow(v: EntityView, p: Player, x: number, y: number, alpha:
     } else {
       key = tk < B.draw + 4 ? 'loose' : 'rest'
       const u = easeOutCubic(Math.min(1, (tk - B.draw) / B.recover))
-      const reach = lerp(8, 4, u)
-      wx = x + Math.cos(aim) * reach * (1 - u) + (x - f * 5) * u
-      wy = y + Math.sin(aim) * reach * 0.8 * (1 - u) + (y - 2) * u
+      const recovered = bowRecoveryPosition(x, y, aim, f, u)
+      wx = recovered.x
+      wy = recovered.y
       angle = lerp(aim, 0, u)
       inFront = u < 0.55
       ws = lerp(1.12, 1, Math.min(1, (tk - B.draw) / 3))

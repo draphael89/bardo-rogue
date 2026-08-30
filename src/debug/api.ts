@@ -36,7 +36,7 @@ export interface GameApi {
   mute(m?: boolean): boolean
   debug(v?: boolean): boolean
   record(on?: boolean): boolean
-  stopRecord(): Replay
+  stopRecord(): Replay | null
   download(name?: string): void
   replay(r: Replay | EncodedReplay): void
   inspectSave(): unknown
@@ -60,7 +60,7 @@ export function installApi(host: {
   debug(v?: boolean): boolean
   title(show?: boolean): boolean
   record(on?: boolean): boolean
-  stopRecord(): Replay
+  stopRecord(): Replay | null
   download(name?: string): void
   replay(r: Replay | EncodedReplay): void
   inspectSave(): unknown
@@ -73,7 +73,10 @@ export function installApi(host: {
     loop: host.loop,
     presenter: host.presenter,
     reset: (seed, scenario, opts) => host.reset(seed, scenario, opts),
-    step: (n = 1) => { for (let i = 0; i < n; i++) host.tick() },
+    step: (n = 1) => {
+      if (!Number.isSafeInteger(n) || n < 0) throw new RangeError('step count must be a non-negative safe integer')
+      for (let i = 0; i < n; i++) host.tick()
+    },
     setInput: f => host.setOverride(f ? { moveX: 0, moveY: 0, aimX: 1, aimY: 0, aimSoft: false, attack: false, attackHeld: false, heavy: false, dodge: false, restart: false, ...f } : null),
     bot: name => host.setBot(name ? makeBot(name) : null),
     pause: p => host.pause(p),
@@ -154,7 +157,10 @@ export function installApi(host: {
     inspectSave: () => host.inspectSave(),
     giveRemembrances: n => {
       const meta = host.getWorld().session.meta
-      meta.remembrances = Math.max(0, meta.remembrances + Math.floor(n))
+      if (!Number.isSafeInteger(n)) throw new RangeError('remembrance change must be a safe integer')
+      const next = meta.remembrances + n
+      if (!Number.isSafeInteger(next)) throw new RangeError('remembrance total must remain a safe integer')
+      meta.remembrances = Math.max(0, next)
       return meta.remembrances
     },
     gotoRoom: (id, opts) => {

@@ -143,6 +143,14 @@ describe('loadSave recovery', () => {
     expect(loaded.save.meta.attempts).toBe(40)
   })
 
+  it('keeps a newer backup identifiable as future rather than restored', async () => {
+    const storage = new MemoryStorage()
+    const future = '{"schemaVersion":99,"meta":{"version":1,"attempts":40},"checkpoint":{"hp":3}}'
+    storage.setItem(backupKey(ID), future)
+    const loaded = await loadSave(createStorageSaveStore(storage), ID)
+    expect(loaded).toMatchObject({ source: 'backup', writable: false, raw: future })
+  })
+
   it('seeds a fresh profile from the system reduced-motion preference', async () => {
     const loaded = await loadSave(createStorageSaveStore(new MemoryStorage()), ID, { preferredReducedEffects: true })
     expect(loaded.source).toBe('default')
@@ -253,14 +261,20 @@ describe('a read that failed is not a read that found nothing', () => {
     expect(loaded.save).toEqual(defaultSave({ profileId: ID }))
   })
 
-  it('still recovers when only the live copy is unreadable', async () => {
+  it('recovers in memory without writing when only the live copy is unreadable', async () => {
     const storage = new MemoryStorage()
     storage.setItem(backupKey(ID), serializeSave(withMeta(5)))
     const store = createStorageSaveStore(storage)
-    const loaded = await loadSave({ ...store, read: () => Promise.reject(new Error('EIO')) }, ID)
+    let writes = 0
+    const loaded = await loadSave({
+      ...store,
+      read: () => Promise.reject(new Error('EIO')),
+      write: async (...args) => { writes++; await store.write(...args) },
+    }, ID)
     expect(loaded.source).toBe('backup')
-    expect(loaded.writable).toBe(true)
+    expect(loaded.writable).toBe(false)
     expect(loaded.save.meta.attempts).toBe(5)
+    expect(writes).toBe(0)
   })
 
   it('recovers from the backup when the live copy is merely missing', async () => {

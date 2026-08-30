@@ -1,11 +1,12 @@
 import type { InputFrame } from '@/sim/input'
-import { replayToJson, type Replay } from '@/sim/replay'
+import { MAX_REPLAY_FRAMES, replayToJson, type Replay } from '@/sim/replay'
 import type { MetaStateV1 } from '@/sim/session'
 
 // Captures every frame the sim consumes while recording. Starting a recording must coincide with a fresh
 // world (main.ts resets first), otherwise the replay would begin from state it cannot reproduce.
 export class Recorder {
   recording = false
+  limitReached = false
   frames: InputFrame[] = []
   last: Replay | null = null
   private seed = 0; private scenario = ''; private god = false
@@ -15,16 +16,26 @@ export class Recorder {
     this.seed = seed; this.scenario = scenario; this.god = god
     this.meta = meta ? { ...meta, unlockedWeapons: [...meta.unlockedWeapons] } : undefined
     this.frames = []
+    this.limitReached = false
     this.recording = true
   }
 
-  capture(frame: InputFrame): void { if (this.recording) this.frames.push(frame) }
+  /** False only on the tick that automatically stops an overlong recording. */
+  capture(frame: InputFrame): boolean {
+    if (!this.recording) return true
+    if (this.frames.length >= MAX_REPLAY_FRAMES) {
+      this.recording = false
+      this.limitReached = true
+      this.last = this.replay()
+      return false
+    }
+    this.frames.push(frame)
+    return true
+  }
 
   stop(): Replay {
     this.recording = false
-    const r: Replay = { v: 1, seed: this.seed, scenario: this.scenario, frames: this.frames }
-    if (this.god) r.god = true
-    if (this.meta) r.meta = this.meta
+    const r = this.replay()
     this.last = r
     return r
   }
@@ -45,6 +56,13 @@ export class Recorder {
     if (!this.last) { console.warn('[replay] nothing recorded yet (F2 to record)'); return }
     downloadJson(name, replayToJson(this.last))
     console.log(`[replay] downloaded ${name}; move it to replays/ to use it with pnpm sim/shot --replay`)
+  }
+
+  private replay(): Replay {
+    const r: Replay = { v: 1, seed: this.seed, scenario: this.scenario, frames: this.frames }
+    if (this.god) r.god = true
+    if (this.meta) r.meta = this.meta
+    return r
   }
 }
 

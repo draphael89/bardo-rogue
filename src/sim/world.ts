@@ -201,7 +201,9 @@ export class World {
     return e
   }
 
-  fireProjectile(x: number, y: number, angle: number, speed: number, radius: number, life: number, team: 0 | 1 = 0, damage = 1, actionId = 0, kind: ProjectileKind = team === 1 ? 'arrow' : 'bolt', srcKind: EnemyKind | 'player' = 'player'): Projectile | null {
+  fireProjectile(x: number, y: number, angle: number, speed: number, radius: number, life: number, team: 0 | 1 = 0, damage = 1, actionId = 0, kind: ProjectileKind = team === 1 ? 'arrow' : 'bolt', srcKind?: EnemyKind | 'player'): Projectile | null {
+    if (team === 0 && (!srcKind || srcKind === 'player')) throw new Error('hostile projectiles require an explicit enemy source')
+    srcKind ??= 'player'
     const p = this.projectiles.find(p => !p.active)
     if (!p) { this.emit({ type: 'poolOverflow', pool: 'projectile', x, y, angle }); return null }
     p.id = this.nextProjectileId++

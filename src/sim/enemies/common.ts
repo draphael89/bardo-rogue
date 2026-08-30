@@ -16,6 +16,8 @@ export function moveToward(world: World, e: Enemy, tx: number, ty: number, speed
   const dx = tx - e.x, dy = ty - e.y
   const d = Math.hypot(dx, dy)
   if (d < 0.5) { e.vx = 0; e.vy = 0; return }
+  const startX = e.x, startY = e.y
+  const budget = speed * DT
   e.vx = dx / d * speed; e.vy = dy / d * speed
   const hit = moveWithWalls(world.arena, e, e.vx * DT, e.vy * DT, e.radius)
   // Axis sliding already handles an oblique approach. A perfectly head-on approach has no tangent,
@@ -27,15 +29,21 @@ export function moveToward(world: World, e: Enemy, tx: number, ty: number, speed
       const wx = waypointX(world.arena, waypoint) - e.x, wy = waypointY(world.arena, waypoint) - e.y
       const wd = Math.hypot(wx, wy) || 1
       e.vx = wx / wd * speed; e.vy = wy / wd * speed
-      moveWithWalls(world.arena, e, e.vx * DT, e.vy * DT, e.radius)
+      const remaining = Math.max(0, budget - Math.hypot(e.x - startX, e.y - startY))
+      if (remaining > 0) moveWithWalls(world.arena, e, e.vx / speed * remaining, e.vy / speed * remaining, e.radius)
     } else { e.vx = 0; e.vy = 0; e.orbitDir = e.orbitDir === 1 ? -1 : 1 }
   }
   if (Math.abs(e.vx) > 1) e.facing = e.vx > 0 ? 1 : -1
 }
 
-export function moveAlong(world: World, e: Enemy, angle: number, speed: number): { hitX: boolean; hitY: boolean } {
+export function moveAlong(world: World, e: Enemy, angle: number, speed: number, distance = speed * DT): { hitX: boolean; hitY: boolean; moved: number } {
+  const x = e.x, y = e.y
   e.vx = Math.cos(angle) * speed; e.vy = Math.sin(angle) * speed
-  return moveWithWalls(world.arena, e, e.vx * DT, e.vy * DT, e.radius)
+  const hit = moveWithWalls(world.arena, e, Math.cos(angle) * distance, Math.sin(angle) * distance, e.radius) as {
+    hitX: boolean; hitY: boolean; moved: number
+  }
+  hit.moved = Math.hypot(e.x - x, e.y - y)
+  return hit
 }
 
 export function applyEnemyKnockback(world: World, e: Enemy): void {

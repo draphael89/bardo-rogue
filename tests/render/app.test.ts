@@ -1,17 +1,19 @@
 import { describe, expect, it } from 'vitest'
-import { fitPhysicalScale } from '@/render/app'
+import { physicalFitScale } from '@/render/app'
 
-describe('render target fitting', () => {
-  it('downscales below the native target instead of cropping it', () => {
-    expect(fitPhysicalScale(390, 844, 640, 360, 1)).toBeCloseTo(390 / 640)
+describe('physical render fit', () => {
+  it('shrinks below one physical pixel when the target is larger than the viewport', () => {
+    expect(physicalFitScale(0.75)).toBe(0.75)
+    expect(physicalFitScale(Math.min(390 / 640, 844 / 360))).toBeCloseTo(390 / 640)
   })
 
-  it('keeps whole physical pixels when they use most of the window', () => {
-    expect(fitPhysicalScale(900, 506, 640, 360, 1)).toBe(1)
-    expect(fitPhysicalScale(1280, 720, 640, 360, 1)).toBe(2)
+  it('keeps useful integer fits and falls back when rounding wastes too much room', () => {
+    expect(physicalFitScale(2.5)).toBe(2)
+    expect(physicalFitScale(2.9)).toBe(2.9)
   })
 
-  it('uses a fractional fit rather than wasting most of a larger window', () => {
-    expect(fitPhysicalScale(1024, 768, 640, 360, 1)).toBeCloseTo(1.6)
+  it('rejects invalid fit values', () => {
+    expect(physicalFitScale(Number.NaN)).toBe(1)
+    expect(physicalFitScale(0)).toBe(1)
   })
 })

@@ -104,9 +104,9 @@ describe('rng streams', () => {
 describe('pool overflow is observable', () => {
   it('emits poolOverflow instead of dropping a shot silently', () => {
     const w = createWorld(1, 'empty')
-    for (let i = 0; i < MAX_PROJECTILES; i++) expect(w.fireProjectile(32, 48, 0, 0, 1, 100000)).not.toBeNull()
+    for (let i = 0; i < MAX_PROJECTILES; i++) expect(w.fireProjectile(32, 48, 0, 0, 1, 100000, 0, 1, 0, 'bolt', 'caster')).not.toBeNull()
     w.events.length = 0
-    expect(w.fireProjectile(10, 20, 0.5, 50, 3, 60)).toBeNull()
+    expect(w.fireProjectile(10, 20, 0.5, 50, 3, 60, 0, 1, 0, 'bolt', 'caster')).toBeNull()
     expect(w.events).toEqual([{ type: 'poolOverflow', pool: 'projectile', x: 10, y: 20, angle: 0.5 }])
   })
 

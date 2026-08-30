@@ -127,6 +127,7 @@ export interface Sheet {
 }
 
 const EMPTY_SOCKETS: Record<string, readonly [number, number]> = Object.freeze({})
+const hasOwn = (record: object, key: PropertyKey): boolean => Object.prototype.hasOwnProperty.call(record, key)
 
 export function validateSheetDef(def: SheetDef, where: string): void {
   const fail = (m: string): never => { throw new Error(`sheet ${where}: ${m}`) }
@@ -168,10 +169,10 @@ export function validateSheetDef(def: SheetDef, where: string): void {
     }
   }
   for (const [alias, target] of Object.entries(def.aliases ?? {})) {
-    if (def.frames[alias]) fail(`alias "${alias}" collides with a real frame name`)
-    if (!def.frames[target]) fail(`alias "${alias}" points at unknown frame "${target}"`)
+    if (hasOwn(def.frames, alias)) fail(`alias "${alias}" collides with a real frame name`)
+    if (!hasOwn(def.frames, target)) fail(`alias "${alias}" points at unknown frame "${target}"`)
   }
-  const resolvable = (n: string): boolean => !!def.frames[n] || !!def.aliases?.[n]
+  const resolvable = (n: string): boolean => hasOwn(def.frames, n) || (!!def.aliases && hasOwn(def.aliases, n))
   for (const [name, clip] of Object.entries(def.clips ?? {})) {
     if (!clip.frames?.length) fail(`clip "${name}" has no frames`)
     for (const fr of clip.frames) if (!resolvable(fr)) fail(`clip "${name}" references unknown frame "${fr}"`)
@@ -202,17 +203,17 @@ export function bindSheet(def: SheetDef, source: Texture, whiteSource: Texture):
   })
   return {
     def,
-    has: name => name in def.frames || !!def.aliases?.[name],
+    has: name => hasOwn(def.frames, name) || (!!def.aliases && hasOwn(def.aliases, name)),
     names: () => Object.keys(def.frames).sort((a, b) => def.frames[a].i - def.frames[b].i),
     frame(name: string): SheetFrameView {
       // Resolve the alias FIRST, so an alias and its target share one cache entry and therefore one
       // Texture. Caching per name minted a second Texture for the same cell, and every consumer that
       // keys a map on texture identity (the player rim's white-silhouette lookup, the shatter
       // sub-texture cache) missed on it — the rim stamped the coloured body instead of a silhouette.
-      const key = def.frames[name] ? name : (def.aliases?.[name] ?? name)
+      const key = hasOwn(def.frames, name) ? name : (def.aliases && hasOwn(def.aliases, name) ? def.aliases[name] : name)
       const hit = cache.get(key)
       if (hit) return hit
-      const f = def.frames[key]
+      const f = hasOwn(def.frames, key) ? def.frames[key] : undefined
       if (!f) throw new Error(`sheet ${def.id}: no frame "${name}"`)
       const view: SheetFrameView = {
         name: key,

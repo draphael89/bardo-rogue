@@ -62,6 +62,10 @@ export function deityFor(family: RewardFamily): Deity {
   return family === 'blade' ? DEITIES.fury.id : DEITIES.hecate.id
 }
 
+export function modalInputArmed(world: World): boolean {
+  return world.tick - world.phaseTick >= tuning.run.modalArmTicks
+}
+
 export function offerReward(world: World, family: RewardFamily, fromRite = false): void {
   const run = world.session.run
   if (!run || run.result !== 'active') return
@@ -108,7 +112,7 @@ export function updateReward(world: World, input: InputFrame): void {
   // player who already knows the card they want loses nothing to the wait. Only the irreversible
   // half is held. The input layer clears latched presses at the same boundary; this is the
   // deterministic half of that guard, and the half a replay or a bot also has to obey.
-  if (world.tick - world.phaseTick < tuning.run.modalArmTicks) return
+  if (!modalInputArmed(world)) return
   if (input.reroll) {
     if (!run || run.rerolls <= 0) return
     run.rerolls--

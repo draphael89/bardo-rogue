@@ -64,7 +64,7 @@ describe('combat slow-motion', () => {
   it('a perfect dodge triggers it, and a second read cannot restack it', () => {
     const w = createWorld(1, 'empty')
     const p = w.player
-    w.fireProjectile(p.x + 30, p.y, Math.PI, 110, 3, 200)
+    w.fireProjectile(p.x + 30, p.y, Math.PI, 110, 3, 200, 0, 1, 0, 'bolt', 'caster')
     stepWorld(w, { ...emptyInput(), dodge: true, moveX: 1 })
     w.events.length = 0
     let sawDodged = false
@@ -95,7 +95,7 @@ describe('combat slow-motion', () => {
     const w = createWorld(1, 'empty')
     forceSlow(w, 400)
     w.player.hp = 1
-    w.fireProjectile(w.player.x + 8, w.player.y, Math.PI, 110, 3, 60)
+    w.fireProjectile(w.player.x + 8, w.player.y, Math.PI, 110, 3, 60, 0, 1, 0, 'bolt', 'caster')
     for (let t = 0; t < 60 && w.player.state !== 'dead'; t++) { stepWorld(w, emptyInput()); w.events.length = 0 }
     expect(w.player.state).toBe('dead')
     expect(w.slowRate, 'death slow-mo would otherwise compose to 1/16 speed').toBe(SLOW_FULL)
@@ -111,7 +111,7 @@ describe('combat slow-motion', () => {
 
     // Hand the caster a bolt in a place we control, rather than waiting for one and then chasing it
     // around the room. The cut itself still goes through the real blade path in updatePlayer.
-    const bolt = w.fireProjectile(p.x + 20, p.y - 40, 0, 40, 3, 600, 0, 1)!
+    const bolt = w.fireProjectile(p.x + 20, p.y - 40, 0, 40, 3, 600, 0, 1, 0, 'bolt', 'caster')!
     caster.targetX = bolt.id
     p.x = bolt.x; p.y = bolt.y + 14          // beside its path, so it cannot simply hit the player
     expect(Math.hypot(caster.x - p.x, caster.y - p.y), 'the sword can reach the caster; the test would prove nothing')
@@ -141,7 +141,7 @@ describe('combat slow-motion', () => {
     expect(casters.length).toBeGreaterThanOrEqual(2)
 
     // two bolts, side by side, both inside one swing arc
-    const bolts = [-6, 6].map(dx => w.fireProjectile(p.x + dx, p.y - 20, 0, 40, 3, 600, 0, 1)!)
+    const bolts = [-6, 6].map(dx => w.fireProjectile(p.x + dx, p.y - 20, 0, 40, 3, 600, 0, 1, 0, 'bolt', 'caster')!)
     casters[0].targetX = bolts[0].id
     casters[1].targetX = bolts[1].id
     const hp = casters.map(c => c.hp)
@@ -169,7 +169,7 @@ describe('combat slow-motion', () => {
     const w = createWorld(1, 'caster-only')
     const p = w.player
     const caster = w.enemies.find(e => e.active && e.kind === 'caster')!
-    const cut = w.fireProjectile(p.x, p.y - 20, 0, 40, 3, 600, 0, 1)!
+    const cut = w.fireProjectile(p.x, p.y - 20, 0, 40, 3, 600, 0, 1, 0, 'bolt', 'caster')!
     const cutId = cut.id
     caster.targetX = cut.id
     for (let t = 0; t < 40 && cut.active; t++) {
@@ -179,7 +179,7 @@ describe('combat slow-motion', () => {
     expect(cut.active, 'setup failed: the bolt was never cut').toBe(false)
 
     // a fresh bolt that happens to carry the same id, belonging to a caster that was never cut
-    const innocent = w.fireProjectile(p.x + 120, p.y, 0, 40, 3, 4, 0, 1)!
+    const innocent = w.fireProjectile(p.x + 120, p.y, 0, 40, 3, 4, 0, 1, 0, 'bolt', 'caster')!
     innocent.id = cutId
     const other = w.enemies.find(e => e.active && e.kind === 'caster' && e !== caster)!
     other.targetX = cutId

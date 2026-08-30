@@ -183,7 +183,7 @@ describe('dodge feel', () => {
     // A normal hurt-immune projectile contact is spent. It neither passes through nor earns the
     // roll's jackpot once the authored travel window is over.
     p.vx = p.vy = 0
-    const bolt = w.fireProjectile(p.x, p.y, 0, 0, 3, 30)!
+    const bolt = w.fireProjectile(p.x, p.y, 0, 0, 3, 30, 0, 1, 0, 'bolt', 'caster')!
     const hp = p.hp
     w.events.length = 0
     stepWorld(w, emptyInput())
@@ -492,7 +492,7 @@ describe('near-miss bullet time', () => {
     const w = createWorld(1, 'empty')
     const p = w.player
     // 12 px above the body: outside the 8 px hit radius, inside the 8 px graze shell
-    w.fireProjectile(p.x + 8, p.y - 12, 0, 80, 3, 200)
+    w.fireProjectile(p.x + 8, p.y - 12, 0, 80, 3, 200, 0, 1, 0, 'bolt', 'caster')
     stepWorld(w, { ...emptyInput(), dodge: true, moveX: 1 })
     let dodged = w.events.some(e => e.type === 'dodged')
     let grazed = w.events.some(e => e.type === 'graze')
@@ -520,7 +520,7 @@ describe('near-miss bullet time', () => {
   it('a bolt that stays well clear does not breathe', () => {
     const w = createWorld(1, 'empty')
     const p = w.player
-    w.fireProjectile(p.x + 8, p.y - 40, 0, 80, 3, 200)
+    w.fireProjectile(p.x + 8, p.y - 40, 0, 80, 3, 200, 0, 1, 0, 'bolt', 'caster')
     stepWorld(w, { ...emptyInput(), dodge: true, moveX: 1 })
     w.events.length = 0
     for (let t = 0; t < 16; t++) {
@@ -534,7 +534,7 @@ describe('near-miss bullet time', () => {
   it('walking past a close bolt without rolling does not breathe', () => {
     const w = createWorld(1, 'empty')
     const p = w.player
-    w.fireProjectile(p.x + 8, p.y - 12, 0, 80, 3, 200)
+    w.fireProjectile(p.x + 8, p.y - 12, 0, 80, 3, 200, 0, 1, 0, 'bolt', 'caster')
     for (let t = 0; t < 16; t++) {
       stepWorld(w, { ...emptyInput(), moveX: 1 })
       w.events.length = 0
@@ -548,7 +548,7 @@ describe('bolt-cut bullet time', () => {
   it('a cut bolt breathes the world the same way a heavy does', () => {
     const w = createWorld(1, 'empty')
     const p = w.player
-    const bolt = w.fireProjectile(p.x + 16, p.y - 8, 0, 20, 3, 200, 0, 1)!
+    const bolt = w.fireProjectile(p.x + 16, p.y - 8, 0, 20, 3, 200, 0, 1, 0, 'bolt', 'caster')!
     let cut = false
     let rateAtCut = 0
     let ticksAtCut = 0
@@ -572,7 +572,7 @@ describe('bolt-cut bullet time', () => {
     const run = (boltOnly: boolean, chain: boolean) => {
       const w = createWorld(1, 'empty')
       const p = w.player
-      if (boltOnly) w.fireProjectile(p.x + 16, p.y - 8, 0, 0, 3, 200, 0, 1)
+      if (boltOnly) w.fireProjectile(p.x + 16, p.y - 8, 0, 0, 3, 200, 0, 1, 0, 'bolt', 'caster')
       let cut = false, connectedAtCut = false
       for (let t = 0; t < 120; t++) {
         stepWorld(w, { ...emptyInput(), attack: t === 0, attackHeld: chain, aimX: 0.8, aimY: -0.6 })

@@ -5,8 +5,9 @@
 // the malformation and expects a path-specific error, so a future loosening shows up as a red test
 // with the fault named.
 import { describe, it, expect } from 'vitest'
+import { Texture } from 'pixi.js'
 import { validateCompileSpec, type CompileSpec } from '../../tools/art/compile'
-import { validateSheetDef, type SheetDef } from '../../src/render/sheet'
+import { bindSheet, validateSheetDef, type SheetDef } from '../../src/render/sheet'
 
 const goodSpec = (): CompileSpec => ({
   id: 'test.actor', kind: 'character', input: 'in.png', output: 'out.png',
@@ -87,4 +88,15 @@ describe('validateSheetDef (strengthened)', () => {
       expect(() => validateSheetDef(d, 't')).toThrow(err)
     })
   }
+
+  it('does not accept inherited Object properties as frames or aliases', () => {
+    const def = goodDef()
+    def.clips = { bad: { frames: ['toString'], timing: 'ticks', ticks: [1] } }
+    expect(() => validateSheetDef(def, 't')).toThrow(/unknown frame "toString"/)
+
+    delete def.clips
+    const sheet = bindSheet(def, Texture.EMPTY, Texture.EMPTY)
+    expect(sheet.has('toString')).toBe(false)
+    expect(() => sheet.frame('toString')).toThrow(/no frame/)
+  })
 })

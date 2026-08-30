@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { emptyInput, type InputFrame } from '@/sim/input'
 import { Rng } from '@/sim/rng'
-import { decodeReplay, encodeReplay, quantizeFrame, replayFromJson, replayToJson, runReplay, type Replay } from '@/sim/replay'
+import { decodeReplay, encodeReplay, MAX_REPLAY_FRAMES, quantizeFrame, replayFromJson, replayToJson, runReplay, type Replay } from '@/sim/replay'
 import { createWorld } from '@/sim/scenarios'
 import { makeBot } from '@/sim/bots'
 import { stepWorld } from '@/sim/step'
@@ -12,9 +12,9 @@ import { Recorder } from '@/input/recorder'
 // Expected hashes for the fixtures under replays/. A changed hash means the sim changed (tuning, rules, rng use).
 // If that change is intended: run `pnpm record-bots`, paste the printed hashes here, and re-check the sanity asserts.
 const FIXTURES = [
-  // Hashes re-recorded at the merge of the island Bardo branch with main's hot-path
-  // optimization (#24): the union of two intended sim changes, pinned on the merged tree.
-  { file: 'kite-full-s2.json', hash: 73257908, check: (m: Record<string, unknown>) => expect(m.clearSeconds).not.toBeNull() },
+  // Hashes re-recorded after main's island/hot-path changes and the intended wall-movement budget
+  // repair were combined, so the merged simulation is pinned rather than either parent in isolation.
+  { file: 'kite-full-s2.json', hash: 776108606, check: (m: Record<string, unknown>) => expect(m.clearSeconds).not.toBeNull() },
   { file: 'naive-wave1-s3.json', hash: 1383404909, check: (m: Record<string, unknown>) => expect(m.wavesCleared).toBe(1) },
   { file: 'idle-wave1-s5.json', hash: 258235426, check: (m: Record<string, unknown>) => expect(m.deaths).toBe(1) },
   // The only fixture that builds the Bardo: a full descent (island hub -> rack -> Gate -> six
@@ -75,6 +75,44 @@ describe('replay format', () => {
   })
   it('rejects unknown versions', () => {
     expect(() => decodeReplay({ v: 2 as 1, seed: 1, scenario: 'empty', runs: [] })).toThrow()
+    expect(() => replayFromJson(JSON.stringify({ v: 2, seed: 1, scenario: 'empty', frames: [] }))).toThrow(/unsupported replay version/)
+  })
+  it('rejects invalid encoded counts before expanding them', () => {
+    const replay = (count: number) => ({ v: 1 as const, seed: 1, scenario: 'empty', runs: [[0, 0, 10000, 0, 0, count]] as [[number, number, number, number, number, number]] })
+    for (const count of [0, -1, 1.5, Number.POSITIVE_INFINITY, MAX_REPLAY_FRAMES + 1]) {
+      expect(() => decodeReplay(replay(count))).toThrow()
+    }
+  })
+  it('never emits a replay larger than the decoder accepts', () => {
+    const frames = new Array(MAX_REPLAY_FRAMES + 1) as ReturnType<typeof emptyInput>[]
+    expect(() => encodeReplay({ v: 1, seed: 1, scenario: 'empty', frames })).toThrow(/frame limit/)
+
+    const recorder = new Recorder()
+    recorder.start(1, 'empty', false)
+    recorder.frames = new Array(MAX_REPLAY_FRAMES).fill(emptyInput())
+    expect(recorder.capture(emptyInput())).toBe(false)
+    expect(recorder.recording).toBe(false)
+    expect(recorder.limitReached).toBe(true)
+    expect(recorder.last?.frames).toHaveLength(MAX_REPLAY_FRAMES)
+  })
+  it('rejects encoded flag bits above the 32-bit range instead of truncating them', () => {
+    expect(() => decodeReplay({
+      v: 1, seed: 1, scenario: 'empty', runs: [[0, 0, 10000, 0, 2 ** 32, 1]],
+    })).toThrow(/unknown flags/)
+  })
+  it('rejects malformed raw frames instead of passing them to the sim', () => {
+    expect(() => replayFromJson(JSON.stringify({
+      v: 1, seed: 1, scenario: 'empty',
+      frames: [{ ...emptyInput(), moveX: 'right' }],
+    }))).toThrow(/invalid moveX/)
+  })
+  it('loads legacy raw frames with new input flags defaulted off', () => {
+    const legacy = { ...emptyInput() } as Partial<InputFrame>
+    delete legacy.attackHeld
+    delete legacy.heavy
+    const replay = replayFromJson(JSON.stringify({ v: 1, seed: 1, scenario: 'empty', frames: [legacy] }))
+    expect(replay.frames[0]).toEqual(emptyInput())
+    expect(() => replayFromJson(JSON.stringify({ v: 1, seed: 1, scenario: 'empty', frames: [{ ...legacy, heavy: 'yes' }] }))).toThrow(/invalid heavy/)
   })
 })
 

@@ -3,7 +3,7 @@ import { createWorld } from '@/sim/scenarios'
 import { stepWorld } from '@/sim/step'
 import { emptyInput } from '@/sim/input'
 import { tuning } from '@/tuning'
-import { applyPlaytestCondition, asPlaytestCondition, conditionOfBundle, PLAYTEST_CONDITIONS } from '@/playtest'
+import { applyPlaytestCondition, asPlaytestCondition, canRecordPlainReplay, conditionOfBundle, PLAYTEST_CONDITIONS } from '@/playtest'
 
 // applyPlaytestCondition writes to the shared tuning, so every test here puts it back. Vitest
 // isolates modules per file, but a leaked cancel window would poison the rest of THIS file.
@@ -81,6 +81,12 @@ describe('no-dash removes the mechanism, not the press', () => {
 })
 
 describe('a bundle carries the condition its frames cannot', () => {
+  it('refuses to represent no-dash as a conditionless plain replay', () => {
+    expect(canRecordPlainReplay('baseline')).toBe(true)
+    expect(canRecordPlainReplay('no-heavy')).toBe(true)
+    expect(canRecordPlainReplay('no-dash')).toBe(false)
+  })
+
   it('reads the condition off an exported bundle', () => {
     expect(conditionOfBundle({ v: 1, seed: 1, scenario: 'loop', runs: [], playtest: { condition: 'no-dash' } })).toBe('no-dash')
     expect(conditionOfBundle({ playtest: { condition: 'baseline' } })).toBe('baseline')

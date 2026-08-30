@@ -20,6 +20,7 @@ export class EntityView {
   hitClass: ContactClass = 'body'
   hitKind: EnemyKind = 'dummy'
   hitHeavy = false
+  private owned: Sprite[] = []
   private normalTex; private whiteTex
   constructor(atlas: Atlas, tile: number, weaponTile: number | null, layers: { entities: Container; shadows: Container }) {
     this.normalTex = atlas.tile(tile); this.whiteTex = atlas.white(tile)
@@ -52,12 +53,13 @@ export class EntityView {
     this.whiteTex = whiteTex
     this.body.texture = tex
   }
+  own(sprite: Sprite): Sprite { this.owned.push(sprite); return sprite }
   // The contact shadow is the authored 16px hard disc (tools/make-bardo-fx.ts), not a soft 64px
   // Kenney blob: §3.2.8 wants cast shadows "hard-edged... never a blur".
   setShadow(x: number, y: number, w: number, h: number, alpha = 0.35) {
     this.shadow.position.set(Math.round(x), Math.round(y)); this.shadow.scale.set(w / 16, h / 16); this.shadow.alpha = alpha
   }
-  destroy() { this.body.destroy(); this.weapon?.destroy(); this.shadow.destroy() }
+  destroy() { this.body.destroy(); this.weapon?.destroy(); this.shadow.destroy(); for (const s of this.owned) s.destroy(); this.owned = [] }
 }
 
 // Per-frame values every enemy kind needs, computed once by the dispatcher.

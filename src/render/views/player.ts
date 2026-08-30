@@ -131,10 +131,12 @@ export function createPlayerView(atlas: Atlas, layers: { entities: Container; sh
       whiteFor.set(f.texture, f.white)
     }
   }
+  const rims: Sprite[] = []
   for (let i = 0; i < RIM_OFFSETS.length; i++) {
     const s = new Sprite(); s.anchor.set(0.5, 1); s.visible = false
-    rimSprites.push(s); layers.entities.addChild(s)
+    rims.push(v.own(s)); layers.entities.addChild(s)
   }
+  rimSprites.set(v, rims)
   return v
 }
 
@@ -144,14 +146,16 @@ export function createPlayerView(atlas: Atlas, layers: { entities: Container; sh
 // own silhouette are stamped one pixel out BEHIND it. This is the only place the game paints white
 // on a character, and even here it never covers one: an outline is the opposite of a wash.
 const RIM_OFFSETS = [[1, 0], [-1, 0], [0, 1], [0, -1]]
-const rimSprites: Sprite[] = []
+const rimSprites = new WeakMap<EntityView, Sprite[]>()
 const whiteFor = new Map<Texture, Texture>()
 
 export function updatePlayerRim(v: EntityView, on: boolean, color: number): void {
   const b = v.body
   const tex = whiteFor.get(b.texture) ?? b.texture
-  for (let i = 0; i < rimSprites.length; i++) {
-    const s = rimSprites[i]
+  const rims = rimSprites.get(v)
+  if (!rims) throw new Error('player rim requires a player view')
+  for (let i = 0; i < rims.length; i++) {
+    const s = rims[i]
     s.visible = on && b.visible
     if (!s.visible) continue
     s.texture = tex

@@ -25,7 +25,14 @@ argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 
 
 def arg(name, dflt):
-    return argv[argv.index(name) + 1] if name in argv else dflt
+    if name not in argv:
+        return dflt
+    i = argv.index(name)
+    if i + 1 >= len(argv):
+        sys.exit(f"[spike] {name} needs a value — usage: ... --python tools/spike/mannequin.py -- "
+                 "[--out DIR] [--px N] [--leg-scale F] [--facings south,north,east] "
+                 "[--save-blend PATH.blend] [--only frame,frame]")
+    return argv[i + 1]
 
 
 OUT = arg("--out", ".art-cache/spike/renders")
@@ -461,9 +468,28 @@ for facing in FACINGS:
         bpy.ops.render.render(write_still=True)
         print(f"[spike] rendered {facing}/{fname}")
 
-with open(os.path.join(OUT, "rig.json"), "w") as f:
+rig_path = os.path.join(OUT, "rig.json")
+if only:
+    # Partial render: merge into the existing rig so the frames NOT re-rendered keep their bones.
+    # A rig.json holding only the subset would break the next assemble (all 14 PNGs still exist,
+    # but the rig would lack the other frames' registration).
+    if os.path.exists(rig_path):
+        with open(rig_path) as f:
+            merged = json.load(f)
+        for k in ("px", "canvas", "scale", "pitchDeg", "legScale", "feetRow"):
+            if merged.get(k) != rig[k]:
+                print(f"[spike] WARNING: --only run changes {k} ({merged.get(k)} -> {rig[k]}); "
+                      "frames not re-rendered keep stale geometry")
+            merged[k] = rig[k]
+        for facing, fd in rig["facings"].items():
+            merged.setdefault("facings", {}).setdefault(facing, {"frames": {}})["frames"].update(fd["frames"])
+        rig = merged
+    else:
+        print("[spike] WARNING: --only with no existing rig.json — writing just the subset; "
+              "assemble needs a full render first")
+with open(rig_path, "w") as f:
     json.dump(rig, f, indent=2)
-print(f"[spike] rig registration -> {os.path.join(OUT, 'rig.json')}")
+print(f"[spike] rig registration -> {rig_path}")
 
 if SAVE_BLEND:
     os.makedirs(os.path.dirname(SAVE_BLEND), exist_ok=True)

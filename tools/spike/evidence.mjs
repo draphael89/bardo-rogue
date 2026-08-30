@@ -12,7 +12,13 @@ import sharp from 'sharp'
 const argv = process.argv.slice(2)
 const flag = (name, dflt) => {
   const i = argv.indexOf('--' + name)
-  return i >= 0 ? argv[i + 1] : dflt
+  if (i < 0) return dflt
+  const v = argv[i + 1]
+  if (v === undefined || v.startsWith('--')) {
+    console.error(`usage: --${name} needs a value`)
+    process.exit(1)
+  }
+  return v
 }
 const COMPILED = flag('compiled', '.art-cache/spike/compiled')
 const OUT = flag('out', '.art-cache/spike')
@@ -105,7 +111,7 @@ async function label(text, w, h = 16) {
   }
   comp.push({ input: await label(`south idle / run4 — 4x`, 300), left: 4, top })
   top += 16
-  for (const [i, name] of [['0', 'idle'], ['1', 'run4']].map((v, i) => [i, v[1]])) {
+  for (const [i, name] of ['idle', 'run4'].entries()) {
     const idx = sheets.south.def.frames[name].i
     comp.push({ input: await toPng(cellRaw(sheets.south, idx), S4), left: 4 + i * w4, top })
   }

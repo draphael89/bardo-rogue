@@ -15,7 +15,13 @@ import sharp from 'sharp'
 const argv = process.argv.slice(2)
 const flag = (name, dflt) => {
   const i = argv.indexOf('--' + name)
-  return i >= 0 ? argv[i + 1] : dflt
+  if (i < 0) return dflt
+  const v = argv[i + 1]
+  if (v === undefined || v.startsWith('--')) {
+    console.error(`usage: --${name} needs a value`)
+    process.exit(1)
+  }
+  return v
 }
 const RENDERS = flag('renders', '.art-cache/spike/renders')
 const OUT = flag('out', '.art-cache/spike')
@@ -89,6 +95,16 @@ for (const facing of Object.keys(rig.facings)) {
     const bones = rig.facings[facing].frames[name].bones
     const sword = rig.facings[facing].frames[name].sword
     const b = boxes[name]
+    // A null bbox is an empty render; a <2px axis makes the shared-fit fractions 0/0 = NaN,
+    // which JSON serializes as null. Either way the spec would be corrupt — fail loudly instead.
+    if (!b) {
+      console.error(`assemble: ${facing}/${name}.png rendered empty (no alpha>=128 pixels) — refusing to write a corrupt spec`)
+      process.exit(1)
+    }
+    if (shared && (b.w < 2 || b.h < 2)) {
+      console.error(`assemble: ${facing}/${name}.png bbox is degenerate (${b.w}x${b.h}) — shared-fit fractions would be NaN`)
+      process.exit(1)
+    }
     const socketNames = sword ? ['handR', 'handL', 'bladeTip', 'bladeMid'] : ['handR', 'handL', 'head']
     const sockets = {}
     for (const sn of socketNames) {

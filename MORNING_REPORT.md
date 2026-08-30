@@ -54,7 +54,7 @@ pipeline and silhouette constraints, not the final identity or Look.
 
 The curated exact-head title, arrival, descent, first-fight, and viewport frames are tracked in
 `public/progress/shots/` as `title-menu.png`, `bardo-arrival-r7.png`, `descent-r7-*.png`, and
-`first-fight-r7.png`, `acheron-shore-r7.png`, plus `viewport-390x844-*.png` and
+`first-fight-r7.png`, `acheron-shore-r7.png`, `cocytus-weep-r7.png`, plus `viewport-390x844-*.png` and
 `viewport-900x506-title-r7.png`. The broader scratch study remains local and intentionally ignored under
 `shots/attended/`:
 
@@ -79,6 +79,12 @@ At Acheron, the lower fight lane now reads as one silt lip over a two-tile water
 test proves this is geographic dress rather than hidden collision, and its exact exhibit is
 byte-identical across independent boots at SHA-256
 `e3a4b425ab34c35545beb70b2038b936f75f3ee49e5103a75233c9ecfbddc9ff`.
+At Cocytus, a single cold reflection now belongs to the west-edge weep and expires before the dry
+fight circle; its floor and dark are paler and more cyan than Acheron's indigo river. The deterministic
+realm-air pass moves Acheron/Cocytus from distance 1.09 to 3.36 and outside the closest pair; median
+room separation rises from 10.54 to 11.32 with no wrong-temperature rooms. The exact
+combat exhibit is byte-identical at SHA-256
+`519384bda07ee327f77a42a855bddb82ae5161c96c7e46c5c759d02c94823902`.
 
 Subjective questions left deliberately open: whether the causeway has the desired emotional weight,
 whether the Veteran relic is poignant rather than merely legible, whether combat reads as satisfying
@@ -90,13 +96,14 @@ user-only gates.** No agent or automated play awarded them.
 | Lane | Result |
 |---|---|
 | Typecheck | `pnpm typecheck` green |
-| Full suite | `pnpm test` — 77 files, 910 tests green |
+| Full suite | `pnpm test` — 77 files, 911 tests green |
 | Loop matrices | `pnpm matrix` — kite 100/100 resolved, 79 wins; naive 100/100 resolved, 0 wins |
 | Pinned replay | `slice-kite-loop-s7.json` hash `1142161593`, won |
 | Web package | `pnpm build` green; shipped 2.110 MB vs 4.096 MB budget, 174 files |
 | Browser smoke | `pnpm smoke -- --url http://localhost:5201` green, real keyboard and both endings |
 | Viewport transitions | `pnpm smoke:viewport -- --url http://localhost:5201` green through 640×360 → 1400×600 → 390×844 → 1920×700 → 900×506 → 640×360 for both title and game HUD; target and UI bounds remain contained, tick stays 0 |
 | Room art | `pnpm room:gate` green, including dimensions, alpha, palette, material spans, negative space, value, highlights, and focality |
+| Realm separation | `pnpm realm-air -- --url http://localhost:5201` owns every render; three clean-room outputs are byte-identical. Median RGB distance 11.32, closest 2.95, widest 16.91, zero temperature violations; no arbitrary pass threshold invented |
 | Regeneration | `pnpm palette` and `pnpm tiles` deterministic; no unexplained drift |
 | Shipping sprite gates | 78/3 waived general, 144/2 hero, 144/4 north, 40/1 north roll, 145/2 south, 40/1 south roll; zero blocking |
 | Candidate stress | `pnpm art:stress-hero` green for dagger and heavy; candidate-only |

@@ -121,8 +121,8 @@ const ICE: AtmospherePreset = {
   rayTint: 0x8aa0b8, rayAlphaMul: 0.4,
   doorGlowTint: 0x5a7088, doorOpenTint: GOLD_OPEN,
   moteTint: 0xb0c4d4, moteAccent: 0xc8d8e8, keyTint: 0x8aa0b8,
-  floorTint: 0xc4ecff,   // Cocytus is the palest floor and the coldest
-  ambientTint: 0x1a3040,   // the coldest dark
+  floorTint: 0xc8f8ff,   // Cocytus is the palest floor and the coldest
+  ambientTint: 0x123c5c,   // the coldest dark: cyan water, decisively not Acheron's indigo river
 }
 
 const BRONZE: AtmospherePreset = {

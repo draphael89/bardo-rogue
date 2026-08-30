@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { PROP, T, buildArena, type Arena } from '@/sim/arena'
+import { PROP, T, TILE, buildArena, type Arena } from '@/sim/arena'
 import { dressArena } from '@/sim/dress'
 import { arenaKind, type LayoutId } from '@/sim/layouts'
 import { Rng } from '@/sim/rng'
@@ -61,6 +61,11 @@ describe('first-gate dress', () => {
     expect(acheron.overlay[11 * acheron.cols + 13]).toBe(T.silt)
     expect(acheron.overlay[12 * acheron.cols + 13]).toBe(T.water)
     expect(acheron.overlay[13 * acheron.cols + 13]).toBe(T.water)
+    const cocytusWeep = cocytus.windows.find(light => light.x === 2.5 * TILE && light.y === 8 * TILE)
+    expect(cocytusWeep).toMatchObject({ radius: 72, strength: 0.82, tint: 0x8aa0b8 })
+    expect(cocytus.overlay[6 * cocytus.cols + 3]).toBe(T.water)
+    expect(cocytus.overlay[8 * cocytus.cols + 4]).toBe(T.grate)
+    expect(cocytus.overlay[8 * cocytus.cols + 13]).toBeLessThan(0) // cold edge, dry fight circle
     expect(acheron.props.some(p => p.tile === PROP.reed)).toBe(true)
     expect(styx.props.some(p => p.tile === PROP.reed)).toBe(false)
     expect(styx.props.some(p => p.tile === PROP.shard)).toBe(true)

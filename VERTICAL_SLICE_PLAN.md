@@ -30,7 +30,7 @@ negative-space loss, composite-size drift, value-budget drift, and top-one-perce
 the Bardo Gate visible, with compact Settings/Credits steles and one guarded, reduced-motion-aware
 Gate-to-player descent. The Gate gained render-only architectural mass; collision and replay state
 remain untouched. Live cancellation proof survives beyond the old completion time, the room gate is
-green, and the suite is 910/910. The locked Veteran rig now also carries dagger-specific attack
+green, and the suite is 911/911. The locked Veteran rig now also carries dagger-specific attack
 grammar and silhouette-changing heavy armor: 42 frames each, three facings, computed registration,
 1,062 total real gates with zero blocking, and committed 1×/black-test exhibits. The failed first
 dagger compile established that shared fit is a long-weapon decision, not an east-facing default.
@@ -40,7 +40,10 @@ stone, and a numen lantern; a code-authored fallen Veteran relic replaces the ge
 same already-solid cell. The relic stays within the canonical palette, binary-alpha, and colour-cap
 contracts, while ImageGen studies remain reference-only. Acheron's lower lane now resolves the
 art bible's promised shore as one silt lip over a two-tile dark-water body without changing any
-solid. Look and Fun remain human gates. The
+solid. Cocytus now gives its west-edge weep one cold reflection that expires before the dry fight
+circle, and a paler cyan surface distinct from Acheron's indigo. The deterministic measured median
+realm separation is 11.32 with no wrong-temperature rooms. Look and Fun
+remain human gates. The
 letterbox and target sky now enter the shared frame grade from identical authored colours; exact
 390×844 and 900×506 probes keep all four target boundaries continuous. The attended evidence and
 exact-head ledger are recorded in `MORNING_REPORT.md`.

@@ -101,11 +101,17 @@ function dressMinosEast(a: Arena): void {
 
 function dressCocytus(a: Arena): void {
   // A weep, not a pool: water down the west edge so the fight circle at (13, 8) stays dry.
-  for (let r = 4; r <= 12; r++) stamp(a, 2, r, T.water)
-  for (const r of [5, 8, 11] as const) stamp(a, 3, r, T.grate)
+  for (let r = 4; r <= 12; r++) {
+    stamp(a, 2, r, T.water)
+    stamp(a, 3, r, T.water)
+  }
+  for (const r of [5, 8, 11] as const) stamp(a, 4, r, T.grate)
   stamp(a, 4, 12, T.silt)
   stamp(a, 5, 12, T.silt)
   stamp(a, 23, 4, T.silt)
+  // A cold reflection belongs to the weep itself, never to the whole room. It expires before the
+  // fight circle and keeps Cocytus from reading as a second Acheron under the shared masonry.
+  a.windows.push({ x: 2.5 * TILE, y: 8 * TILE, radius: 72, strength: 0.82, tint: 0x8aa0b8 })
   if (a.windows[0]) { a.windows[0].strength = 0.34; a.windows[0].tint = 0x163044 }
   if (a.braziers[0]) a.braziers[0].strength = 0.38
   if (a.braziers[1]) a.braziers[1].strength = 0.16

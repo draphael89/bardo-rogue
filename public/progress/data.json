@@ -1,10 +1,14 @@
 {
   "title": "Bardo Rogue",
   "subtitle": "First Gate: rooms-as-data, a generated route, a town that remembers",
-  "updated": "2026-08-30T04:02:00-04:00",
+  "updated": "2026-08-30T04:13:00-04:00",
   "now": "exact-head-closeout",
   "round": 7,
   "timeline": [
+    {
+      "t": "04:07",
+      "text": "The exact replay timeline holds across Lethe, the Landing, Cocytus, the Oath-Bound, Minos, verdict, and return, but a corrected deterministic realm probe found one weak pair: Acheron and Cocytus were only 1.09 RGB units apart. Cocytus now widens its existing west-edge weep by one tile, gives that edge one pale cold reflection, and wears a paler cyan surface that expires before the dry fight circle. Acheron/Cocytus moves to 3.36 and median separation rises from 10.54 to 11.32; no room reads the wrong temperature. Three clean-room realm outputs are byte-identical, exact dress/air tests pin the distinction, and a deterministic combat exhibit is tracked. ImageGen supplied the vertical-value premise, while its generated pixels and generic ice spectacle remain reference-only."
+    },
     {
       "t": "04:02",
       "text": "Viewport proof is now a repeatable gate, not a folder of unrelated boots. One living page resizes through 640x360, 1400x600, 390x844, 1920x700, 900x506, and back to 640x360 in both title and paused-game phases. The target grows to 848/992 for wide views, returns to 640 for portrait, stays inside the physical viewport, keeps visible UI inside the internal target, and never advances tick 0. Honest limit: the 390px portrait view is complete and unclipped but too physically small for comfortable keyboard play; it is no-crop proof, not a Look or usability verdict."

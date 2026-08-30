@@ -83,6 +83,13 @@ describe('a realm is a surface, not only a name', () => {
     }
   })
 
+  it('keeps Cocytus paler and more cyan than the Acheron river', () => {
+    const river = atmosphereFor('threshold')
+    const ice = atmosphereFor('cocytus')
+    expect(G(ice.floorTint)).toBeGreaterThan(G(river.floorTint))
+    expect(B(ice.ambientTint) - R(ice.ambientTint)).toBeGreaterThan(B(river.ambientTint) - R(river.ambientTint))
+  })
+
   it('spends brightness for hue, but only downward and only so far', () => {
     // A tint can only multiply, so pulling a warm hue out of blue-grey stone costs luminance -- the
     // wine-fire floor is the dearest at 0.718 of the untinted one. Two directions matter and both

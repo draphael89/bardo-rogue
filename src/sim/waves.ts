@@ -3,10 +3,9 @@ import type { World } from './world'
 import { TILE, setDoorWalkable } from './arena'
 import { clearBulletTime } from './combat'
 import { overlapsSolid } from './collision'
-import { grantClearObols, offerShop } from './economy'
-import { offerMystery } from './mystery'
-import { offerReward } from './rewards'
+import { grantClearObols } from './economy'
 import { finishRun } from './session'
+import { placeShrine } from './shrine'
 import type { SpawnDef, WaveDef, WaveGroup } from './content/waves'
 
 export type { SpawnDef, WaveGroup, WaveDef } from './content/waves'
@@ -161,10 +160,13 @@ export function updateWaves(world: World): void {
       })
       grantClearObols(world)
       if (victory) finishRun(world, 'won')
-      else if (reward === 'shop') offerShop(world)
-      else if (reward === 'mystery') offerMystery(world)
-      else if (reward) offerReward(world, reward)
-      else {
+      // What the room owes is LIT, not opened. It becomes a thing standing in the room that the
+      // player walks into (src/sim/shrine.ts), which is what leaves the clear slow-motion set two
+      // lines above alive: the old `offer*` call here reached parkForModal on this same tick and
+      // reset timeScale to 1, so a room with a reward never once played its own kill-punch.
+      else if (reward && placeShrine(world, reward)) {
+        // The room is held by the vessel now: no timer runs it out, so nothing else belongs here.
+      } else {
         world.roomPhase = world.hasNextRoom() ? 'exits' : 'resolved'
         world.phaseTick = world.tick
       }

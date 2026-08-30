@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { arrivalBanner, backPause, backTitle, confirmTitle, deathCarriedLadder, deathCarriedLine, deathClose, deathReachedLine, deathSentLine, deathTakenLine, duoFooter, hideFightChrome, hidePlaceCaption, homeBanner, keptLabel, meetingVeil, offerAct, offerSpoken, pauseFooter, pauseNudge, pauseRows, resolvePause, runStartBanner, shopAct, shopSpoken, showBuildStrip, titleDescend, titleNudge, titleRows, townTally, victoryKeptLine, wrapPauseFocus, wrapTitleFocus } from '@/render/titleMenu'
+import { arrivalBanner, backPause, buildStripLadder, backTitle, confirmTitle, deathCarriedLadder, deathCarriedLine, deathClose, deathReachedLine, deathSentLine, deathTakenLine, duoFooter, hideFightChrome, hidePlaceCaption, homeBanner, keptLabel, meetingVeil, offerAct, offerCardHeight, offerSpoken, pauseFooter, pauseNudge, pauseRows, resolvePause, runStartBanner, shopAct, shopSpoken, showBuildStrip, titleDescend, titleNudge, titleRows, townTally, victoryKeptLine, wrapPauseFocus, wrapTitleFocus } from '@/render/titleMenu'
 import { SHOP_COPY } from '@/sim/economy'
 import { clampSlider, nudgeSlider } from '@/sim/storage'
 
@@ -207,5 +207,39 @@ describe('title menu', () => {
     expect(backTitle('menu')).toEqual({ page: 'menu', focus: 0 })
     expect(backTitle('settings')).toEqual({ page: 'menu', focus: 1 })
     expect(backTitle('credits')).toEqual({ page: 'menu', focus: 2 })
+  })
+})
+
+describe('the offer card holds its own prose', () => {
+  // A two-line detail is the common card and must not move by a pixel.
+  it('leaves the two-line card at the height it has always been', () => {
+    expect(offerCardHeight(51, 16)).toBe(88)
+  })
+  // BETWEEN-STEP and CROSSROADS both wrap to three at the card's 118px, and both are Hecate's --
+  // so both can turn up in a Fury offer, where an attribution footer is drawn under the block.
+  it('grows for a three-line detail instead of crowding the attribution', () => {
+    expect(offerCardHeight(51, 24)).toBe(96)
+    // the same 11px between the block's last line and the footer's middle, at either height
+    expect(offerCardHeight(51, 24) - 10 - (51 + 24)).toBe(offerCardHeight(51, 16) - 10 - (51 + 16))
+  })
+})
+
+describe('the fight strip cannot outgrow the frame', () => {
+  const five = ["PHLEGETHON'S KISS", 'THE DEBT PASSES', 'CLEAVING GRACE', 'FINAL JUDGMENT', 'BETWEEN-STEP']
+  it('leads with every name and ends with a bare count', () => {
+    const forms = buildStripLadder(five)
+    expect(forms[0]).toBe(five.join('  ·  '))
+    expect(forms[forms.length - 1]).toBe('5 VOWS')
+  })
+  it('drops from the end, so the left of the row never reshuffles', () => {
+    const forms = buildStripLadder(five)
+    expect(forms[1]).toBe("PHLEGETHON'S KISS  ·  THE DEBT PASSES  ·  CLEAVING GRACE  ·  FINAL JUDGMENT  ·  +1")
+    expect(forms[4]).toBe("PHLEGETHON'S KISS  ·  +4")
+    // every form after the first is strictly shorter than the one before it, or the walk is a lie
+    for (let i = 1; i < forms.length; i++) expect(forms[i].length).toBeLessThan(forms[i - 1].length)
+  })
+  it('says nothing about a build that does not exist yet', () => {
+    expect(buildStripLadder([])).toEqual([''])
+    expect(buildStripLadder(['TORCHLIGHT'])).toEqual(['TORCHLIGHT', '1 VOW'])
   })
 })

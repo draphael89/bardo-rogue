@@ -6,6 +6,7 @@
 //   §5.4 ≥35 % negative space; props cluster at the edges and thin toward the centre
 //   §3.1 light the fight, let the frame edges fall away: no perimeter braziers
 import type { Rng } from './rng'
+import type { RoomReward } from './session'
 
 export const TILE = 16
 
@@ -49,6 +50,18 @@ export interface ArenaRack {
   x: number
   y: number
   arm: 'blade'
+}
+
+/**
+ * What a cleared room owes you, standing in the room. Placed by `shrine.ts` on the clear and walked
+ * into to open the meeting it holds; `kind` is the room's own `reward`, so the vessel a Fury room
+ * lights is not the stall the Landing keeps. Presentation reads `shrineTaken` the way it reads
+ * `offeringTaken`.
+ */
+export interface ArenaShrine {
+  x: number
+  y: number
+  kind: RoomReward
 }
 
 export interface ArenaDoor {
@@ -96,6 +109,8 @@ export interface Arena {
   offeringTaken?: boolean
   rack?: ArenaRack                 // Bardo preparation; walk into the weapon to ready the threshold
   rackTaken?: boolean
+  shrine?: ArenaShrine             // the cleared room's payout, lit where the eye already is
+  shrineTaken?: boolean
   smith?: { x: number; y: number } // west of the rack: remember, then prepare
   smithNear?: boolean
   islands?: IslandRect[]           // walled masses in an interior-void room (§8.4); render-only

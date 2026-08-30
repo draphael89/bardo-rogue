@@ -52,7 +52,11 @@ const TONES: Record<Tone, ToneDef> = {
   gift: { text: C.goldHot, rule: C.ember, edge: C.goldHot },
 }
 
-const BANNER_Y = 44, BAND_H = 28, OPEN = 8, CLOSE = 10   // the card sits clear of the corner panels
+// The banner band sits BELOW the fight strip's row, not on top of it. At 44 the slab spanned y
+// 30..58 and the build strip spans 30..48, so the word naming the vow you had just claimed was drawn
+// underneath a strip whose newest entry was that same vow — and its sub-line landed under the route
+// panel. 62 puts the band at 48..76: clear of the strip above and of the route strip below.
+const BANNER_Y = 62, BAND_H = 28, OPEN = 8, CLOSE = 10   // the card sits clear of the corner panels
 
 // --- the death card -------------------------------------------------------------------------------------------
 // VISION.md §2: "You are already dead. Losing a run is not a game over; it is being pulled back to the bardo."
@@ -355,6 +359,18 @@ export class Hud {
   }
 
   clearBanner() { this.bannerTicks = 0; this.hideBanner() }
+
+  /**
+   * Whether a banner slab will draw on THIS tick — the same question `updateBanner` answers a few
+   * lines below, asked before it runs so the shell can stand the route strip down rather than let
+   * the two share a frame. Exact rather than a frame stale, which a read of `banner.visible` after
+   * the fact would not be.
+   */
+  bannerUp(world: World): boolean {
+    if (world.player.state === 'dead') return false
+    if (world.session.run?.pendingReward || world.session.run?.pendingRite) return false
+    return this.bannerTicks > 0 && this.bannerStart >= 0 && world.tick - this.bannerStart < this.bannerTicks
+  }
 
   /** The sim named the killer; the card states it. Called from the playerDeath event. */
   setKiller(kind: EnemyKind | 'none', sentence?: WardenAttackPattern, hunt = false, debt = false): void {

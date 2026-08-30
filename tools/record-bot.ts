@@ -33,7 +33,9 @@ function record(bot: BotName, scenario: string, seed: number, out: string, god =
     stepWorld(world, f)
     world.events.length = 0
     if (scenario === 'loop' && world.returns > 0) break
-    if (world.wave.state === 'done' && world.tick - world.roomClearTick > 120) break
+    // Only non-loop recordings end on a cleared wave: a loop run clears many rooms on its way to
+    // the return, and the walk-into shrine keeps the world live past the old 120-tick grace.
+    if (scenario !== 'loop' && world.wave.state === 'done' && world.tick - world.roomClearTick > 120) break
     if (world.player.state === 'dead' && world.tick - world.player.deathTick > 120) break
   }
   const replay: Replay = { v: 1, seed, scenario, frames, ...(god ? { god: true } : {}) }

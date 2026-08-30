@@ -244,6 +244,18 @@ export function playEventSfx(a: AudioSystem, ev: SimEvent, listener?: Readonly<{
       a.bell(0.7, 196, 2.2)
       a.bell(0.4, 293.66, 1.6, 'music', 0.2)
       break
+    // Lit on the same tick roomClear rings its two bowls, so this waits for them: a high bowl
+    // struck alone once the clear has finished speaking is the sound of something ARRIVING in a
+    // room that just went quiet.
+    case 'shrineLit':
+      a.bell(0.34, 587.33, 2.4, 'ui', 0.55)
+      break
+    // The physical half of taking it. The meeting's own bell (rewardOffered / shopOffered /
+    // mysteryOffered) lands on the next tick and carries the rest.
+    case 'shrineTaken':
+      a.play('impactGeneric_light', { gain: 0.26, pitch: 1.35, bus: 'ui' })
+      a.bell(0.3, 392, 1.6, 'music', 0.1)
+      break
     case 'offeringTaken':
       a.bell(0.55, 392, 2.4)
       a.bell(0.28, 523.25, 1.8, 'music', 0.2)

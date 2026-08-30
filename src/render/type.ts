@@ -18,7 +18,7 @@
  *
  * What survives both tests: Mini at 8/16/24/32, Mini Square Mono at any multiple of 8, Blocks at
  * 16/32, and Kenney Pixel at 32 ONLY. That leaves cap heights of 5, 10, 14 and 15 px and nothing in
- * between, which is the honest constraint of pixel type in a 480x270 frame — three body sizes were
+ * between, which is the honest constraint of pixel type in the render target — three body sizes were
  * never three tiers, only three broken rasterisations of one. Hierarchy below 10px therefore comes
  * from TRACKING and colour, not size: `meta` is the tracked-caps heading, `body` is the prose.
  *

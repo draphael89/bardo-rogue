@@ -157,19 +157,19 @@ export function doorEnterMaxY(door: ArenaDoor): number {
   return door.row * TILE + tuning.run.doorEnterDepth
 }
 
-function overlapsDoor(px: number, py: number, dir: DoorDir, col: number, row: number): boolean {
-  switch (dir) {
+function overlapsDoor(px: number, py: number, door: ArenaDoor): boolean {
+  switch (door.dir) {
     case 'north': {
-      const cx = (col + 0.5) * TILE
+      const cx = (door.col + 0.5) * TILE
       if (Math.abs(px - cx) > tuning.run.doorHalfW) return false
-      return py <= row * TILE + tuning.run.doorEnterDepth
+      return py <= doorEnterMaxY(door)
     }
     case 'east': {
-      const cy = (row + 0.5) * TILE
+      const cy = (door.row + 0.5) * TILE
       if (Math.abs(py - cy) > tuning.run.doorHalfW) return false
-      return px >= col * TILE - 4
+      return px >= door.col * TILE - 4
     }
-    default: { const _e: never = dir; return _e }
+    default: { const _e: never = door.dir; return _e }
   }
 }
 
@@ -183,7 +183,7 @@ export function tryEnterDoor(world: World): void {
   for (const ex of exits) {
     const d = world.arena.doors.find(x => x.dir === ex.dir)
     if (!d) continue
-    if (overlapsDoor(p.x, p.y, ex.dir, d.col, d.row)) {
+    if (overlapsDoor(p.x, p.y, d)) {
       const leavingTown = world.scenario === 'loop' && room.id === HUB_ID
       if (leavingTown && !startRun(world, ex.to)) return
       world.roomPhase = 'transitioning'

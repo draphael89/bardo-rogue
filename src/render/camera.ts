@@ -1,13 +1,18 @@
 import { tuning } from '@/tuning'
 
 // World-bounds clamp for the follow focus, one axis at a time. `span` is the room's world extent,
-// `visSpan` how much world the viewport shows. When the span (plus margin) fits inside the view the
-// range collapses and the room is centred exactly — which is how today's screen-sized rooms stay
+// `visSpan` how much world the viewport shows. When the span fits inside the view the range
+// collapses and the room is centred exactly — which is how today's screen-sized rooms stay
 // static under the same code path an oversized room scrolls through (ADR 0001).
-export function clampFocus(focus: number, span: number, visSpan: number, margin: number): number {
+export function clampFocus(focus: number, span: number, visSpan: number): number {
   const half = visSpan / 2
-  const lo = half - margin, hi = span - half + margin
+  const lo = half, hi = span - half
   return lo >= hi ? span / 2 : Math.max(lo, Math.min(hi, focus))
+}
+
+// Smoothing factors are tuned per 60 Hz frame; rescale by dt so high-Hz displays don't snap harder.
+function lerpK(perFrame: number, dtSec: number): number {
+  return 1 - Math.pow(1 - perFrame, dtSec * 60)
 }
 
 // Trauma-based shake (shake = trauma^2), noise-driven, with an optional directional kick, plus the
@@ -60,8 +65,7 @@ export class Camera {
   snapFollow() { this.followFresh = true }
   follow(tx: number, ty: number, dtSec: number) {
     if (this.followFresh) { this.followX = tx; this.followY = ty; this.followFresh = false; return }
-    // followLerp is tuned per 60 Hz frame; rescale by dt so high-Hz displays don't snap harder
-    const k = 1 - Math.pow(1 - tuning.view.camera.followLerp, dtSec * 60)
+    const k = lerpK(tuning.view.camera.followLerp, dtSec)
     this.followX += (tx - this.followX) * k
     this.followY += (ty - this.followY) * k
   }
@@ -77,10 +81,10 @@ export class Camera {
     // the impact kick snaps back in ~4 frames: a slow return reads as drift, not as a blow
     const kd = Math.pow(0.001, dtSec * J.hit.kickDecay)
     this.kickX *= kd; this.kickY *= kd
-    // lookaheadLerp is tuned per 60 Hz frame; rescale by dt so 144 Hz displays don't snap harder
-    const lk = 1 - Math.pow(1 - J.lookaheadLerp, dtSec * 60)
-    this.lookX += (aimX * J.lookahead - this.lookX) * lk
-    this.lookY += (aimY * J.lookahead - this.lookY) * lk
+    const C = tuning.view.camera
+    const lk = lerpK(C.lookaheadLerp, dtSec)
+    this.lookX += (aimX * C.lookahead - this.lookX) * lk
+    this.lookY += (aimY * C.lookahead - this.lookY) * lk
     const lr = 1 - Math.pow(0.001, dtSec * 2.5)
     this.leanX += (this.leanTX - this.leanX) * lr; this.leanY += (this.leanTY - this.leanY) * lr
     this.leanTX = 0; this.leanTY = 0

@@ -47,7 +47,7 @@ describe('one authority decides whether the pause card can abandon', () => {
     expect(clampPauseFocus('menu', 1, false)).toBe(1)
     expect(clampPauseFocus('menu', 0, false)).toBe(0)
     // The settings page is five rows whatever the answer, so a focused meter never moves.
-    for (let f = 0; f < 5; f++) expect(clampPauseFocus('settings', f, false)).toBe(f)
+    for (let f = 0; f < 6; f++) expect(clampPauseFocus('settings', f, false)).toBe(f)
   })
 
   it('the two answers really do produce different cards', () => {

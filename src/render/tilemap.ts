@@ -1,5 +1,5 @@
 import { Container, Sprite, RenderTexture, Graphics, type DestroyOptions, type Renderer } from 'pixi.js'
-import { TILE, T, type Arena, type ArenaDoor, type DoorMark, type ArenaOffering, type ArenaRack, doorOpens } from '@/sim/arena'
+import { TILE, T, interior, type Arena, type ArenaDoor, type DoorMark, type ArenaOffering, type ArenaRack, doorOpens } from '@/sim/arena'
 import type { Atlas } from './atlas'
 import { OATH } from './oathMetal'
 
@@ -354,16 +354,26 @@ function px(g: Graphics, x: number, y: number, w: number, h: number, color: numb
 // bottom strip; this is the floor side of the same joint, on all four walls. An island room
 // (arena.islands, §8.4) runs the same joint per island instead of around the room's rect —
 // the room's own rect is void there, and a strip across it would float on the starfield.
+// Laid one tile at a time, and only where the adjacent cell really IS wall: a bridge paves
+// through an island's wall (paveRect), and a joint strip across that mouth is a dark band
+// over walkable floor — the same way the room's own door gap must stay clean.
 function bakeOcclusion(g: Graphics, arena: Arena): void {
   const rects = arena.islands ?? [{ c0: 0, r0: 0, c1: arena.cols - 1, r1: arena.rows - 1 }]
+  const wallAt = (c: number, r: number): boolean =>
+    c < 0 || r < 0 || c >= arena.cols || r >= arena.rows || arena.solid[r * arena.cols + c] === 1
   for (const R of rects) {
-    const x0 = (R.c0 + 1) * TILE, x1 = R.c1 * TILE
-    const y0 = (R.r0 + 2) * TILE, y1 = R.r1 * TILE
-    px(g, x0, y0, x1 - x0, 3, C.void)
-    px(g, x0, y0 + 3, x1 - x0, 1, C.mortar)
-    px(g, x0, y1 - 2, x1 - x0, 2, C.void)
-    px(g, x0, y0, 2, y1 - y0, C.void)
-    px(g, x1 - 2, y0, 2, y1 - y0, C.void)
+    const I = interior(R)
+    for (let c = I.c0; c <= I.c1; c++) {
+      if (wallAt(c, I.r0 - 1)) {
+        px(g, c * TILE, I.r0 * TILE, TILE, 3, C.void)
+        px(g, c * TILE, I.r0 * TILE + 3, TILE, 1, C.mortar)
+      }
+      if (wallAt(c, I.r1 + 1)) px(g, c * TILE, (I.r1 + 1) * TILE - 2, TILE, 2, C.void)
+    }
+    for (let r = I.r0; r <= I.r1; r++) {
+      if (wallAt(I.c0 - 1, r)) px(g, I.c0 * TILE, r * TILE, 2, TILE, C.void)
+      if (wallAt(I.c1 + 1, r)) px(g, (I.c1 + 1) * TILE - 2, r * TILE, 2, TILE, C.void)
+    }
   }
 }
 
@@ -420,8 +430,15 @@ function bakeScorch(g: Graphics, arena: Arena): void {
 }
 
 // §3.2.8 cast shadows are fixed and hard: south, 15° right, length ≈ 0.4 × height,
-// a stepped silhouette rather than a blurred ellipse.
+// a stepped silhouette rather than a blurred ellipse. A prop may overhang the void (the
+// skiff's prow, a Seal brazier) but its shadow may not: an opaque grey row on the starfield
+// reads as a floating blob, so each row is painted in runs that skip void ground.
 function bakePropShadows(g: Graphics, arena: Arena): void {
+  const voidAt = (x: number, y: number): boolean => {
+    const c = Math.floor(x / TILE), r = Math.floor(y / TILE)
+    if (c < 0 || r < 0 || c >= arena.cols || r >= arena.rows) return true
+    return arena.base[r * arena.cols + c] === T.void
+  }
   for (const p of arena.props) {
     if (p.sheet === 'prop' && p.tile <= 3) continue     // the bell casts its own, in its art
     const wide = p.sheet === 'prop'
@@ -430,7 +447,13 @@ function bakePropShadows(g: Graphics, arena: Arena): void {
     for (let i = 0; i < rows; i++) {
       const w = (wide ? 22 : 12) - i * (wide ? 5 : 3)
       const off = Math.round(i * 0.6)
-      px(g, cx - w / 2 + off + 2, p.sortY - 3 + i, w, 1, i === 0 ? C.grout : C.mortar)
+      const x0 = cx - w / 2 + off + 2, y = p.sortY - 3 + i
+      let run = -1
+      for (let k = 0; k <= w; k++) {
+        const ground = k < w && !voidAt(x0 + k, y)
+        if (ground && run < 0) run = k
+        else if (!ground && run >= 0) { px(g, x0 + run, y, k - run, 1, i === 0 ? C.grout : C.mortar); run = -1 }
+      }
     }
   }
 }
@@ -444,8 +467,9 @@ function bakeGrit(g: Graphics, arena: Arena): void {
   // An island room scatters per island, against each island's own walls.
   const rects = arena.islands ?? [{ c0: 0, r0: 0, c1: arena.cols - 1, r1: arena.rows - 1 }]
   for (const R of rects) {
-    const bx = (R.c0 + 1) * TILE, by = (R.r0 + 2) * TILE
-    const w = (R.c1 - R.c0 - 1) * TILE, h = (R.r1 - R.r0 - 2) * TILE
+    const I = interior(R)
+    const bx = I.c0 * TILE, by = I.r0 * TILE
+    const w = (I.c1 + 1 - I.c0) * TILE, h = (I.r1 + 1 - I.r0) * TILE
     for (let i = 0; i < 40; i++) {
       const x = bx + ((i * 97) % w)
       const y = by + ((i * 61) % h)
@@ -470,18 +494,20 @@ export function buildTilemap(renderer: Renderer, atlas: Atlas, arena: Arena, flo
     const i = r * arena.cols + col
     // Void cells stay TRANSPARENT in the bake (ADR 0001): the screen-space starfield underlay is
     // the sky between an island room's masses, and a baked void tile would freeze a second one.
-    if (arena.base[i] !== T.void) {
-      const s = new Sprite(atlas.room(arena.base[i]))
-      s.position.set(col * TILE, r * TILE)
-      c.addChild(s)
-    }
+    // The invariant lives in the SHEET — tools/make-bardo-tiles.ts emits cell 0 alpha-0 — so the
+    // bake needs no per-tile branch.
+    const s = new Sprite(atlas.room(arena.base[i]))
+    s.position.set(col * TILE, r * TILE)
+    c.addChild(s)
     const o = arena.overlay[i]
     if (o >= 0) { const os = new Sprite(atlas.room(o)); os.position.set(col * TILE, r * TILE); c.addChild(os) }
   }
   const g = new Graphics()
   bakeOcclusion(g, arena)
   bakeFurrow(g, arena)
-  if (!arena.islands) bakeScorch(g, arena)   // the soot fan is the bell's; islands author their own use marks
+  // The soot fan is the sunken bell's; the bardo district authors its own use marks. Keyed on the
+  // room's identity, not on islands-presence — a future walled room without a bell keeps its floor.
+  if (arena.kind !== 'bardo') bakeScorch(g, arena)
   bakeGrit(g, arena)
   bakePropShadows(g, arena)
   c.addChild(g)

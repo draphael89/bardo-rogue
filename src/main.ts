@@ -58,7 +58,7 @@ async function boot() {
 
   const manifest = await (await fetch(`${ASSET_BASE}manifest.json`)).json() as Record<string, string[]>
   await loadFonts()
-  const ra = await createRenderApp(document.getElementById('app')!)
+  const ra = await createRenderApp(document.getElementById('app')!, viewOverride)
   const atlas = await loadAtlas(manifest)
   const audio = new AudioSystem()
   audio.muted = mute
@@ -149,7 +149,6 @@ async function boot() {
   // Refresh the ears immediately before every sound. Footsteps are cadence, not authority: a
   // stationary player and a freshly reset room must spatialize enemy tells just as accurately.
   presenter.onEvent = ev => playEventSfx(audio, ev, world.player)
-  ra.viewOverride = viewOverride
   ra.onViewResize = () => { presenter.rebuildRoom(); presenter.hud.relayout(); presenter.reward.relayout(); presenter.routeMap.relayout(); presenter.title.relayout() }
   const input = new InputSystem(ra)
   const overlay = new DebugOverlay(ra.layers.debug, ra.layers.hud)
@@ -743,6 +742,8 @@ async function boot() {
     if (act === 'resume') setPaused(false)
     else if (act === 'abandon') giveTheAttemptBack()
     else if (act === 'toggle-still') applyReduced(!reducedEffects)
+    // The same host verb F carries; the row mirrors the title's so both settings pages share one order.
+    else if (act === 'fullscreen') void platform.fullscreen()
   }
 
   const answerTitle = (gesture: boolean): void => {

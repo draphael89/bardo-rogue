@@ -1,9 +1,11 @@
 // The title's pages are presentation, not sim: they never reach stepWorld. The verbs live here so
 // the overlay and its tests share one wrap, and a new page cannot be drawn without a confirm path.
 
-// Both settings pages share one row order, so a meter can never mean one thing on the title and
-// another mid-descent. Index is the focused row; master scales everything, music also carries
-// ambience, sound also carries ui (src/audio/audio.ts).
+// Both settings pages share one row order (still, master, music, sound, fullscreen, back), so a
+// row can never mean one thing on the title and another mid-descent. Index is the focused row;
+// master scales everything, music also carries ambience, sound also carries ui (src/audio/audio.ts).
+// (A rows-as-data table would enforce the mirror by construction; deferred — two literal pages
+// are still readable at this size.)
 const METER_AT: Record<number, 'master' | 'music' | 'sfx' | undefined> = { 1: 'master', 2: 'music', 3: 'sfx' }
 
 export type TitlePage = 'menu' | 'settings' | 'credits'
@@ -47,12 +49,12 @@ export function confirmTitle(page: TitlePage, focus: number): { page: TitlePage;
 }
 
 export type PausePage = 'menu' | 'settings'
-export type PauseAct = 'none' | 'resume' | 'abandon' | 'toggle-still'
+export type PauseAct = 'none' | 'resume' | 'abandon' | 'toggle-still' | 'fullscreen'
 
 export function pauseRows(page: PausePage, canAbandon: boolean): number {
   switch (page) {
     case 'menu': return canAbandon ? 3 : 2
-    case 'settings': return 5   // still, master, music, sound, back
+    case 'settings': return 6   // still, master, music, sound, fullscreen, back
     default: { const _: never = page; return _ }
   }
 }
@@ -99,6 +101,8 @@ export function resolvePause(
     case 'settings':
       if (focus === 0) return { page, focus, act: 'toggle-still', abandonArmed: false }
       if (METER_AT[focus]) return { page, focus, act: 'none', abandonArmed: false }
+      // Same host verb as the title's row (main.ts routes it to platform.fullscreen).
+      if (focus === 4) return { page, focus, act: 'fullscreen', abandonArmed: false }
       return { page: 'menu', focus: pauseSettingsFocus(canAbandon), act: 'none', abandonArmed: false }
     default: { const _: never = page; return { page: 'menu', focus: 0, act: 'none', abandonArmed: false } }
   }

@@ -28,11 +28,11 @@ export const tuning = {
   // speed stays in sim px. Render-side only — the sim never reads this block.
   view: {
     width: 640, height: 360, worldScale: 1.5,
-    // The follow camera (ADR 0001). followLerp is per 60Hz frame (dt-corrected in presenter);
-    // clampMargin is world px the view may rest beyond the room bounds. A room that fits the
-    // viewport collapses the clamp range and is centred exactly, which is what keeps today's
-    // rooms static under the same code path.
-    camera: { followLerp: 0.12, clampMargin: 0 },
+    // The follow camera (ADR 0001), the ONE home for camera feel. followLerp / lookaheadLerp
+    // are per 60Hz frame (dt-corrected in camera.ts); lookahead is px the view leads the aim.
+    // A room that fits the viewport collapses the clamp range (camera.ts clampFocus) and is
+    // centred exactly, which is what keeps today's rooms static under the same code path.
+    camera: { followLerp: 0.12, lookahead: 4, lookaheadLerp: 0.08 },
   },
 
   player: {
@@ -335,7 +335,6 @@ export const tuning = {
     flashTicks: 4, squashTicks: 6,
     hitFlashSec: 0.034,     // enemy white-flash on real time: two frames. Longer and the target is a
                             // featureless white blob for most of the hit-stop.
-    lookahead: 4, lookaheadLerp: 0.08,
     aberrationTicks: 3,
     aberrationStrength: 2,  // TARGET px of red/blue split at the pulse peak, quantised to whole target pixels (§6.8)
     // Screen flash on an ordinary kill. It has to sit UNDER heavy contact (0.20) and under getting

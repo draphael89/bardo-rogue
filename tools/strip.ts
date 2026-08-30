@@ -14,6 +14,7 @@ import { chromium } from '@playwright/test'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
 import sharp from 'sharp'
+import { tuning } from '../src/tuning'
 
 const args = Object.fromEntries(process.argv.slice(2).map((a, i, arr) => a.startsWith('--') ? [a.slice(2), arr[i + 1] ?? '1'] : []).filter(x => x.length))
 const scenario = args.scenario ?? 'full'
@@ -40,8 +41,8 @@ function parseHold(s: string): Record<string, unknown> {
   catch { throw new Error(`--hold must be JSON, e.g. --hold '{"attack":true,"aimX":1}' (got: ${s})`) }
 }
 
-// crop in 640x360 internal-resolution coords: "x,y,w,h", or "player" / "player,w,h" (a FIXED box on the player at frame 0)
-const VIEW_W = 640, VIEW_H = 360
+// crop in internal-resolution coords (tuning.view): "x,y,w,h", or "player" / "player,w,h" (a FIXED box on the player at frame 0)
+const VIEW_W = tuning.view.width, VIEW_H = tuning.view.height
 const cropArg = args.crop ?? ''
 let cropMode: 'fixed' | 'player' = 'fixed'
 let crop = { x: 0, y: 0, w: VIEW_W, h: VIEW_H }
@@ -51,7 +52,7 @@ if (cropArg.startsWith('player')) {
   crop = { x: 0, y: 0, w: p[0] || 160, h: p[1] || 120 }
 } else if (cropArg) {
   const p = cropArg.split(',').map(Number)
-  if (p.length !== 4 || p.some((n: number) => !Number.isFinite(n))) throw new Error('--crop takes x,y,w,h in 640x360 view coords (or "player" / "player,w,h")')
+  if (p.length !== 4 || p.some((n: number) => !Number.isFinite(n))) throw new Error(`--crop takes x,y,w,h in ${VIEW_W}x${VIEW_H} view coords (or "player" / "player,w,h")`)
   crop = { x: p[0], y: p[1], w: p[2], h: p[3] }
 }
 

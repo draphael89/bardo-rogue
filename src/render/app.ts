@@ -39,7 +39,10 @@ export function fitViewWidth(override = 0): number {
   return Math.max(640, Math.min(1024, Math.round((tuning.view.height * aspect) / 16) * 16))
 }
 
-export async function createRenderApp(parent: HTMLElement): Promise<RenderApp> {
+// `viewOverride` must arrive HERE, not be assigned onto the returned app: the initial resize()
+// below already fits the target, and an override assigned after the fact was discarded until the
+// next real resize event on any non-16:9 window.
+export async function createRenderApp(parent: HTMLElement, viewOverride = 0): Promise<RenderApp> {
   const { height } = tuning.view
   const width = tuning.view.width
   const app = new Application()
@@ -72,11 +75,17 @@ export async function createRenderApp(parent: HTMLElement): Promise<RenderApp> {
   world.addChild(layers.floor, layers.decals, layers.shadows, layers.projectiles, layers.entities, layers.light, layers.fx, layers.debug)
   root.addChild(layers.underlay, world, layers.hud)
 
+  let lastW = -1, lastH = -1
   const ra: RenderApp = {
-    app, root, world, frame, layers, rt, screen, scale: 1, viewOverride: 0,
+    app, root, world, frame, layers, rt, screen, scale: 1, viewOverride,
     resize() {
       // The target may need to get wider or narrower before we fit it: fullscreen changes the aspect.
       const wantW = fitViewWidth(ra.viewOverride)
+      const w = parent.clientWidth || window.innerWidth, h = parent.clientHeight || window.innerHeight
+      // A resize event that changed nothing (a fullscreen toggle fires two) must not rebuild the
+      // letterbox and resize the renderer for nothing.
+      if (wantW === tuning.view.width && w === lastW && h === lastH) return
+      lastW = w; lastH = h
       if (wantW !== tuning.view.width) {
         tuning.view.width = wantW
         rt.resize(wantW, height)
@@ -85,7 +94,6 @@ export async function createRenderApp(parent: HTMLElement): Promise<RenderApp> {
       const width = tuning.view.width
       // integer scale in PHYSICAL pixels (crisp on 2x displays); fall back to a fractional fit when the integer
       // scale would waste more than ~30% of the window
-      const w = parent.clientWidth || window.innerWidth, h = parent.clientHeight || window.innerHeight
       const fit = Math.min(w * dpr / width, h * dpr / height)
       let phys = Math.max(1, Math.floor(fit))
       if (phys / fit < 0.7) phys = fit

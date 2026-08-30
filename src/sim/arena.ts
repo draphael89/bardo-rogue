@@ -162,58 +162,21 @@ interface Shell {
 
 // The wall ring. Warm dark stone, one cope line on the north face, corners falling to
 // void so the room does not read as a box with a bright frame around it (§2.3, §3.2.3).
+// A classic room IS one island filling the whole grid (§8.4), so this is the island toolkit
+// applied once: a void field with a single ring carved into it, cell-identical to the old
+// hand-rolled loop.
 function shell(cols: number, rows: number): Shell {
-  const base = new Uint16Array(cols * rows)
-  const overlay = new Int16Array(cols * rows).fill(-1)
-  const solid = new Uint8Array(cols * rows)
-  const idx = (c: number, r: number) => r * cols + c
-  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
-    const corner = (r <= 1 || r === rows - 1) && (c === 0 || c === cols - 1)
-    let t: number = T.void
-    if (corner) t = T.corner
-    else if (r === 0) t = T.capNorth
-    else if (r === rows - 1) t = T.capSouth
-    else if (c === 0) t = T.capWest
-    else if (c === cols - 1) t = T.capEast
-    else if (r === 1) t = T.wallFace
-    else t = T.void
-    base[idx(c, r)] = t
-    solid[idx(c, r)] = (r <= 1 || r === rows - 1 || c === 0 || c === cols - 1) ? 1 : 0
-  }
-  return { cols, rows, base, overlay, solid, idx }
+  const s = voidField(cols, rows)
+  ringIsland(s, { c0: 0, r0: 0, c1: cols - 1, r1: rows - 1 })
+  return s
 }
 
-// §2.2 running bond in BANDS two rows tall. Every band lays 2- and 3-wide slabs from a
-// per-band phase, so vertical joints stagger between bands and no slab is one tile.
-// `levelAt` picks the value level per slab, never per cell, so a slab is never split down
-// the middle: the floor's macro-scale variation is between whole slabs (§2.1 Law 1).
+// §2.2 running bond in BANDS two rows tall (the bond itself lives in paveRect). The whole-room
+// pave is paveRect over the shell's interior rect, respecting solids so a caller that walls
+// cells before paving keeps them. Identical output: the interior rect excludes the wall ring,
+// the bands align to row 2 either way, and shell rooms are 15 rows so both loops stop at row 13.
 function pave(s: Shell, levelAt: (c: number, r: number) => number): void {
-  const widths = [2, 3, 2, 3, 3, 2, 3]
-  for (let top = 2; top < s.rows - 1; top += 2) {
-    const band = (top - 2) >> 1
-    let c = 1 - ((band * 2) % 3)
-    let w = 0
-    while (c < s.cols - 1) {
-      const wide = widths[(band * 3 + w) % widths.length]
-      const mc = Math.min(s.cols - 2, Math.max(1, c + (wide >> 1)))
-      const lv = levelAt(mc, top)
-      const v: 0 | 1 = hash2(mc, top, 29) < 0.5 ? 0 : 1
-      for (let k = 0; k < wide; k++) {
-        const cc = c + k
-        if (cc <= 0 || cc >= s.cols - 1) continue
-        const hx: 0 | 1 | 2 = k === 0 ? 0 : k === wide - 1 ? 2 : 1
-        for (const dr of [0, 1] as const) {
-          const rr = top + dr
-          if (rr >= s.rows - 1) continue
-          const i = s.idx(cc, rr)
-          if (s.solid[i]) continue
-          s.base[i] = T.level(lv, v, hx, dr === 1)
-        }
-      }
-      c += wide
-      w++
-    }
-  }
+  paveRect(s, { c0: 1, r0: 2, c1: s.cols - 2, r1: s.rows - 2 }, levelAt, true)
 }
 
 // ---- island toolkit (§8.4): a room whose interior is void, with walled masses carved into it ----
@@ -248,11 +211,14 @@ function ringIsland(s: Shell, R: IslandRect): void {
   }
 }
 
-// §2.2 slab paving scoped to a rect: bridges, piers, and island interiors. Same running bond as
-// pave() — 2/3-wide slabs in two-row bands, level picked per slab — but bands align to the rect's
-// own top, so every island's stone starts on a whole slab. Rects must span an even number of rows.
-// Every cell it touches becomes walkable, which is also how a bridge cuts through an island wall.
-function paveRect(s: Shell, R: IslandRect, levelAt: (c: number, r: number) => number): void {
+// §2.2 slab paving scoped to a rect: whole rooms, bridges, piers, and island interiors. Running
+// bond — 2/3-wide slabs in two-row bands, level picked per slab, never per cell, so a slab is
+// never split down the middle (§2.1 Law 1) — with bands aligned to the rect's own top, so every
+// island's stone starts on a whole slab. Rects must span an even number of rows.
+// By default every cell it touches becomes walkable, which is also how a bridge cuts through an
+// island wall; `respectSolid` instead leaves solid cells (and their tiles) alone, for paving a
+// room around walls already stood up.
+function paveRect(s: Shell, R: IslandRect, levelAt: (c: number, r: number) => number, respectSolid = false): void {
   const widths = [2, 3, 2, 3, 3, 2, 3]
   for (let top = R.r0; top < R.r1; top += 2) {
     const band = (top - R.r0) >> 1
@@ -269,14 +235,24 @@ function paveRect(s: Shell, R: IslandRect, levelAt: (c: number, r: number) => nu
         const hx: 0 | 1 | 2 = k === 0 ? 0 : k === wide - 1 ? 2 : 1
         for (const dr of [0, 1] as const) {
           const i = s.idx(cc, top + dr)
+          if (respectSolid && s.solid[i]) continue
           s.base[i] = T.level(lv, v, hx, dr === 1)
-          s.solid[i] = 0
+          if (!respectSolid) s.solid[i] = 0
         }
       }
       c += wide
       w++
     }
   }
+}
+
+/**
+ * An island's walkable interior (inside the two-row north wall and the one-tile ring),
+ * inclusive tile coords. The render-side bakes (occlusion, grit) inset by exactly this,
+ * so the rule lives once.
+ */
+export function interior(R: IslandRect): IslandRect {
+  return { c0: R.c0 + 1, r0: R.r0 + 2, c1: R.c1 - 1, r1: R.r1 - 1 }
 }
 
 // distance from (px,py) to the segment (x0,y0)-(x1,y1), in px
@@ -287,7 +263,9 @@ function distToSeg(px: number, py: number, x0: number, y0: number, x1: number, y
   return Math.hypot(px - qx, py - qy)
 }
 
-function hash2(x: number, y: number, s: number): number {
+// Deterministic 2D hash in [0,1). Exported for render-side authored scatter (starfield.ts) so
+// the constants live once; callers keep their own salts.
+export function hash2(x: number, y: number, s: number): number {
   let n = Math.imul(x | 0, 374761393) + Math.imul(y | 0, 668265263) + Math.imul(s | 0, 1274126177)
   n = Math.imul(n ^ (n >>> 13), 1274126177)
   return (n >>> 0) % 1000 / 1000
@@ -545,7 +523,6 @@ function buildBardo(rng: Rng): Arena {
     if (lift < 0.84) return 2
     return 4
   }
-  const interior = (R: IslandRect): IslandRect => ({ c0: R.c0 + 1, r0: R.r0 + 2, c1: R.c1 - 1, r1: R.r1 - 1 })
   for (const R of islands) paveRect(s, interior(R), levelFor(R))
 
   // ---- the line itself: bridges and the pier, paved through the walls they meet ----
@@ -617,10 +594,10 @@ function buildBardo(rng: Rng): Arena {
     [0, 0, PROP.bellNW], [32, 0, PROP.bellNE], [0, 32, PROP.bellSW], [32, 32, PROP.bellSE],
   ] as const) props.push({ x: bellX + dx, y: bellY + dy, tile, sortY: bellSort, sheet: 'prop' })
   for (let r = 20; r <= 21; r++) for (let c = 50; c <= 52; c++) solid[idx(c, r)] = 1
-  props.push({ x: 46 * TILE - 8, y: 22 * TILE - 20, tile: PROP.pan, sortY: 23 * TILE, sheet: 'prop' })
+  furniture(46, 22, PROP.pan, false)
   // PIER: the Ferryman's mooring (§8.4.4) — a pole on the boards, the skiff's prow in the void.
   furniture(20, 29, PROP.pole)
-  props.push({ x: 18 * TILE - 8, y: 31 * TILE - 20, tile: PROP.prow, sortY: 32 * TILE, sheet: 'prop' })
+  furniture(18, 31, PROP.prow, false)
 
   // ---- the Seals, silhouette only (§8.4.3) ----
   // West: the dead tower — an obelisk profile and a brazier nobody lights (§8.2.4).

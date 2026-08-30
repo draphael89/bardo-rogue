@@ -123,12 +123,11 @@ export class Presenter {
       L.entities.addChild(s)
     }
     this.playerView = createPlayerView(atlas, L)
-    this.particles = new Particles(atlas, L.fx, L.decals, L.floor)
-    this.particles.bindArena(world.arena)
+    this.particles = new Particles(atlas, L.fx, L.decals, L.floor, world.arena)
     this.atmosphere = new Atmosphere(atlas, L.fx, world.arena, world.rooms[world.roomIndex]?.layout ?? 'threshold')
     L.fx.addChild(this.fxGraphics)
     L.shadows.addChild(this.groundFx)
-    this.hud = new Hud(atlas, L.hud)
+    this.hud = new Hud(atlas, L.hud, ra.world)
     this.flashOverlay = new Sprite(Texture.WHITE); this.flashOverlay.width = tuning.view.width; this.flashOverlay.height = tuning.view.height
     this.flashOverlay.alpha = 0; L.hud.addChild(this.flashOverlay)
     this.reward = new RewardOverlay(L.hud)
@@ -178,6 +177,7 @@ export class Presenter {
     this.judgmentT = -1
     this.huntIds.clear()
     this.rebuildRoom()
+    this.camera.snapFollow()               // a restart is a new arena: framed, never scrolled into
     this.playerView.body.tint = 0xffffff
     // juice hooks: the player body is hidden after the death shatter
     this.playerView.body.visible = this.playerView.shadow.visible = true
@@ -460,6 +460,7 @@ export class Presenter {
           break
         case 'roomEnter':
           this.rebuildRoom()
+          this.camera.snapFollow()         // a new room is framed, never scrolled into
           // The decal target is a single persistent render texture, and rebuildRoom only rebuilds
           // the tilemap. Without this the blood and wound stamps of the last fight are still on the
           // floor of the next room, on a different layout, under enemies that did not bleed there.
@@ -485,6 +486,7 @@ export class Presenter {
           this.impacts.length = 0
           this.dodgedT = this.grazeT = this.reversalT = -1
           this.rebuildRoom()
+          this.camera.snapFollow()         // the hub is a different arena: framed, never scrolled into
           this.particles.clear()
           this.damageNumbers.clear()
           const v = this.playerView
@@ -1010,9 +1012,15 @@ export class Presenter {
     this.impacts.length = write
   }
 
+  // Rebuilds the room's baked surfaces for the CURRENT arena. Deliberately does not touch the
+  // camera: a room change snaps the follow at its call site, while a view resize mid-walk must
+  // keep the smooth follow (a snap there jump-cut the bardo camera on every fullscreen toggle).
   rebuildRoom(): void {
     const L = this.ra.layers
-    this.tilemap.sprite.destroy()
+    // The baked floor is this sprite's own RenderTexture and nobody else's. pixi's plain destroy()
+    // keeps it alive (autoGarbageCollect is off), stranding ~2.4MB of GPU floor per room entry.
+    // ONLY the tilemap sprite destroys its texture — door and props share atlas textures.
+    this.tilemap.sprite.destroy({ texture: true, textureSource: true })
     this.tilemap.door.destroy()
     for (const s of this.propSprites) s.destroy()
     this.propSprites = []
@@ -1028,17 +1036,19 @@ export class Presenter {
     this.lighting.rebind(this.world.arena)
     this.atmosphere.rebind(this.world.arena, this.world.rooms[this.world.roomIndex]?.layout ?? 'threshold')
     this.tilemap.setDoorOpen(this.world.doorOpen)
-    // A new room is framed, never scrolled into.
-    this.camera.snapFollow()
   }
 
   // The room's resting rect in target px (camera at rest). Feeds the underlay's star skip so a room
-  // that fits the frame keeps a starless interior, exactly as the old bake did.
+  // that fits the frame keeps a starless interior, exactly as the old bake did. The rect comes from
+  // clampFocus's own collapsed centre — the one authority on where a room rests — not from parallel
+  // centring arithmetic.
   private rebuildVoid(): void {
     const V = tuning.view, S = V.worldScale
     const a = this.world.arena
     const w = a.cols * TILE * S, h = a.rows * TILE * S
-    drawVoidUnderlay(this.voidG, { x: Math.round((V.width - w) / 2), y: Math.round((V.height - h) / 2), w, h })
+    const fx = clampFocus(0, a.cols * TILE, V.width / S)
+    const fy = clampFocus(0, a.rows * TILE, V.height / S)
+    drawVoidUnderlay(this.voidG, { x: Math.round(V.width / 2 - fx * S), y: Math.round(V.height / 2 - fy * S), w, h })
   }
 
   private flashAlpha = 0
@@ -1182,8 +1192,7 @@ export class Presenter {
     this.particles.setThreatPriority(hasHostileFloorThreat(w))
     this.particles.update(dtSec)
     this.atmosphere.update(w, dtSec)
-    // juice hooks
-    this.lighting.update(w, dtSec, alpha)
+    // juice hooks (the lightmap updates below, after the camera settles: it follows the view)
     this.damageNumbers.update(dtSec)
     this.postfx.update(dtSec)
 
@@ -1196,8 +1205,8 @@ export class Presenter {
     const V = tuning.view, S = V.worldScale
     const pxi = lerp(p.px, p.x, alpha), pyi = lerp(p.py, p.y, alpha)
     this.camera.follow(pxi, pyi, dtSec)
-    const fx = clampFocus(this.camera.followX, w.arena.cols * TILE, V.width / S, V.camera.clampMargin)
-    const fy = clampFocus(this.camera.followY, w.arena.rows * TILE, V.height / S, V.camera.clampMargin)
+    const fx = clampFocus(this.camera.followX, w.arena.cols * TILE, V.width / S)
+    const fy = clampFocus(this.camera.followY, w.arena.rows * TILE, V.height / S)
     const tx = Math.round(V.width / 2 - fx * S), ty = Math.round(V.height / 2 - fy * S)
     const pxq = Math.round(pxi * S) / S, pyq = Math.round(pyi * S) / S
     this.ra.world.pivot.set(pxq, pyq)
@@ -1207,10 +1216,12 @@ export class Presenter {
       Math.round(pxq * S + tx + this.camera.offsetX * S),
       Math.round(pyq * S + ty + this.camera.offsetY * S),
     )
+    // The lightmap follows the camera (light.ts): hand it the resting view origin in world px.
+    this.lighting.update(w, dtSec, alpha, fx - V.width / (2 * S), fy - V.height / (2 * S))
 
     if (this.flashAlpha > 0) {
-      // The target's width is adaptive (app.ts fits 480..768 in 16px steps), so a size taken once at
-      // construction leaves the "full-frame" flash covering the left 480px of a wide screen.
+      // The target's width is adaptive (app.ts fits 640..1024 in 16px steps), so a size taken once at
+      // construction leaves the "full-frame" flash covering the left 640px of a wide screen.
       if (this.flashOverlay.width !== tuning.view.width) this.flashOverlay.width = tuning.view.width
       if (this.flashOverlay.height !== tuning.view.height) this.flashOverlay.height = tuning.view.height
       this.flashOverlay.alpha = this.flashAlpha; this.flashAlpha = Math.max(0, this.flashAlpha - dtSec * 6)
@@ -1397,7 +1408,7 @@ function drawGuard(g: Graphics, e: Enemy, alpha: number, flash: number): void {
 }
 
 // ---- authored contact shapes -------------------------------------------------------------------
-// Everything below emits 1px rects only. A vector shape at 480x270 lands on half pixels and the
+// Everything below emits 1px rects only. A vector shape in the render target lands on half pixels and the
 // NEAREST upscale doubles the smear; whole-pixel rows keep every edge hard, and a fixed handful of
 // flat colours keeps a contact frame from adding forty near-white tones to the image.
 
@@ -1590,7 +1601,7 @@ function ringBand(g: Graphics, cx: number, cy: number, r: number, half: number, 
 
 // The direction the read went, as one tapered bar along the roll axis: long behind, short ahead, so a
 // single frame says which way the body left. Plotted per pixel about the axis rather than drawn as a
-// rotated rectangle, because at 480x270 a rotated vector edge lands on half pixels and the NEAREST
+// rotated rectangle, because in the render target a rotated vector edge lands on half pixels and the NEAREST
 // upscale doubles the smear.
 function smearBar(g: Graphics, cx: number, cy: number, a: number, back: number, front: number, thick: number, dark: number, core: number): void {
   const ux = Math.cos(a), uy = Math.sin(a) * 0.9

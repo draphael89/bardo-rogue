@@ -43,9 +43,8 @@ function harness(pad?: FakePad) {
     value: pad ? { getGamepads: () => [pad] } : {}, configurable: true, writable: true,
   })
   const worldContainer = new Container()
-  const arenaOffset = { x: 0, y: 0 }
   const ra = {
-    app: { canvas }, world: worldContainer, screen: { x: 0, y: 0 }, scale: 1, arenaOffset,
+    app: { canvas }, world: worldContainer, screen: { x: 0, y: 0 }, scale: 1,
   } as unknown as RenderApp
   return { win, canvas, worldContainer, input: new InputSystem(ra) }
 }

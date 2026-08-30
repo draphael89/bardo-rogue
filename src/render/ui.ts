@@ -33,7 +33,7 @@ function styleFor(tier: TypeTier, color: number): TextStyle {
 /**
  * A label in the overlay type ramp. Position it with one of the `place*` helpers below rather than
  * setting `.position` directly: an anchor of 0.5 on odd-width text puts the glyph run on a half
- * pixel, which the 480x270 target samples before `crispText` can do anything about it.
+ * pixel, which the render target samples before `crispText` can do anything about it.
  */
 export function label(text: string, tier: TypeTier, color = P.bone): Text {
   const t = new Text({ text, style: styleFor(tier, color), resolution: 1 })

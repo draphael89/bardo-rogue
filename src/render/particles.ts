@@ -1,4 +1,5 @@
 import { Container, Sprite, Texture, RenderTexture, Rectangle } from 'pixi.js'
+import { TILE } from '@/sim/arena'
 import type { Atlas } from './atlas'
 import { fxRng } from './fxRng'
 import { decalAlphaForFrame } from './feedback'
@@ -14,7 +15,7 @@ interface P { s: Sprite; frames: readonly Texture[] | null; spin: number; vx: nu
 const FX = FX_UNIT
 const BODY_UNIT = 64
 
-// §6.1: rotation quantises to 16 steps. A freely rotating sprite over a 480x270 target resamples its
+// §6.1: rotation quantises to 16 steps. A freely rotating sprite over the render target resamples its
 // own pixels every frame, which is the loudest "not pixel art" tell there is.
 const QUANT = (Math.PI * 2) / 16
 
@@ -34,20 +35,21 @@ export class Particles {
   // World px past the room edge a stamp may still land on (knockback splatter against a wall).
   private decalPad = 32
 
-  constructor(private atlas: Atlas, private fx: Container, decals: Container, _floor: Container) {
+  constructor(private atlas: Atlas, private fx: Container, decals: Container, _floor: Container, arena: { cols: number; rows: number }) {
     this.dustFrames = [1, 2, 3, 4].map(i => atlas.particle(`smoke_0${i}`))
-    // Sized by bindArena to the room, not the viewport: decals live in world space and a camera
-    // larger room must not scroll its floor scars out of the texture.
-    this.decalRt = RenderTexture.create({ width: 16, height: 16, scaleMode: 'nearest' })
+    // Sized to the room, not the viewport: decals live in world space and a room larger than the
+    // camera must not scroll its floor scars out of the texture. Created at final size — a
+    // placeholder RT immediately resized was one allocation for nothing.
+    this.decalRt = RenderTexture.create({ width: arena.cols * TILE + this.decalPad * 2, height: arena.rows * TILE + this.decalPad * 2, scaleMode: 'nearest' })
     this.decalSprite = new Sprite(this.decalRt); this.decalSprite.position.set(-this.decalPad, -this.decalPad)
     decals.addChild(this.decalSprite)
     this.decalContainer.addChild(this.stamp)
     this.stamp.anchor.set(0.5)
   }
 
-  /** Room entry (and first mount): size the decal target to the room. Resizing clears it. */
+  /** Room entry: size the decal target to the room. Resizing clears it. */
   bindArena(arena: { cols: number; rows: number }): void {
-    const w = arena.cols * 16 + this.decalPad * 2, h = arena.rows * 16 + this.decalPad * 2
+    const w = arena.cols * TILE + this.decalPad * 2, h = arena.rows * TILE + this.decalPad * 2
     if (this.decalRt.width !== w || this.decalRt.height !== h) this.decalRt.resize(w, h)
   }
   private renderer: import('pixi.js').Renderer | null = null
@@ -178,8 +180,8 @@ export class Particles {
     }
   }
 
-  // The cut mark used to be a soft additive slash sprite stamped between the fighters. At 480x270 an
-  // alpha-ramped bloom covers both silhouettes and says nothing about direction, so the contact shape
+  // The cut mark used to be a soft additive slash sprite stamped between the fighters. In the render
+  // target an alpha-ramped bloom covers both silhouettes and says nothing about direction, so the contact shape
   // is now authored out of whole pixels in presenter.drawContact instead.
 
   spawnBurst(x: number, y: number, tint = SPAWN.burst, spark = SPAWN.burstSpark) {

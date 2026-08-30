@@ -272,7 +272,7 @@ describe('attack', () => {
     expect(swings.slice(0, 3)).toEqual([0, 1, 2])
     expect(swings[3]).toBe(0)
   })
-  it('flows the chain at its own pace while the button is held', () => {
+  it('flows the quick two-cut chain while held without manufacturing a heavy', () => {
     const w = createWorld(1, 'empty')
     const swings: number[] = []
     for (let i = 0; i < 300; i++) {
@@ -281,8 +281,8 @@ describe('attack', () => {
       w.events.length = 0
     }
     expect(swings.length).toBeGreaterThan(6)
-    // held intent sustains the chain but never manufactures discrete queued presses
-    for (let i = 0; i < swings.length; i++) expect(swings[i], `swing ${i}`).toBe(i % 3)
+    // Held intent sustains the quick rhythm, but never invents the renewed intent a heavy requires.
+    for (let i = 0; i < swings.length; i++) expect(swings[i], `swing ${i}`).toBe(i % 2)
   })
   it('hits a dummy in front once per swing and applies hit-stop', () => {
     const w = createWorld(1, 'dummy')

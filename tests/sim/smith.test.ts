@@ -24,6 +24,10 @@ function walkToSmith(world: ReturnType<typeof createWorld>): void {
   stepWorld(world, emptyInput())
 }
 
+function strikeSmith(world: ReturnType<typeof createWorld>): void {
+  stepWorld(world, { ...emptyInput(), attack: true })
+}
+
 function armThenConfirm(world: ReturnType<typeof createWorld>, extra: Record<string, unknown> = {}): void {
   while (world.tick - world.phaseTick < tuning.run.modalArmTicks) stepWorld(world, emptyInput())
   stepWorld(world, { ...emptyInput(), ...extra, confirm: true })
@@ -57,16 +61,20 @@ describe('the Smith', () => {
     expect(world.events.some(e => e.type === 'smithSpoke' && e.beat === 'stranger')).toBe(true)
   })
 
-  it('sells one reforging for remembrances, once', () => {
+  it('never spends on approach, then sells one reforging on a deliberate strike', () => {
     const world = inTown()
-    world.session.meta.remembrances = tuning.economy.smith.rerollCost
+    world.session.meta.remembrances = tuning.economy.smith.rerollCost + tuning.economy.smith.vesselCost
     walkToSmith(world)
+    expect(world.session.meta.rerollUnlocked).toBe(false)
+    expect(world.session.meta.vesselUnlocked).toBe(false)
+    expect(world.session.meta.remembrances).toBe(tuning.economy.smith.rerollCost + tuning.economy.smith.vesselCost)
+    strikeSmith(world)
     expect(world.session.meta.rerollUnlocked).toBe(true)
-    expect(world.session.meta.remembrances).toBe(0)
+    expect(world.session.meta.vesselUnlocked).toBe(false)
+    expect(world.session.meta.remembrances).toBe(tuning.economy.smith.vesselCost)
     expect(world.events.some(e => e.type === 'rerollUnlocked')).toBe(true)
-    world.session.meta.remembrances = 9
-    walkToSmith(world)
-    expect(world.session.meta.remembrances).toBe(9)
+    stepWorld(world, emptyInput())
+    expect(world.session.meta.remembrances).toBe(tuning.economy.smith.vesselCost)
     expect(world.events.filter(e => e.type === 'rerollUnlocked')).toHaveLength(1)
   })
 
@@ -75,6 +83,9 @@ describe('the Smith', () => {
     world.session.meta.rerollUnlocked = true
     world.session.meta.remembrances = tuning.economy.smith.vesselCost
     walkToSmith(world)
+    expect(world.session.meta.vesselUnlocked).toBe(false)
+    expect(world.session.meta.remembrances).toBe(tuning.economy.smith.vesselCost)
+    strikeSmith(world)
     expect(world.session.meta.vesselUnlocked).toBe(true)
     expect(world.session.meta.remembrances).toBe(0)
     expect(world.player.maxHp).toBe(tuning.player.hp + tuning.economy.smith.vesselAmount)
@@ -134,7 +145,7 @@ describe('the Smith', () => {
     expect(world.events.some(e => e.type === 'smithSpoke' && e.beat === 'unburied')).toBe(false)
   })
 
-  it('names the one you left even when the same step buys the cup', () => {
+  it('names the one you left before a later strike buys the cup', () => {
     const world = createWorld(7, 'loop')
     prepareWeapon(world, 'blade')
     startRun(world, 'threshold')
@@ -158,10 +169,14 @@ describe('the Smith', () => {
     world.session.meta.rerollUnlocked = true
     world.session.meta.remembrances = tuning.economy.smith.vesselCost
     walkToSmith(world)
-    expect(world.session.meta.vesselUnlocked).toBe(true)
-    expect(world.events.some(e => e.type === 'vesselUnlocked')).toBe(true)
+    expect(world.session.meta.vesselUnlocked).toBe(false)
     expect(world.events.some(e => e.type === 'smithSpoke' && e.beat === 'unburied')).toBe(true)
     expect(world.events.some(e => e.type === 'smithSpoke' && e.beat === 'vesselSold')).toBe(false)
+    world.events.length = 0
+    strikeSmith(world)
+    expect(world.session.meta.vesselUnlocked).toBe(true)
+    expect(world.events.some(e => e.type === 'vesselUnlocked')).toBe(true)
+    expect(world.events.some(e => e.type === 'smithSpoke' && e.beat === 'vesselSold')).toBe(true)
     world.events.length = 0
     world.player.x += 80
     stepWorld(world, emptyInput())

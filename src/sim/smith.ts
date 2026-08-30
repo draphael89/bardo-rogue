@@ -12,14 +12,14 @@ function keptCount(n: number): string {
 
 export const SMITH_LINES: Record<SmithBeat, string> = {
   get stranger() {
-    return `Bring ${keptCount(tuning.economy.smith.rerollCost).toLowerCase()} of what the dead keep. I turn the next offer.`
+    return `Bring ${keptCount(tuning.economy.smith.rerollCost).toLowerCase()} of what the dead keep. Strike when you mean to turn the next offer.`
   },
   afterDeath: 'You came back thinner. The anvil still spends.',
   afterVictory: 'Minos named you. I do not.',
   unburied: 'You left one on the bank. He will not stay there.',
   sold: 'Once a descent I will turn the offer. After that you live with it.',
   get vesselWait() {
-    return `${keptCount(tuning.economy.smith.vesselCost)} of what you kept. A cup that does not spill on the way home.`
+    return `${keptCount(tuning.economy.smith.vesselCost)} of what you kept. Strike when you mean to forge a cup that does not spill.`
   },
   vesselSold: 'The boat holds one more. Every descent from here.',
   owned: 'It is already in the steel. Go.',
@@ -27,8 +27,8 @@ export const SMITH_LINES: Record<SmithBeat, string> = {
 
 function beatOf(world: World, bought: 'reroll' | 'vessel' | null): SmithBeat {
   const m = world.session.meta
-  // The one you left is the first thing he is allowed to say. A cup bought on the same
-  // step still stays; its line waits for the next approach.
+  // The one you left is the first thing he is allowed to say. Approach clears it before
+  // any later purchase can answer with its own line.
   if (world.session.lastMystery === 'leave') return 'unburied'
   if (bought === 'reroll') return 'sold'
   if (bought === 'vessel') return 'vesselSold'
@@ -39,8 +39,8 @@ function beatOf(world: World, bought: 'reroll' | 'vessel' | null): SmithBeat {
   return 'stranger'
 }
 
-/** Walk-in, once per approach. Buying is the same verb as taking the blade. */
-export function tryTalkSmith(world: World): void {
+/** Approach starts the meeting. A later light-action edge makes the purchase deliberate. */
+export function tryTalkSmith(world: World, confirm: boolean): void {
   if (world.roomPhase !== 'town') return
   const smith = world.arena.smith
   if (!smith) return
@@ -53,8 +53,14 @@ export function tryTalkSmith(world: World): void {
     world.arena.smithNear = false
     return
   }
-  if (world.arena.smithNear) return
-  world.arena.smithNear = true
+  if (!world.arena.smithNear) {
+    world.arena.smithNear = true
+    const beat = beatOf(world, null)
+    if (beat === 'unburied') world.session.lastMystery = null
+    world.emit({ type: 'smithSpoke', beat, line: SMITH_LINES[beat], x: smith.x, y: smith.y })
+    return
+  }
+  if (!confirm) return
 
   const meta = world.session.meta
   const s = tuning.economy.smith
@@ -71,6 +77,7 @@ export function tryTalkSmith(world: World): void {
     applyTownHealth(world)
     world.emit({ type: 'vesselUnlocked', cost: s.vesselCost, remembrances: meta.remembrances })
   }
+  if (!bought) return
   const beat = beatOf(world, bought)
   if (beat === 'unburied') world.session.lastMystery = null
   world.emit({ type: 'smithSpoke', beat, line: SMITH_LINES[beat], x: smith.x, y: smith.y })

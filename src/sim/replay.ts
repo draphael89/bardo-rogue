@@ -16,9 +16,59 @@ export type EncodedRun = [number, number, number, number, number, number]
 export interface EncodedReplay { v: 1; seed: number; scenario: string; god?: boolean; meta?: MetaStateV1; runs: EncodedRun[] }
 
 export const Q = 10000
+export const MAX_REPLAY_FRAMES = 1_000_000
 // Exported so the harness documentation can be checked against it: the flag table drifted from
 // HARNESS.md once already, and a wrong bit list is worse than none for anyone decoding a fixture.
 export const FLAG = { aimSoft: 1, attack: 2, dodge: 4, restart: 8, attackHeld: 16, confirm: 32, choiceLeft: 64, choiceRight: 128, heavy: 256, reroll: 512 } as const
+const FLAG_MASK = Object.values(FLAG).reduce((mask, bit) => mask | bit, 0)
+
+function replayObject(value: unknown): Record<string, unknown> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) throw new Error('replay must be an object')
+  return value as Record<string, unknown>
+}
+
+function assertReplayHeader(value: unknown): asserts value is { v: 1; seed: number; scenario: string; god?: boolean } {
+  const replay = replayObject(value)
+  if (replay.v !== 1) throw new Error(`unsupported replay version ${String(replay.v)}`)
+  if (typeof replay.seed !== 'number' || !Number.isFinite(replay.seed)) throw new Error('replay seed must be finite')
+  if (typeof replay.scenario !== 'string' || !replay.scenario) throw new Error('replay scenario must be a non-empty string')
+  if (replay.god !== undefined && typeof replay.god !== 'boolean') throw new Error('replay god flag must be boolean')
+}
+
+function assertEncodedReplay(value: unknown): asserts value is EncodedReplay {
+  assertReplayHeader(value)
+  const replay = value as unknown as Record<string, unknown>
+  if (!Array.isArray(replay.runs)) throw new Error('encoded replay runs must be an array')
+  let total = 0
+  for (const [index, value] of replay.runs.entries()) {
+    if (!Array.isArray(value) || value.length !== 6 || !value.every(Number.isSafeInteger)) {
+      throw new Error(`encoded replay run ${index} must contain six safe integers`)
+    }
+    const [mx, my, ax, ay, flags, count] = value as number[]
+    if ([mx, my, ax, ay].some(axis => Math.abs(axis) > Q)) throw new Error(`encoded replay run ${index} has an axis outside -${Q}..${Q}`)
+    if (flags < 0 || (flags & ~FLAG_MASK) !== 0) throw new Error(`encoded replay run ${index} has unknown flags`)
+    if (count <= 0) throw new Error(`encoded replay run ${index} count must be a positive integer`)
+    if (count > MAX_REPLAY_FRAMES - total) throw new Error(`replay exceeds the ${MAX_REPLAY_FRAMES}-frame limit`)
+    total += count
+  }
+}
+
+function assertInputFrame(value: unknown, index: number): asserts value is InputFrame {
+  const frame = replayObject(value)
+  for (const key of ['moveX', 'moveY', 'aimX', 'aimY'] as const) {
+    const axis = frame[key]
+    if (typeof axis !== 'number' || !Number.isFinite(axis) || Math.abs(axis) > 1) throw new Error(`replay frame ${index} has invalid ${key}`)
+  }
+  for (const key of ['aimSoft', 'attack', 'attackHeld', 'heavy', 'dodge', 'restart'] as const) {
+    if (typeof frame[key] !== 'boolean') throw new Error(`replay frame ${index} has invalid ${key}`)
+  }
+  for (const key of ['confirm', 'reroll'] as const) {
+    if (frame[key] !== undefined && typeof frame[key] !== 'boolean') throw new Error(`replay frame ${index} has invalid ${key}`)
+  }
+  if (frame.choiceDelta !== undefined && frame.choiceDelta !== -1 && frame.choiceDelta !== 0 && frame.choiceDelta !== 1) {
+    throw new Error(`replay frame ${index} has invalid choiceDelta`)
+  }
+}
 
 function copyMeta(meta: MetaStateV1): MetaStateV1 {
   if (meta.version !== 1) return defaultMetaState()
@@ -59,7 +109,7 @@ export function encodeReplay(r: Replay): EncodedReplay {
 }
 
 export function decodeReplay(e: EncodedReplay): Replay {
-  if (e.v !== 1) throw new Error(`unsupported replay version ${String(e.v)}`)
+  assertEncodedReplay(e)
   const frames: InputFrame[] = []
   for (const [mx, my, ax, ay, flags, count] of e.runs) {
     const f: InputFrame = {
@@ -78,7 +128,9 @@ export function decodeReplay(e: EncodedReplay): Replay {
   return out
 }
 
-export function isEncodedReplay(x: Replay | EncodedReplay): x is EncodedReplay { return 'runs' in x }
+export function isEncodedReplay(x: unknown): x is EncodedReplay {
+  return typeof x === 'object' && x !== null && Object.prototype.hasOwnProperty.call(x, 'runs')
+}
 
 // One run per line: small on disk, still diffable.
 export function replayToJson(r: Replay): string {
@@ -88,8 +140,14 @@ export function replayToJson(r: Replay): string {
 }
 
 export function replayFromJson(json: string): Replay {
-  const obj = JSON.parse(json) as Replay | EncodedReplay
-  return isEncodedReplay(obj) ? decodeReplay(obj) : obj
+  const obj = JSON.parse(json) as unknown
+  if (isEncodedReplay(obj)) return decodeReplay(obj)
+  assertReplayHeader(obj)
+  const raw = obj as unknown as Record<string, unknown>
+  if (!Array.isArray(raw.frames)) throw new Error('raw replay frames must be an array')
+  if (raw.frames.length > MAX_REPLAY_FRAMES) throw new Error(`replay exceeds the ${MAX_REPLAY_FRAMES}-frame limit`)
+  raw.frames.forEach(assertInputFrame)
+  return obj as Replay
 }
 
 // Fresh world from the replay header, then one frame per tick. A restart frame rebuilds the world and

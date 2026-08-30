@@ -32,14 +32,14 @@ const step = (w: ReturnType<typeof createWorld>, f = emptyInput()) => { stepWorl
 {
   const w=createWorld(1,'wave1'); const p=w.player
   w.enemies.forEach(e=>e.active=false); w.spawnQueue=[]; w.wave.index=0; w.wave.state='active'; w.wave.groupIndex=1
-  p.hp=1; w.fireProjectile(p.x+11,p.y,Math.PI,110,3,180)
+  p.hp=1; w.fireProjectile(p.x+11,p.y,Math.PI,110,3,180,0,1,0,'bolt','caster')
   updateWaves(w); const clear={tick:w.tick,hp:p.hp,state:w.wave.state,bolts:w.projectiles.filter(b=>b.active).length,events:w.events.slice()}; w.events.length=0
   for(let i=0;i<10 && p.state!=='dead';i++)step(w)
   out.postClearDamage={clear,after:{tick:w.tick,hp:p.hp,state:p.state,wave:w.wave.state,door:w.doorOpen}}
 }
 {
   const w=createWorld(1,'empty'); let admitted=0
-  for(let i=0;i<200;i++) if(w.fireProjectile(200,130,0,0,3,1000)) admitted++
+  for(let i=0;i<200;i++) if(w.fireProjectile(200,130,0,0,3,1000,0,1,0,'bolt','caster')) admitted++
   out.projectileCapacity={requested:200,admitted,rejected:200-admitted,pool:w.projectiles.length}
 }
 {
@@ -50,7 +50,7 @@ const step = (w: ReturnType<typeof createWorld>, f = emptyInput()) => { stepWorl
 {
   const w=createWorld(1,'empty'); const p=w.player; const m=new Metrics()
   p.state='dodge';p.stateTick=4
-  w.fireProjectile(p.x,p.y,0,0,3,100)
+  w.fireProjectile(p.x,p.y,0,0,3,100,0,1,0,'bolt','caster')
   const ev=step(w); m.consume(w,ev)
   out.boltDodgeMetric={hp:p.hp,activeBolts:w.projectiles.filter(b=>b.active).length,events:ev,successes:m.summary().successfulDodges}
   const before=w.player.hp; hurtPlayer(w,0,1); hurtPlayer(w,0,1); m.consume(w,w.events)
@@ -88,7 +88,7 @@ const step = (w: ReturnType<typeof createWorld>, f = emptyInput()) => { stepWorl
   const samples: unknown[]=[]
   for(const n of [0,32,64]){
     const w=createWorld(11,'empty',{god:true});for(let i=0;i<32;i++)w.spawnEnemy('dummy',32+(i%8)*45,50+Math.floor(i/8)*45)
-    for(let i=0;i<n;i++)w.fireProjectile(40+(i%8)*42,60+Math.floor(i/8)*18,0,0,3,1000000)
+    for(let i=0;i<n;i++)w.fireProjectile(40+(i%8)*42,60+Math.floor(i/8)*18,0,0,3,1000000,0,1,0,'bolt','caster')
     for(let i=0;i<500;i++)step(w)
     const times=[];for(let i=0;i<10000;i++){const t=performance.now();step(w);times.push((performance.now()-t)*1000)}
     times.sort((a,b)=>a-b);samples.push({enemies:32,projectiles:n,medianUs:times[5000],p95Us:times[9500],maxUs:times[times.length-1]})

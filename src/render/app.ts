@@ -34,6 +34,13 @@ export function fitViewWidth(override = 0): number {
   return Math.max(480, Math.min(768, Math.round((tuning.view.height * aspect) / 16) * 16))
 }
 
+export function physicalFitScale(fit: number): number {
+  if (!Number.isFinite(fit) || fit <= 0) return 1
+  if (fit < 1) return fit
+  const integer = Math.floor(fit)
+  return integer / fit < 0.7 ? fit : integer
+}
+
 export async function createRenderApp(parent: HTMLElement, arenaPx: { w: number; h: number }): Promise<RenderApp> {
   const { height } = tuning.view
   const width = tuning.view.width
@@ -82,8 +89,7 @@ export async function createRenderApp(parent: HTMLElement, arenaPx: { w: number;
       // scale would waste more than ~30% of the window
       const w = parent.clientWidth || window.innerWidth, h = parent.clientHeight || window.innerHeight
       const fit = Math.min(w * dpr / width, h * dpr / height)
-      let phys = Math.max(1, Math.floor(fit))
-      if (phys / fit < 0.7) phys = fit
+      const phys = physicalFitScale(fit)
       const s = phys / dpr
       ra.scale = s
       app.renderer.resize(w, h)

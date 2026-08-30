@@ -27,7 +27,7 @@ import { detectPlatform, PROFILE_ID } from '@/platform'
 import { loadSave, saveFilename } from '@/platform/saveFile'
 import { titleNudge, townTally } from '@/render/titleMenu'
 import { nudgeSlider } from '@/sim/storage'
-import { applyPlaytestCondition, asPlaytestCondition, conditionOfBundle, PLAYTEST_CONDITIONS } from '@/playtest'
+import { applyPlaytestCondition, asPlaytestCondition, canRecordPlainReplay, conditionOfBundle, PLAYTEST_CONDITIONS, type PlaytestCondition } from '@/playtest'
 
 async function boot() {
   const q = new URLSearchParams(location.search)
@@ -45,6 +45,7 @@ async function boot() {
   // session interlocks that keep a bundle honest: PLAYTEST.md.
   const playtestRaw = q.get('playtest')
   const playtest = asPlaytestCondition(playtestRaw)
+  let replayCondition: PlaytestCondition | null = playtest
   if (playtestRaw && !playtest) console.log(`[playtest] unknown condition "${playtestRaw}"; expected ${PLAYTEST_CONDITIONS.join(' | ')}`)
 
   // Widen the render target to the window's aspect before anything reads it, so the room is not
@@ -341,6 +342,10 @@ async function boot() {
 
   const record = (on = !recorder.recording) => {
     if (on && !recorder.recording) {
+      if (!canRecordPlainReplay(replayCondition)) {
+        console.log('[replay] plain recording refused: the active no-dash condition requires a playtest bundle')
+        return false
+      }
       reset()
       recorder.start(cur.seed, cur.scenario, cur.god, cur.scenario === 'loop' ? world.session.meta : undefined)
       console.log('[replay] recording (fresh run)')
@@ -362,6 +367,7 @@ async function boot() {
     const bundled = conditionOfBundle(r)
     if (bundled) {
       applyPlaytestCondition(bundled)
+      if (bundled === 'no-dash' || replayCondition !== 'no-dash') replayCondition = bundled
       console.log(`[replay] playtest bundle: condition "${bundled}" applied`)
     }
     const rep = isEncodedReplay(r) ? decodeReplay(r) : r

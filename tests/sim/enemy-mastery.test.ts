@@ -286,7 +286,7 @@ describe('enemy cadence and projectile authority', () => {
   it('uses each hostile projectile own damage value', () => {
     const world = createWorld(1, 'empty')
     const p = world.player
-    world.fireProjectile(p.x, p.y, 0, 0, 3, 20, 0, 3)
+    world.fireProjectile(p.x, p.y, 0, 0, 3, 20, 0, 3, 0, 'bolt', 'caster')
     updateProjectiles(world)
     expect(p.hp).toBe(tuning.player.hp - 3)
     expect(world.events.some(x => x.type === 'playerHurt' && x.hp === tuning.player.hp - 3)).toBe(true)

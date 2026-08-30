@@ -12,11 +12,13 @@ beforeAll(() => { (globalThis as unknown as { window: Record<string, unknown> })
 function makeHost() {
   let world = createWorld(1, 'empty')
   let metrics = new Metrics()
+  let ticks = 0
   const loop = { paused: false, stats: () => ({ frames: 0 }) } as unknown as Loop
   return {
     getWorld: () => world,
     reset: (seed = 1, scenario = 'empty') => { world = createWorld(seed, scenario); metrics = new Metrics() },
-    tick: () => {},
+    tick: () => { ticks++ },
+    get ticks() { return ticks },
     setOverride: () => {},
     setBot: () => {},
     pause: (p?: boolean) => { loop.paused = p ?? !loop.paused; return loop.paused },
@@ -50,5 +52,30 @@ describe('__game.metrics', () => {
     expect(api.metrics.swings).toBe(0)
     // state() always re-read the host; the two views must not disagree
     expect(api.metrics.summary()).toEqual((api.state() as { metrics: unknown }).metrics)
+  })
+})
+
+describe('__game numeric controls', () => {
+  it('rejects unsafe step counts before entering the tick loop', () => {
+    const host = makeHost()
+    const api = installApi(host)
+    for (const n of [Number.POSITIVE_INFINITY, Number.NaN, -1, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+      expect(() => api.step(n)).toThrow(RangeError)
+    }
+    expect(host.ticks).toBe(0)
+    api.step(2)
+    expect(host.ticks).toBe(2)
+  })
+
+  it('rejects non-integer or overflowing currency mutations without corrupting state', () => {
+    const host = makeHost()
+    const api = installApi(host)
+    const meta = host.getWorld().session.meta
+    meta.remembrances = 7
+    for (const n of [Number.POSITIVE_INFINITY, Number.NaN, 1.5, Number.MAX_SAFE_INTEGER]) {
+      expect(() => api.giveRemembrances(n)).toThrow(RangeError)
+      expect(meta.remembrances).toBe(7)
+    }
+    expect(api.giveRemembrances(-10)).toBe(0)
   })
 })

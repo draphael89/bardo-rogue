@@ -138,8 +138,15 @@ export class PostFx {
 
   pulse(strength = tuning.juice.aberrationStrength, ticks = tuning.juice.aberrationTicks) {
     if (this.reducedEffects) return
-    this.total = ticks * TICK_MS / 1000
-    this.left = Math.max(this.left, this.total)
+    const duration = ticks * TICK_MS / 1000
+    if (!Number.isFinite(duration) || duration <= 0 || !Number.isFinite(strength) || strength <= 0) return
+    if (this.left <= 0) {
+      this.total = duration
+      this.left = duration
+    } else {
+      this.left = Math.max(this.left, duration)
+      this.total = Math.max(this.total, this.left)
+    }
     this.strength = Math.max(this.strength, strength)
   }
 
@@ -154,7 +161,7 @@ export class PostFx {
       return
     }
     this.left -= dtSec
-    const k = Math.max(0, this.left / this.total)
+    const k = Math.max(0, Math.min(1, this.left / this.total))
     const off = this.uniforms.uniforms.uOffset as Float32Array
     off[0] = this.strength * k; off[1] = this.strength * k * 0.35
     this.uniforms.update()

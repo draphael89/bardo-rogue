@@ -146,7 +146,7 @@ describe('dodge', () => {
   it('rolls through a bolt without taking damage', () => {
     const w = createWorld(1, 'empty')
     const p = w.player
-    w.fireProjectile(p.x + 16, p.y, Math.PI, 110, 3, 200)
+    w.fireProjectile(p.x + 16, p.y, Math.PI, 110, 3, 200, 0, 1, 0, 'bolt', 'caster')
     stepWorld(w, { ...emptyInput(), dodge: true, moveX: 1 })
     let hurt = false
     for (let i = 0; i < 30; i++) { stepWorld(w, emptyInput()); if (w.events.some(e => e.type === 'playerHurt')) hurt = true; w.events.length = 0 }
@@ -156,7 +156,7 @@ describe('dodge', () => {
   it('announces a bolt-through once and keeps the bolt', () => {
     const w = createWorld(1, 'empty')
     const p = w.player
-    const bolt = w.fireProjectile(p.x + 16, p.y, Math.PI, 110, 3, 200)
+    const bolt = w.fireProjectile(p.x + 16, p.y, Math.PI, 110, 3, 200, 0, 1, 0, 'bolt', 'caster')
     expect(bolt).toBeTruthy()
     stepWorld(w, { ...emptyInput(), dodge: true, moveX: 1 })
     let reads = 0
@@ -389,7 +389,7 @@ describe('room clear', () => {
     const w = createWorld(1, 'wave1')
     const p = w.player
     // a bolt already in flight, aimed straight at the player, when the last enemy dies
-    expect(w.fireProjectile(p.x - 60, p.y, 0, 110, 3, 180, 0, 1)).not.toBeNull()
+    expect(w.fireProjectile(p.x - 60, p.y, 0, 110, 3, 180, 0, 1, 0, 'bolt', 'caster')).not.toBeNull()
     forceRoomClear(w)
     expect(w.events.some(e => e.type === 'roomClear')).toBe(true)
     w.events.length = 0

@@ -119,7 +119,7 @@ describe('action-composed screen feedback', () => {
   it('keeps floor truth prioritized through live projectiles and spawn telegraphs', () => {
     const world = createWorld(9, 'empty')
     expect(hasHostileFloorThreat(world)).toBe(false)
-    const bolt = world.fireProjectile(100, 100, 0, 20, 3, 30, 0, 1)!
+    const bolt = world.fireProjectile(100, 100, 0, 20, 3, 30, 0, 1, 0, 'bolt', 'caster')!
     expect(hasHostileFloorThreat(world)).toBe(true)
     bolt.active = false
     world.fireProjectile(100, 100, 0, 20, 3, 30, 1, 1)

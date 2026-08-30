@@ -65,7 +65,7 @@ describe('terrain-clipped combat contact', () => {
       const p = world.player
       p.x = p.px = WALL_LEFT - p.radius
       p.y = p.py = WALL_Y
-      const bolt = world.fireProjectile(WALL_RIGHT + 3, WALL_Y, 0, 0, 3, 200)!
+      const bolt = world.fireProjectile(WALL_RIGHT + 3, WALL_Y, 0, 0, 3, 200, 0, 1, 0, 'bolt', 'caster')!
       if (blocked) addWall(world)
       let cuts = 0
       for (let tick = 0; tick < 48; tick++) {
@@ -236,8 +236,8 @@ describe('projectile hash contract', () => {
   it('hashes hostile projectile damage even when every other field is identical', () => {
     const a = createWorld(6, 'empty')
     const b = createWorld(6, 'empty')
-    const pa = a.fireProjectile(80, 80, 0, 100, 3, 60, 0, 1)!
-    const pb = b.fireProjectile(80, 80, 0, 100, 3, 60, 0, 2)!
+    const pa = a.fireProjectile(80, 80, 0, 100, 3, 60, 0, 1, 0, 'bolt', 'caster')!
+    const pb = b.fireProjectile(80, 80, 0, 100, 3, 60, 0, 2, 0, 'bolt', 'caster')!
     expect(pa.team).toBe(0)
     expect(pb.team).toBe(0)
     expect(hashWorld(a)).not.toBe(hashWorld(b))

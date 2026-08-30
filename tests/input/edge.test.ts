@@ -186,6 +186,23 @@ describe('dodge stays edge-triggered', () => {
 })
 
 describe('modal input', () => {
+  it('does not turn menu navigation into the next live aim direction', () => {
+    const h = harness()
+    const w = createWorld(1, 'empty')
+    h.win.fire('keydown', key('ArrowRight'))
+    expect(aimDeg(h.input.sample(w))).toBe(0)
+    h.win.fire('keyup', key('ArrowRight'))
+
+    w.roomPhase = 'reward'
+    h.input.sample(w)
+    h.win.fire('keydown', key('ArrowLeft'))
+    expect(h.input.sample(w).choiceDelta).toBe(-1)
+    h.win.fire('keyup', key('ArrowLeft'))
+
+    w.roomPhase = 'fighting'
+    expect(aimDeg(h.input.sample(w))).toBe(0)
+  })
+
   it('does not let a keypress buffered during the killing blow claim the offer', () => {
     const h = harness()
     const w = createWorld(1, 'empty')

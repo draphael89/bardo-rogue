@@ -34,7 +34,7 @@
     "realm-air": "tsx tools/realm-air.ts",
     "art": "tsx tools/art.ts",
     "site:build": "tsx tools/build-site.ts",
-    "site:deploy": "pnpm site:build && wrangler pages deploy site/dist --project-name=playbardo --branch=main",
+    "site:deploy": "tsx tools/deploy-site.ts",
     "palette": "tsx tools/art.ts palette",
     "fx": "tsx tools/make-bardo-fx.ts"
   },

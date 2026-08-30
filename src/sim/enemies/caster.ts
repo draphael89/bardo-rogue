@@ -85,7 +85,8 @@ export function updateCaster(world: World, e: Enemy): void {
         const r = moveAlong(world, e, a + Math.PI + RETREAT_SKEW * e.orbitDir, C.speed)
         if (r.hitX || r.hitY) {
           e.orbitDir = e.orbitDir === 1 ? -1 : 1
-          moveAlong(world, e, a + Math.PI / 2 * e.orbitDir, C.speed)  // slide along the wall
+          const remaining = Math.max(0, C.speed * DT - r.moved)
+          if (remaining > 0) moveAlong(world, e, a + Math.PI / 2 * e.orbitDir, C.speed, remaining)  // slide along the wall
         }
       } else if (d > C.prefMax) moveToward(world, e, p.x, p.y, C.speed)
       else {

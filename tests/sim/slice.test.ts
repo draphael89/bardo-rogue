@@ -529,7 +529,7 @@ describe('boon interactions', () => {
     const world = createWorld(1, 'empty')
     grantBoon(world, 'mirrorSteel')
     const p = world.player
-    const bolt = world.fireProjectile(p.x + 16, p.y, Math.PI, 0, 3, 100)!
+    const bolt = world.fireProjectile(p.x + 16, p.y, Math.PI, 0, 3, 100, 0, 1, 0, 'bolt', 'caster')!
     for (let i = 0; i < 12 && bolt.team === 0; i++) {
       stepWorld(world, { ...emptyInput(), attack: i === 0, aimX: 1, aimY: 0 })
       world.events.length = 0

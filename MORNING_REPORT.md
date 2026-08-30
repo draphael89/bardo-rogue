@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-30  
 **Branch:** `codex/bardo-first-sixty-seconds`  
-**Implementation anchor:** `79825672ad517673d0a71826c8e7946cb79fdcc6`  
+**Recorded proof head before the final report updates:** `f50ccb14b16b96ce1a5e8317e735f20afb8ef38c`
 **Reconciled main:** `2b82d61c9103a34b9abdc535afe165efbad4f630`
 
 The branch now delivers a coherent first minute: the title belongs to the Bardo Gate; DESCEND makes
@@ -23,6 +23,10 @@ its original 16px logical grid.
 - `e7a9c2e` — Bardo procession inlay connecting arrival, junction, and Gate.
 - `a829d40` — Keeper light, cold braziers, pier damp, numen lantern, and baked causeway wear.
 - `7982567` — a code-authored fallen Veteran relic replaces the generic ossuary on the same solid cell.
+- `310537e`, `712adf4`, `d2d8e49` — fixed-clock title, descent, combat, and screenshot evidence.
+- `0c2abd4`, `e8b8ca9`, `ac5bb72` — Acheron shore, Cocytus weep, and Minos verdict dressing.
+- `455a4e9`, `d2b8904`, `b017a2d`, `f50ccb1` — deterministic realm/room evidence and live resize coverage across every first-minute UI surface.
+- `1a4093d` — dagger/heavy stress regeneration now fails on any drift from its committed evidence.
 
 ## The three inherited polish gaps
 
@@ -72,7 +76,9 @@ The curated exact-head title, arrival, descent, first-fight, and viewport frames
 
 Objective observations: the causeway centre now measures roughly twice the perimeter value; the
 four Bardo islands retain 82.6%–95.2% negative space; the Bardo frame remains below the highlight
-budget and retains a concentrated focal peak. UI panels remain comfortable at native size and above,
+budget and retains a concentrated focal peak. The exact room gate samples all 13 production-loop
+layouts once across the real first-gate, Fire Ford, and Styx Gate spines; the dedicated Styx and
+Phlegethon nodes are asserted separately from alternate dresses. UI panels remain comfortable at native size and above,
 real keyboard input reaches the first fight, and reduced motion snaps the descent instead of animating it.
 At 390×844 and 900×506, the sampled sky values now remain continuous across every target boundary;
 the tracked portrait frames preserve the complete title and Bardo rather than clipping either.
@@ -110,12 +116,12 @@ user-only gates.** No agent or automated play awarded them.
 | Web package | `pnpm build` green; shipped 2.110 MB vs 4.096 MB budget, 174 files |
 | Browser smoke | `pnpm smoke -- --url http://localhost:5201` green, real keyboard and both endings |
 | Viewport transitions | `pnpm smoke:viewport -- --url http://localhost:5201` green through 640×360 → 1400×600 → 390×844 → 1920×700 → 900×506 → 640×360 across title menu/Settings/Credits, game HUD, and pause menu/Settings; target and UI bounds remain contained, tick stays 0 |
-| Room art | `pnpm room:gate` owns every render and is green across Bardo, Acheron, Lethe, Landing, Cocytus, Antechamber, and Minos, including dimensions, alpha, palette, material spans, negative space, value, highlights, and focality; two complete outputs are byte-identical at SHA-256 `f4cd248824c4e574671d57692ac400816942acee56e11655c4dff32971711180` |
+| Room art | `pnpm room:gate` owns every render and is green across all 13 production-loop layouts, including the named Styx and Phlegethon nodes, dimensions, alpha, palette, material spans, negative space, value, highlights, focality, and browser errors; two complete outputs are byte-identical at SHA-256 `35247bb81f4af78591d9365861e4252b0bf0dbfc78294c1eb5c77ad55f3b2f22` |
 | Realm separation | `pnpm realm-air -- --url http://localhost:5201` owns every render; three clean-room outputs are byte-identical. Median RGB distance 11.31, closest 2.95, widest 16.91, zero temperature violations; no arbitrary pass threshold invented |
-| Regeneration | `pnpm palette` and `pnpm tiles` deterministic; the 192×288 room sheet and 192×192 prop sheet regenerate byte-identically with no unexplained drift |
+| Regeneration | `pnpm palette`, `pnpm assets`, and `pnpm tiles` deterministic; the 192×288 room sheet and 192×192 prop sheet regenerate byte-identically with no unexplained drift |
 | Shipping sprite gates | 78/3 waived general, 144/2 hero, 144/4 north, 40/1 north roll, 145/2 south, 40/1 south roll; zero blocking |
 | Candidate stress | `pnpm art:stress-hero` green for dagger and heavy; all four regenerated 1×/black-test artifacts byte-identical to committed exhibits; candidate-only, with in-game motion and user Look still open |
-| Desktop | `pnpm desktop:build` green; isolated `pnpm smoke:desktop` green across 23 checks and 6 launches |
+| Desktop | Exact current `pnpm desktop:build` and `pnpm smoke:desktop` are green on the first run across 23 checks and 6 launches |
 | Performance | SwiftShader exact-head probes: Warden render p50 1.2 ms / p95 2.2 ms; synthetic 32-enemy + 64-projectile render stress p50 24–25 ms / p95 31–32 ms with render-only hash unchanged. Pinned replay and dense sim each repeated 100× with stable hashes; stress figures are not a native-GPU or Fun claim |
 | Deterministic visual evidence | `pnpm shot ... --visualMs N` owns every render from before boot. Five independent pinned-replay captures at tick 400 + visual 500 ms are byte-identical, SHA-256 `abebb71e7b498e456847a8596f3f091e44234df6ca6877cb4841ff5501a78063`; three title boots are byte-identical at `c1318840345230773edac472c8d31e25f78f4ce3b719954c83a85075abfc4bb4`; two independent captures match at each of the four descent phases. |
 | Viewport boundary evidence | 390×844 title SHA-256 `ed3d89b4a1a7225ce1100589116c275c75575a0593648811d3066cd01fc9b8d1`; 390×844 game `ebcc7c8c21b34bdd12d1ce29f1439aa953f863a8efc15f8d492e6d5659fd3969`; 900×506 title `becb27e095f6a2f2b0e3c4348b3de7344fc90e81e4e510c0d30ecd39855c7446` |
@@ -133,7 +139,7 @@ not silently converted into a clean first run.
 
 ## Custody and release ledger
 
-- The implementation anchor and its reconciled `origin/main` are named above. The final local and
+- The recorded proof head and its reconciled `origin/main` are named above. The final local and
   remote branch IDs are obtained with `git rev-parse HEAD` and
   `git rev-parse origin/codex/bardo-first-sixty-seconds`; a commit cannot self-contain its own hash.
 - The branch was pushed only to its existing successor branch, as authorized. No destructive Git

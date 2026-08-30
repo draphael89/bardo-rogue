@@ -19,6 +19,9 @@ const flag = (name: string): string | undefined => {
 interface Check { name: string; pass: boolean; detail: string }
 interface RuntimeRoom {
   id: string
+  layout: string
+  template: string
+  seed: number
   cols: number
   rows: number
   texture: { width: number; height: number }
@@ -128,74 +131,116 @@ async function frameMetrics(png: Buffer, points: Array<{ x: number; y: number }>
 
 async function runtime(url: string, shotDir?: string): Promise<RuntimeRoom[]> {
   const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] })
-  const page = await browser.newPage({ viewport: { width: 640, height: 360 }, deviceScaleFactor: 1 })
-  // Own every render from before boot. A fixed sim state is not a fixed image when free-running
-  // zero-dt frames still consume seeded FX and change the room light sampled by the gate.
-  await page.addInitScript({ content: `{
-    Object.defineProperty(performance, 'now', { configurable: true, value: () => 0 });
-    window.requestAnimationFrame = callback => { window.__roomGateRaf = callback; return 1; };
-    window.cancelAnimationFrame = () => {};
-  }` })
-  await page.goto(url + (url.includes('?') ? '&' : '?') + 'scenario=loop&seed=1&view=640', { waitUntil: 'networkidle' })
-  await page.waitForFunction(() => !!(window as unknown as { __game?: unknown }).__game, null, { polling: 50 })
-  await page.evaluate(() => {
-    const g = (window as unknown as { __game: any }).__game
-    g.pause(true)
-    g.loop.stop()
-    const hooks = g.loop.hooks
-    if (typeof hooks?.render !== 'function') throw new Error('room-art-gates: Loop.hooks.render is unreachable')
-    ;(window as any).__roomGateRender = () => hooks.render(1, 1 / 60)
-  })
   const rooms: RuntimeRoom[] = []
-  for (const id of ['bardo', 'threshold', 'veil-path', 'black-step', 'cocytus', 'antechamber', 'warden']) {
-    const actual = await page.evaluate((roomId) => {
+  const seenLayouts = new Set<string>()
+  const errors: string[] = []
+  // Seed 1 is the canonical first-gate route. Seed 31 contributes the real Fire Ford node before
+  // another route can reuse its dress; seed 10 then adds Styx. Layout de-duplication leaves one
+  // frame each for crossing masonry, Phlegethon, Oath Court, and east-facing Minos.
+  for (const seed of [1, 31, 10]) {
+    const page = await browser.newPage({ viewport: { width: 640, height: 360 }, deviceScaleFactor: 1 })
+    page.on('pageerror', error => errors.push(`seed ${seed} pageerror: ${error.message}`))
+    page.on('console', message => { if (message.type() === 'error') errors.push(`seed ${seed} console: ${message.text()}`) })
+    // Own every render from before boot. A fixed sim state is not a fixed image when free-running
+    // zero-dt frames still consume seeded FX and change the room light sampled by the gate.
+    await page.addInitScript({ content: `{
+      Object.defineProperty(performance, 'now', { configurable: true, value: () => 0 });
+      window.requestAnimationFrame = callback => { window.__roomGateRaf = callback; return 1; };
+      window.cancelAnimationFrame = () => {};
+    }` })
+    const query = `${url.includes('?') ? '&' : '?'}scenario=loop&seed=${seed}&mute=1&save=off&view=640`
+    await page.goto(url + query, { waitUntil: 'networkidle' })
+    await page.waitForFunction(() => !!(window as unknown as { __game?: unknown }).__game, null, { polling: 50 })
+    await page.evaluate(() => {
       const g = (window as unknown as { __game: any }).__game
       g.title(false)
-      if (roomId !== 'bardo') { g.gotoRoom(roomId, { skipRite: true }); g.step(1) }
-      for (let i = 0; i < 40; i++) (window as any).__roomGateRender()
-      return g.state().room.id as string
-    }, id)
-    if (actual !== id) throw new Error(`room-art-gates: requested ${id}, remained in ${actual}`)
-    // Audio permission can finish booting after __game exists and raise WAKE THE ROOM. The room
-    // frame gate is not allowed to pass on bright title typography, so hide once more after boot's
-    // async boundary and only then sample the live composite.
-    await page.evaluate(() => (window as unknown as { __game: any }).__game.title(false))
-    await page.evaluate(() => (window as any).__roomGateRender())
-    const room = await page.evaluate((roomId) => {
+      g.pause(true)
+      g.loop.stop()
+      const hooks = g.loop.hooks
+      if (typeof hooks?.render !== 'function') throw new Error('room-art-gates: Loop.hooks.render is unreachable')
+      ;(window as any).__roomGateRender = () => hooks.render(1, 1 / 60)
+    })
+
+    const targets = await page.evaluate((includeBardo) => {
       const g = (window as unknown as { __game: any }).__game
-      const p = g.presenter
-      const a = g.world.arena
-      const player = p.ra.world.toGlobal({ x: g.world.player.x, y: g.world.player.y })
-      const focal = p.ra.world.toGlobal({ x: a.focal.x, y: a.focal.y })
-      return {
-        id: roomId,
-        cols: a.cols,
-        rows: a.rows,
-        texture: { width: p.tilemap.sprite.texture.width, height: p.tilemap.sprite.texture.height },
-        display: { width: p.tilemap.sprite.width, height: p.tilemap.sprite.height },
-        player: { x: player.x, y: player.y },
-        focal: { x: focal.x, y: focal.y },
+      const bardo = includeBardo ? [{ id: 'bardo', layout: 'bardo', template: 'town' }] : []
+      // This call installs the real seeded route. It may return false when that route opens at Styx,
+      // but the route is still installed; enumerate it only after this boundary.
+      g.gotoRoom('threshold', { skipRite: true })
+      const template = g.world.session.run?.map?.template ?? 'unknown'
+      return bardo.concat(g.world.rooms
+        .filter((room: any) => room.id !== 'bardo')
+        .map((room: any) => ({ id: room.id, layout: room.layout, template })))
+    }, seed === 1) as Array<{ id: string; layout: string; template: string }>
+
+    for (const target of targets) {
+      if (seenLayouts.has(target.layout)) continue
+      const actual = await page.evaluate((id) => {
+        const g = (window as unknown as { __game: any }).__game
+        g.title(false)
+        g.gotoRoom(id, { skipRite: true }); g.step(1)
+        for (let i = 0; i < 40; i++) (window as any).__roomGateRender()
+        return { id: g.state().room.id as string, layout: g.state().room.layout as string }
+      }, target.id)
+      if (actual.id !== target.id || actual.layout !== target.layout) {
+        throw new Error(`room-art-gates: requested ${target.id}/${target.layout}, remained in ${actual.id}/${actual.layout}`)
       }
-    }, id) as RuntimeRoom
-    const png = await page.screenshot()
-    if (shotDir) {
-      mkdirSync(shotDir, { recursive: true })
-      await sharp(png).png().toFile(join(shotDir, `${id}.png`))
+      // Audio permission can finish booting after __game exists and raise WAKE THE ROOM. The room
+      // frame gate is not allowed to pass on bright title typography, so hide once more after boot's
+      // async boundary and only then sample the live composite.
+      await page.evaluate(() => (window as unknown as { __game: any }).__game.title(false))
+      await page.evaluate(() => (window as any).__roomGateRender())
+      const room = await page.evaluate(({ id, layout, template, seed }) => {
+        const g = (window as unknown as { __game: any }).__game
+        const p = g.presenter
+        const a = g.world.arena
+        const player = p.ra.world.toGlobal({ x: g.world.player.x, y: g.world.player.y })
+        const focal = p.ra.world.toGlobal({ x: a.focal.x, y: a.focal.y })
+        return {
+          id, layout, template, seed,
+          cols: a.cols,
+          rows: a.rows,
+          texture: { width: p.tilemap.sprite.texture.width, height: p.tilemap.sprite.texture.height },
+          display: { width: p.tilemap.sprite.width, height: p.tilemap.sprite.height },
+          player: { x: player.x, y: player.y },
+          focal: { x: focal.x, y: focal.y },
+        }
+      }, { ...target, seed }) as RuntimeRoom
+      const png = await page.screenshot()
+      if (shotDir) {
+        mkdirSync(shotDir, { recursive: true })
+        await sharp(png).png().toFile(join(shotDir, `${target.layout}.png`))
+      }
+      const frame = await frameMetrics(png, [room.player, room.focal])
+      room.frame = frame
+      const label = target.layout
+      const source = `${target.id}, seed ${seed}, ${target.template}`
+      add(`${label}:native-composite`, room.texture.width === room.cols * 24 && room.texture.height === room.rows * 24,
+        `${room.texture.width}x${room.texture.height}; required ${room.cols * 24}x${room.rows * 24} (${source})`)
+      add(`${label}:logical-display`, Math.round(room.display.width) === room.cols * 16 && Math.round(room.display.height) === room.rows * 16,
+        `${room.display.width.toFixed(1)}x${room.display.height.toFixed(1)}; required ${room.cols * 16}x${room.rows * 16} (${source})`)
+      add(`${label}:frame-mean`, frame.mean <= 0.30, `${frame.mean.toFixed(3)}; ceiling 0.300 (${source})`)
+      add(`${label}:highlight-budget`, frame.highlightShare <= 0.035,
+        `${(frame.highlightShare * 100).toFixed(2)}%; ceiling 3.50% (${source})`)
+      add(`${label}:top-one-focality`, frame.topOneNearest <= 64 && frame.topOneNearShare >= 0.04,
+        `${(frame.topOneNearShare * 100).toFixed(1)}% of full top-1% set within 64px of player/focal; nearest ${frame.topOneNearest.toFixed(1)}px (${source})`)
+      rooms.push(room)
+      seenLayouts.add(target.layout)
     }
-    const frame = await frameMetrics(png, [room.player, room.focal])
-    room.frame = frame
-    add(`${id}:native-composite`, room.texture.width === room.cols * 24 && room.texture.height === room.rows * 24,
-      `${room.texture.width}x${room.texture.height}; required ${room.cols * 24}x${room.rows * 24}`)
-    add(`${id}:logical-display`, Math.round(room.display.width) === room.cols * 16 && Math.round(room.display.height) === room.rows * 16,
-      `${room.display.width.toFixed(1)}x${room.display.height.toFixed(1)}; required ${room.cols * 16}x${room.rows * 16}`)
-    add(`${id}:frame-mean`, frame.mean <= 0.30, `${frame.mean.toFixed(3)}; ceiling 0.300`)
-    add(`${id}:highlight-budget`, frame.highlightShare <= 0.035,
-      `${(frame.highlightShare * 100).toFixed(2)}%; ceiling 3.50%`)
-    add(`${id}:top-one-focality`, frame.topOneNearest <= 64 && frame.topOneNearShare >= 0.04,
-      `${(frame.topOneNearShare * 100).toFixed(1)}% of full top-1% set within 64px of player/focal; nearest ${frame.topOneNearest.toFixed(1)}px`)
-    rooms.push(room)
+    await page.close()
   }
+  const productionLayouts = [
+    'bardo', 'threshold', 'crossing', 'lethe', 'asphodel', 'landing', 'minos',
+    'minos-east', 'cocytus', 'antechamber', 'oath-court', 'phlegethon', 'styx',
+  ]
+  const missing = productionLayouts.filter(layout => !seenLayouts.has(layout))
+  add('runtime:production-layout-coverage', missing.length === 0,
+    missing.length ? `missing ${missing.join(', ')}` : `${productionLayouts.length}/${productionLayouts.length} production-loop layouts sampled`)
+  const namedRivers = ['phlegethon', 'styx'].filter(id => !rooms.some(room => room.id === id && room.layout === id))
+  add('runtime:named-river-nodes', namedRivers.length === 0,
+    namedRivers.length ? `missing dedicated ${namedRivers.join(', ')} node(s)` : 'Styx Gate and Phlegethon Ford sampled by node, not merely by dress')
   await browser.close()
+  if (errors.length) throw new Error(errors.join('\n'))
   return rooms
 }
 

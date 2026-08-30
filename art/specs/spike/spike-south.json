@@ -1,0 +1,420 @@
+{
+  "id": "spike.veteran.south",
+  "kind": "character",
+  "input": ".art-cache/spike/master-south.png",
+  "output": ".art-cache/spike/compiled/spike_veteran_south.png",
+  "sidecar": ".art-cache/spike/compiled/spike_veteran_south.json",
+  "cell": 64,
+  "cols": 4,
+  "rows": 4,
+  "maxColors": 16,
+  "palette": [
+    "mortar",
+    "seal0",
+    "iron",
+    "ironHi",
+    "slate1",
+    "slate2",
+    "slate3",
+    "slateHi",
+    "brickLo",
+    "brick",
+    "brickHi",
+    "cope",
+    "boneLo",
+    "boneDim",
+    "bone"
+  ],
+  "facing": "south",
+  "fit": "grid",
+  "chromaKey": false,
+  "coverage": 0.5,
+  "valueLift": {
+    "targetMean": 0.31
+  },
+  "salience": {
+    "minShare": 0.22,
+    "minDelta": 0.16
+  },
+  "frames": [
+    {
+      "name": "idle",
+      "i": 0,
+      "sockets": {
+        "handR": [
+          39,
+          50
+        ],
+        "handL": [
+          25,
+          50
+        ],
+        "head": [
+          32,
+          32
+        ]
+      },
+      "pivot": [
+        32,
+        60
+      ]
+    },
+    {
+      "name": "run0",
+      "i": 1,
+      "sockets": {
+        "handR": [
+          38,
+          49
+        ],
+        "handL": [
+          26,
+          49
+        ],
+        "head": [
+          32,
+          31
+        ]
+      },
+      "pivot": [
+        32,
+        58
+      ]
+    },
+    {
+      "name": "run1",
+      "i": 2,
+      "sockets": {
+        "handR": [
+          38,
+          48
+        ],
+        "handL": [
+          26,
+          49
+        ],
+        "head": [
+          32,
+          32
+        ]
+      },
+      "pivot": [
+        32,
+        58
+      ]
+    },
+    {
+      "name": "run2",
+      "i": 3,
+      "sockets": {
+        "handR": [
+          38,
+          48
+        ],
+        "handL": [
+          26,
+          49
+        ],
+        "head": [
+          32,
+          32
+        ]
+      },
+      "pivot": [
+        32,
+        58
+      ]
+    },
+    {
+      "name": "run3",
+      "i": 4,
+      "sockets": {
+        "handR": [
+          38,
+          48
+        ],
+        "handL": [
+          26,
+          49
+        ],
+        "head": [
+          32,
+          32
+        ]
+      },
+      "pivot": [
+        32,
+        58
+      ]
+    },
+    {
+      "name": "run4",
+      "i": 5,
+      "sockets": {
+        "handR": [
+          38,
+          49
+        ],
+        "handL": [
+          26,
+          49
+        ],
+        "head": [
+          32,
+          31
+        ]
+      },
+      "pivot": [
+        32,
+        58
+      ]
+    },
+    {
+      "name": "run5",
+      "i": 6,
+      "sockets": {
+        "handR": [
+          38,
+          49
+        ],
+        "handL": [
+          26,
+          48
+        ],
+        "head": [
+          32,
+          32
+        ]
+      },
+      "pivot": [
+        32,
+        58
+      ]
+    },
+    {
+      "name": "run6",
+      "i": 7,
+      "sockets": {
+        "handR": [
+          38,
+          49
+        ],
+        "handL": [
+          26,
+          48
+        ],
+        "head": [
+          32,
+          32
+        ]
+      },
+      "pivot": [
+        32,
+        58
+      ]
+    },
+    {
+      "name": "run7",
+      "i": 8,
+      "sockets": {
+        "handR": [
+          38,
+          49
+        ],
+        "handL": [
+          26,
+          48
+        ],
+        "head": [
+          32,
+          32
+        ]
+      },
+      "pivot": [
+        32,
+        58
+      ]
+    },
+    {
+      "name": "swingAnticipate",
+      "i": 9,
+      "sockets": {
+        "handR": [
+          44,
+          25
+        ],
+        "handL": [
+          41,
+          29
+        ],
+        "bladeTip": [
+          58,
+          5
+        ],
+        "bladeMid": [
+          52,
+          14
+        ]
+      },
+      "pivot": [
+        32,
+        57
+      ]
+    },
+    {
+      "name": "swingCommit",
+      "i": 10,
+      "sockets": {
+        "handR": [
+          41,
+          25
+        ],
+        "handL": [
+          34,
+          25
+        ],
+        "bladeTip": [
+          57,
+          19
+        ],
+        "bladeMid": [
+          50,
+          22
+        ]
+      },
+      "pivot": [
+        32,
+        57
+      ]
+    },
+    {
+      "name": "swingImpact",
+      "i": 11,
+      "sockets": {
+        "handR": [
+          32,
+          48
+        ],
+        "handL": [
+          33,
+          47
+        ],
+        "bladeTip": [
+          17,
+          61
+        ],
+        "bladeMid": [
+          24,
+          55
+        ]
+      },
+      "pivot": [
+        32,
+        57
+      ]
+    },
+    {
+      "name": "swingFollow",
+      "i": 12,
+      "sockets": {
+        "handR": [
+          25,
+          47
+        ],
+        "handL": [
+          26,
+          48
+        ],
+        "bladeTip": [
+          5,
+          57
+        ],
+        "bladeMid": [
+          14,
+          53
+        ]
+      },
+      "pivot": [
+        32,
+        57
+      ]
+    },
+    {
+      "name": "swingRecover",
+      "i": 13,
+      "sockets": {
+        "handR": [
+          29,
+          47
+        ],
+        "handL": [
+          30,
+          48
+        ],
+        "bladeTip": [
+          11,
+          61
+        ],
+        "bladeMid": [
+          19,
+          55
+        ]
+      },
+      "pivot": [
+        32,
+        57
+      ]
+    }
+  ],
+  "clips": {
+    "run": {
+      "frames": [
+        "run0",
+        "run1",
+        "run2",
+        "run3",
+        "run4",
+        "run5",
+        "run6",
+        "run7"
+      ],
+      "timing": "ticks",
+      "ticks": [
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4
+      ],
+      "loop": true
+    },
+    "heavy": {
+      "frames": [
+        "swingAnticipate",
+        "swingCommit",
+        "swingImpact",
+        "swingFollow",
+        "swingRecover"
+      ],
+      "timing": "sim",
+      "sim": {
+        "ref": "player.attack.swings.2",
+        "contact": "swingImpact"
+      }
+    }
+  },
+  "waivers": [
+    {
+      "gate": "frame:swingAnticipate:height",
+      "reason": "The raised greatsword apex IS the tell (SS4.1 weapon-apex waiver, as on the brute): the body is ~33px, well under the cap; the overage is blade. Measured on this compile."
+    }
+  ],
+  "provenance": {
+    "provider": "blender-mannequin-spike",
+    "model": "blender-eevee ortho pitch 20deg, legScale 1"
+  },
+  "registrationNote": "Pivots, anchorX and sockets are COMPUTED from projected rig bones (rig.json), not judged. Spike output only: .art-cache/spike, never public/assets."
+}

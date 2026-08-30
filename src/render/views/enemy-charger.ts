@@ -160,7 +160,7 @@ function heatLayer(ground: Container): Container {
 }
 
 // One floor-mark set per charger view. Long continuous strokes are rotated 1x quads (one draw each,
-// and they rasterise hard into the 480x270 target because antialias is off, so they land on the
+// and they rasterise hard into the render target because antialias is off, so they land on the
 // pixel grid like everything else); everything with a shape - rungs, gate, arrowhead, flash, burst -
 // is whole-pixel rects in a Graphics.
 class Lane {
@@ -447,7 +447,7 @@ function drawDash(lane: Lane, v: EntityView, e: Enemy, f: EnemyFrame, arena: Are
 
 // The trail: six additive bands from the head back along the travel axis, tapering from the true
 // danger half-width to a point, hot orange into red, with a white-hot core over the front 55%.
-// Bands and not a per-pixel field: a rotated quad rasterises hard into the 480x270 target with
+// Bands and not a per-pixel field: a rotated quad rasterises hard into the render target with
 // antialias off, so this lands on the pixel grid like the rest of the art and costs one draw each.
 // The wake starts BODY_CLEAR behind the head for the same reason the telegraph stops there: the
 // crouched, stretched silhouette is the thing the player reads the strike off, and a trail drawn

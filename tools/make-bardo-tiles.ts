@@ -518,13 +518,12 @@ function beamTile(): Uint8Array {
   return t.d
 }
 
+// TRANSPARENT (ADR 0001): the screen-space starfield underlay is the sky between an island
+// room's masses, and an opaque baked void tile would freeze a second one. The sheet carries
+// the invariant, so the renderer bakes every base cell with no per-tile branch.
 function voidTile(): Uint8Array {
   const t = makeTile()
-  t.fill(P.void)
-  for (let i = 0; i < 3; i++) {
-    const x = hash(i, 1, 8) % 16, y = hash(i, 2, 8) % 16
-    t.set(x, y, i === 0 ? P.goldStar : P.star)
-  }
+  t.fill(P.void, 0)
   return t.d
 }
 

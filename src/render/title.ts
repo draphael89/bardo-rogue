@@ -98,11 +98,18 @@ export class TitleOverlay {
 
   relayout(): void { this.key = '' }
 
+  // A transient line in the settings foot ("the row could not act, here is why"). Times out on its
+  // own; part of the repaint key so it appears and clears without any extra draw path.
+  private note = ''
+  private noteT = 0
+  say(note: string): void { this.note = note; this.noteT = 3; this.key = '' }
+
   update(world: World, dtSec: number): void {
     if (!this.shown) return
     this.t += dtSec
+    if (this.noteT > 0) { this.noteT -= dtSec; if (this.noteT <= 0) { this.note = ''; this.key = '' } }
     const m = world.session.meta
-    const next = `${tuning.view.width}|${m.attempts}|${m.victories}|${m.remembrances}|${this.soundGate}|${this.page}|${this.focus}|${this.reducedEffects ? 1 : 0}|${this.master}|${this.music}|${this.sfx}`
+    const next = `${tuning.view.width}|${m.attempts}|${m.victories}|${m.remembrances}|${this.soundGate}|${this.page}|${this.focus}|${this.reducedEffects ? 1 : 0}|${this.master}|${this.music}|${this.sfx}|${this.note}`
     // The card is static; only the prompt breathes. Twice a second is not often, but this is the
     // first screen the game ever shows and it was destroying eleven display objects and rasterising
     // ten new text textures on every beat to recolour one label — a hitch landing exactly on the
@@ -188,13 +195,13 @@ export class TitleOverlay {
 
   private paintSettings(W: number, H: number): void {
     const still = this.reducedEffects ? 'THE ROOM IS STILL' : 'STILL THE ROOM'
-    // Five rows now, so the block starts higher: RISE used to sit on the footer rule.
     this.paintRow(W / 2, 140, still, this.focus === 0)
     this.paintMeter(W / 2, 158, 'MASTER', this.master, this.focus === 1)
     this.paintMeter(W / 2, 176, 'MUSIC', this.music, this.focus === 2)
     this.paintMeter(W / 2, 194, 'SOUND', this.sfx, this.focus === 3)
-    this.paintRow(W / 2, 212, 'RISE', this.focus === 4)
-    const foot = label('THE ROOM LISTENS', 'meta', P.dim)
+    this.paintRow(W / 2, 212, 'FULLSCREEN', this.focus === 4)
+    this.paintRow(W / 2, 230, 'RISE', this.focus === 5)
+    const foot = label(this.note || 'THE ROOM LISTENS', 'meta', this.note ? P.gold : P.dim)
     placeCentered(foot, W / 2, H - 38); this.add(foot)
   }
 

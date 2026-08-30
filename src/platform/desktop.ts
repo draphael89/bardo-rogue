@@ -79,7 +79,7 @@ export function createDesktopPlatform(bridge: DesktopBridge): Platform {
     // Escape is the pause key, and owning it is one of the reasons the desktop host exists.
     // 'toggle' is resolved by the host against its own tracked intent: reading the window's state and
     // inverting it here would swallow a second press during macOS's fullscreen animation.
-    fullscreen: async on => { await bridge.setFullscreen(on ?? 'toggle') },
+    fullscreen: async on => { await bridge.setFullscreen(on ?? 'toggle'); return true },
     setRunActive: active => bridge.setRunActive(active),
     setSaving: saving => bridge.setSaving(saving),
     exportFile: (text, filename) => bridge.exportFile(text, filename),

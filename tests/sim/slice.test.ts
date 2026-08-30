@@ -8,7 +8,7 @@ import { damageEnemyForTest, hurtPlayer, type DamageResult } from '@/sim/combat'
 import { hashWorld } from '@/sim/hash'
 import { loadMeta, loadSettings, META_KEY, saveMeta, saveSettings, SETTINGS_KEY, type StorageLike } from '@/sim/storage'
 import { tuning } from '@/tuning'
-import { enterRoomById, roomsFor } from '@/sim/rooms'
+import { doorEnterMaxY, enterRoomById, roomsFor } from '@/sim/rooms'
 import { makeBot } from '@/sim/bots'
 import { shopCost } from '@/sim/economy'
 import { canAffordMystery, mysteryCost } from '@/sim/mystery'
@@ -29,7 +29,7 @@ function prepareAndDescend(world = createWorld(1, 'loop')) {
   stepWorld(world, emptyInput())
   const north = world.arena.doors.find(d => d.dir === 'north')!
   world.player.x = (north.col + 0.5) * TILE
-  world.player.y = tuning.run.doorEnterMaxY
+  world.player.y = doorEnterMaxY(north)
   stepWorld(world, emptyInput())
   for (let i = 0; i < tuning.run.transitionTicks; i++) stepWorld(world, emptyInput())
   pinUtility(world, 'shop')
@@ -91,7 +91,7 @@ function takeDoor(world: ReturnType<typeof createWorld>, dir: 'north' | 'east'):
   const door = world.arena.doors.find(d => d.dir === dir)!
   if (dir === 'north') {
     world.player.x = (door.col + 0.5) * TILE
-    world.player.y = tuning.run.doorEnterMaxY
+    world.player.y = doorEnterMaxY(door)
   } else {
     world.player.x = door.col * TILE
     world.player.y = (door.row + 0.5) * TILE
@@ -108,7 +108,7 @@ describe('production vertical slice', () => {
     stepWorld(world, emptyInput())
     const north = world.arena.doors.find(d => d.dir === 'north')!
     world.player.x = (north.col + 0.5) * TILE
-    world.player.y = tuning.run.doorEnterMaxY
+    world.player.y = doorEnterMaxY(north)
     stepWorld(world, emptyInput())
     expect(world.roomPhase).toBe('transitioning')
     expect(world.rooms[world.roomIndex]?.id).toBe('bardo')
@@ -607,7 +607,7 @@ describe('attempt identity', () => {
       stepWorld(world, emptyInput())
       const north = world.arena.doors.find(d => d.dir === 'north')!
       world.player.x = (north.col + 0.5) * TILE
-      world.player.y = tuning.run.doorEnterMaxY
+      world.player.y = doorEnterMaxY(north)
       stepWorld(world, emptyInput())
       for (let i = 0; i < tuning.run.transitionTicks; i++) stepWorld(world, emptyInput())
       seeds.add(world.session.run!.seed)

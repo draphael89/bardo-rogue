@@ -1,0 +1,388 @@
+{
+  "id": "spike.veteran.east",
+  "kind": "character",
+  "input": ".art-cache/spike/master-east.png",
+  "output": ".art-cache/spike/compiled/spike_veteran_east.png",
+  "sidecar": ".art-cache/spike/compiled/spike_veteran_east.json",
+  "cell": 64,
+  "cols": 4,
+  "rows": 4,
+  "maxColors": 16,
+  "palette": [
+    "mortar",
+    "seal0",
+    "iron",
+    "ironHi",
+    "slate1",
+    "slate2",
+    "slate3",
+    "slateHi",
+    "brickLo",
+    "brick",
+    "brickHi",
+    "cope",
+    "boneLo",
+    "boneDim",
+    "bone"
+  ],
+  "facing": "east",
+  "mirror": true,
+  "fit": "shared",
+  "register": [
+    27,
+    60
+  ],
+  "margin": 1,
+  "chromaKey": false,
+  "coverage": 0.5,
+  "valueLift": {
+    "targetMean": 0.31
+  },
+  "salience": {
+    "minShare": 0.22,
+    "minDelta": 0.16
+  },
+  "frames": [
+    {
+      "name": "idle",
+      "i": 0,
+      "sockets": {
+        "handR": [
+          0.407,
+          0.603
+        ],
+        "handL": [
+          0.407,
+          0.726
+        ],
+        "head": [
+          0.538,
+          0.208
+        ]
+      },
+      "anchorX": 0.254
+    },
+    {
+      "name": "run0",
+      "i": 1,
+      "sockets": {
+        "handR": [
+          0.667,
+          0.587
+        ],
+        "handL": [
+          0.667,
+          0.693
+        ],
+        "head": [
+          0.611,
+          0.207
+        ]
+      },
+      "anchorX": 0.329
+    },
+    {
+      "name": "run1",
+      "i": 2,
+      "sockets": {
+        "handR": [
+          0.521,
+          0.589
+        ],
+        "handL": [
+          0.852,
+          0.661
+        ],
+        "head": [
+          0.639,
+          0.206
+        ]
+      },
+      "anchorX": 0.377
+    },
+    {
+      "name": "run2",
+      "i": 3,
+      "sockets": {
+        "handR": [
+          0.531,
+          0.612
+        ],
+        "handL": [
+          0.927,
+          0.672
+        ],
+        "head": [
+          0.691,
+          0.213
+        ]
+      },
+      "anchorX": 0.467
+    },
+    {
+      "name": "run3",
+      "i": 4,
+      "sockets": {
+        "handR": [
+          0.576,
+          0.625
+        ],
+        "handL": [
+          0.869,
+          0.7
+        ],
+        "head": [
+          0.68,
+          0.218
+        ]
+      },
+      "anchorX": 0.448
+    },
+    {
+      "name": "run4",
+      "i": 5,
+      "sockets": {
+        "handR": [
+          0.667,
+          0.585
+        ],
+        "handL": [
+          0.667,
+          0.691
+        ],
+        "head": [
+          0.611,
+          0.207
+        ]
+      },
+      "anchorX": 0.329
+    },
+    {
+      "name": "run5",
+      "i": 6,
+      "sockets": {
+        "handR": [
+          0.852,
+          0.574
+        ],
+        "handL": [
+          0.521,
+          0.719
+        ],
+        "head": [
+          0.639,
+          0.211
+        ]
+      },
+      "anchorX": 0.377
+    },
+    {
+      "name": "run6",
+      "i": 7,
+      "sockets": {
+        "handR": [
+          0.927,
+          0.569
+        ],
+        "handL": [
+          0.531,
+          0.732
+        ],
+        "head": [
+          0.691,
+          0.217
+        ]
+      },
+      "anchorX": 0.467
+    },
+    {
+      "name": "run7",
+      "i": 8,
+      "sockets": {
+        "handR": [
+          0.869,
+          0.576
+        ],
+        "handL": [
+          0.576,
+          0.721
+        ],
+        "head": [
+          0.68,
+          0.212
+        ]
+      },
+      "anchorX": 0.448
+    },
+    {
+      "name": "swingAnticipate",
+      "i": 9,
+      "sockets": {
+        "handR": [
+          0.304,
+          0.387
+        ],
+        "handL": [
+          0.764,
+          0.406
+        ],
+        "bladeTip": [
+          0.052,
+          0.025
+        ],
+        "bladeMid": [
+          0.166,
+          0.188
+        ]
+      },
+      "anchorX": 0.731
+    },
+    {
+      "name": "swingCommit",
+      "i": 10,
+      "sockets": {
+        "handR": [
+          0.401,
+          0.311
+        ],
+        "handL": [
+          0.399,
+          0.352
+        ],
+        "bladeTip": [
+          0.928,
+          0.033
+        ],
+        "bladeMid": [
+          0.69,
+          0.158
+        ]
+      },
+      "anchorX": 0.145
+    },
+    {
+      "name": "swingImpact",
+      "i": 11,
+      "sockets": {
+        "handR": [
+          0.533,
+          0.466
+        ],
+        "handL": [
+          0.323,
+          0.51
+        ],
+        "bladeTip": [
+          0.957,
+          0.82
+        ],
+        "bladeMid": [
+          0.766,
+          0.66
+        ]
+      },
+      "anchorX": 0.075
+    },
+    {
+      "name": "swingFollow",
+      "i": 12,
+      "sockets": {
+        "handR": [
+          0.562,
+          0.566
+        ],
+        "handL": [
+          0.248,
+          0.678
+        ],
+        "bladeTip": [
+          0.942,
+          0.917
+        ],
+        "bladeMid": [
+          0.771,
+          0.759
+        ]
+      },
+      "anchorX": 0.096
+    },
+    {
+      "name": "swingRecover",
+      "i": 13,
+      "sockets": {
+        "handR": [
+          0.464,
+          0.564
+        ],
+        "handL": [
+          0.306,
+          0.628
+        ],
+        "bladeTip": [
+          0.942,
+          0.962
+        ],
+        "bladeMid": [
+          0.726,
+          0.783
+        ]
+      },
+      "anchorX": 0.138
+    }
+  ],
+  "clips": {
+    "run": {
+      "frames": [
+        "run0",
+        "run1",
+        "run2",
+        "run3",
+        "run4",
+        "run5",
+        "run6",
+        "run7"
+      ],
+      "timing": "ticks",
+      "ticks": [
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4
+      ],
+      "loop": true
+    },
+    "heavy": {
+      "frames": [
+        "swingAnticipate",
+        "swingCommit",
+        "swingImpact",
+        "swingFollow",
+        "swingRecover"
+      ],
+      "timing": "sim",
+      "sim": {
+        "ref": "player.attack.swings.2",
+        "contact": "swingImpact"
+      }
+    }
+  },
+  "waivers": [
+    {
+      "gate": "frame:swingAnticipate:height",
+      "reason": "The raised greatsword apex IS the tell (SS4.1 weapon-apex waiver, as on the brute): the body is ~33px, well under the cap; the overage is blade. Measured on this compile."
+    },
+    {
+      "gate": "frame:swingCommit:height",
+      "reason": "The raised greatsword apex IS the tell (SS4.1 weapon-apex waiver, as on the brute): the body is ~33px, well under the cap; the overage is blade. Measured on this compile."
+    }
+  ],
+  "provenance": {
+    "provider": "blender-mannequin-spike",
+    "model": "blender-eevee ortho pitch 20deg, legScale 1"
+  },
+  "registrationNote": "Pivots, anchorX and sockets are COMPUTED from projected rig bones (rig.json), not judged. Spike output only: .art-cache/spike, never public/assets."
+}

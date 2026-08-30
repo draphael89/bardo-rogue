@@ -171,6 +171,55 @@ Known flake, not a regression: `pnpm smoke:desktop` failed once on the corrupt-s
 CLEARED). Both passed on re-run, and three consecutive clean runs followed. The suite has a timing
 weakness worth its own pass.
 
+### Revision 6 (2026-08-29) — the graphics overhaul is decided
+
+A grilled design session (four rounds, every decision confirmed by the user) reset the visual bar to
+nine named concept images and settled the opening of the game. Durable rationale lives in
+`docs/adr/0001` and `docs/adr/0002`; the enforceable rules are in the amended `ART_DIRECTION.md`;
+the vocabulary is in `CONTEXT.md`. Decisions of record:
+
+1. **Decision 2's Greek contradiction is closed** — and was already closed in the bible: §9.0 ("THE
+   FIRST GATE") makes Greek the first production realm, keeping the Hades fear as a forbidden list.
+   The generation freeze is lifted. Greek is the first realm of several: Duat, Niflheim and Mictlan
+   entries stand in §9; the Bardo and the hero are pantheon-neutral.
+2. **The render target moves to 640 × 360** via a 1.5× world-render scale (ADR 0002). The sim is
+   untouched; art density becomes 24 px/tile, hero ~39–40 px body on a 64 canvas, ladder ×1.5.
+   Combat rooms keep placeholder art (scaled, temporarily scruffy) until their recast phase.
+3. **The Bardo becomes one continuous ~64 × 36-tile room of floating islands** under a new generic
+   follow camera (ADR 0001): a south-to-north pilgrimage line, Seals foreshadowing the other
+   pantheons, three silent inhabitants (Smith, Ferryman, Keeper), void-to-the-glass presentation,
+   fullscreen toggle. Combat rooms stay 26 × 15.
+4. **The hero is regenerated from scratch** — the approved masters were judged below the new bar.
+   Authored unarmed-first with a paired sword state (kills the baked-sword fallback for good),
+   tripled frame budget. The Brute re-derives at the new density; Kenney actors await recasts.
+5. **The title becomes a camera vista** over the pilgrimage axis; DESCEND glides the camera down to
+   the causeway. The 48%-alpha veil dies.
+6. **Decision 2's art-budget half is revised: generation restarts now.** gpt-image is the primary
+   lane (provenance shows it produced the existing masters); PixelLab spends where it is strongest
+   before the cycle dies 2026-09-04 but is no longer load-bearing.
+7. **Scope guards:** audio deferred; Seal unlock triggers designed later (assets ship both states);
+   one replay-hash rebaseline (`pnpm record-bots`) when the new Bardo arena lands. Acceptance is
+   the blind-critic protocol with the nine concepts registered in `art/reference/concepts/`.
+
+### Revision 7 (2026-08-30) — the hero becomes a system before it becomes a picture
+
+Revision 6's decision 4 produced a first identity round: eight screened 64×64 candidates
+(`.art-cache/candidates/hero-identity-v2/`). The user rejected the framing before choosing —
+every candidate is a costume whose identity lives in removable equipment — and issued a
+foundational brief, canonized as `CHARACTER_FOUNDATION.md`, the standing spec for the player
+character. Consequences of record:
+
+1. **No identity master exists.** The candidate round is shelved as reference; `pnpm art approve`
+   stays untouched. Identity art resumes only after the user locks a mannequin, a hard-constraints
+   spec, and a production pipeline (the document's exploration phase).
+2. **Revision 6's "tripled frame budget" is revised:** strong poses first (anticipation → commit →
+   impact → follow-through → recovery); frames serve poses.
+3. **The character production pipeline is an open architecture question** — single source of truth,
+   Dead Cells principle (cheap iteration), options to be investigated and costed before locking.
+4. Tracks are unaffected where independent: the engine track (ADR 0001/0002) proceeds; set-piece
+   and district art proceeds under the bible; the PixelLab cycle now most likely lapses for hero
+   work (as decision 2 originally planned) and spends, if at all, on non-hero assets.
+
 ### Open after the merge (audited 2026-08-29, eleven agents over PR #13)
 
 Fixed in the merge: the double schema-3 collision, the duplicate latch release, the missing master

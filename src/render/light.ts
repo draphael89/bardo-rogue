@@ -2,7 +2,7 @@ import { Container, RenderTexture, Sprite, Texture, type Renderer } from 'pixi.j
 import type { RenderApp } from './app'
 import type { Atlas } from './atlas'
 import type { World } from '@/sim/world'
-import { doorOpens, type ArenaDoor } from '@/sim/arena'
+import { TILE, doorOpens, type ArenaDoor } from '@/sim/arena'
 import type { Particles } from './particles'
 import { tuning } from '@/tuning'
 import { atmosphereFor, brazierFlame } from './atmospherePresets'
@@ -12,6 +12,10 @@ import { fxRng } from './fxRng'
 
 // Subtle 2.5D lighting. A lightmap is composed each frame (ambient fill + additive lights + vignette lift)
 // and multiplied over the world, so lit floor keeps its own colours and the edges only fall off gently.
+// Lights are positioned in WORLD px, but the map itself is VIEW-sized (plus pad) and follows the
+// camera each frame: the render fill per frame is constant regardless of room size (a room-sized
+// map re-rendered the whole 64×36 district every frame), and the multiply covers every visible
+// pixel, so the underlay's stars dim uniformly with no seam where a room-sized map used to end.
 export class Lighting {
   private rt: RenderTexture
   private scene = new Container()
@@ -27,11 +31,12 @@ export class Lighting {
   private t = 0
   private flameAcc = 0
   private deathT = 0
+  // World px of coverage beyond the resting view on every side: absorbs shake, kicks, lean,
+  // look-ahead (≤ ~15 world px combined) and the zoom punch, which only ever scales ≥ 1.
   private pad = 32
 
-  constructor(private ra: RenderApp, private atlas: Atlas, private particles: Particles, private renderer: Renderer, arena: World['arena']) {
-    const { width, height } = tuning.view
-    const w = width + this.pad * 2, h = height + this.pad * 2
+  constructor(ra: RenderApp, private atlas: Atlas, private particles: Particles, private renderer: Renderer, arena: World['arena']) {
+    const { w, h } = this.rtSize()
     this.rt = RenderTexture.create({ width: w, height: h, scaleMode: 'nearest' })
 
     this.base = new Sprite(Texture.WHITE); this.base.width = w; this.base.height = h
@@ -43,11 +48,26 @@ export class Lighting {
     this.scene.addChild(this.player)
 
     this.out = new Sprite(this.rt); this.out.blendMode = 'multiply'
-    this.out.position.set(-this.pad - ra.arenaOffset.x, -this.pad - ra.arenaOffset.y)
+    this.out.position.set(-this.pad, -this.pad)
     ra.layers.light.addChild(this.out)
   }
 
+  // The visible world window plus pad, in world px. tuning.view.width is adaptive (app.ts), so
+  // this is re-asked on every rebind — a view resize rebuilds the room and lands here.
+  private rtSize(): { w: number; h: number } {
+    const V = tuning.view
+    return {
+      w: Math.ceil(V.width / V.worldScale) + this.pad * 2,
+      h: Math.ceil(V.height / V.worldScale) + this.pad * 2,
+    }
+  }
+
   rebind(arena: World['arena']): void {
+    const { w, h } = this.rtSize()
+    if (this.rt.width !== w || this.rt.height !== h) {
+      this.rt.resize(w, h)
+      this.base.width = w; this.base.height = h
+    }
     for (const s of this.braziers) s.destroy()
     for (const c of this.cores) c.s.destroy()
     for (const s of this.windows) s.destroy()
@@ -61,7 +81,6 @@ export class Lighting {
 
   private layoutLights(arena: World['arena']): void {
     const atlas = this.atlas
-    const ra = this.ra
     // ART_DIRECTION.md §3.2: one key + at most two named accents + ambient. The room (not
     // this file) says where they are and how far they reach; tuning owns flicker and tint.
     // arena.braziers[0] is the key and it sits on the focal object, never at the frame edge.
@@ -70,7 +89,7 @@ export class Lighting {
     // past the ambient, and §3.2.3 wants the playable centre 1-2 bands over the perimeter.
     for (const b of arena.braziers) {
       const s = new Sprite(atlas.light('circle_noise')); s.anchor.set(0.5); s.blendMode = 'add'
-      s.position.set(Math.round(b.x) + this.pad + ra.arenaOffset.x, Math.round(b.y) - 4 + this.pad + ra.arenaOffset.y)
+      s.position.set(Math.round(b.x), Math.round(b.y) - 4)
       this.scene.addChild(s); this.braziers.push(s)
       if (b.strength > 1) {
         const core = new Sprite(atlas.light('circle')); core.anchor.set(0.5); core.blendMode = 'add'
@@ -80,12 +99,12 @@ export class Lighting {
     }
     for (const w of arena.windows) {
       const s = new Sprite(atlas.light('circle')); s.anchor.set(0.5); s.blendMode = 'add'
-      s.position.set(Math.round(w.x) + this.pad + ra.arenaOffset.x, Math.round(w.y) + this.pad + ra.arenaOffset.y)
+      s.position.set(Math.round(w.x), Math.round(w.y))
       this.scene.addChild(s); this.windows.push(s)
     }
     this.door.position.set(
-      (arena.door.col + 0.5) * 16 + this.pad + ra.arenaOffset.x,
-      (arena.door.row + 0.7) * 16 + this.pad + ra.arenaOffset.y,
+      (arena.door.col + 0.5) * TILE,
+      (arena.door.row + 0.7) * TILE,
     )
     if (!this.door.parent) this.scene.addChild(this.door)
     for (const d of arena.doors) {
@@ -93,10 +112,10 @@ export class Lighting {
       const s = new Sprite(atlas.light('circle')); s.anchor.set(0.5); s.blendMode = 'add'
       switch (d.dir) {
         case 'north':
-          s.position.set((d.col + 0.5) * 16 + this.pad + ra.arenaOffset.x, (d.row + 0.7) * 16 + this.pad + ra.arenaOffset.y)
+          s.position.set((d.col + 0.5) * TILE, (d.row + 0.7) * TILE)
           break
         case 'east':
-          s.position.set(d.col * 16 + this.pad + ra.arenaOffset.x, (d.row + 0.5) * 16 + this.pad + ra.arenaOffset.y)
+          s.position.set(d.col * TILE, (d.row + 0.5) * TILE)
           break
         default: { const _e: never = d.dir; return _e }
       }
@@ -105,10 +124,10 @@ export class Lighting {
     }
     // §3.2.7 the pool is baked into the room art; this only adds the falloff on top of it,
     // and it leans toward the focal object so the lift knows where the eye is going.
-    const arenaW = arena.cols * 16, arenaH = arena.rows * 16
+    const arenaW = arena.cols * TILE, arenaH = arena.rows * TILE
     const vx = (arenaW / 2) * 0.62 + arena.focal.x * 0.38
     const vy = (arenaH / 2) * 0.62 + arena.focal.y * 0.38
-    this.vignette.position.set(Math.round(vx) + this.pad + ra.arenaOffset.x, Math.round(vy) + this.pad + ra.arenaOffset.y)
+    this.vignette.position.set(Math.round(vx), Math.round(vy))
     // §3.2.3 "Light pools; it does not wash." At 1.15 x 1.30 the arena this sprite reached
     // past every wall, so the lift was a flat wash over the whole room and the floor had no
     // dark to fall to: nothing in the playfield measured under L 0.10 while the reference
@@ -117,7 +136,12 @@ export class Lighting {
     this.vignette.scale.set(arenaW * 0.74 / 128, arenaH * 0.94 / 128)
   }
 
-  update(world: World, dtSec: number, alpha = 1) {
+  /**
+   * `viewX`/`viewY`: the resting view window's top-left in world px — the clamped follow focus
+   * minus half the visible span, the exact translation the world container is given (shake and
+   * zoom ride the container and are absorbed by the pad).
+   */
+  update(world: World, dtSec: number, alpha: number, viewX: number, viewY: number) {
     const L = tuning.juice.light
     this.t += dtSec
     const p = world.player
@@ -197,7 +221,7 @@ export class Lighting {
     }
 
     const px = lerp(p.px, p.x, alpha), py = lerp(p.py, p.y, alpha)
-    this.player.position.set(Math.round(px) + this.pad + this.ra.arenaOffset.x, Math.round(py) + this.pad + this.ra.arenaOffset.y)
+    this.player.position.set(Math.round(px), Math.round(py))
     this.player.scale.set((L.playerLightRadius * 2) / 128)
     this.player.alpha = d > 0 ? 0 : L.playerLightAlpha
     this.player.tint = 0xffe8c8
@@ -211,6 +235,13 @@ export class Lighting {
       this.particles.flame(bz.x, bz.y - 6, tongue.tint, tongue.tint1)
     }
 
+    // Follow the camera: anchor the RT's world origin at the padded view window (rounded to whole
+    // world px so texels stay put), counter-offset the scene so every light stays glued to the
+    // world, and park the ambient fill at the RT's own origin so it always covers the full target.
+    const ox = Math.round(viewX) - this.pad, oy = Math.round(viewY) - this.pad
+    this.scene.position.set(-ox, -oy)
+    this.base.position.set(ox, oy)
+    this.out.position.set(ox, oy)
     this.renderer.render({ container: this.scene, target: this.rt, clear: true })
   }
 }

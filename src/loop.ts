@@ -20,7 +20,10 @@ export class Loop {
     const frame = (now: number) => {
       this.raf = requestAnimationFrame(frame)
       const t0 = performance.now()
-      let dt = Math.min(100, now - this.lastNow)
+      // Floored at 0: the first rAF timestamp can sit BEFORE the performance.now() start() captured
+      // (headless boots see ~300ms), and a negative dt runs every render integrator backwards —
+      // camera lookahead diverged to -70px before the first frame a capture could see.
+      let dt = Math.min(100, Math.max(0, now - this.lastNow))
       this.lastNow = now
       if (!this.paused) {
         this.acc += dt * this.hooks.timeScale()

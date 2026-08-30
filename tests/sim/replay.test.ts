@@ -12,9 +12,15 @@ import { Recorder } from '@/input/recorder'
 // Expected hashes for the fixtures under replays/. A changed hash means the sim changed (tuning, rules, rng use).
 // If that change is intended: run `pnpm record-bots`, paste the printed hashes here, and re-check the sanity asserts.
 const FIXTURES = [
+  // Hashes re-recorded at the merge of the island Bardo branch with main's hot-path
+  // optimization (#24): the union of two intended sim changes, pinned on the merged tree.
   { file: 'kite-full-s2.json', hash: 73257908, check: (m: Record<string, unknown>) => expect(m.clearSeconds).not.toBeNull() },
   { file: 'naive-wave1-s3.json', hash: 1383404909, check: (m: Record<string, unknown>) => expect(m.wavesCleared).toBe(1) },
   { file: 'idle-wave1-s5.json', hash: 258235426, check: (m: Record<string, unknown>) => expect(m.deaths).toBe(1) },
+  // The only fixture that builds the Bardo: a full descent (island hub -> rack -> Gate -> six
+  // rooms -> Minos -> return), so the hub geometry the wave/full fixtures never construct is
+  // hash-pinned too.
+  { file: 'slice-kite-loop-s7.json', hash: 1142161593, check: (m: Record<string, unknown>) => { expect(m.returns).toBe(1); expect(m.runResult).toBe('won') } },
 ]
 
 function loadFixture(file: string): Replay {

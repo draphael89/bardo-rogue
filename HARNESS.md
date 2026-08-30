@@ -1,7 +1,7 @@
 # Agent harness
 
 How to run, drive, inspect, and regression-test the game without a human at the keyboard.
-Stack: PixiJS v8 + Vite + TypeScript strict, pnpm. Sim ticks at 60 Hz; 1 tile = 16 px; view is 480x270 upscaled.
+Stack: PixiJS v8 + Vite + TypeScript strict, pnpm. Sim ticks at 60 Hz; 1 tile = 16 px; view is a 640x360 target (world drawn at 1.5x, so a tile is 24 target px), integer-upscaled.
 
 ## The one rule
 
@@ -105,7 +105,7 @@ Available once the page has booted (`await page.waitForFunction(() => !!window._
   runs free and the reported tick can overshoot by up to 4.
 - `--eval` runs JS in the page after the ticks and before the screenshot. Set `window.__out = {...}` to get values back
   in the printed JSON (`extra`). The JSON also has `state` (from `__game.state()`), `stats`, and console `errors`.
-- Then Read the PNG. It is 1920x1080; the 480x270 render target is upscaled 4x.
+- Then Read the PNG. It is 1920x1080; the 640x360 render target is upscaled 3x.
 
 ## Record and replay
 

@@ -15,7 +15,6 @@ import { Metrics } from '@/sim/metrics'
 import { DebugOverlay } from '@/debug/overlay'
 import { installApi } from '@/debug/api'
 import { makeBot, type BotName } from '@/sim/bots'
-import { ARENA_COLS, ARENA_ROWS, TILE } from '@/sim/arena'
 import { decodeReplay, isEncodedReplay, quantizeFrame, replayToJson, type Replay, type EncodedReplay } from '@/sim/replay'
 import { downloadJson, Recorder } from '@/input/recorder'
 import { tuning } from '@/tuning'
@@ -48,18 +47,18 @@ async function boot() {
   if (playtestRaw && !playtest) console.log(`[playtest] unknown condition "${playtestRaw}"; expected ${PLAYTEST_CONDITIONS.join(' | ')}`)
 
   // Widen the render target to the window's aspect before anything reads it, so the room is not
-  // letterboxed into the middle third of a wide monitor. HEIGHT NEVER CHANGES: sprite scale, the
-  // 16px grid and every tuned distance stay exactly as authored; only how much void you see to the
-  // left and right moves. Snapped to 16 so the tile grid still lands on whole tiles, and floored at
-  // 480 so the HUD never has less room than it was laid out for.
-  // A 16:9 window computes to exactly 480, and tools/shot.ts opens a 1920x1080 viewport, so every
-  // pinned evidence crop and every gauntlet protocol keeps its coordinates. `?view=480` forces it.
+  // letterboxed into the middle third of a wide monitor. HEIGHT NEVER CHANGES: the world-render
+  // scale, the 16px sim grid and every tuned distance stay exactly as authored; only how much void
+  // you see to the left and right moves. Snapped to 16, and floored at 640 so the HUD never has
+  // less room than it was laid out for.
+  // A 16:9 window computes to exactly 640, and tools/shot.ts opens a 1920x1080 viewport, so every
+  // pinned evidence crop and every gauntlet protocol keeps its coordinates. `?view=640` forces it.
   const viewOverride = +(q.get('view') ?? 0)
   tuning.view.width = fitViewWidth(viewOverride)
 
   const manifest = await (await fetch(`${ASSET_BASE}manifest.json`)).json() as Record<string, string[]>
   await loadFonts()
-  const ra = await createRenderApp(document.getElementById('app')!, { w: ARENA_COLS * TILE, h: ARENA_ROWS * TILE })
+  const ra = await createRenderApp(document.getElementById('app')!, viewOverride)
   const atlas = await loadAtlas(manifest)
   const audio = new AudioSystem()
   audio.muted = mute
@@ -150,7 +149,6 @@ async function boot() {
   // Refresh the ears immediately before every sound. Footsteps are cadence, not authority: a
   // stationary player and a freshly reset room must spatialize enemy tells just as accurately.
   presenter.onEvent = ev => playEventSfx(audio, ev, world.player)
-  ra.viewOverride = viewOverride
   ra.onViewResize = () => { presenter.rebuildRoom(); presenter.hud.relayout(); presenter.reward.relayout(); presenter.routeMap.relayout(); presenter.title.relayout() }
   const input = new InputSystem(ra)
   const overlay = new DebugOverlay(ra.layers.debug, ra.layers.hud)
@@ -744,6 +742,10 @@ async function boot() {
     if (act === 'resume') setPaused(false)
     else if (act === 'abandon') giveTheAttemptBack()
     else if (act === 'toggle-still') applyReduced(!reducedEffects)
+    // The same host verb F carries; the row mirrors the title's so both settings pages share one order.
+    // A gamepad confirm arrives from polling, outside any user activation, and the browser refuses
+    // the request — say so instead of letting the row silently do nothing.
+    else if (act === 'fullscreen') void platform.fullscreen().then(ok => { if (!ok) presenter.hud.showBanner('FULLSCREEN NEEDS A KEY', 'PRESS F', 2.4) })
   }
 
   const answerTitle = (gesture: boolean): void => {
@@ -751,6 +753,9 @@ async function boot() {
     const act = presenter.title.confirm()
     if (act === 'descend') void dismissTitle(gesture)
     else if (act === 'toggle-still') applyReduced(!reducedEffects)
+    // The same host verb F carries; the row exists so the control is discoverable from Settings.
+    // On a gamepad confirm (no user activation) the browser refuses; the settings foot says why.
+    else if (act === 'fullscreen') void platform.fullscreen().then(ok => { if (!ok) presenter.title.say('FULLSCREEN NEEDS A KEY. PRESS F') })
   }
 
   // A click answers the focused title verb. Registered on the window rather than the canvas so a

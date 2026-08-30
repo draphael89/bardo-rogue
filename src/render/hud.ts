@@ -133,12 +133,19 @@ const SPILL: [number, number][] = [[3, 0.34], [8, 0.20], [14, 0.11], [21, 0.05]]
 const VEIL_STEPS = 8                                 // the aperture closes in whole steps (§6.6), never a ramp
 const VEIL_BAND = 5                                  // row quantum: the veil's edge is stepped, like everything else
 const STARS = 34                                    // ~2 % of the opening's area: a deep sky, not a starfield poster
+// Body-anchored offsets are authored in WORLD px against the sprite and pass through bodyPx()
+// at use: the world renders at tuning.view.worldScale, so a raw target-px offset authored for
+// the old 1:1 scale lands mid-body (the crown drew mid-head, the rings started inside the
+// silhouette).
 const FEET = 6                                       // player.radius + 1: the row the sprite's feet stand on
 const CROWN_UP = 32                                  // authored 32px hero: keep the life crown clear of crest and raised blade
+const bodyPx = (v: number) => Math.round(v * tuning.view.worldScale)
 // The judge's plate, in view pixels. One definition, because the crown has to step out of exactly
 // this rectangle and nothing else — updateBoss draws it and updateCrown avoids it.
 const BOSS_BAR = { w: 168, h: 16, y: 2 }
-const BOSS_BAR_X = Math.round((V.width - BOSS_BAR.w) / 2)
+// A function, not a module const: V.width is adaptive (app.ts) and a value baked at import time
+// would strand the plate off-centre after a fullscreen re-fit.
+const bossBarX = () => Math.round((V.width - BOSS_BAR.w) / 2)
 const HEART_X = 8, HEART_Y = 6, STEP = 9            // flame pitch in unscaled px; the rig is drawn at 2x
 const HURT_SHAKE = [1, -1, 1, 0, -1, 1, 0, 0]       // authored 8-tick rig shake, never a random jitter
 
@@ -173,8 +180,8 @@ function plate(g: Graphics, x: number, y: number, w: number, h: number, edge: nu
   g.rect(x, y + 1, 1, h - 2).fill({ color: edge, alpha: 0.95 })
   g.rect(x + w - 1, y + 1, 1, h - 2).fill({ color: edge, alpha: 0.95 })
 }
-// An octagon ring of whole pixels. A stroked circle at 480x270 lands on half pixels and the NEAREST upscale
-// doubles the smear; runs of 1px rects keep every edge hard.
+// An octagon ring of whole pixels. A stroked circle in the render target lands on half pixels and the NEAREST
+// upscale doubles the smear; runs of 1px rects keep every edge hard.
 function ring(g: Graphics, cx: number, cy: number, r: number, col: number, alpha: number) {
   const k = Math.round(r * 0.4)
   g.rect(cx - k, cy - r, k * 2 + 1, 1).fill({ color: col, alpha })
@@ -211,8 +218,7 @@ export class Hud {
   private markG = new Graphics()      // the player's own ground mark, drawn in screen space at the player's feet
   private crownG = new Graphics()     // the life crown: five wicks riding 8px over the player's head
   private hurtG = new Graphics()      // the damage event: emitted light at the body + a red frame vignette
-  private hudLayer: Container
-  private worldC: Container | null = null
+  private worldC: Container
   private plateG = new Graphics()     // life panel
   private rigG = new Graphics()       // flames + smoke, drawn at 1px and scaled 2x
   private waveG = new Graphics()      // wave panel + remaining-enemy pips
@@ -261,8 +267,8 @@ export class Hud {
   private padDirty = true
   private rigKey = ''
 
-  constructor(_atlas: Atlas, layer: Container) {
-    this.hudLayer = layer
+  constructor(_atlas: Atlas, layer: Container, worldC: Container) {
+    this.worldC = worldC
     this.rig.position.set(HEART_X, HEART_Y)
     this.rig.scale.set(2)
     this.rig.addChild(this.rigG)
@@ -409,17 +415,13 @@ export class Hud {
   //
   // It is drawn in the HUD layer, i.e. above the lightmap, so the mark keeps its value in a dim corner of the
   // room — and every pixel of it sits BELOW the sprite's feet row, so it never paints over the character.
-  // Anchor: the presenter sets the world container's pivot to the interpolated player position and its position
-  // to where that pivot lands, so `worldC.position` IS the player's screen pixel, shake and look-ahead included.
+
   // Where the player is, in screen pixels. The presenter sets the world container's pivot to the interpolated
   // player position and its position to where that pivot lands, so `worldC.position` IS the player's pixel,
-  // shake and look-ahead included.
-  private playerPx(): { x: number; y: number } | null {
-    if (!this.worldC) {
-      const root = this.hudLayer.parent
-      this.worldC = root ? (root.children.find(c => c !== this.hudLayer) as Container | undefined) ?? null : null
-    }
-    if (!this.worldC) return null
+  // shake and look-ahead included. The container is handed in BY IDENTITY at construction — the HUD must
+  // never guess it from the display tree: the screen-space underlay is root child 0, and the old "first
+  // child that isn't the HUD" heuristic picked it, anchoring every on-body element at (0,0).
+  private playerPx(): { x: number; y: number } {
     return { x: Math.round(this.worldC.position.x), y: Math.round(this.worldC.position.y) }
   }
 
@@ -427,7 +429,6 @@ export class Hud {
     const g = this.markG
     g.clear()
     const at = this.playerPx()
-    if (!at) { g.visible = false; return }
     if (p.state === 'dead') {
       g.visible = true
       this.drawDeathStain(g, at)
@@ -435,7 +436,7 @@ export class Hud {
     }
     g.visible = true
     const cx = at.x
-    const cy = at.y + FEET
+    const cy = at.y + bodyPx(FEET)
 
     // guarded: the mercy window and the dodge's i-frames both bleach the mark, so "nothing can touch me right
     // now" is legible on the floor, not only in the flicker of the sprite.
@@ -466,7 +467,7 @@ export class Hud {
   // (§8.2.2). Whole-pixel steps, no idle motion. R2 won both orders and was not wowed: the body
   // still read as a leftover cloak. This is the floor of the last moment.
   private drawDeathStain(g: Graphics, at: { x: number; y: number }) {
-    const cx = at.x, cy = at.y + FEET
+    const cx = at.x, cy = at.y + bodyPx(FEET)
     const well: [number, number, number, number, number][] = [
       [-3, -3, 7, C.gold, 1],
       [-2, -5, 11, C.purple1, 0.95],
@@ -493,7 +494,7 @@ export class Hud {
     const top = baseY - 2, bottom = baseY + 6
     const left = x0 - 1, right = x0 + w + 1
     return top <= BOSS_BAR.y + BOSS_BAR.h && bottom >= BOSS_BAR.y
-      && left <= BOSS_BAR_X + BOSS_BAR.w && right >= BOSS_BAR_X
+      && left <= bossBarX() + BOSS_BAR.w && right >= bossBarX()
   }
 
   // --- the life crown: the health read, on the body -------------------------------------------------------------
@@ -509,15 +510,15 @@ export class Hud {
   //      flames come and go.
   //   3. Lit and empty separate by value AND by hue: a warm flame at L~180 in a cup whose empty interior is
   //      L~10, so the count survives a dim corner, a lit slab, and the death grade.
-  private updateCrown(world: World, p: World['player'], at: { x: number; y: number } | null, hurtAge: number) {
+  private updateCrown(world: World, p: World['player'], at: { x: number; y: number }, hurtAge: number) {
     const g = this.crownG
     g.clear()
-    if (!at || p.state === 'dead' || meetingHud(world, this.hushFight)) { g.visible = false; return }
+    if (p.state === 'dead' || meetingHud(world, this.hushFight)) { g.visible = false; return }
     if (world.rooms[world.roomIndex]?.id === HUB_ID) { g.visible = false; return }
     const n = p.maxHp
     const PITCH = 4, ARC = [1, 0, -1, 0, 1, 0, 1, 0]
     const x0 = at.x - Math.round((n * PITCH - 1) / 2)
-    const baseY = at.y - CROWN_UP
+    const baseY = at.y - bodyPx(CROWN_UP)
     // The judge's plate owns the top band while he lives, and a crown drawn into it stops reading as
     // the player's and starts reading as part of his bar. Step aside for the plate — NOT for the
     // fight. Hiding the on-body count for the whole Minos encounter sent the survival read back to
@@ -574,7 +575,7 @@ export class Hud {
   // hard white emitted off the player's own outline, a red frame vignette on the same two ticks, then a bone ring
   // expanding away. The whole thing is keyed off the sim's mercy counter, so a stepwise capture at tick T shows
   // exactly the frame tick T implies.
-  private updateHurtLight(p: World['player'], at: { x: number; y: number } | null, hurtAge: number) {
+  private updateHurtLight(p: World['player'], at: { x: number; y: number }, hurtAge: number) {
     const g = this.hurtG
     g.clear()
     if (hurtAge > 3 || hurtAge < 0 || p.state === 'dead') { g.visible = false; return }
@@ -589,15 +590,13 @@ export class Hud {
       g.rect(i, 0, 1, V.height).fill({ color: C.hurt, alpha: a * 0.85 })
       g.rect(V.width - 1 - i, 0, 1, V.height).fill({ color: C.hurt, alpha: a * 0.85 })
     }
-    if (!at) return
-
     // 2. the body emits. The frame's colour grade (src/render/postfx.ts) clamps every pixel near L200, so this
     //    event cannot win on peak value — it wins on AREA and on shape. A double shockwave stepping outward
     //    from the player's own outline over four ticks: two hard white rings, then bone, then gone. It never
     //    fills the middle, so the figure stays legible inside its own flare.
     const cx = at.x, cy = at.y
     if (hurtAge <= 1) {
-      const r = hurtAge === 0 ? 8 : 10
+      const r = bodyPx(hurtAge === 0 ? 8 : 10)
       ring(g, cx, cy, r, C.copeHi, 1)
       ring(g, cx, cy, r - 1, C.copeHi, 1)
       ring(g, cx, cy, r + 4, C.wickWhite, hurtAge === 0 ? 0.6 : 0.4)
@@ -606,7 +605,7 @@ export class Hud {
         g.rect(cx + dx * (r + 1) - (dy ? 1 : 0), cy + dy * (r + 1) - (dx ? 1 : 0), dy ? 3 : 5, dx ? 3 : 5).fill(C.copeHi)
       }
     } else {
-      const r = hurtAge === 2 ? 13 : 16
+      const r = bodyPx(hurtAge === 2 ? 13 : 16)
       ring(g, cx, cy, r, C.bone, hurtAge === 2 ? 0.8 : 0.4)
       ring(g, cx, cy, r - 1, C.hurtHi, hurtAge === 2 ? 0.55 : 0.25)
     }
@@ -760,7 +759,7 @@ export class Hud {
     const cardAge = dp.state === 'dead' && dp.deathTick >= 0 ? world.tick - dp.deathTick : -1
     const back = fightChrome(cardAge)
     const bw = BOSS_BAR.w, bh = BOSS_BAR.h
-    const bx = BOSS_BAR_X, by = BOSS_BAR.y
+    const bx = bossBarX(), by = BOSS_BAR.y
     const cracked = e.phase > 0
     const ink = minosLifeInk(cracked)
     g.visible = back > 0
@@ -955,7 +954,7 @@ export class Hud {
     //
     //    The corpse's screen pixel is latched on the killing frame and every later beat is anchored to it, so the
     //    veil never slides when the camera's death trauma shakes the world under it.
-    if (!this.deathAt || age <= 1) this.deathAt = this.playerPx() ?? this.deathAt
+    if (!this.deathAt || age <= 1) this.deathAt = this.playerPx()
 
     const at = this.deathAt
     // The veil: an aperture closing on the corpse in eight whole steps, not a scrim dropped over the frame. It is
@@ -1461,7 +1460,7 @@ export class Hud {
     const glyphText = (s: string, cx: number, cy: number, col: number) => {
       const t = new Text({ text: s, style: { fontFamily: 'Kenney Mini', fontSize: 8, fill: col }, resolution: 1 })
       // Centre by rounding the left edge, NOT with anchor 0.5: an anchor puts an odd-width label on a
-      // half pixel, and a half-pixel sprite is bilinear-sampled into the 480x270 target before any
+      // half pixel, and a half-pixel sprite is bilinear-sampled into the render target before any
       // filter can see it. That smear is why these caps read blurrier than the labels beside them.
       t.anchor.set(0, 0)
       t.position.set(Math.round(cx - t.width / 2), Math.round(cy))

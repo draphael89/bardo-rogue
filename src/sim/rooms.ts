@@ -1,5 +1,5 @@
 import { tuning } from '@/tuning'
-import { TILE, buildArena, setDoorWalkable, type DoorDir, type DoorMark, type RoomKind } from './arena'
+import { TILE, buildArena, setDoorWalkable, type ArenaDoor, type DoorDir, type DoorMark, type RoomKind } from './arena'
 import { runGraph, sliceGraph } from './content/slice'
 import type { WaveDef } from './content/waves'
 import { dressArena } from './dress'
@@ -148,19 +148,28 @@ export function enterRoomById(world: World, id: string, via: 'door' | 'return' |
   enterRoom(world, index, via, mark)
 }
 
-function overlapsDoor(px: number, py: number, dir: DoorDir, col: number, row: number): boolean {
-  switch (dir) {
+/**
+ * How far south of a north door's own row the entry overlap reaches (ADR 0001). The old absolute
+ * `doorEnterMaxY: 32` assumed the door sat at row 1; an island room hangs its Gate deeper in the
+ * grid, so the line is relative to the door. At row 1 this is the same 32 px it always was.
+ */
+export function doorEnterMaxY(door: ArenaDoor): number {
+  return door.row * TILE + tuning.run.doorEnterDepth
+}
+
+function overlapsDoor(px: number, py: number, door: ArenaDoor): boolean {
+  switch (door.dir) {
     case 'north': {
-      const cx = (col + 0.5) * TILE
+      const cx = (door.col + 0.5) * TILE
       if (Math.abs(px - cx) > tuning.run.doorHalfW) return false
-      return py <= tuning.run.doorEnterMaxY
+      return py <= doorEnterMaxY(door)
     }
     case 'east': {
-      const cy = (row + 0.5) * TILE
+      const cy = (door.row + 0.5) * TILE
       if (Math.abs(py - cy) > tuning.run.doorHalfW) return false
-      return px >= col * TILE - 4
+      return px >= door.col * TILE - tuning.run.doorEnterInset
     }
-    default: { const _e: never = dir; return _e }
+    default: { const _e: never = door.dir; return _e }
   }
 }
 
@@ -174,7 +183,7 @@ export function tryEnterDoor(world: World): void {
   for (const ex of exits) {
     const d = world.arena.doors.find(x => x.dir === ex.dir)
     if (!d) continue
-    if (overlapsDoor(p.x, p.y, ex.dir, d.col, d.row)) {
+    if (overlapsDoor(p.x, p.y, d)) {
       const leavingTown = world.scenario === 'loop' && room.id === HUB_ID
       if (leavingTown && !startRun(world, ex.to)) return
       world.roomPhase = 'transitioning'

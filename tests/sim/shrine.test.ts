@@ -4,7 +4,7 @@ import { overlapsSolid } from '@/sim/collision'
 import { hashWorld } from '@/sim/hash'
 import { emptyInput, type InputFrame } from '@/sim/input'
 import { waypointX, waypointY, pathWaypoint } from '@/sim/nav'
-import { enterRoomById } from '@/sim/rooms'
+import { doorEnterMaxY, enterRoomById } from '@/sim/rooms'
 import { buildSliceRooms, FIRST_GATE, FIXED_ROUTE, installRoute, pinUtility } from '@/sim/route'
 import { createWorld } from '@/sim/scenarios'
 import { prepareWeapon, startRun } from '@/sim/session'
@@ -184,7 +184,7 @@ describe('the cleared room lights what it owes', () => {
     expect(world.arena.shrineTaken).toBe(true)
     const door = world.arena.doors.find(d => d.dir === 'north')!
     world.player.x = (door.col + 0.5) * TILE
-    world.player.y = tuning.run.doorEnterMaxY
+    world.player.y = doorEnterMaxY(door)
     stepWorld(world, emptyInput())
     for (let i = 0; i < tuning.run.transitionTicks; i++) stepWorld(world, emptyInput())
     expect(world.arena.shrine).toBeUndefined()

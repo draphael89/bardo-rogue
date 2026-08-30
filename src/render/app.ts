@@ -1,12 +1,18 @@
-import { Application, Container, RenderTexture, Sprite } from 'pixi.js'
+import { Application, Container, Graphics, RenderTexture, Sprite } from 'pixi.js'
 import { tuning } from '@/tuning'
+import { drawLetterboxVoid, VOID_BLACK } from './starfield'
 
-// Everything renders into a 480x270 target, then that target is drawn at an integer scale.
+// Everything renders into a 640x360 target (ADR 0002), then that target is drawn at an integer
+// scale. The world container renders sim space at tuning.view.worldScale (1.5x); the underlay and
+// hud layers are screen space. The letterbox outside the target paints the same starfield void —
+// one black to the glass, never two.
 export interface RenderApp {
   app: Application
-  root: Container          // low-res scene root (world + hud)
-  world: Container         // offset by camera/shake
+  root: Container          // low-res scene root (underlay + world + hud)
+  world: Container         // scaled by view.worldScale; positioned by the follow camera each frame
+  frame: Container         // stage side: letterbox void + upscaled target. postfx filters THIS.
   layers: {
+    underlay: Container    // screen space, behind the world: the starfield void
     floor: Container; decals: Container; shadows: Container; projectiles: Container; entities: Container
     fx: Container; light: Container; debug: Container; hud: Container
   }
@@ -14,27 +20,35 @@ export interface RenderApp {
   screen: Sprite
   scale: number
   viewOverride: number
-  arenaOffset: { x: number; y: number }
   resize(): void
   onViewResize?: () => void          // fired when the target's WIDTH changed and the scene must re-bake
   renderFrame(): void
 }
 
 // The target's width follows the window's aspect so the room is not letterboxed into the middle of a
-// wide monitor. HEIGHT NEVER CHANGES: sprite scale, the 16px grid and every tuned distance stay as
-// authored; only how much starfield you see to the sides moves. Snapped to 16 so the tile grid still
-// lands on whole tiles, floored at 480 so the HUD never has less room than it was laid out for, and
-// recomputed on every resize because fullscreen changes the aspect -- a 576-wide target would cap
-// fullscreen at the same integer scale as the window and make the button pointless.
-// A 16:9 viewport computes to exactly 480, which is what tools/shot.ts opens, so every pinned
+// wide monitor. HEIGHT NEVER CHANGES: sprite scale, the world-render scale and every tuned distance
+// stay as authored; only how much starfield you see to the sides moves. Snapped to 16 so widths stay
+// tidy, floored at 640 so the HUD never has less room than it was laid out for, and recomputed on
+// every resize because fullscreen changes the aspect — a wider target would cap fullscreen at the
+// same integer scale as the window and make the button pointless.
+// A 16:9 viewport computes to exactly 640, which is what tools/shot.ts opens, so every pinned
 // evidence crop keeps its coordinates.
 export function fitViewWidth(override = 0): number {
-  if (override >= 480) return Math.round(override / 16) * 16
+  if (override >= 640) return Math.round(override / 16) * 16
+  if (override > 0) {
+    // The pre-ADR-0002 capture protocol forced ?view=480. Swallowing that silently turns a stale
+    // recipe into a phantom layout regression; say so, and hold the floor deterministically.
+    console.warn(`view override ${override} is below the 640 floor (ADR 0002); using 640`)
+    return 640
+  }
   const aspect = window.innerWidth / Math.max(1, window.innerHeight)
-  return Math.max(480, Math.min(768, Math.round((tuning.view.height * aspect) / 16) * 16))
+  return Math.max(640, Math.min(1024, Math.round((tuning.view.height * aspect) / 16) * 16))
 }
 
-export async function createRenderApp(parent: HTMLElement, arenaPx: { w: number; h: number }): Promise<RenderApp> {
+// `viewOverride` must arrive HERE, not be assigned onto the returned app: the initial resize()
+// below already fits the target, and an override assigned after the fact was discarded until the
+// next real resize event on any non-16:9 window.
+export async function createRenderApp(parent: HTMLElement, viewOverride = 0): Promise<RenderApp> {
   const { height } = tuning.view
   const width = tuning.view.width
   const app = new Application()
@@ -42,17 +56,22 @@ export async function createRenderApp(parent: HTMLElement, arenaPx: { w: number;
   // The game loop is the one frame owner. Letting Pixi auto-start its own ticker means the stage can
   // present the previous low-res texture before our RAF has updated it, adding a hidden display frame
   // and making Loop.stats() stop before the work the player actually sees.
-  await app.init({ background: 0x0b0608, antialias: false, resolution: dpr, autoDensity: true, preference: 'webgl', powerPreference: 'high-performance', autoStart: false })
+  await app.init({ background: VOID_BLACK, antialias: false, resolution: dpr, autoDensity: true, preference: 'webgl', powerPreference: 'high-performance', autoStart: false })
   parent.appendChild(app.canvas)
   app.ticker.stop()
 
   const rt = RenderTexture.create({ width, height, scaleMode: 'nearest' })
   const screen = new Sprite(rt)
-  app.stage.addChild(screen)
+  const letterbox = new Graphics()
+  const frame = new Container()
+  frame.addChild(letterbox, screen)
+  app.stage.addChild(frame)
 
   const root = new Container()
   const world = new Container()
+  world.scale.set(tuning.view.worldScale)
   const layers = {
+    underlay: new Container(),
     floor: new Container(), decals: new Container(), shadows: new Container(),
     projectiles: new Container(), entities: new Container(), fx: new Container(), light: new Container(), debug: new Container(), hud: new Container(),
   }
@@ -60,27 +79,27 @@ export async function createRenderApp(parent: HTMLElement, arenaPx: { w: number;
   // Physical arrows stay below actors so they cannot erase a traversal silhouette. Hostile caster
   // bolts retain their calibrated above-light FX plane and fade locally during a dodge overlap.
   world.addChild(layers.floor, layers.decals, layers.shadows, layers.projectiles, layers.entities, layers.light, layers.fx, layers.debug)
-  root.addChild(world, layers.hud)
+  root.addChild(layers.underlay, world, layers.hud)
 
-  const arenaOffset = { x: Math.floor((width - arenaPx.w) / 2), y: Math.floor((height - arenaPx.h) / 2) }
-  world.position.set(arenaOffset.x, arenaOffset.y)
-
+  let lastW = -1, lastH = -1
   const ra: RenderApp = {
-    app, root, world, layers, rt, screen, scale: 1, arenaOffset, viewOverride: 0,
+    app, root, world, frame, layers, rt, screen, scale: 1, viewOverride,
     resize() {
       // The target may need to get wider or narrower before we fit it: fullscreen changes the aspect.
       const wantW = fitViewWidth(ra.viewOverride)
+      const w = parent.clientWidth || window.innerWidth, h = parent.clientHeight || window.innerHeight
+      // A resize event that changed nothing (a fullscreen toggle fires two) must not rebuild the
+      // letterbox and resize the renderer for nothing.
+      if (wantW === tuning.view.width && w === lastW && h === lastH) return
+      lastW = w; lastH = h
       if (wantW !== tuning.view.width) {
         tuning.view.width = wantW
         rt.resize(wantW, height)
-        arenaOffset.x = Math.floor((wantW - arenaPx.w) / 2)     // mutated in place: light.ts holds this object
-        world.position.set(arenaOffset.x, arenaOffset.y)
         ra.onViewResize?.()                                      // re-bake the void and re-place the HUD
       }
       const width = tuning.view.width
       // integer scale in PHYSICAL pixels (crisp on 2x displays); fall back to a fractional fit when the integer
       // scale would waste more than ~30% of the window
-      const w = parent.clientWidth || window.innerWidth, h = parent.clientHeight || window.innerHeight
       const fit = Math.min(w * dpr / width, h * dpr / height)
       let phys = Math.max(1, Math.floor(fit))
       if (phys / fit < 0.7) phys = fit
@@ -89,6 +108,7 @@ export async function createRenderApp(parent: HTMLElement, arenaPx: { w: number;
       app.renderer.resize(w, h)
       screen.scale.set(s)
       screen.position.set(Math.floor((w - width * s) / 2 * dpr) / dpr, Math.floor((h - height * s) / 2 * dpr) / dpr)
+      drawLetterboxVoid(letterbox, w, h, screen.position.x, screen.position.y, s)
     },
     renderFrame() {
       // One ordered present: build the pixel-scale scene, then immediately blit that exact texture to

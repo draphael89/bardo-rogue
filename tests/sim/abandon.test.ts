@@ -4,6 +4,7 @@ import { emptyInput } from '@/sim/input'
 import { stepWorld } from '@/sim/step'
 import { TILE } from '@/sim/arena'
 import { abandonRun } from '@/sim/return'
+import { doorEnterMaxY } from '@/sim/rooms'
 import { tuning } from '@/tuning'
 
 function prepareAndDescend(world = createWorld(1, 'loop')) {
@@ -12,7 +13,7 @@ function prepareAndDescend(world = createWorld(1, 'loop')) {
   stepWorld(world, emptyInput())
   const north = world.arena.doors.find(d => d.dir === 'north')!
   world.player.x = (north.col + 0.5) * TILE
-  world.player.y = tuning.run.doorEnterMaxY
+  world.player.y = doorEnterMaxY(north)
   stepWorld(world, emptyInput())
   for (let i = 0; i < tuning.run.transitionTicks; i++) stepWorld(world, emptyInput())
   return world

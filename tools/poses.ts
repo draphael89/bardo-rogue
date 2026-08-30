@@ -79,7 +79,7 @@ for (const pose of POSES) {
   try {
     // the dev server may hot-reload the page between poses (someone editing source); re-arm every time
     await page.waitForFunction(() => !!(window as unknown as { __game?: unknown }).__game, null, { timeout: 15000 })
-    const clip = await page.evaluate(({ scenario, seed, god, run, focus, CROP, PRELUDE }) => {
+    const focusPt = await page.evaluate(({ scenario, seed, god, run, focus, PRELUDE }) => {
       const g = (window as any).__game
       g.pause(true)
       g.reset(seed, scenario, { god: !!god })
@@ -89,15 +89,26 @@ for (const pose of POSES) {
       let fx = w.player.x, fy = w.player.y
       if (focus === 'enemy') { const busy = ['windup', 'attack', 'recover', 'stagger', 'aim', 'freeze', 'dash']; const e = w.enemies.find((e: any) => e.active && busy.includes(e.state)) ?? w.enemies.find((e: any) => e.active && e.state !== 'idle') ?? w.enemies.find((e: any) => e.active); if (e) { fx = e.x; fy = e.y } else if (w.spawnQueue[0]) { fx = w.spawnQueue[0].x; fy = w.spawnQueue[0].y } }
       if (focus === 'bolt') { const b = w.projectiles.find((b: any) => b.active); if (b) { fx = b.x; fy = b.y } }
+      return { fx, fy, state: `${w.player.state}:${w.player.stateTick}` }
+    }, { scenario: pose.scenario, seed, god: pose.god, run: pose.run, focus, PRELUDE })
+    // frameTimes is a 240-sample ring, so waiting for length >= 242 deadlocks late in a full sheet.
+    // Await two actual browser frames instead; the paused loop still renders on every rAF — and the
+    // crop is derived only AFTER these renders, because until the presenter has drawn the new pose
+    // ra.world still carries the PREVIOUS pose's camera transform (follow, zoom punch, shake) and a
+    // toGlobal() taken early crops the wrong place.
+    await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))))
+    const clip = await page.evaluate(({ fx, fy, state, CROP }) => {
+      const g = (window as any).__game
       const ra = g.presenter.ra
       const s = ra.scale
-      const vx = ra.arenaOffset.x + fx, vy = ra.arenaOffset.y + fy
-      const x = Math.max(0, Math.round((vx - CROP / 2) * s + ra.screen.x)), y = Math.max(0, Math.round((vy - CROP / 2) * s + ra.screen.y))
-      return { x, y, width: CROP * s, height: CROP * s, state: `${w.player.state}:${w.player.stateTick}` }
-    }, { scenario: pose.scenario, seed, god: pose.god, run: pose.run, focus, CROP, PRELUDE })
-    // frameTimes is a 240-sample ring, so waiting for length >= 242 deadlocks late in a full sheet.
-    // Await two actual browser frames instead; the paused loop still renders on every rAF.
-    await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))))
+      // CROP is WORLD px of context; the world renders at view.worldScale onto the target, and the
+      // camera owns the world transform, so ask the container where the focus actually landed.
+      const S = g.tuning.view.worldScale
+      const pt = ra.world.toGlobal({ x: fx, y: fy })
+      const half = (CROP * S) / 2
+      const x = Math.max(0, Math.round((pt.x - half) * s + ra.screen.x)), y = Math.max(0, Math.round((pt.y - half) * s + ra.screen.y))
+      return { x, y, width: CROP * S * s, height: CROP * S * s, state }
+    }, { fx: focusPt.fx, fy: focusPt.fy, state: focusPt.state, CROP })
     const buf = await page.screenshot({ clip: { x: clip.x, y: clip.y, width: clip.width, height: clip.height }, timeout: 15000 })
     tiles.push({ name: `${pose.name} (${clip.state})`, buf })
     console.log('posed', pose.name, clip.state)

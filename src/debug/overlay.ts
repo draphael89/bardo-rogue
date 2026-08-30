@@ -53,7 +53,10 @@ export class DebugOverlay {
         g.circle(e.x, e.y, tuning.warden.slamRadius).stroke({ color: e.state === 'attack' ? 0xff4040 : 0xffe040, width: 1 })
       }
       let l = this.labels[li]
-      if (!l) { l = new Text({ text: '', style: { fontFamily: 'Kenney Mini', fontSize: 8, fill: 0xffffff }, resolution: 1 }); l.anchor.set(0.5, 1); this.worldLayer.addChild(l); this.labels.push(l) }
+      // The world container renders at worldScale (ADR 0002); a Text left at scale 1 would
+      // rasterize its glyphs at a fractional 1.5x — the uneven-stem defect type.ts forbids.
+      // Counter-scaling puts one font px on one target px, the same size the old 1:1 target drew.
+      if (!l) { l = new Text({ text: '', style: { fontFamily: 'Kenney Mini', fontSize: 8, fill: 0xffffff }, resolution: 1 }); l.anchor.set(0.5, 1); l.scale.set(1 / tuning.view.worldScale); this.worldLayer.addChild(l); this.labels.push(l) }
       l.visible = true; l.text = `${e.kind[0]}${e.id} ${e.state}:${e.stateTick} hp${e.hp}`; l.position.set(Math.round(e.x), Math.round(e.y - e.radius - 12))
       li++
     }

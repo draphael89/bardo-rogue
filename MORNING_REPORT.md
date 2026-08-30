@@ -54,8 +54,8 @@ pipeline and silhouette constraints, not the final identity or Look.
 
 The curated exact-head title, arrival, descent, first-fight, and viewport frames are tracked in
 `public/progress/shots/` as `title-menu.png`, `bardo-arrival-r7.png`, `descent-r7-*.png`, and
-`first-fight-r7.png`, plus `viewport-390x844-*.png` and `viewport-900x506-title-r7.png`. The broader
-scratch study remains local and intentionally ignored under
+`first-fight-r7.png`, `acheron-shore-r7.png`, plus `viewport-390x844-*.png` and
+`viewport-900x506-title-r7.png`. The broader scratch study remains local and intentionally ignored under
 `shots/attended/`:
 
 - `first-minute/` and `keyboard-route/`: title, Settings, Credits, descent beats, rack, first fight,
@@ -73,6 +73,10 @@ budget and retains a concentrated focal peak. UI panels remain legible at the te
 keyboard input reaches the first fight, and reduced motion snaps the descent instead of animating it.
 At 390×844 and 900×506, the sampled sky values now remain continuous across every target boundary;
 the tracked portrait frames preserve the complete title and Bardo rather than clipping either.
+At Acheron, the lower fight lane now reads as one silt lip over a two-tile water body; the same-solid
+test proves this is geographic dress rather than hidden collision, and its exact exhibit is
+byte-identical across independent boots at SHA-256
+`e3a4b425ab34c35545beb70b2038b936f75f3ee49e5103a75233c9ecfbddc9ff`.
 
 Subjective questions left deliberately open: whether the causeway has the desired emotional weight,
 whether the Veteran relic is poignant rather than merely legible, whether combat reads as satisfying

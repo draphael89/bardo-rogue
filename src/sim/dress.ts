@@ -25,7 +25,11 @@ function prop(a: Arena, c: number, r: number, tile: number): void {
 
 function dressAcheron(a: Arena): void {
   // Horizontal silt line — a shore you cannot quite leave.
-  for (let c = 2; c <= 23; c++) stamp(a, c, 12, T.silt)
+  for (let c = 2; c <= 23; c++) stamp(a, c, 11, T.silt)
+  for (let c = 3; c <= 22; c++) {
+    stamp(a, c, 12, T.water)
+    stamp(a, c, 13, T.water)
+  }
   stamp(a, 3, 11, T.reed)
   stamp(a, 4, 11, T.reed)
   // North door as a river mouth: water under the threshold, not a temple pediment.

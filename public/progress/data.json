@@ -1,10 +1,14 @@
 {
   "title": "Bardo Rogue",
   "subtitle": "First Gate: rooms-as-data, a generated route, a town that remembers",
-  "updated": "2026-08-30T03:54:00-04:00",
+  "updated": "2026-08-30T03:57:00-04:00",
   "now": "exact-head-closeout",
   "round": 7,
   "timeline": [
+    {
+      "t": "03:57",
+      "text": "Acheron finally meets the player as a shore. The room already promised a horizontal silt line, but it sat at the bottom edge and read as another strip of masonry. The lip now moves one row inward and the lower two rows become dark water, putting the player at the boundary without touching the fight circle, adding a prop, or changing collision. A same-solids test and exact overlay assertions hold the contract; independent deterministic exhibits are byte-identical. An ImageGen overpaint supplied the large-value premise but its ornate pixels, enlarged UI, and Hades-adjacent richness were rejected and remain reference-only."
+    },
     {
       "t": "03:54",
       "text": "The fixed-clock screenshot claim failed a fresh five-run challenge: the first-fight PNG alternated between two hashes even though sim tick and visible time matched. The cause was an uncontrolled number of zero-time boot renders consuming the seeded FX streams. The evidence lane now swallows rAF before boot and drives the production render hook itself in fixed quanta. Five first-fight boots, three title boots, two Bardo arrivals, and two captures at each of four descent phases are byte-identical within their cases. All tracked visual evidence and its hashes were regenerated; the older title and fight hashes are explicitly invalidated rather than preserved as metric theater."

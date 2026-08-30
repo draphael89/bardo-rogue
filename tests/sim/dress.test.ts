@@ -55,6 +55,12 @@ describe('first-gate dress', () => {
     expect(overlayKeys(minos)).not.toBe(overlayKeys(acheron))
     expect(overlayKeys(minosEast)).not.toBe(overlayKeys(minos))
     expect(overlayKeys(minosEast)).not.toBe(overlayKeys(acheron))
+    // Acheron meets the player as an actual shore: one silt lip, then a two-tile water body.
+    // These are overlays only; the shared-solid assertions above prove the river does not become
+    // invisible collision or steal the lower fight lane.
+    expect(acheron.overlay[11 * acheron.cols + 13]).toBe(T.silt)
+    expect(acheron.overlay[12 * acheron.cols + 13]).toBe(T.water)
+    expect(acheron.overlay[13 * acheron.cols + 13]).toBe(T.water)
     expect(acheron.props.some(p => p.tile === PROP.reed)).toBe(true)
     expect(styx.props.some(p => p.tile === PROP.reed)).toBe(false)
     expect(styx.props.some(p => p.tile === PROP.shard)).toBe(true)

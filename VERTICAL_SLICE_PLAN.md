@@ -38,7 +38,9 @@ dagger compile established that shared fit is a long-weapon decision, not an eas
 lock. The arrival causeway now stages a warm Keeper light against cold abandoned braziers, damp pier
 stone, and a numen lantern; a code-authored fallen Veteran relic replaces the generic ossuary on the
 same already-solid cell. The relic stays within the canonical palette, binary-alpha, and colour-cap
-contracts, while ImageGen studies remain reference-only. Look and Fun remain human gates. The
+contracts, while ImageGen studies remain reference-only. Acheron's lower lane now resolves the
+art bible's promised shore as one silt lip over a two-tile dark-water body without changing any
+solid. Look and Fun remain human gates. The
 letterbox and target sky now enter the shared frame grade from identical authored colours; exact
 390×844 and 900×506 probes keep all four target boundaries continuous. The attended evidence and
 exact-head ledger are recorded in `MORNING_REPORT.md`.

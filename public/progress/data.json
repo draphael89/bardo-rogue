@@ -1,10 +1,14 @@
 {
   "title": "Bardo Rogue",
   "subtitle": "First Gate: rooms-as-data, a generated route, a town that remembers",
-  "updated": "2026-08-30T03:42:00-04:00",
+  "updated": "2026-08-30T03:54:00-04:00",
   "now": "exact-head-closeout",
   "round": 7,
   "timeline": [
+    {
+      "t": "03:54",
+      "text": "The fixed-clock screenshot claim failed a fresh five-run challenge: the first-fight PNG alternated between two hashes even though sim tick and visible time matched. The cause was an uncontrolled number of zero-time boot renders consuming the seeded FX streams. The evidence lane now swallows rAF before boot and drives the production render hook itself in fixed quanta. Five first-fight boots, three title boots, two Bardo arrivals, and two captures at each of four descent phases are byte-identical within their cases. All tracked visual evidence and its hashes were regenerated; the older title and fight hashes are explicitly invalidated rather than preserved as metric theater."
+    },
     {
       "t": "03:42",
       "text": "A deterministic portrait probe overturned the source-level answer for the letterbox seam. At 390x844 the old gutters resolved to (0,0,2) beside a (0,0,4) target sky: pre-darkening only the screen-space bars was not equivalent to lighting the world. The gutters and target now begin with the same authored void and star colours before the shared frame grade. Every sampled boundary matches at 390x844 and 900x506, three representative viewport frames are tracked, the screenshot harness accepts exact custom viewport pairs, and a focused regression test forbids gutter-only ambient colours. The full suite is 910/910. This is runtime proof of continuity, not a user Look verdict."

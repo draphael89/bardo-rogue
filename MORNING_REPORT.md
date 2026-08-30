@@ -94,8 +94,14 @@ user-only gates.** No agent or automated play awarded them.
 | Shipping sprite gates | 78/3 waived general, 144/2 hero, 144/4 north, 40/1 north roll, 145/2 south, 40/1 south roll; zero blocking |
 | Candidate stress | `pnpm art:stress-hero` green for dagger and heavy; candidate-only |
 | Desktop | `pnpm desktop:build` green; isolated `pnpm smoke:desktop` green across 23 checks and 6 launches |
-| Deterministic visual evidence | `pnpm shot ... --visualMs N`; independent title boots at 500 ms are byte-identical, SHA-256 `096aca3759cd68606d6b7790d21fc66b99a6cde2028b7c0fdd172e5a92e2eed9`. Pinned replay tick 400 + visual 500 ms is also byte-identical, SHA-256 `779fa78980069598578d8e576f9add48436a1ec4bf90256669c384cba5cf5e70` |
-| Viewport boundary evidence | 390×844 title SHA-256 `3721831ba14f59bfa6a46d6f8435fbfb42bbe1e8d6226346ddce8a403d33cca7`; 390×844 game `92ed8a7fba19dd4b718344f244bd0ac8950ae1b96f42f47525110a6d576fea14`; 900×506 title `349ac697545425a862b4ce879eacc3c4f680cab59c2eb1d651eb5df32aa332c7` |
+| Deterministic visual evidence | `pnpm shot ... --visualMs N` owns every render from before boot. Five independent pinned-replay captures at tick 400 + visual 500 ms are byte-identical, SHA-256 `abebb71e7b498e456847a8596f3f091e44234df6ca6877cb4841ff5501a78063`; three title boots are byte-identical at `c1318840345230773edac472c8d31e25f78f4ce3b719954c83a85075abfc4bb4`; two independent captures match at each of the four descent phases. |
+| Viewport boundary evidence | 390×844 title SHA-256 `ed3d89b4a1a7225ce1100589116c275c75575a0593648811d3066cd01fc9b8d1`; 390×844 game `ebcc7c8c21b34bdd12d1ce29f1439aa953f863a8efc15f8d492e6d5659fd3969`; 900×506 title `becb27e095f6a2f2b0e3c4348b3de7344fc90e81e4e510c0d30ecd39855c7446` |
+
+The first fixed-clock capture implementation was not sufficient. A fresh five-run probe found two
+alternating first-fight hashes: an uncontrolled number of zero-time boot renders still consumed the
+seeded FX streams. The evidence lane now swallows rAF before boot and invokes the production render
+hook itself in fixed quanta. The older `096aca...` / `779fa...` screenshot hashes are invalidated;
+the hashes above are the clean-room replacements. This is a tooling correction, not a visual change.
 
 The first desktop smoke observed one banner-timing failure on the import-durability assertion
 (`ROOM CLEARED` replaced the expected acknowledgement). An isolated rerun passed the same durable

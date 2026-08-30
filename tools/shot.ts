@@ -41,18 +41,19 @@ mkdirSync('shots', { recursive: true })
 const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] })
 const page = await browser.newPage({ viewport: { width: viewWidth, height: viewHeight }, deviceScaleFactor: 1 })
 if (visualMs !== null) {
-  // The ordinary lane observes the living game. The evidence lane instead starts every render-only
-  // clock at zero and advances it below in fixed quanta. Pausing only the simulation is insufficient:
-  // atmosphere, lighting, idle poses and the title descent deliberately run on presentation time,
-  // so two boots otherwise capture different frames despite identical world ticks.
+  // The ordinary lane observes the living game. The evidence lane owns EVERY render. Merely replacing
+  // performance.now() is insufficient: a variable number of zero-dt boot frames still consumes the
+  // seeded FX streams, producing two alternating screenshots at the same sim tick and visible time.
+  // Swallow rAF before boot, then drive the real Loop render hook below with one fixed frame sequence.
   // A string is intentional. tsx decorates serialised functions with an out-of-scope `__name`
-  // helper; the page then errors before the clock override installs.
+  // helper; the page then errors before these overrides install.
   await page.addInitScript(`{
     let captureNow = 0;
-    const liveRaf = window.requestAnimationFrame.bind(window);
     Object.defineProperty(performance, 'now', { configurable: true, value: () => captureNow });
     window.__captureSetTime = ms => { captureNow = ms; };
-    window.requestAnimationFrame = callback => liveRaf(() => callback(captureNow));
+    window.__captureRafQueue = [];
+    window.requestAnimationFrame = callback => { window.__captureRafQueue.push(callback); return window.__captureRafQueue.length; };
+    window.cancelAnimationFrame = () => {};
   }`)
 }
 const errors: string[] = []
@@ -62,22 +63,42 @@ page.on('pageerror', e => errors.push('pageerror: ' + e.message))
 // reducedEffects would cap flashes and camera movement in every shot). Pass --save on to opt out.
 const save = args.save === 'on' ? '' : '&save=off'
 await page.goto(`${url}/?scenario=${scenario}&seed=${seed}&debug=${debug}&mute=${mute}${save}${bot ? `&bot=${bot}` : ''}`)
-await page.waitForFunction(() => !!(window as unknown as { __game?: unknown }).__game, null, { timeout: 15000 })
+await page.waitForFunction(() => !!(window as unknown as { __game?: unknown }).__game, null, {
+  timeout: 15000,
+  ...(visualMs !== null ? { polling: 50 } : {}), // rAF polling cannot wake when the evidence lane owns rAF
+})
 if (visualMs === null) await page.waitForTimeout(400)
 
+if (visualMs !== null) {
+  await page.evaluate(() => {
+    const g = (window as any).__game
+    const hooks = (g.loop as any).hooks
+    if (typeof hooks?.render !== 'function') throw new Error('shot: Loop.hooks.render is unreachable; update the deterministic capture lane')
+    g.pause(true)
+    g.loop.stop()
+    ;(window as any).__captureRender = (dtMs: number) => hooks.render(1, dtMs / 1000)
+  })
+}
+
 const advanceVisualClock = async (targetMs: number) => {
+  if (targetMs === 0) {
+    await page.evaluate(() => (window as any).__captureRender(0))
+    return
+  }
   for (let now = 0; now < targetMs;) {
-    now = Math.min(targetMs, now + 50)
-    const before = await page.evaluate(() => (window as any).__game.loop.frameTimes.length)
-    await page.evaluate(ms => (window as typeof window & { __captureSetTime(ms: number): void }).__captureSetTime(ms), now)
-    await page.waitForFunction(n => (window as any).__game.loop.frameTimes.length > n, before, { timeout: 10000 })
+    const next = Math.min(targetMs, now + 50)
+    await page.evaluate(({ next, dt }) => {
+      ;(window as any).__captureSetTime(next)
+      ;(window as any).__captureRender(dt)
+    }, { next, dt: next - now })
+    now = next
   }
 }
 
-if (stepwise) {
+if (stepwise || visualMs !== null) {
   // deterministic: pause the loop and step the sim by hand, then render one frame
   await page.evaluate(({ n, r }) => { const g = (window as any).__game; g.pause(true); if (r) g.replay(r); g.step(n) }, { n: ticks, r: replay })
-  await page.waitForTimeout(100)
+  if (visualMs === null) await page.waitForTimeout(100)
 } else {
   // the loop may step up to 5 ticks per frame, so the reported tick can overshoot by a few
   if (replay) await page.evaluate((r) => (window as any).__game.replay(r), replay)
@@ -89,9 +110,12 @@ if (visualMs !== null) await advanceVisualClock(visualMs)
 else if (waitMs) await page.waitForTimeout(waitMs)
 if (postEvalJs) await page.evaluate((js) => { new Function(js)() }, postEvalJs)
 if (postWaitMs) await page.waitForTimeout(postWaitMs)
-// headless rAF can be slow; make sure at least two frames rendered after the last sim change
-const f0 = await page.evaluate(() => (window as any).__game.loop.frameTimes.length)
-await page.waitForFunction((n) => (window as any).__game.loop.frameTimes.length >= n + 2, f0, { timeout: 10000 })
+if (visualMs !== null && postEvalJs) await page.evaluate(() => (window as any).__captureRender(0))
+if (visualMs === null) {
+  // headless rAF can be slow; make sure at least two frames rendered after the last sim change
+  const f0 = await page.evaluate(() => (window as any).__game.loop.frameTimes.length)
+  await page.waitForFunction((n) => (window as any).__game.loop.frameTimes.length >= n + 2, f0, { timeout: 10000 })
+}
 const state = await page.evaluate(() => (window as any).__game.state())
 const stats = await page.evaluate(() => (window as any).__game.frameStats())
 const extra = await page.evaluate(() => (window as any).__out ?? null)

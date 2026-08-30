@@ -1,10 +1,14 @@
 {
   "title": "Bardo Rogue",
   "subtitle": "First Gate: rooms-as-data, a generated route, a town that remembers",
-  "updated": "2026-08-30T03:29:51-04:00",
+  "updated": "2026-08-30T03:42:00-04:00",
   "now": "exact-head-closeout",
   "round": 7,
   "timeline": [
+    {
+      "t": "03:42",
+      "text": "A deterministic portrait probe overturned the source-level answer for the letterbox seam. At 390x844 the old gutters resolved to (0,0,2) beside a (0,0,4) target sky: pre-darkening only the screen-space bars was not equivalent to lighting the world. The gutters and target now begin with the same authored void and star colours before the shared frame grade. Every sampled boundary matches at 390x844 and 900x506, three representative viewport frames are tracked, the screenshot harness accepts exact custom viewport pairs, and a focused regression test forbids gutter-only ambient colours. The full suite is 910/910. This is runtime proof of continuity, not a user Look verdict."
+    },
     {
       "t": "03:29",
       "text": "The evidence now obeys the same determinism discipline as the simulation. The ordinary screenshot harness let atmosphere, lighting, idle poses, and the title descent advance by however many live frames happened before capture, so two tick-zero PNGs were not byte-identical. A narrow --visualMs lane freezes browser time at boot and advances it in fixed 50 ms quanta. Independent title boots pinned at 500 ms now produce the same SHA-256; pinning replay tick 400 and visual time 500 ms does the same for the active first fight. The exact title, arrival, four descent phases, and first-fight teaching frame are tracked in the progress gallery instead of living only in ignored scratch shots."

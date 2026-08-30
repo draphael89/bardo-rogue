@@ -30,7 +30,7 @@ negative-space loss, composite-size drift, value-budget drift, and top-one-perce
 the Bardo Gate visible, with compact Settings/Credits steles and one guarded, reduced-motion-aware
 Gate-to-player descent. The Gate gained render-only architectural mass; collision and replay state
 remain untouched. Live cancellation proof survives beyond the old completion time, the room gate is
-green, and the suite is 909/909. The locked Veteran rig now also carries dagger-specific attack
+green, and the suite is 910/910. The locked Veteran rig now also carries dagger-specific attack
 grammar and silhouette-changing heavy armor: 42 frames each, three facings, computed registration,
 1,062 total real gates with zero blocking, and committed 1×/black-test exhibits. The failed first
 dagger compile established that shared fit is a long-weapon decision, not an east-facing default.
@@ -39,7 +39,9 @@ lock. The arrival causeway now stages a warm Keeper light against cold abandoned
 stone, and a numen lantern; a code-authored fallen Veteran relic replaces the generic ossuary on the
 same already-solid cell. The relic stays within the canonical palette, binary-alpha, and colour-cap
 contracts, while ImageGen studies remain reference-only. Look and Fun remain human gates. The
-attended evidence and exact-head ledger are recorded in `MORNING_REPORT.md`.
+letterbox and target sky now enter the shared frame grade from identical authored colours; exact
+390×844 and 900×506 probes keep all four target boundaries continuous. The attended evidence and
+exact-head ledger are recorded in `MORNING_REPORT.md`.
 
 The sections below are the plan as written. This block records what was executed against it, so the
 document does not become the next stale audit. Tests: **275 passing**; `pnpm matrix` 100/100 seeds

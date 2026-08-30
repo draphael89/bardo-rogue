@@ -26,8 +26,11 @@ its original 16px logical grid.
 
 ## The three inherited polish gaps
 
-1. **Letterbox stars:** closed. `src/render/starfield.ts` applies `ambientRest()` to the stars, so the
-   letterbox edge no longer reveals a separate untreated sky layer.
+1. **Letterbox stars:** closed after a runtime correction. A deterministic 390×844 probe disproved
+   the earlier source-level answer: the bars resolved to `(0,0,2)` beside a `(0,0,4)` target sky.
+   `src/render/starfield.ts` now starts both surfaces from the same authored void and star colours
+   before the shared frame grade. All four tested boundaries resolve to `(0,0,4)` at 390×844 and
+   900×506; `tests/render/starfield.test.ts` guards against reintroducing a gutter-only ambient pass.
 2. **East-door `-4`:** closed. `doorEnterInset: 4` lives in `src/tuning.ts` and `src/sim/rooms.ts`
    reads the tuning value; there is no unexplained orientation-only literal.
 3. **Pinned rewritten-Bardo replay:** closed. `replays/slice-kite-loop-s7.json` is pinned in
@@ -49,9 +52,10 @@ pipeline and silhouette constraints, not the final identity or Look.
 
 ## Attended observations
 
-The curated exact-head title, arrival, descent, and first-fight frames are tracked in
+The curated exact-head title, arrival, descent, first-fight, and viewport frames are tracked in
 `public/progress/shots/` as `title-menu.png`, `bardo-arrival-r7.png`, `descent-r7-*.png`, and
-`first-fight-r7.png`. The broader scratch study remains local and intentionally ignored under
+`first-fight-r7.png`, plus `viewport-390x844-*.png` and `viewport-900x506-title-r7.png`. The broader
+scratch study remains local and intentionally ignored under
 `shots/attended/`:
 
 - `first-minute/` and `keyboard-route/`: title, Settings, Credits, descent beats, rack, first fight,
@@ -67,6 +71,8 @@ Objective observations: the causeway centre now measures roughly twice the perim
 four Bardo islands retain 82.6%–95.2% negative space; the Bardo frame remains below the highlight
 budget and retains a concentrated focal peak. UI panels remain legible at the tested sizes, real
 keyboard input reaches the first fight, and reduced motion snaps the descent instead of animating it.
+At 390×844 and 900×506, the sampled sky values now remain continuous across every target boundary;
+the tracked portrait frames preserve the complete title and Bardo rather than clipping either.
 
 Subjective questions left deliberately open: whether the causeway has the desired emotional weight,
 whether the Veteran relic is poignant rather than merely legible, whether combat reads as satisfying
@@ -78,7 +84,7 @@ user-only gates.** No agent or automated play awarded them.
 | Lane | Result |
 |---|---|
 | Typecheck | `pnpm typecheck` green |
-| Full suite | `pnpm test` — 76 files, 909 tests green |
+| Full suite | `pnpm test` — 77 files, 910 tests green |
 | Loop matrices | `pnpm matrix` — kite 100/100 resolved, 79 wins; naive 100/100 resolved, 0 wins |
 | Pinned replay | `slice-kite-loop-s7.json` hash `1142161593`, won |
 | Web package | `pnpm build` green; shipped 2.110 MB vs 4.096 MB budget, 174 files |
@@ -89,6 +95,7 @@ user-only gates.** No agent or automated play awarded them.
 | Candidate stress | `pnpm art:stress-hero` green for dagger and heavy; candidate-only |
 | Desktop | `pnpm desktop:build` green; isolated `pnpm smoke:desktop` green across 23 checks and 6 launches |
 | Deterministic visual evidence | `pnpm shot ... --visualMs N`; independent title boots at 500 ms are byte-identical, SHA-256 `096aca3759cd68606d6b7790d21fc66b99a6cde2028b7c0fdd172e5a92e2eed9`. Pinned replay tick 400 + visual 500 ms is also byte-identical, SHA-256 `779fa78980069598578d8e576f9add48436a1ec4bf90256669c384cba5cf5e70` |
+| Viewport boundary evidence | 390×844 title SHA-256 `3721831ba14f59bfa6a46d6f8435fbfb42bbe1e8d6226346ddce8a403d33cca7`; 390×844 game `92ed8a7fba19dd4b718344f244bd0ac8950ae1b96f42f47525110a6d576fea14`; 900×506 title `349ac697545425a862b4ce879eacc3c4f680cab59c2eb1d651eb5df32aa332c7` |
 
 The first desktop smoke observed one banner-timing failure on the import-durability assertion
 (`ROOM CLEARED` replaced the expected acknowledgement). An isolated rerun passed the same durable

@@ -58,27 +58,16 @@ export function drawVoidUnderlay(g: Graphics, roomRect: { x: number; y: number; 
  * the target grid (each star is one target pixel, `s` CSS px square), so the frame edge is
  * invisible in the sky.
  */
-// The letterbox lies outside the render target, so the lightmap's resting ambient multiply
-// (lerp(1, tint/255, ambientDarkness) per channel) never reaches it. Bake that factor into the
-// letterbox's own colors so a star 1px outside the frame edge matches one 1px inside. The canonical
-// indigo stands in for per-room presets, and the death fade still diverges in the bars — accepted:
-// the bars sit outside the grade of attention, and the resting mismatch was the visible artifact.
-function ambientRest(c: number): number {
-  const L = tuning.juice.light
-  let out = 0
-  for (const sh of [16, 8, 0]) {
-    const ch = (c >> sh) & 255, ach = (L.ambientTint >> sh) & 255
-    out |= Math.round(ch * (1 - L.ambientDarkness + (ach / 255) * L.ambientDarkness)) << sh
-  }
-  return out
-}
-
 export function drawLetterboxVoid(g: Graphics, canvasW: number, canvasH: number, frameX: number, frameY: number, s: number): void {
   const { width, height } = tuning.view
   g.clear()
   // Four gutter rects around the screen sprite, never a full-canvas quad: the sprite overdraws
   // the middle completely, so painting it here was dead fill (7.5MPx per frame at 16:9, 2x DPR).
-  const fill = ambientRest(VOID_BLACK)
+  // The screen-space underlay is not a child of the lit world. Applying the world's resting
+  // ambient a second time only to the gutters made the actual frame edge measurable: the portrait
+  // target resolved its sky to (0,0,4) after the shared grade while the bars resolved to (0,0,2).
+  // Both surfaces enter the shared frame grade from the same authored void instead.
+  const fill = VOID_BLACK
   const fw = width * s, fh = height * s
   const x1 = frameX + fw, y1 = frameY + fh
   if (frameY > 0) g.rect(0, 0, canvasW, frameY).fill({ color: fill, alpha: 1 })
@@ -87,6 +76,6 @@ export function drawLetterboxVoid(g: Graphics, canvasW: number, canvasH: number,
   if (x1 < canvasW) g.rect(x1, frameY, canvasW - x1, fh).fill({ color: fill, alpha: 1 })
   eachStar(-frameX / s, -frameY / s, (canvasW - frameX) / s, (canvasH - frameY) / s, (x, y, color) => {
     if (x >= 0 && y >= 0 && x < width && y < height) return   // under the target's own sky
-    g.rect(frameX + x * s, frameY + y * s, s, s).fill({ color: ambientRest(color), alpha: 1 })
+    g.rect(frameX + x * s, frameY + y * s, s, s).fill({ color, alpha: 1 })
   })
 }

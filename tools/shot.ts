@@ -3,6 +3,7 @@
 //        pnpm shot -- --replay replays/naive-wave1-s3.json --ticks 300 --stepwise 1   (replay sets its own seed/scenario)
 //        pnpm shot -- --scenario loop --ticks 0 --oneX 1 --visualMs 0               (byte-stable presentation clock)
 //        pnpm shot -- --replay replays/run.json --ticks 400 --stepwise 1 --visualMs 500 (pin both clocks)
+//        pnpm shot -- --scenario loop --width 390 --height 844 --visualMs 500        (viewport proof)
 import { chromium } from '@playwright/test'
 import { mkdirSync, readFileSync } from 'node:fs'
 import sharp from 'sharp'
@@ -19,6 +20,9 @@ const stepwise = args.stepwise === '1'
 // A page screenshot at the harness's usual 1920x1080 viewport is a 3x enlargement of the
 // 640x360 target. `--oneX 1` is the art-review lane: one PNG pixel is one target pixel.
 const oneX = args.oneX === '1'
+const customViewport = args.width !== undefined || args.height !== undefined
+const viewWidth = +(args.width ?? (oneX ? 640 : 1920))
+const viewHeight = +(args.height ?? (oneX ? 360 : 1080))
 const mute = args.mute ?? '1'
 const evalJs = args.eval ?? ''  // JS run in the page before the screenshot, e.g. "__game.setInput({attack:true,aimX:1}); __game.step(8)"
 const press = args.press ?? ''
@@ -29,10 +33,13 @@ const postWaitMs = Math.max(0, +(args.postWaitMs ?? 0))
 const replay = args.replay ? JSON.parse(readFileSync(args.replay, 'utf8')) : null
 if (visualMs !== null && (!Number.isFinite(visualMs) || visualMs < 0)) throw new Error('--visualMs must be a non-negative number')
 if (visualMs !== null && waitMs) throw new Error('--visualMs replaces --waitMs')
+if (customViewport && (args.width === undefined || args.height === undefined)) throw new Error('--width and --height must be supplied together')
+if (!Number.isInteger(viewWidth) || !Number.isInteger(viewHeight) || viewWidth < 1 || viewHeight < 1) throw new Error('--width and --height must be positive integers')
+if (oneX && customViewport) throw new Error('--oneX already fixes the viewport at 640x360')
 mkdirSync('shots', { recursive: true })
 
 const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] })
-const page = await browser.newPage({ viewport: oneX ? { width: 640, height: 360 } : { width: 1920, height: 1080 }, deviceScaleFactor: 1 })
+const page = await browser.newPage({ viewport: { width: viewWidth, height: viewHeight }, deviceScaleFactor: 1 })
 if (visualMs !== null) {
   // The ordinary lane observes the living game. The evidence lane instead starts every render-only
   // clock at zero and advances it below in fixed quanta. Pausing only the simulation is insufficient:

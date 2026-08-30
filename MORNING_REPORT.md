@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-30
 **Branch:** `codex/bardo-first-sixty-seconds`
-**Recorded proof head before the final report updates:** `7c4384d9a921d4cf2f1a704884de2939e578cbe5`
+**Recorded proof head before the final report updates:** `8306cc45b172e733a31828b0165c8d9a957f4117`
 **Reconciled main:** `2b82d61c9103a34b9abdc535afe165efbad4f630`
 
 The branch now delivers a coherent first minute: the title belongs to the Bardo Gate; DESCEND makes
@@ -44,6 +44,8 @@ its original 16px logical grid.
   render roots are reused, bounding room-rebuild resources under a 200-descent browser soak.
 - `7c4384d` — the viewport gate first observes the exact resized target and only then accepts two
   rendered frames, closing a stale-wide-frame race exposed by concurrent proof lanes.
+- `8306cc4` — damage-number pop scales now preserve the world parent's counter-scale, completing a
+  latent pixel-type finding from the Claude sweep at exact 2× → 1× target-pixel sizes.
 
 ## The three inherited polish gaps
 
@@ -142,20 +144,21 @@ user-only gates.** No agent or automated play awarded them.
 | Lane | Result |
 |---|---|
 | Typecheck | `pnpm typecheck` green |
-| Full suite | `pnpm test` — 78 files, 914 tests green |
-| Loop matrices | Exact-current production-input `pnpm matrix` — kite 100/100 resolved, 78 wins; naive 100/100 resolved, 0 wins. The earlier extended 1–1,000 pass on the same pinned simulation resolves 1,000/1,000 for both policies, with 806 skilled wins and zero mash wins |
+| Full suite | `pnpm test` — 79 files, 916 tests green |
+| Loop matrices | Exact-current production-input `pnpm matrix` — kite 100/100 resolved, 78 wins; naive 100/100 resolved, 0 wins. The extended exact-current 1–10,000 pass resolves 10,000/10,000 for both policies, with 7,917 skilled wins (79%) and zero mash wins; no seed stranded or returned unresolved across 20,000 attempts |
 | Pinned replay | `slice-kite-loop-s7.json` hash `1142161593`, won |
 | Web package | `pnpm build` green; shipped 2.110 MB vs 4.096 MB budget, 174 files |
 | Browser smoke | `pnpm smoke -- --url http://localhost:5201 --seed N` green with real keyboard and both endings on all six production route families: first-gate seed 1, Ash March seed 2, field-fork seed 4, late-shop seed 8, Styx Gate seed 10, and Fire Ford seed 31. A broader production-input soak passed 94 distinct compatible seed pairs (188 full runs) through hub, toll where present, offer, boss/victory or death, and return with zero browser errors. Toll rendering is required only on routes that actually reach the Landing; early deaths and bankless spines no longer create a false failure |
-| Viewport transitions | `pnpm smoke:viewport -- --url http://localhost:5201` green through 640×360 → 1400×600 → 390×844 → 1920×700 → 900×506 → 640×360 across title menu/Settings/Credits, game HUD, and pause menu/Settings; target and UI bounds remain contained, tick stays 0. Two complete gates also passed concurrently after the gate began requiring the resized target before counting its two proof frames |
+| Viewport transitions | `pnpm smoke:viewport -- --url http://localhost:5201` green through 640×360 → 1400×600 → 390×844 → 1920×700 → 900×506 → 640×360 across title menu/Settings/Credits, game HUD, and pause menu/Settings; target and UI bounds remain contained, tick stays 0. Two complete gates also passed concurrently after the gate began requiring the resized target before counting its two proof frames. An additional exact-head challenge passed 120 title/game/pause transitions over 40 sizes from 180×120 and 1280×240 to 3440×1440, plus 96 transitions over the representative set at DPR 2 and 3, with no bounds, tick, target, or page errors; this remains routing proof, not a comfort claim at tiny sizes |
 | Room art | `pnpm room:gate` owns every render and is green across the fresh pre-run Bardo plus all 12 production route layouts, including the named Styx and Phlegethon nodes, dimensions, alpha, palette, material spans, negative space, value, highlights, focality, and browser errors; two complete outputs are byte-identical at SHA-256 `4464422c2d45fdd404d0ac49c3d645a6e4c971720c5413750e23a2549a8d4884` |
 | Realm separation | `pnpm realm-air -- --url http://localhost:5201 --seed N` installs the real seeded route before measuring it and owns every render. Exact repeat pairs are byte-identical for first-gate seed 1 (`ff8533e3…`, median 11.31), Fire Ford seed 31 (`9cb35419…`, 10.61), and Styx Gate seed 10 (`2bc3a662…`, 10.79); zero skipped rooms, browser errors, or temperature violations. No arbitrary pass threshold invented |
 | Regeneration | `pnpm palette`, `pnpm assets`, and `pnpm tiles` deterministic; the 192×288 room sheet and 192×192 prop sheet regenerate byte-identically with no unexplained drift |
 | Shipping sprite gates | 78/3 waived general, 144/2 hero, 144/4 north, 40/1 north roll, 145/2 south, 40/1 south roll; zero blocking |
 | Candidate stress | `pnpm art:stress-hero` green for dagger and heavy; all four regenerated 1×/black-test artifacts byte-identical to committed exhibits; candidate-only, with in-game motion and user Look still open |
 | Desktop | Exact current `pnpm desktop:build` and `pnpm smoke:desktop` are green across 23 checks and 6 launches. After correcting the import gate's cross-process observation race, 30 consecutive complete smokes (180 launches) passed with no recurrence |
-| Performance | Exact-current SwiftShader Warden probe: render p50 0.8 ms / p95 1.5 ms / p99 3.8 ms / max 9.4 ms, with the repeated sim hash identical. The earlier synthetic 32-enemy + 64-projectile render stress measured p50 24–25 ms / p95 31–32 ms with render-only hash unchanged. Pinned replay and dense sim each repeated 100× with stable hashes; stress figures are not a native-GPU or Fun claim |
-| Renderer longevity | A fresh page completed 200 full production descents (737,106 ticks; 159 wins / 41 losses) with periodic real Pixi draws and zero browser errors. Forced-GC heap finished at 36.5 MB instead of the pre-fix 1.23 GB; live Graphics contexts stayed at 27, live texture sources at 145, batch roots at 6, and Pixi visibly compacted its Graphics tombstone registry from 10,998 keys to 1,228. The lifecycle regression locks explicit child-context teardown and reused offscreen roots |
+| Performance | Exact-current SwiftShader Warden probe: render p50 0.8 ms / p95 1.5 ms / p99 3.8 ms / max 9.4 ms, with the repeated sim hash identical. A separate 240-frame comparison at DPR 1/2/3 kept the exact same sim hash and p95 at 1.5/1.6/1.6 ms; isolated software-renderer maxima rose to 68.9/167.8/326.7 ms and are recorded rather than hidden by the percentiles. The earlier synthetic 32-enemy + 64-projectile render stress measured p50 24–25 ms / p95 31–32 ms with render-only hash unchanged. Pinned replay and dense sim each repeated 100× with stable hashes; stress figures are not a native-GPU or Fun claim |
+| Renderer longevity | One fresh page and persistent Pixi renderer completed 5,000 full production descents (18,313,112 ticks; 4,021 wins / 979 losses), with a real draw after every return and zero browser errors. After the first 1,000-run pool warm-up, forced-GC heap moved only 24.2 → 26.9 MB through run 5,000 instead of reaching the pre-fix 1.23 GB after 200 resets; live Graphics contexts stayed at 15, live texture sources at 69, batch roots at 6, and subtextures at 64. Pixi's dead-key registries compacted in cycles. The lifecycle regression locks explicit child-context teardown and reused offscreen roots |
+| Clean remote proof | A fresh clone of the pushed branch at `8306cc45b172e733a31828b0165c8d9a957f4117` passed frozen install, typecheck, 79/916 tests, build/check-build, palette/assets/tiles regeneration, and finished byte-clean against its remote |
 | Deterministic visual evidence | `pnpm shot ... --visualMs N` owns every render from before boot and exits nonzero on page/console errors. Three independent exact-current live-bot captures at seed 7 / tick 400 + visual 500 ms are byte-identical, SHA-256 `b9e4fa9db6383cd281cb4d2cf57317af232167a831a4559cdb54a4279b928f3d`; this player-facing exhibit omits the replay diagnostic while the separate pinned-replay lane retains hash truth. Three title boots are byte-identical at `c1318840345230773edac472c8d31e25f78f4ce3b719954c83a85075abfc4bb4`; two independent captures match at each of the four descent phases. The exact replay strip captures all 12 requested frames at ticks 400–433 and repeats at SHA-256 `e8094445c4233d3427d3cb2f21ee32ff783ec03d2b9b4a0638862685c47b2a27`; the pose atlas captures 35/35 requested states. |
 | Viewport boundary evidence | 390×844 title SHA-256 `ed3d89b4a1a7225ce1100589116c275c75575a0593648811d3066cd01fc9b8d1`; 390×844 game `ebcc7c8c21b34bdd12d1ce29f1439aa953f863a8efc15f8d492e6d5659fd3969`; 900×506 title `becb27e095f6a2f2b0e3c4348b3de7344fc90e81e4e510c0d30ecd39855c7446` |
 
@@ -183,8 +186,8 @@ showing that raw registry-key growth alone is not a texture-leak signal. A deepe
 then disproved the premature broader conclusion: recursive `{ children: true }` teardown was leaving
 owned `GraphicsContext` path/triangulation data alive, and Pixi's batch pipe was retaining one batcher
 for each disposable offscreen render root. Explicit `context: true` teardown plus one persistent tile
-bake root and one persistent decal-clear root cut the same reset slope by roughly 98%; the relevant
-200-descent workload then stabilised as described in the ledger. The evidence kept the texture,
+bake root and one persistent decal-clear root cut the same reset slope by roughly 98%; the extended
+5,000-descent workload then stayed bounded as described in the ledger. The evidence kept the texture,
 Graphics-context, batch-root, and JS-heap claims separate rather than calling one counter the whole result.
 
 ## Custody and release ledger

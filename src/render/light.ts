@@ -1,4 +1,4 @@
-import { Container, RenderTexture, Sprite, Texture, type Renderer } from 'pixi.js'
+import { Container, MaskFilter, RenderTexture, Sprite, Texture, type Renderer } from 'pixi.js'
 import type { RenderApp } from './app'
 import type { Atlas } from './atlas'
 import type { World } from '@/sim/world'
@@ -15,7 +15,8 @@ import { fxRng } from './fxRng'
 // Lights are positioned in WORLD px, but the map itself is VIEW-sized (plus pad) and follows the
 // camera each frame: the render fill per frame is constant regardless of room size (a room-sized
 // map re-rendered the whole 64×36 district every frame), and the multiply covers every visible
-// pixel, so the underlay's stars dim uniformly with no seam where a room-sized map used to end.
+// pixel. The baked room alpha masks that multiply so the screen-space void stays identical to the
+// letterbox instead of acquiring a target-sized lightmap seam.
 export class Lighting {
   private rt: RenderTexture
   private scene = new Container()
@@ -28,6 +29,8 @@ export class Lighting {
   private extraDoors: Array<{ s: Sprite; d: ArenaDoor }> = []
   private player: Sprite
   private out: Sprite
+  private roomMask: Sprite
+  private mask: MaskFilter
   private t = 0
   private flameAcc = 0
   private deathT = 0
@@ -35,7 +38,7 @@ export class Lighting {
   // look-ahead (≤ ~15 world px combined) and the zoom punch, which only ever scales ≥ 1.
   private pad = 32
 
-  constructor(ra: RenderApp, private atlas: Atlas, private particles: Particles, private renderer: Renderer, arena: World['arena']) {
+  constructor(ra: RenderApp, private atlas: Atlas, private particles: Particles, private renderer: Renderer, arena: World['arena'], room: Sprite) {
     const { w, h } = this.rtSize()
     this.rt = RenderTexture.create({ width: w, height: h, scaleMode: 'nearest' })
 
@@ -47,9 +50,20 @@ export class Lighting {
     this.layoutLights(arena)
     this.scene.addChild(this.player)
 
-    this.out = new Sprite(this.rt); this.out.blendMode = 'multiply'
+    this.roomMask = new Sprite(room.texture)
+    this.roomMask.scale.set(room.scale.x, room.scale.y)
+    this.roomMask.position.set(room.position.x, room.position.y)
+    this.roomMask.renderable = false
+    this.out = new Sprite(this.rt)
+    this.mask = new MaskFilter({ sprite: this.roomMask, channel: 'alpha', blendMode: 'multiply', resolution: 'inherit' })
+    this.out.filters = [this.mask]
     this.out.position.set(-this.pad, -this.pad)
-    ra.layers.light.addChild(this.out)
+    ra.layers.light.addChild(this.roomMask, this.out)
+  }
+
+  releaseRoomMask(): void {
+    this.roomMask.texture = Texture.EMPTY
+    this.mask.setSprite(this.roomMask)
   }
 
   // The visible world window plus pad, in world px. tuning.view.width is adaptive (app.ts), so
@@ -62,12 +76,16 @@ export class Lighting {
     }
   }
 
-  rebind(arena: World['arena']): void {
+  rebind(arena: World['arena'], room: Sprite): void {
     const { w, h } = this.rtSize()
     if (this.rt.width !== w || this.rt.height !== h) {
       this.rt.resize(w, h)
       this.base.width = w; this.base.height = h
     }
+    this.roomMask.texture = room.texture
+    this.roomMask.scale.set(room.scale.x, room.scale.y)
+    this.roomMask.position.set(room.position.x, room.position.y)
+    this.mask.setSprite(this.roomMask)
     for (const s of this.braziers) s.destroy()
     for (const c of this.cores) c.s.destroy()
     for (const s of this.windows) s.destroy()

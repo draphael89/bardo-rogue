@@ -26,12 +26,14 @@ const viewHeight = +(args.height ?? (oneX ? 360 : 1080))
 const mute = args.mute ?? '1'
 const evalJs = args.eval ?? ''  // JS run in the page before the screenshot, e.g. "__game.setInput({attack:true,aimX:1}); __game.step(8)"
 const press = args.press ?? ''
-const waitMs = Math.max(0, +(args.waitMs ?? 0))
+const waitMs = +(args.waitMs ?? 0)
 const visualMs = args.visualMs === undefined ? null : +args.visualMs
 const postEvalJs = args.postEval ?? ''
-const postWaitMs = Math.max(0, +(args.postWaitMs ?? 0))
+const postWaitMs = +(args.postWaitMs ?? 0)
 const replay = args.replay ? JSON.parse(readFileSync(args.replay, 'utf8')) : null
+if (!Number.isFinite(waitMs) || waitMs < 0) throw new Error('--waitMs must be a non-negative number')
 if (visualMs !== null && (!Number.isFinite(visualMs) || visualMs < 0)) throw new Error('--visualMs must be a non-negative number')
+if (!Number.isFinite(postWaitMs) || postWaitMs < 0) throw new Error('--postWaitMs must be a non-negative number')
 if (visualMs !== null && waitMs) throw new Error('--visualMs replaces --waitMs')
 if (customViewport && (args.width === undefined || args.height === undefined)) throw new Error('--width and --height must be supplied together')
 if (!Number.isInteger(viewWidth) || !Number.isInteger(viewHeight) || viewWidth < 1 || viewHeight < 1) throw new Error('--width and --height must be positive integers')

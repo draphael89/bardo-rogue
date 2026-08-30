@@ -26,6 +26,7 @@ interface Row {
   ui: Bounds
   tick: number
   titleVisible: boolean
+  pause: { visible: boolean; page: string; labels: string[] } | null
 }
 
 function inside(label: string, bounds: Bounds, width: number, height: number): void {
@@ -51,9 +52,10 @@ async function resize(page: Page, size: { width: number; height: number }, phase
   const row = await page.evaluate((phase): Row => {
     const g = (window as any).__game
     const ra = g.presenter.ra
+    const reward = g.presenter.reward
     const bounds = phase.startsWith('title')
       ? g.presenter.title.root.getBounds()
-      : phase.startsWith('pause') ? g.presenter.reward.root.getBounds() : ra.layers.hud.getBounds()
+      : phase.startsWith('pause') ? reward.root.getBounds() : ra.layers.hud.getBounds()
     return {
       phase,
       viewport: [innerWidth, innerHeight],
@@ -62,6 +64,11 @@ async function resize(page: Page, size: { width: number; height: number }, phase
       ui: { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height },
       tick: g.world.tick,
       titleVisible: g.presenter.title.visible,
+      pause: phase.startsWith('pause') ? {
+        visible: reward.root.visible,
+        page: reward.pausePage,
+        labels: reward.texts.filter((text: any) => text.visible && text.renderable && text.alpha > 0).map((text: any) => String(text.text)),
+      } : null,
     }
   }, phase)
   const [vw, vh] = row.viewport
@@ -72,6 +79,15 @@ async function resize(page: Page, size: { width: number; height: number }, phase
   inside(`${vw}x${vh} ${phase}`, row.ui, tw, th)
   if (row.tick !== 0) throw new Error(`${vw}x${vh}: resize advanced paused world to tick ${row.tick}`)
   if (row.titleVisible !== phase.startsWith('title')) throw new Error(`${vw}x${vh}: wrong title visibility in ${phase} phase`)
+  if (phase.startsWith('pause')) {
+    const expectedPage = phase === 'pause-settings' ? 'settings' : 'menu'
+    const required = expectedPage === 'settings'
+      ? ['BETWEEN BREATHS', 'MASTER', 'MUSIC', 'SOUND', 'FULLSCREEN', 'RISE']
+      : ['BETWEEN BREATHS', 'RISE', 'SETTINGS']
+    if (!row.pause?.visible || row.pause.page !== expectedPage || required.some(label => !row.pause!.labels.includes(label))) {
+      throw new Error(`${vw}x${vh}: ${phase} did not paint its visible ${expectedPage} card: ${JSON.stringify(row.pause)}`)
+    }
+  }
   return row
 }
 

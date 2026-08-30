@@ -143,7 +143,7 @@ export class Presenter {
     // Above the reward overlay in z-order: the title is the one thing that covers everything.
     this.title = new TitleOverlay(L.hud)
     // juice hooks
-    this.lighting = new Lighting(ra, atlas, this.particles, ra.app.renderer, world.arena)
+    this.lighting = new Lighting(ra, atlas, this.particles, ra.app.renderer, world.arena, this.tilemap.sprite)
     this.postfx = new PostFx(ra)
     this.damageNumbers = new DamageNumbers(L.fx)
     this.tilemap.setDoorOpen(world.doorOpen)
@@ -1085,6 +1085,7 @@ export class Presenter {
     // The baked floor is this sprite's own RenderTexture and nobody else's. pixi's plain destroy()
     // keeps it alive (autoGarbageCollect is off), stranding ~2.4MB of GPU floor per room entry.
     // ONLY the tilemap sprite destroys its texture — door and props share atlas textures.
+    this.lighting.releaseRoomMask()
     this.tilemap.sprite.destroy({ texture: true, textureSource: true })
     this.tilemap.door.destroy()
     for (const s of this.propSprites) s.destroy()
@@ -1098,7 +1099,7 @@ export class Presenter {
       L.entities.addChild(s)
     }
     this.particles.bindArena(this.world.arena)
-    this.lighting.rebind(this.world.arena)
+    this.lighting.rebind(this.world.arena, this.tilemap.sprite)
     this.atmosphere.rebind(this.world.arena, this.world.rooms[this.world.roomIndex]?.layout ?? 'threshold')
     this.tilemap.setDoorOpen(this.world.doorOpen)
   }

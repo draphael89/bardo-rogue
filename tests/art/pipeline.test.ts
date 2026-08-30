@@ -386,15 +386,17 @@ describe('code-generated sheets', () => {
       const canonHex = new Set(Object.values(canon().colors).map(c => c.hex))
       const { data } = await sharp(`public/assets/sprites/${name}.png`).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
       const off = new Set<string>()
-      let partial = 0
+      let partial = 0, painted = 0
       for (let i = 0; i < data.length; i += 4) {
         if (data[i + 3] === 0) continue
+        painted++
         if (data[i + 3] < 255) partial++
         const hex = rgbToHex([data[i], data[i + 1], data[i + 2]])
         if (!canonHex.has(hex)) off.add(hex)
       }
       expect([...off], `${name} carries off-palette colour`).toEqual([])
       expect(partial, `${name} has anti-aliased pixels — §2.1 Law 5`).toBe(0)
+      expect(painted, `${name} is fully transparent`).toBeGreaterThan(0)
     })
   }
 })

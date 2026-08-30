@@ -13,7 +13,10 @@ import { Rng } from '../src/sim/rng'
 const argv = process.argv.slice(2)
 const flag = (name: string): string | undefined => {
   const i = argv.indexOf('--' + name)
-  return i < 0 ? undefined : argv[i + 1]
+  if (i < 0) return undefined
+  const value = argv[i + 1]
+  if (!value || value.startsWith('--')) throw new Error(`--${name} requires a value`)
+  return value
 }
 
 interface Check { name: string; pass: boolean; detail: string }
@@ -28,7 +31,7 @@ interface RuntimeRoom {
   display: { width: number; height: number }
   player: { x: number; y: number }
   focal: { x: number; y: number }
-  frame?: { mean: number; highlightShare: number; topOneNearShare: number; topOneNearest: number }
+  frame?: { mean: number; readableShare: number; highlightShare: number; topOneNearShare: number; topOneNearest: number }
 }
 
 const checks: Check[] = []
@@ -41,14 +44,18 @@ async function sourceSheet(file: string, width: number, height: number): Promise
     `${info.width}x${info.height}; required ${width}x${height}`)
   const allowed = new Set(Object.values(canon().colors).map(c => c.hex))
   const off = new Set<string>()
-  let partial = 0
+  let partial = 0, painted = 0
   for (let i = 0; i < data.length; i += 4) {
     const a = data[i + 3]
     if (a !== 0 && a !== 255) partial++
-    if (a && !allowed.has(rgbToHex([data[i], data[i + 1], data[i + 2]]))) off.add(rgbToHex([data[i], data[i + 1], data[i + 2]]))
+    if (a) {
+      painted++
+      if (!allowed.has(rgbToHex([data[i], data[i + 1], data[i + 2]]))) off.add(rgbToHex([data[i], data[i + 1], data[i + 2]]))
+    }
   }
   add(`${file}:binary-alpha`, partial === 0, `${partial} partial-alpha pixels`)
   add(`${file}:canon-palette`, off.size === 0, off.size ? `off-palette ${[...off].join(' ')}` : 'all opaque pixels canonical')
+  add(`${file}:painted-content`, painted > 0, `${painted} non-transparent pixels`)
 }
 
 function tileColorSpan(data: Buffer, tile: number, cols: number, cell: number, sheetWidth: number): number {
@@ -116,6 +123,9 @@ async function frameMetrics(png: Buffer, points: Array<{ x: number; y: number }>
   }
   const values = samples.map(s => s.l).sort((a, b) => a - b)
   const mean = values.reduce((a, b) => a + b, 0) / Math.max(1, values.length)
+  // B1 begins at 0.08 in the canon palette. A real room occupies well over 15% of the playfield in
+  // that band; a missing room with only the player/focal light patch does not.
+  const readableShare = values.filter(v => v >= 0.08).length / Math.max(1, values.length)
   const highlightShare = values.filter(v => v >= 0.70).length / Math.max(1, values.length)
   const cut = percentile(values, 0.99)
   const top = samples.filter(s => s.l >= cut)
@@ -123,6 +133,7 @@ async function frameMetrics(png: Buffer, points: Array<{ x: number; y: number }>
   const topOneNearShare = distances.filter(d => d <= 64).length / Math.max(1, distances.length)
   return {
     mean,
+    readableShare,
     highlightShare,
     topOneNearShare,
     topOneNearest: Math.min(...distances),
@@ -209,6 +220,8 @@ async function runtime(url: string, shotDir?: string): Promise<RuntimeRoom[]> {
       add(`${label}:logical-display`, Math.round(room.display.width) === room.cols * 16 && Math.round(room.display.height) === room.rows * 16,
         `${room.display.width.toFixed(1)}x${room.display.height.toFixed(1)}; required ${room.cols * 16}x${room.rows * 16} (${source})`)
       add(`${label}:frame-mean`, frame.mean <= 0.30, `${frame.mean.toFixed(3)}; ceiling 0.300 (${source})`)
+      add(`${label}:readable-content`, frame.readableShare >= 0.15,
+        `${(frame.readableShare * 100).toFixed(1)}% at B1 or brighter; floor 15.0% (${source})`)
       add(`${label}:highlight-budget`, frame.highlightShare <= 0.035,
         `${(frame.highlightShare * 100).toFixed(2)}%; ceiling 3.50% (${source})`)
       add(`${label}:top-one-focality`, frame.topOneNearest <= 64 && frame.topOneNearShare >= 0.04,
@@ -256,7 +269,8 @@ await sourceSheet('public/assets/sprites/bardo_room.png', 8 * 24, 12 * 24)
 await sourceSheet('public/assets/sprites/bardo_props.png', 4 * 48, 4 * 48)
 await materialSpan()
 negativeSpace(buildArena(new Rng(1), 'bardo'))
-const rooms = flag('url') ? await runtime(flag('url')!, flag('shot-dir')) : []
+const url = flag('url')
+const rooms = url ? await runtime(url, flag('shot-dir')) : []
 const report = { pass: checks.every(c => c.pass), checks, rooms }
 const out = flag('out')
 if (out) { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, JSON.stringify(report, null, 2) + '\n') }

@@ -149,8 +149,13 @@ foundation, will we be grateful we chose it?**
 2. **Pipeline: LOCKED (2026-08-30) — Option A**, a rigged Blender mannequin as the single source
    of truth feeding the existing compile→gates→approve machinery, with pivots/anchors/sockets
    computed from bones (evidence and costing: `docs/CHARACTER_PIPELINE_OPTIONS.md`). The proof
-   spike (idle + run + greatsword arc, three facings, timed proportion-change finale) is the
-   standing verification; PixelLab and gpt-image remain accelerator/set-piece tiers.
+   spike PASSED (2026-08-30, tools committed at `ed8a03e`): the Veteran rig's greatsword arc reads
+   at true scale in three facings, all three sheets clear the real compile (177 gates each, 0
+   blocking, only judged weapon-apex waivers — the Brute's own pattern), and a +10% proportion
+   change re-rendered everything in **52 seconds** against the 5-minute target. Production notes
+   from the spike: deepen the combat crouch to the locked 0.90 factor; move pose truth from
+   Python op-lists into Blender Actions; add IK/grip constraints; declare material→ramp locks.
+   PixelLab and gpt-image remain accelerator/set-piece tiers.
 3. **Stress tests (open):** the Veteran rig carries a greatsword, a dagger, and heavy-armor
    silhouette blocks before the hard-constraints spec is finalized.
 4. **Hard-constraints spec (open):** drafted from the spike's rig conventions, then locked by the

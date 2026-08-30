@@ -351,7 +351,11 @@ async function boot() {
     else if (!on && recorder.recording) stopRecord()
     return recorder.recording
   }
-  const stopRecord = () => {
+  const stopRecord = (): Replay | null => {
+    if (!canRecordPlainReplay(replayCondition)) {
+      console.log('[replay] plain recording stop refused: the active no-dash condition requires a playtest bundle')
+      return null
+    }
     const r = recorder.stop()
     console.log(`[replay] ${r.frames.length} frames; suggested file replays/${recorder.suggestedName(r)}`)
     console.log(replayToJson(r))
@@ -521,7 +525,14 @@ async function boot() {
     },
     debug: v => { overlay.setVisible(v ?? !overlay.visible); return overlay.visible },
     record, stopRecord, replay,
-    download: name => { if (recorder.recording) stopRecord(); recorder.download(name) },
+    download: name => {
+      if (!canRecordPlainReplay(replayCondition)) {
+        console.log('[replay] plain download refused: the active no-dash condition requires a playtest bundle')
+        return
+      }
+      if (recorder.recording) stopRecord()
+      recorder.download(name)
+    },
     inspectSave: () => ({
       schemaVersion: savedSave.schemaVersion,
       contentRevision: savedSave.contentRevision,

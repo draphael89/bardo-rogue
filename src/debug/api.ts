@@ -36,7 +36,7 @@ export interface GameApi {
   mute(m?: boolean): boolean
   debug(v?: boolean): boolean
   record(on?: boolean): boolean
-  stopRecord(): Replay
+  stopRecord(): Replay | null
   download(name?: string): void
   replay(r: Replay | EncodedReplay): void
   inspectSave(): unknown
@@ -60,7 +60,7 @@ export function installApi(host: {
   debug(v?: boolean): boolean
   title(show?: boolean): boolean
   record(on?: boolean): boolean
-  stopRecord(): Replay
+  stopRecord(): Replay | null
   download(name?: string): void
   replay(r: Replay | EncodedReplay): void
   inspectSave(): unknown

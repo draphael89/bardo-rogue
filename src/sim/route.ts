@@ -5,6 +5,7 @@ import { arenaKind, type LayoutId } from './layouts'
 import type { RoomDef } from './rooms'
 import type { Rng } from './rng'
 import type { World } from './world'
+import { contractForDestination } from './contracts'
 
 /** Same-kind dresses only. Crossing masonry has no east door. */
 const CROSSING_DRESS = ['lethe', 'crossing'] as const satisfies readonly LayoutId[]
@@ -13,10 +14,10 @@ const LAYOUT_POOLS: Record<string, readonly LayoutId[]> = {
   threshold: ['threshold', 'asphodel'],
   'veil-path': CROSSING_DRESS,
   'blade-path': ['asphodel', 'threshold'],
-  cocytus: ['cocytus', 'phlegethon'],
+  cocytus: ['cocytus'],
   antechamber: ['antechamber', 'oath-court'],
-  phlegethon: ['phlegethon', 'cocytus'],
-  styx: ['styx', 'cocytus'],
+  phlegethon: ['phlegethon'],
+  styx: ['styx'],
   warden: ['minos', 'minos-east'],
 }
 
@@ -357,19 +358,18 @@ export const SLICE_TEMPLATE = FIRST_GATE
 
 const TEMPLATES: readonly RouteTemplate[] = [FIRST_GATE, LATE_SHOP, FIELD_FORK, FIRE_FORD, STYX_GATE, ASH_MARCH]
 
-/** Derived from the attempt seed. Does not touch the dress/mystery stream. */
-export function templateForSeed(runSeed: number): RouteTemplate {
-  const lane = (runSeed >>> 0) % 6
-  if (lane === 0) return FIRST_GATE
-  if (lane === 1) return LATE_SHOP
-  if (lane === 2) return FIELD_FORK
-  if (lane === 3) return FIRE_FORD
-  if (lane === 4) return STYX_GATE
-  return ASH_MARCH
+/**
+ * The live descent has one authored spine. Variation belongs to its consequential fork and room
+ * dressing, not to six topologies that sometimes omit the bank or change the lesson order.
+ * Keep the seed parameter at this boundary because checkpoints and callers still own a run seed.
+ */
+export function templateForSeed(_runSeed: number): RouteTemplate {
+  return FIRST_GATE
 }
 
-export function templateById(id: string): RouteTemplate {
-  return TEMPLATES.find(t => t.id === id) ?? FIRST_GATE
+/** Former live spines are retained only so an in-progress checkpoint can finish on its own map. */
+export function templateById(id: string): RouteTemplate | null {
+  return TEMPLATES.find(t => t.id === id) ?? null
 }
 
 function kindOf(kind: RouteNodeKind): RouteNodeKind {
@@ -513,6 +513,8 @@ export interface MapPlanDoor {
   mark: DoorMark
   markLabel: string
   dest: string
+  /** The combat promise attached to the first fork. Omitted for ordinary doors. */
+  detail?: string
 }
 
 export interface MapPlan {
@@ -524,15 +526,17 @@ export interface MapPlan {
  * The exits strip is the plan. The footer already names this floor — a HERE row
  * would reprint ACHERON GATE on top of THE ACHERON GATE.
  */
-export function mapPlan(rooms: RoomDef[], fromId: string): MapPlan {
+export function mapPlan(rooms: RoomDef[], fromId: string, contractForkEnabled = false): MapPlan {
   const room = rooms.find(r => r.id === fromId)
   const exits = room?.exits ?? []
   const doors = exits.map(ex => {
     const dest = rooms.find(r => r.id === ex.to)
+    const contract = contractForkEnabled && fromId === 'threshold' ? contractForDestination(ex.to) : null
     return {
       mark: ex.mark,
-      markLabel: doorMarkLabel(ex.mark, ex.to),
+      markLabel: contract?.label ?? doorMarkLabel(ex.mark, ex.to),
       dest: dest ? routeLabel(dest) : ex.to,
+      ...(contract ? { detail: contract.preview } : {}),
     }
   })
   const tail = routeTail(rooms, fromId)

@@ -12,12 +12,13 @@ import { doorEnterMaxY, enterRoomById, roomsFor } from '@/sim/rooms'
 import { makeBot } from '@/sim/bots'
 import { shopCost } from '@/sim/economy'
 import { canAffordMystery, mysteryCost } from '@/sim/mystery'
-import { FIRST_GATE, LATE_SHOP, FIELD_FORK, FIRE_FORD, STYX_GATE, ASH_MARCH, pinUtility } from '@/sim/route'
+import { FIRST_GATE, pinUtility } from '@/sim/route'
 import { offerReward } from '@/sim/rewards'
 import { quantizeFrame, runReplay, type Replay } from '@/sim/replay'
 import { tryCollectOffering } from '@/sim/offering'
 import { guardUp } from '@/sim/enemies/oathbound'
 import { claimShrine } from './claim'
+import { SLICE_ECHO_COMMIT, SLICE_ECHO_CUT } from '@/sim/content/waves'
 
 const landed = (interrupted = false): DamageResult => ({
   outcome: 'landed', landed: true, killed: false, guarded: false, interrupted, resolvedDamage: 1,
@@ -251,80 +252,36 @@ describe('production vertical slice', () => {
     expect(a.solid[east.row * a.cols + east.col]).toBe(1)
   })
 
-  it.each([
-    [FIRST_GATE.id, 'north'],
-    [FIRST_GATE.id, 'east'],
-    [LATE_SHOP.id, 'north'],
-    [LATE_SHOP.id, 'east'],
-    [FIELD_FORK.id, 'north'],
-    [FIELD_FORK.id, 'east'],
-    [FIRE_FORD.id, 'north'],
-    [FIRE_FORD.id, 'east'],
-    [STYX_GATE.id, 'north'],
-    [STYX_GATE.id, 'east'],
-    [ASH_MARCH.id, 'north'],
-    [ASH_MARCH.id, 'east'],
-  ] as const)('connects %s via %s through six chambers to victory', (template, dir) => {
-    const world = descendOn(template)
+  it.each(['north', 'east'] as const)('connects the first-gate %s contract through six clears to victory', dir => {
+    const world = descendOn(FIRST_GATE.id)
     clearAndClaim(world); chooseFocusedReward(world)
-    if (template === FIELD_FORK.id) {
-      takeDoor(world, 'north')
-      expect(world.rooms[world.roomIndex].id).toBe('blade-path')
-      clearAndClaim(world); chooseFocusedReward(world)
-      takeDoor(world, dir)
-      expect(['veil-path', 'cocytus']).toContain(world.rooms[world.roomIndex].id)
-      clearAndClaim(world); chooseFocusedReward(world); takeDoor(world, 'north')
-      expect(world.rooms[world.roomIndex].id).toBe('black-step')
-      answerRite(world, 'swim')
-      clearAndClaim(world); chooseFocusedReward(world); takeDoor(world, 'north')
-    } else {
-      takeDoor(world, dir)
-      expect(['veil-path', 'blade-path']).toContain(world.rooms[world.roomIndex].id)
-      clearAndClaim(world); chooseFocusedReward(world); takeDoor(world, 'north')
-      // Early shop / fire-ford: landing then the river. Late shop: Cocytus then landing.
-      const mid = world.rooms[world.roomIndex].id
-      expect(['black-step', 'cocytus', 'phlegethon']).toContain(mid)
-      if (mid === 'black-step') answerRite(world, 'swim')
-      clearAndClaim(world); chooseFocusedReward(world); takeDoor(world, 'north')
-      const mid2 = world.rooms[world.roomIndex].id
-      expect(['black-step', 'cocytus', 'phlegethon']).toContain(mid2)
-      expect(mid2).not.toBe(mid)
-      if (mid2 === 'black-step') answerRite(world, 'swim')
-      clearAndClaim(world); chooseFocusedReward(world); takeDoor(world, 'north')
-    }
+    takeDoor(world, dir)
+    expect(world.rooms[world.roomIndex].id).toBe(dir === 'north' ? 'veil-path' : 'blade-path')
+    const contract = dir === 'north' ? 'cut' : 'commit'
+    const family = contract === 'cut' ? 'veil' : 'blade'
+    expect(world.session.run?.contract).toBe(contract)
+    clearAndClaim(world)
+    expect(world.session.run?.pendingReward?.family).toBe(family)
+    chooseFocusedReward(world); takeDoor(world, 'north')
+    expect(world.rooms[world.roomIndex].id).toBe('black-step')
+    answerRite(world, 'swim')
+    clearAndClaim(world); chooseFocusedReward(world); takeDoor(world, 'north')
+    expect(world.rooms[world.roomIndex].id).toBe('cocytus')
+    expect(world.waveDefs).toBe(contract === 'commit' ? SLICE_ECHO_COMMIT : SLICE_ECHO_CUT)
+    clearAndClaim(world)
+    expect(world.session.run?.pendingReward?.family).toBe(family)
+    chooseFocusedReward(world); takeDoor(world, 'north')
     expect(world.rooms[world.roomIndex].id).toBe('antechamber')
-    if (template === FIELD_FORK.id) {
-      const seen = world.session.run!.roomHistory.map(v => v.id)
-      expect(seen.includes('veil-path') && seen.includes('cocytus')).toBe(false)
-      expect(seen.includes('veil-path') || seen.includes('cocytus')).toBe(true)
-    }
-    if (template === FIRE_FORD.id) {
-      const seen = world.session.run!.roomHistory.map(v => v.id)
-      expect(seen).toContain('phlegethon')
-      expect(seen).not.toContain('cocytus')
-    }
-    if (template === STYX_GATE.id) {
-      const seen = world.session.run!.roomHistory.map(v => v.id)
-      expect(seen).toContain('styx')
-      expect(seen).not.toContain('threshold')
-    }
-    if (template === ASH_MARCH.id) {
-      const seen = world.session.run!.roomHistory.map(v => v.id)
-      expect(seen).toContain('phlegethon')
-      expect(seen).toContain('cocytus')
-      expect(seen).not.toContain('black-step')
-    }
     clearAndClaim(world); takeDoor(world, 'north')
     expect(world.rooms[world.roomIndex].id).toBe('warden')
-    const owed = template !== ASH_MARCH.id
-    expect(world.spawnQueue.some(s => s.kind === tuning.rites.toll.debtKind)).toBe(owed)
+    expect(world.spawnQueue.some(s => s.kind === tuning.rites.toll.debtKind)).toBe(true)
     expect(world.session.run?.riteDebt).toBe(false)
     clearAndClaim(world)
     expect(world.session.run?.result).toBe('won')
     expect(world.roomPhase).toBe('resolved')
     expect(world.session.meta.victories).toBe(1)
     expect(world.session.meta.remembrances).toBe(6 * tuning.economy.remembrancePerDepth + tuning.economy.remembranceOnVictory)
-    expect(activeBoons(world)).toHaveLength(owed ? 3 : 4)
+    expect(activeBoons(world)).toHaveLength(3)
     stepWorld(world, { ...emptyInput(), confirm: true })
     expect(world.roomName).toBe('THE BARDO')
     expect(world.roomPhase).toBe('town')
@@ -335,10 +292,8 @@ describe('production vertical slice', () => {
     expect(world.session.meta.victories).toBe(1)
   })
 
-  it.each(['threshold', 'styx', 'veil-path', 'blade-path', 'black-step', 'cocytus', 'phlegethon', 'antechamber', 'warden'])('returns a death in %s safely to a clean Bardo', roomId => {
-    const world = roomId === 'phlegethon' ? descendOn(FIRE_FORD.id)
-      : roomId === 'styx' ? descendOn(STYX_GATE.id)
-      : descendOn(FIRST_GATE.id)
+  it.each(['threshold', 'veil-path', 'blade-path', 'black-step', 'cocytus', 'antechamber', 'warden'])('returns a death in %s safely to a clean Bardo', roomId => {
+    const world = descendOn(FIRST_GATE.id)
     if (world.rooms[world.roomIndex].id !== roomId) enterRoomById(world, roomId)
     grantBoon(world, 'ashenEdge')
     world.player.hp = 1
@@ -364,6 +319,24 @@ describe('production vertical slice', () => {
     const judge = world.enemies.find(e => e.active && e.kind === 'warden')
     expect(judge).toBeDefined()
     expect(judge?.hp).toBe(tuning.warden.hp)
+  })
+
+  it.each([
+    ['commit', 'slam'],
+    ['cut', 'ring'],
+  ] as const)('lets the %s contract choose Minos\'s %s opening', (contract, opening) => {
+    const world = descendOn(FIRST_GATE.id)
+    world.session.run!.contract = contract
+    world.player.god = true
+    enterRoomById(world, 'warden')
+    let heard: string | undefined
+    for (let i = 0; i < 360 && !heard; i++) {
+      stepWorld(world, emptyInput())
+      const tell = world.events.find(e => e.type === 'enemyWindup' && e.kind === 'warden')
+      if (tell?.type === 'enemyWindup' && tell.kind === 'warden') heard = tell.pattern
+      world.events.length = 0
+    }
+    expect(heard).toBe(opening)
   })
 
   it('the Antechamber teaches the shield on the production clock: a light is bronze, a heavy is the answer', () => {

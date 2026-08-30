@@ -138,7 +138,7 @@ const saveA = serializeSave(bumpRevision(defaultSave({ profileId: 'default' })))
 const saveB = serializeSave(bumpRevision(bumpRevision(defaultSave({ profileId: 'default' }))))
 const importedSave = serializeSave({
   ...defaultSave({ profileId: 'default' }),
-  meta: { version: 1, attempts: 42, victories: 6, remembrances: 0, rerollUnlocked: false, vesselUnlocked: false, unlockedWeapons: ['blade'] },
+  meta: { ...defaultSave({ profileId: 'default' }).meta, attempts: 42, victories: 6 },
 })
 const CORRUPT = '{"schemaVersion": 2, "meta"'
 const CORRUPT_BACKUP = '{"schemaVersion": 2, "settings"'

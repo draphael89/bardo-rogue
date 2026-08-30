@@ -20,7 +20,7 @@ const FIXTURES = [
   // The only fixture that builds the Bardo: a full descent (island hub -> rack -> Gate -> six
   // rooms -> Minos -> return), so the hub geometry the wave/full fixtures never construct is
   // hash-pinned too.
-  { file: 'slice-kite-loop-s7.json', hash: 1142161593, check: (m: Record<string, unknown>) => { expect(m.returns).toBe(1); expect(m.runResult).toBe('won') } },
+  { file: 'slice-kite-loop-s7.json', hash: 358263678, check: (m: Record<string, unknown>) => { expect(m.returns).toBe(1); expect(m.runResult).toBe('won') } },
 ]
 
 function loadFixture(file: string): Replay {
@@ -65,6 +65,30 @@ describe('replay format', () => {
     expect(decodeReplay(encodeReplay(r))).toEqual(r)
     expect(replayFromJson(replayToJson(r))).toEqual(r)
   })
+  it('round-trips V2 meta and its pending Smith facts through encoded and raw replays', () => {
+    const r: Replay = {
+      v: 1, seed: 17, scenario: 'loop',
+      meta: {
+        version: 2,
+        attempts: 7,
+        victories: 3,
+        remembrances: 4,
+        rerollUnlocked: false,
+        vesselUnlocked: false,
+        unlockedWeapons: ['blade'],
+        pendingSmithUnburied: true,
+        pendingSmithContract: 'cut',
+      },
+      frames: [emptyInput()],
+    }
+    expect(decodeReplay(encodeReplay(r))).toEqual(r)
+    expect(replayFromJson(replayToJson(r))).toEqual(r)
+    expect(replayFromJson(JSON.stringify(r))).toEqual(r)
+    expect(runReplay({ ...r, frames: [] }).world.session.meta).toMatchObject({
+      pendingSmithUnburied: true,
+      pendingSmithContract: 'cut',
+    })
+  })
   it('snapshots recorder meta instead of retaining a live counter reference', () => {
     const meta = { version: 1 as const, attempts: 7, victories: 3, remembrances: 0, rerollUnlocked: false, vesselUnlocked: false, unlockedWeapons: ['blade' as const] }
     const recorder = new Recorder()
@@ -73,9 +97,33 @@ describe('replay format', () => {
     recorder.capture(emptyInput())
     expect(recorder.stop().meta).toEqual({ version: 1, attempts: 7, victories: 3, remembrances: 0, rerollUnlocked: false, vesselUnlocked: false, unlockedWeapons: ['blade'] })
   })
+  it('records V2 pending Smith facts without retaining their live object', () => {
+    const meta = {
+      version: 2 as const,
+      attempts: 7,
+      victories: 3,
+      remembrances: 0,
+      rerollUnlocked: false,
+      vesselUnlocked: false,
+      unlockedWeapons: ['blade' as const],
+      pendingSmithUnburied: true,
+      pendingSmithContract: 'commit' as const,
+    }
+    const recorder = new Recorder()
+    recorder.start(17, 'loop', false, meta)
+    meta.pendingSmithUnburied = false
+    recorder.capture(emptyInput())
+    expect(recorder.stop().meta).toMatchObject({ pendingSmithUnburied: true, pendingSmithContract: 'commit' })
+  })
   it('rejects unknown versions', () => {
     expect(() => decodeReplay({ v: 2 as 1, seed: 1, scenario: 'empty', runs: [] })).toThrow()
     expect(() => replayFromJson(JSON.stringify({ v: 2, seed: 1, scenario: 'empty', frames: [] }))).toThrow(/unsupported replay version/)
+    expect(() => decodeReplay({
+      v: 1, seed: 1, scenario: 'empty', meta: { version: 99 } as never, runs: [],
+    })).toThrow(/unsupported replay meta version/)
+    expect(() => replayFromJson(JSON.stringify({
+      v: 1, seed: 1, scenario: 'empty', meta: { version: 99 }, frames: [],
+    }))).toThrow(/unsupported replay meta version/)
   })
   it('rejects invalid encoded counts before expanding them', () => {
     const replay = (count: number) => ({ v: 1 as const, seed: 1, scenario: 'empty', runs: [[0, 0, 10000, 0, 0, count]] as [[number, number, number, number, number, number]] })

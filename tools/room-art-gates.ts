@@ -145,10 +145,9 @@ async function runtime(url: string, shotDir?: string): Promise<RuntimeRoom[]> {
   const rooms: RuntimeRoom[] = []
   const seenLayouts = new Set<string>()
   const errors: string[] = []
-  // Seed 1 is the canonical first-gate route. Seed 31 contributes the real Fire Ford node before
-  // another route can reuse its dress; seed 10 then adds Styx. Layout de-duplication leaves one
-  // frame each for crossing masonry, Phlegethon, Oath Court, and east-facing Minos.
-  for (const seed of [1, 31, 10]) {
+  // These seeds cover every layout pool used by the production First Gate. Layout de-duplication
+  // leaves one frame per live layout.
+  for (const seed of [1, 31]) {
     const page = await browser.newPage({ viewport: { width: 640, height: 360 }, deviceScaleFactor: 1 })
     page.on('pageerror', error => errors.push(`seed ${seed} pageerror: ${error.message}`))
     page.on('console', message => { if (message.type() === 'error') errors.push(`seed ${seed} console: ${message.text()}`) })
@@ -235,8 +234,7 @@ async function runtime(url: string, shotDir?: string): Promise<RuntimeRoom[]> {
     if (seed === 1) await capture({ id: 'bardo', layout: 'bardo', template: 'town' }, false)
     const targets = await page.evaluate(() => {
       const g = (window as unknown as { __game: any }).__game
-      // This call installs the real seeded route. It may return false when that route opens at Styx,
-      // but the route is still installed; enumerate it only after this boundary.
+      // This call installs the real seeded route; enumerate it only after this boundary.
       g.gotoRoom('threshold', { skipRite: true })
       const template = g.world.session.run?.map?.template ?? 'unknown'
       return g.world.rooms
@@ -252,14 +250,11 @@ async function runtime(url: string, shotDir?: string): Promise<RuntimeRoom[]> {
   }
   const productionLayouts = [
     'bardo', 'threshold', 'crossing', 'lethe', 'asphodel', 'landing', 'minos',
-    'minos-east', 'cocytus', 'antechamber', 'oath-court', 'phlegethon', 'styx',
+    'minos-east', 'cocytus', 'antechamber', 'oath-court',
   ]
   const missing = productionLayouts.filter(layout => !seenLayouts.has(layout))
   add('runtime:production-layout-coverage', missing.length === 0,
     missing.length ? `missing ${missing.join(', ')}` : `${productionLayouts.length}/${productionLayouts.length} production-loop layouts sampled`)
-  const namedRivers = ['phlegethon', 'styx'].filter(id => !rooms.some(room => room.id === id && room.layout === id))
-  add('runtime:named-river-nodes', namedRivers.length === 0,
-    namedRivers.length ? `missing dedicated ${namedRivers.join(', ')} node(s)` : 'Styx Gate and Phlegethon Ford sampled by node, not merely by dress')
   await browser.close()
   if (errors.length) throw new Error(errors.join('\n'))
   return rooms

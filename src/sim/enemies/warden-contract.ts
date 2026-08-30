@@ -10,9 +10,7 @@ export type WardenProjectilePattern = 'ring' | 'fan'
 // life==0 move is discarded before collision, hence the exact (lifeTicks - 1) damaging steps.
 export interface WardenProjectileContract {
   pattern: WardenProjectilePattern
-  phase: 0 | 1
   count: number
-  volleys: number
   spawnOffset: number
   speed: number
   lifeTicks: number
@@ -22,12 +20,10 @@ export interface WardenProjectileContract {
   damagingCenterTravel: number
   fullDangerReach: number
   spread: number
-  returnSweep: number
 }
 
-export function wardenProjectileContract(pattern: WardenProjectilePattern, phase: number): WardenProjectileContract {
+export function wardenProjectileContract(pattern: WardenProjectilePattern): WardenProjectileContract {
   const W = tuning.warden
-  const p2 = phase > 0
   // Phase two recombines slam/ring/fan. Density stays the taught sentence; faster/fatter
   // volleys were acceleration, not a new decision.
   const speed = pattern === 'ring' ? W.boltSpeed : W.fanSpeed
@@ -37,9 +33,7 @@ export function wardenProjectileContract(pattern: WardenProjectilePattern, phase
   const damagingCenterTravel = speed * DT * Math.max(0, lifeTicks - 1)
   return {
     pattern,
-    phase: p2 ? 1 : 0,
     count: pattern === 'ring' ? W.boltCount : W.fanCount,
-    volleys: 1,
     spawnOffset,
     speed,
     lifeTicks,
@@ -49,27 +43,21 @@ export function wardenProjectileContract(pattern: WardenProjectilePattern, phase
     damagingCenterTravel,
     fullDangerReach: spawnOffset + damagingCenterTravel + combinedHurtRadius,
     spread: pattern === 'fan' ? W.fanSpreadDeg * Math.PI / 180 : Math.PI * 2,
-    returnSweep: pattern === 'fan' && p2 ? W.fanVolleySweepDeg * Math.PI / 180 : 0,
   }
 }
 
-// The phase-two fan's second beat sweeps across the first rather than repeating it. Alternating the
-// direction per authored pattern cycle prevents a permanent preferred side without drawing RNG.
 export function wardenProjectileAngle(
   contract: WardenProjectileContract,
   aimAngle: number,
   patternCursor: number,
   index: number,
-  volley = 0,
 ): number {
   if (contract.pattern === 'ring') {
     const offset = aimAngle + (patternCursor & 1 ? Math.PI / contract.count : 0)
     return offset + (Math.PI * 2 * index) / contract.count
   }
   const u = contract.count === 1 ? 0.5 : index / (contract.count - 1)
-  const sweepSign = patternCursor & 1 ? 1 : -1
-  const sweptReturn = volley > 0 ? contract.returnSweep * sweepSign : 0
-  return aimAngle + sweptReturn + (u - 0.5) * contract.spread
+  return aimAngle + (u - 0.5) * contract.spread
 }
 
 // Exact terrain-clipped endpoint for the centre line used by a tell. It includes the combined hurt

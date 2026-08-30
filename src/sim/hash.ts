@@ -61,12 +61,19 @@ export function hashWorld(world: World): number {
     int(session.meta.attempts); int(session.meta.victories); int(session.meta.remembrances)
     flag(session.meta.rerollUnlocked)
     flag(session.meta.vesselUnlocked)
+    flag(session.meta.pendingSmithUnburied)
+    byte(session.meta.pendingSmithContract === 'commit' ? 1 : session.meta.pendingSmithContract === 'cut' ? 2 : 0)
+    byte(session.lastMystery ? MYSTERY[session.lastMystery] + 1 : 0)
     byte(session.preparedWeapon ? ARM[session.preparedWeapon] + 1 : 0)
     const run = session.run
     flag(!!run)
     if (run) {
       int(run.seed); int(run.hp); int(run.maxHp); int(run.depth); int(run.startedTick); byte(run.result === 'active' ? 0 : run.result === 'won' ? 1 : 2)
-      flag(run.primedBrand); int(run.boonBits); int(run.roomHistory.length)
+      flag(run.primedBrand); int(run.boonBits)
+      byte(run.contract === 'commit' ? 1 : run.contract === 'cut' ? 2 : 0)
+      int(run.clearedRoomIds.length)
+      for (const id of run.clearedRoomIds) str(id)
+      int(run.roomHistory.length)
       for (const visit of run.roomHistory) { str(visit.id); int(visit.enteredTick) }
       // A flag-then-body block is the one legal shape for optional data: the flag discriminates, so
       // the body's bytes can never be mistaken for a neighbour's.

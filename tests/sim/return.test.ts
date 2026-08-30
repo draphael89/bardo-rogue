@@ -4,7 +4,6 @@ import { enterRoomById } from '@/sim/rooms'
 import { abandonRun, canAbandon, canReturn, returnToHub } from '@/sim/return'
 import { createWorld } from '@/sim/scenarios'
 import { prepareWeapon, startRun } from '@/sim/session'
-import { tuning } from '@/tuning'
 
 function descend(seed = 4) {
   const world = createWorld(seed, 'loop')
@@ -27,22 +26,22 @@ describe('giving the attempt back', () => {
     expect(abandonRun(world)).toBe(false)
   })
 
-  it('wakes you in the Bardo and banks what the depth was worth', () => {
+  it('wakes you in the Bardo without paying for an uncleared room', () => {
     const world = descend()
-    expect(['THE ACHERON GATE', 'THE STYX GATE']).toContain(world.roomName)
+    expect(world.roomName).toBe('THE ACHERON GATE')
     expect(abandonRun(world)).toBe(true)
     expect(world.roomName).toBe('THE BARDO')
     expect(world.roomPhase).toBe('town')
     expect(world.session.run).toBeNull()
     expect(world.player.state).toBe('free')
     expect(world.player.armed).toBe(false)
-    expect(world.session.lastBanked).toBe(tuning.economy.remembrancePerDepth)
-    expect(world.session.meta.remembrances).toBe(tuning.economy.remembrancePerDepth)
+    expect(world.session.lastBanked).toBe(0)
+    expect(world.session.meta.remembrances).toBe(0)
     const home = world.events.find(e => e.type === 'returned')
     expect(home).toMatchObject({
       type: 'returned',
-      kept: tuning.economy.remembrancePerDepth,
-      remembrances: tuning.economy.remembrancePerDepth,
+      kept: 0,
+      remembrances: 0,
       smithWaiting: false,
     })
     expect(world.events.some(e => e.type === 'runLost')).toBe(true)

@@ -38,7 +38,8 @@ export function updateBrute(world: World, e: Enemy): void {
       else { e.vx = 0; e.vy = 0 }
       const activeStart = B.lungeTicks, activeEnd = B.lungeTicks + B.active
       if (!e.hitDone && e.stateTick > activeStart && e.stateTick <= activeEnd) {
-        if (enemyArcAttack(world, e, B.hitRadius, B.hitArcDeg, B.damage)) e.hitDone = true
+        enemyArcAttack(world, e, B.hitRadius, B.hitArcDeg, B.damage)
+        if (world.session.run && world.session.run.result !== 'active') return
       }
       if (e.stateTick >= activeEnd) { e.state = 'recover'; e.stateTick = 0 }
       break

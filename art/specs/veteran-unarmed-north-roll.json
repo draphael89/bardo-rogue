@@ -1,0 +1,148 @@
+{
+  "id": "actor.veteran.unarmed.north.roll",
+  "kind": "character",
+  "input": "art/approved/bardo_veteran_unarmed_north_roll_v1.png",
+  "output": "public/assets/sprites/bardo_veteran_unarmed_north_roll.png",
+  "sidecar": "public/assets/sprites/bardo_veteran_unarmed_north_roll.json",
+  "cell": 64,
+  "cols": 2,
+  "rows": 2,
+  "maxColors": 16,
+  "palette": [
+    "mortar",
+    "seal0",
+    "iron",
+    "ironHi",
+    "purple0",
+    "purple2",
+    "purple3",
+    "boneLo",
+    "boneDim",
+    "bone",
+    "brickLo",
+    "brick",
+    "brickHi",
+    "cope",
+    "gold"
+  ],
+  "facing": "north",
+  "fit": "grid",
+  "chromaKey": false,
+  "coverage": 0.5,
+  "valueLift": false,
+  "salience": {
+    "minShare": 0.22,
+    "minDelta": 0.16
+  },
+  "frames": [
+    {
+      "name": "dive",
+      "i": 0,
+      "sockets": {
+        "handR": [
+          23,
+          30
+        ],
+        "handL": [
+          41,
+          30
+        ],
+        "head": [
+          32,
+          24
+        ]
+      },
+      "pivot": [
+        32,
+        54
+      ]
+    },
+    {
+      "name": "tuck",
+      "i": 1,
+      "sockets": {
+        "handR": [
+          24,
+          38
+        ],
+        "handL": [
+          40,
+          38
+        ],
+        "head": [
+          32,
+          29
+        ]
+      },
+      "pivot": [
+        32,
+        54
+      ]
+    },
+    {
+      "name": "apex",
+      "i": 2,
+      "sockets": {
+        "handR": [
+          25,
+          46
+        ],
+        "handL": [
+          39,
+          46
+        ],
+        "head": [
+          32,
+          39
+        ]
+      },
+      "pivot": [
+        32,
+        54
+      ]
+    },
+    {
+      "name": "extend",
+      "i": 3,
+      "sockets": {
+        "handR": [
+          17,
+          36
+        ],
+        "handL": [
+          47,
+          36
+        ],
+        "head": [
+          32,
+          27
+        ]
+      },
+      "pivot": [
+        32,
+        54
+      ]
+    }
+  ],
+  "clips": {
+    "roll": {
+      "frames": [
+        "dive",
+        "tuck",
+        "apex",
+        "extend"
+      ],
+      "timing": "sim",
+      "sim": {
+        "ref": "player.dodge"
+      },
+      "grounded": false
+    }
+  },
+  "provenance": {
+    "provider": "blender-mannequin-spike",
+    "model": "blender-eevee ortho pitch 20deg, legScale 1, weapon none, armor base, sun 1.07, ambient 1.75",
+    "approvedSource": "art/approved/bardo_veteran_unarmed_north_roll_v1.png"
+  },
+  "registrationNote": "Pivots and sockets are COMPUTED from projected rig bones (rig.json), not judged. Compiled from the approved master under art/approved; the receipt beside it is verified on every production compile."
+}

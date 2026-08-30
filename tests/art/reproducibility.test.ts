@@ -12,7 +12,12 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { compileSheet, type CompileSpec } from '../../tools/art/compile'
 
-const SPECS = ['hero', 'hero-north', 'hero-south', 'hero-north-roll', 'hero-south-roll', 'brute']
+const SPECS = [
+  'veteran-unarmed-east', 'veteran-unarmed-north', 'veteran-unarmed-south',
+  'veteran-unarmed-north-roll', 'veteran-unarmed-south-roll',
+  'veteran-greatsword-east', 'veteran-greatsword-north', 'veteran-greatsword-south',
+  'brute',
+]
 const dir = mkdtempSync(join(tmpdir(), 'bardo-repro-'))
 afterAll(() => rmSync(dir, { recursive: true, force: true }))
 

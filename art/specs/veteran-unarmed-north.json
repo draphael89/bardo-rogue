@@ -1,0 +1,391 @@
+{
+  "id": "actor.veteran.unarmed.north",
+  "kind": "character",
+  "input": "art/approved/bardo_veteran_unarmed_north_v1.png",
+  "output": "public/assets/sprites/bardo_veteran_unarmed_north.png",
+  "sidecar": "public/assets/sprites/bardo_veteran_unarmed_north.json",
+  "cell": 64,
+  "cols": 4,
+  "rows": 4,
+  "maxColors": 16,
+  "palette": [
+    "mortar",
+    "seal0",
+    "iron",
+    "ironHi",
+    "purple0",
+    "purple2",
+    "purple3",
+    "boneLo",
+    "boneDim",
+    "bone",
+    "brickLo",
+    "brick",
+    "brickHi",
+    "cope",
+    "gold"
+  ],
+  "facing": "north",
+  "fit": "grid",
+  "chromaKey": false,
+  "coverage": 0.5,
+  "valueLift": false,
+  "salience": {
+    "minShare": 0.22,
+    "minDelta": 0.16
+  },
+  "frames": [
+    {
+      "name": "idle",
+      "i": 0,
+      "sockets": {
+        "handR": [
+          25,
+          48
+        ],
+        "handL": [
+          39,
+          48
+        ],
+        "head": [
+          32,
+          30
+        ]
+      },
+      "pivot": [
+        32,
+        60
+      ]
+    },
+    {
+      "name": "run0",
+      "i": 1,
+      "sockets": {
+        "handR": [
+          26,
+          44
+        ],
+        "handL": [
+          38,
+          44
+        ],
+        "head": [
+          32,
+          28
+        ]
+      },
+      "pivot": [
+        32,
+        58
+      ]
+    },
+    {
+      "name": "run1",
+      "i": 2,
+      "sockets": {
+        "handR": [
+          26,
+          46
+        ],
+        "handL": [
+          38,
+          43
+        ],
+        "head": [
+          32,
+          28
+        ]
+      },
+      "pivot": [
+        32,
+        58
+      ]
+    },
+    {
+      "name": "run2",
+      "i": 3,
+      "sockets": {
+        "handR": [
+          26,
+          47
+        ],
+        "handL": [
+          38,
+          42
+        ],
+        "head": [
+          32,
+          29
+        ]
+      },
+      "pivot": [
+        32,
+        58
+      ]
+    },
+    {
+      "name": "run3",
+      "i": 4,
+      "sockets": {
+        "handR": [
+          26,
+          46
+        ],
+        "handL": [
+          38,
+          43
+        ],
+        "head": [
+          32,
+          28
+        ]
+      },
+      "pivot": [
+        32,
+        58
+      ]
+    },
+    {
+      "name": "run4",
+      "i": 5,
+      "sockets": {
+        "handR": [
+          26,
+          44
+        ],
+        "handL": [
+          38,
+          44
+        ],
+        "head": [
+          32,
+          28
+        ]
+      },
+      "pivot": [
+        32,
+        58
+      ]
+    },
+    {
+      "name": "run5",
+      "i": 6,
+      "sockets": {
+        "handR": [
+          26,
+          43
+        ],
+        "handL": [
+          38,
+          46
+        ],
+        "head": [
+          32,
+          28
+        ]
+      },
+      "pivot": [
+        32,
+        58
+      ]
+    },
+    {
+      "name": "run6",
+      "i": 7,
+      "sockets": {
+        "handR": [
+          26,
+          42
+        ],
+        "handL": [
+          38,
+          47
+        ],
+        "head": [
+          32,
+          29
+        ]
+      },
+      "pivot": [
+        32,
+        58
+      ]
+    },
+    {
+      "name": "run7",
+      "i": 8,
+      "sockets": {
+        "handR": [
+          26,
+          43
+        ],
+        "handL": [
+          38,
+          46
+        ],
+        "head": [
+          32,
+          28
+        ]
+      },
+      "pivot": [
+        32,
+        58
+      ]
+    },
+    {
+      "name": "hurt",
+      "i": 9,
+      "sockets": {
+        "handR": [
+          16,
+          39
+        ],
+        "handL": [
+          48,
+          40
+        ],
+        "head": [
+          32,
+          29
+        ]
+      },
+      "pivot": [
+        32,
+        57
+      ]
+    },
+    {
+      "name": "dead",
+      "i": 10,
+      "sockets": {
+        "handR": [
+          23,
+          43
+        ],
+        "handL": [
+          41,
+          41
+        ],
+        "head": [
+          31,
+          36
+        ]
+      },
+      "pivot": [
+        34,
+        57
+      ]
+    },
+    {
+      "name": "dodge",
+      "i": 11,
+      "sockets": {
+        "handR": [
+          23,
+          39
+        ],
+        "handL": [
+          41,
+          39
+        ],
+        "head": [
+          32,
+          33
+        ]
+      },
+      "pivot": [
+        32,
+        57
+      ]
+    },
+    {
+      "name": "fall",
+      "i": 12,
+      "sockets": {
+        "handR": [
+          24,
+          24
+        ],
+        "handL": [
+          40,
+          24
+        ],
+        "head": [
+          32,
+          25
+        ]
+      },
+      "pivot": [
+        32,
+        57
+      ]
+    },
+    {
+      "name": "land",
+      "i": 13,
+      "sockets": {
+        "handR": [
+          19,
+          43
+        ],
+        "handL": [
+          45,
+          42
+        ],
+        "head": [
+          30,
+          31
+        ]
+      },
+      "pivot": [
+        30,
+        57
+      ]
+    }
+  ],
+  "clips": {
+    "run": {
+      "frames": [
+        "run0",
+        "run1",
+        "run2",
+        "run3",
+        "run4",
+        "run5",
+        "run6",
+        "run7"
+      ],
+      "timing": "ticks",
+      "ticks": [
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4
+      ],
+      "loop": true
+    },
+    "dodge": {
+      "frames": [
+        "dodge",
+        "fall",
+        "land"
+      ],
+      "timing": "sim",
+      "sim": {
+        "ref": "player.dodge"
+      },
+      "grounded": false
+    }
+  },
+  "provenance": {
+    "provider": "blender-mannequin-spike",
+    "model": "blender-eevee ortho pitch 20deg, legScale 1, weapon none, armor base, sun 1.07, ambient 1.75",
+    "approvedSource": "art/approved/bardo_veteran_unarmed_north_v1.png"
+  },
+  "registrationNote": "Pivots, anchorX and sockets are COMPUTED from projected rig bones (rig.json), not judged. Compiled from the approved master under art/approved; the receipt beside it is verified on every production compile."
+}

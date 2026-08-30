@@ -8,17 +8,21 @@ import { validateSheetDef, type SheetDef } from '../../src/render/sheet'
 import { compileSheet, validateClipRefs, type CompileReport, type CompileSpec } from '../../tools/art/compile'
 import { makeContext, runGates, summarise } from '../../tools/art/gates'
 import { canon, rgbToHex, type RGB } from '../../tools/art/palette'
+import { verifyApproval } from '../../tools/art/approve'
 import { authoredFxFrame, quantizeFxAlpha, quantizeFxRotation } from '../../src/render/fxUnits'
 import { heroFrameName } from '../../src/render/views/player'
 import { createWorld } from '../../src/sim/scenarios'
 import { ARM } from '../../src/sim/weapons'
 
 const SHEETS = [
-  'bardo_hero',
-  'bardo_hero_north',
-  'bardo_hero_north_roll',
-  'bardo_hero_south',
-  'bardo_hero_south_roll',
+  'bardo_veteran_unarmed_east',
+  'bardo_veteran_unarmed_north',
+  'bardo_veteran_unarmed_south',
+  'bardo_veteran_unarmed_north_roll',
+  'bardo_veteran_unarmed_south_roll',
+  'bardo_veteran_greatsword_east',
+  'bardo_veteran_greatsword_north',
+  'bardo_veteran_greatsword_south',
   'bardo_brute',
 ] as const
 const sheetPath = (n: string) => `public/assets/sprites/${n}.png`
@@ -443,18 +447,25 @@ describe('review findings', () => {
     expect(() => validateClipRefs(wrongContact, 'x')).toThrow(/not a contact\/hit\/strike\/impact key/)
   })
 
-  it('pins every shipped source to its own immutable prompt record', () => {
-    const promptFiles = new Set<string>()
+  it('pins every shipped source to the approved master it was compiled from', () => {
+    // The custody claim, not the generator's: whatever made the pixels, a shipped sheet must name a
+    // master under art/approved that still matches its own receipt. A rig-rendered sheet has no
+    // prompt to pin, so a prompt is checked only where one is claimed.
+    const masters = new Set<string>()
     for (const name of SHEETS) {
       const def = JSON.parse(readFileSync(sidecarPath(name), 'utf8')) as SheetDef
-      const promptFile = def.source!.promptFile!
-      const promptHash = def.source!.promptHash!
+      const master = def.source!.approvedSource!
+      expect(master, name).toMatch(/^art\/approved\/.+\.png$/)
+      expect(() => verifyApproval(master, name), name).not.toThrow()
+      expect(def.source!.sourceFile, name).toBe(master)
+      masters.add(master)
+      const promptFile = def.source!.promptFile
+      if (!promptFile) continue
       expect(promptFile, name).toMatch(/^art\/prompts\/.+\.txt$/)
-      expect(promptHash, name).toBe(createHash('sha256').update(readFileSync(promptFile)).digest('hex'))
+      expect(def.source!.promptHash, name).toBe(createHash('sha256').update(readFileSync(promptFile)).digest('hex'))
       expect(readFileSync(promptFile, 'utf8').trim().length, name).toBeGreaterThan(100)
-      promptFiles.add(promptFile)
     }
-    expect(promptFiles.size).toBe(SHEETS.length)
+    expect(masters.size).toBe(SHEETS.length)
   })
 
   it('every shipped sidecar names a tuning window that still exists', () => {
@@ -470,11 +481,11 @@ describe('review findings', () => {
     world.player.state = 'attack'
     world.player.swingIndex = 1
     world.player.stateTick = 4
-    const south = JSON.parse(readFileSync('public/assets/sprites/bardo_hero_south.json', 'utf8')) as SheetDef
+    const south = JSON.parse(readFileSync('public/assets/sprites/bardo_veteran_greatsword_south.json', 'utf8')) as SheetDef
     const southSheet = { def: south } as unknown as Parameters<typeof heroFrameName>[0]
     const runtimeKey = heroFrameName(southSheet, world.player, world, 0)
     expect(runtimeKey).toBe(south.clips!.light2.sim!.contact)
-    expect(south.frames[runtimeKey].i).toBe(9)
+    expect(south.frames[runtimeKey].i).toBe(21)
   })
 
   it('pose fit preserves aspect instead of stretching a cropped silhouette', async () => {

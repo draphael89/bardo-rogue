@@ -7,11 +7,14 @@ TextureSource.defaultOptions.scaleMode = 'nearest'
 
 /** Authored sheets, each a PNG plus the JSON sidecar that names its frames. */
 const SHEETS = [
-  'bardo_hero',
-  'bardo_hero_north',
-  'bardo_hero_north_roll',
-  'bardo_hero_south',
-  'bardo_hero_south_roll',
+  'bardo_veteran_unarmed_east',
+  'bardo_veteran_unarmed_north',
+  'bardo_veteran_unarmed_south',
+  'bardo_veteran_unarmed_north_roll',
+  'bardo_veteran_unarmed_south_roll',
+  'bardo_veteran_greatsword_east',
+  'bardo_veteran_greatsword_north',
+  'bardo_veteran_greatsword_south',
   'bardo_brute',
 ] as const
 export type SheetName = (typeof SHEETS)[number]

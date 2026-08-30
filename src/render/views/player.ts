@@ -3,34 +3,42 @@ import type { Container, Graphics } from 'pixi.js'
 import type { Atlas } from '../atlas'
 import type { World, Player } from '@/sim/world'
 import { tuning } from '@/tuning'
-import { lerp, clamp01, easeOutCubic, easeInCubic, lerpAngle } from '../anim'
+import { lerp, easeOutCubic, easeInCubic } from '../anim'
 import { swingProgress } from '@/sim/combat'
 import { activeBoons, hasBoon, swingReach } from '@/sim/boons'
 import { BLADE_SMEAR, bladeDress, type BladeDress } from '../bladeDress'
-import { EntityView, SPRITE, WEAPON, HALF_PI } from './shared'
+import { EntityView, SPRITE, WEAPON, snapToTarget } from './shared'
 import type { Sheet } from '../sheet'
 import { ARM, armOf } from '@/sim/weapons'
-import { restoreSword, updateBow } from './bow'
+import { updateBow } from './bow'
 import { nearestHeroDirection, stableHeroDirection, verticalDodgeFrame, type HeroDirection } from '../heroDirection'
 import { dodgeClipFrame, promiseFrame, rollClipFrame, swingClipFrame, tickClipFrame } from '../clipSelect'
 
-const deg = (d: number): number => d * Math.PI / 180
-
 // The body and blade are one authored drawing: semantic simulation phases select semantic frames, so
 // no full-body rotation or squash is needed to invent an attack pose after the fact. Frame names,
-// cell indices and per-pose foot pivots all live in the sheet's sidecar
-// (`public/assets/sprites/bardo_hero.json`, compiled by `pnpm art compile art/specs/hero.json`) —
-// the renderer names a pose and the contract answers with the drawing and where its feet are.
+// cell indices and per-pose foot pivots all live in the sheet's sidecar (compiled by
+// `pnpm art compile art/specs/veteran-*.json`) — the renderer names a pose and the contract answers
+// with the drawing and where its feet are.
+//
+// Two FAMILIES, selected by what the hand is holding. Unarmed is the body the Bardo starts in; the
+// greatsword family carries the blade in every one of its cells, which is why the separate weapon
+// sprite is not drawn over it. There is no third path: every state the player can be in, in either
+// family, resolves to an authored frame.
 const VERTICAL_ROLL_HOP = [0, 1, 2, 0] as const
 type HeroSheet = { sheet: Sheet; roll?: Sheet }
-type PlayerArt = { stock: Texture; stockWhite: Texture; hero: Record<HeroDirection, HeroSheet> }
+type HeroFamily = Record<HeroDirection, HeroSheet>
+type PlayerArt = { unarmed: HeroFamily; armed: HeroFamily }
 const playerArt = new WeakMap<EntityView, PlayerArt>()
 type ClipSelection = { key: string; direction: HeroDirection; stateTick: number }
 const clipSelection = new WeakMap<EntityView, ClipSelection>()
 const freeDirection = new WeakMap<EntityView, HeroDirection>()
 
-// Clip names in play order: swings[i] maps to SWING_CLIPS[i] in every hero sidecar.
+// Clip names in play order: swings[i] maps to SWING_CLIPS[i] in every armed sidecar.
 const SWING_CLIPS = ['light1', 'light2', 'heavy'] as const
+// What every hero sheet must carry, and what only an armed one must. The unarmed family cannot
+// swing — `capturePlayerInput` drops attack and heavy while `!p.armed` — so demanding a swing chain
+// of it would be demanding art for a state the sim cannot enter.
+const BODY_CLIPS = ['run', 'dodge'] as const
 
 /**
  * Fail at load, not mid-combat.
@@ -39,9 +47,12 @@ const SWING_CLIPS = ['light1', 'light2', 'heavy'] as const
  * generic gates, and then throws the first time the player moves, dodges or swings. The vocabulary
  * a hero sheet must carry is a real contract; assert it once where the sheets are bound.
  */
-function requireHeroClips(sheet: Sheet): Sheet {
-  for (const name of ['run', 'dodge', ...SWING_CLIPS]) {
+function requireHeroClips(sheet: Sheet, clips: readonly string[]): Sheet {
+  for (const name of clips) {
     if (!sheet.def.clips?.[name]) throw new Error(`sheet ${sheet.def.id}: a hero sheet must declare the "${name}" clip — the renderer selects frames by that name`)
+  }
+  for (const name of ['idle', 'hurt', 'dead']) {
+    if (!sheet.has(name)) throw new Error(`sheet ${sheet.def.id}: a hero sheet must declare the bare "${name}" frame`)
   }
   return sheet
 }
@@ -74,8 +85,7 @@ export function heroFrameName(sheet: Sheet, p: Player, world: World, time: numbe
     s.heavy ? promiseFrame(tuning.player.attack.heavyCommitTick) : undefined)
 }
 
-function authoredDirectionFor(v: EntityView, p: Player, bladeEquipped: boolean): HeroDirection | null {
-  if (!bladeEquipped) { clipSelection.delete(v); freeDirection.delete(v); return null }
+function authoredDirectionFor(v: EntityView, p: Player): HeroDirection {
   if (p.state === 'free') {
     clipSelection.delete(v)
     const direction = stableHeroDirection(p.aimAngle, freeDirection.get(v))
@@ -110,25 +120,33 @@ function authoredDirectionFor(v: EntityView, p: Player, bladeEquipped: boolean):
 
 export function createPlayerView(atlas: Atlas, layers: { entities: Container; shadows: Container }): EntityView {
   const v = new EntityView(atlas, SPRITE.player, WEAPON.player, layers)
+  // The armed family owns no roll sheet, and that is the contract rather than a gap: the rig refuses
+  // to carry a greatsword through a tuck (the blade tip leaves the cell), so an armed depth-axis
+  // dodge plays that family's own dive/fall/land with the blade still in hand.
   const art: PlayerArt = {
-    stock: atlas.tile(SPRITE.player), stockWhite: atlas.white(SPRITE.player),
-    hero: {
-      side: { sheet: requireHeroClips(atlas.sheet('bardo_hero')) },
-      north: { sheet: requireHeroClips(atlas.sheet('bardo_hero_north')), roll: requireRollClip(atlas.sheet('bardo_hero_north_roll')) },
-      south: { sheet: requireHeroClips(atlas.sheet('bardo_hero_south')), roll: requireRollClip(atlas.sheet('bardo_hero_south_roll')) },
+    unarmed: {
+      side: { sheet: requireHeroClips(atlas.sheet('bardo_veteran_unarmed_east'), BODY_CLIPS) },
+      north: { sheet: requireHeroClips(atlas.sheet('bardo_veteran_unarmed_north'), BODY_CLIPS), roll: requireRollClip(atlas.sheet('bardo_veteran_unarmed_north_roll')) },
+      south: { sheet: requireHeroClips(atlas.sheet('bardo_veteran_unarmed_south'), BODY_CLIPS), roll: requireRollClip(atlas.sheet('bardo_veteran_unarmed_south_roll')) },
+    },
+    armed: {
+      side: { sheet: requireHeroClips(atlas.sheet('bardo_veteran_greatsword_east'), [...BODY_CLIPS, ...SWING_CLIPS]) },
+      north: { sheet: requireHeroClips(atlas.sheet('bardo_veteran_greatsword_north'), [...BODY_CLIPS, ...SWING_CLIPS]) },
+      south: { sheet: requireHeroClips(atlas.sheet('bardo_veteran_greatsword_south'), [...BODY_CLIPS, ...SWING_CLIPS]) },
     },
   }
   playerArt.set(v, art)
-  whiteFor.set(atlas.tile(SPRITE.player), atlas.white(SPRITE.player))
-  for (const direction of ['side', 'north', 'south'] as const) {
-    const { sheet, roll } = art.hero[direction]
-    for (const name of sheet.names()) {
-      const f = sheet.frame(name)
-      whiteFor.set(f.texture, f.white)
-    }
-    for (const name of roll?.names() ?? []) {
-      const f = roll!.frame(name)
-      whiteFor.set(f.texture, f.white)
+  for (const family of [art.unarmed, art.armed]) {
+    for (const direction of ['side', 'north', 'south'] as const) {
+      const { sheet, roll } = family[direction]
+      for (const name of sheet.names()) {
+        const f = sheet.frame(name)
+        whiteFor.set(f.texture, f.white)
+      }
+      for (const name of roll?.names() ?? []) {
+        const f = roll!.frame(name)
+        whiteFor.set(f.texture, f.white)
+      }
     }
   }
   const rims: Sprite[] = []
@@ -145,7 +163,10 @@ export function createPlayerView(atlas: Atlas, layers: { entities: Container; sh
 // a pixel of shading. So the shaded body is drawn exactly as it always is, and four copies of its
 // own silhouette are stamped one pixel out BEHIND it. This is the only place the game paints white
 // on a character, and even here it never covers one: an outline is the opposite of a wash.
-const RIM_OFFSETS = [[1, 0], [-1, 0], [0, 1], [0, -1]]
+// One TARGET pixel out, which is what "one pixel" means for art cut 1:1 against the world scale.
+// In world units that is 1 / worldScale; a whole world px would put the stamp on a half target
+// pixel and turn a hard outline back into a guess.
+const RIM_OFFSETS = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([x, y]) => [x / tuning.view.worldScale, y / tuning.view.worldScale])
 const rimSprites = new WeakMap<EntityView, Sprite[]>()
 const whiteFor = new Map<Texture, Texture>()
 
@@ -170,387 +191,35 @@ export function updatePlayerRim(v: EntityView, on: boolean, color: number): void
   }
 }
 
-// ---------------------------------------------------------------------------------------------
-// The roll's own art. Eight authored 16 px poses, in the player sprite's exact five-colour palette
-// (outline 3f2631, shadow 52607c, steel 8b9bb4, highlight c0cbdc, leather bd6c4a), drawn once into
-// nearest-sampled textures at first use. A dodge is NOT the standing sprite under a transform: the
-// body pitches over on the launch, leaves the floor, turns through two tuck halves whose helmet and
-// shadow mass swap ends, opens out into the brake, plants wide, and stands back up. Every pose is a
-// different silhouette, so a single frame of a strip says "roll" with no motion and no label.
-// Authored facing right; the sprite's own `facing` mirror serves the other side.
-const ROLL_COLORS: Record<string, string> = { k: '#3f2631', d: '#52607c', m: '#8b9bb4', l: '#c0cbdc', s: '#bd6c4a' }
-const ROLL_ART: Record<string, string[]> = {
-  launch: [
-    '................',
-    '................',
-    '.........kkkk...',
-    '........kllllk..',
-    '.......klllllk..',
-    '.......kllkllk..',
-    '.....kkkmmkmmk..',
-    '...kkmmmmmmmk...',
-    '..kdmmmmmmmmk...',
-    '..kdmmsssmmmk...',
-    '.kddkkmmmmmmk...',
-    '.kdk..kmmmmmk...',
-    'kdk...kdddddk...',
-    'kk....kddkkddk..',
-    '......kddk.kdk..',
-    '.....kklk..klk..',
-  ],
-  dive: [
-    '................',
-    '................',
-    '................',
-    '..kkk...........',
-    '.kdddk..........',
-    '.kdddkkk........',
-    '.kkddddddkk.....',
-    '..kmmmmmmmmkk...',
-    '..kmmmmmmllllk..',
-    '.kdmmmmmlkkllk..',
-    '.kdmmkkmllllllk.',
-    '.kdk..kmmlllkk..',
-    '..k...kkkkkk....',
-    '................',
-    '................',
-    '................',
-  ],
-  tuckA: [
-    '................',
-    '................',
-    '................',
-    '................',
-    '....kkkkk.......',
-    '...kdddddkk.....',
-    '..kddddddddk....',
-    '.kdddddddddmk...',
-    '.kddmmmmmmmmmk..',
-    '.kdmmmmmkllllk..',
-    '..kmmmmklklklk..',
-    '...kmmmklllllk..',
-    '....kmmkllllk...',
-    '.....kkkkkkk....',
-    '................',
-    '................',
-  ],
-  tuckB: [
-    '................',
-    '................',
-    '................',
-    '..kkkkk.........',
-    '.kllllldkk......',
-    '.klklklddddk....',
-    '.klllllddddddk..',
-    '.kllllmmmmmmmk..',
-    '..kmmmmmmmmmmk..',
-    '..kmmmmmmmmmdk..',
-    '...kddddddddk...',
-    '...kdddddddkk...',
-    '....kkddddkk....',
-    '......kkkk......',
-    '................',
-    '................',
-  ],
-  extend: [
-    '................',
-    '................',
-    '................',
-    '....kkkk........',
-    '...kllllk.......',
-    '...kllllkk......',
-    '...kmllmmmk.....',
-    '..kdmmmmmmmk....',
-    '.kdmmmmmmmmmk...',
-    'kdmssssmmmmmk...',
-    'kdk.ksssmmmmk...',
-    'kk...kmmmmmmk...',
-    '.....kdddkdddk..',
-    '....kkddk.kddk..',
-    '....kddk...kdk..',
-    '....klk....klk..',
-  ],
-  plant: [
-    '................',
-    '................',
-    '................',
-    '......kkkk......',
-    '.....kllllk.....',
-    '....kmllllmk....',
-    '....kmlkmklmk...',
-    '...kmmmmmmmmk...',
-    '..kmmmmmmmmmmk..',
-    '.kmmmmmmmmmmmk..',
-    'kdmkssssssmkmk..',
-    'kdk.kmmmmk.kmk..',
-    'kk.kddddddk.kk..',
-    '..kdddkkdddk....',
-    '..kddk..kddk....',
-    '.kklk...kklk....',
-  ],
-  absorb: [
-    '................',
-    '................',
-    '................',
-    '................',
-    '................',
-    '......kkkk......',
-    '.....kllllk.....',
-    '....kmllllmk....',
-    '....kmlkmklmk...',
-    '...kmmmmmmmmk...',
-    '..kmmmmmmmmmmk..',
-    '.kdmssssssssmdk.',
-    '.kdkkmmmmmmkkdk.',
-    '.kk.kdddddddk.k.',
-    '....kddk.kddk...',
-    '...kklk...kklk..',
-  ],
-  rise: [
-    '................',
-    '................',
-    '.....kkkkk......',
-    '....klllllk.....',
-    '...kmllllmk.....',
-    '...kmllllmk.....',
-    '..kmmmmmmmmk....',
-    '..kmmkmkmkmk....',
-    '..kmmmmmmmmk....',
-    '.kllkkkkkkllk...',
-    '.kllmmllmmllk...',
-    '.kddmmllmmddk...',
-    '..kdkssssskdk...',
-    '..kdk.kkk.kdk...',
-    '...kk.kddk.kk...',
-    '......klk.......',
-  ],
-  lightCoil: [
-    '................',
-    '......kkkk......',
-    '.....kllllk.....',
-    '.....kllllk.....',
-    '.....kmlmlk.....',
-    '....kmmmmmk.....',
-    '....kmmmmmk.....',
-    '...kkmmmmmk.....',
-    '..kdmkkkkmk.....',
-    '..kdmssssmk.....',
-    '..kdkkmmmkk.....',
-    '..kdk.kddk......',
-    '..kk..kddk......',
-    '......kddk......',
-    '......klk.......',
-    '................',
-  ],
-  lightCut: [
-    '................',
-    '....kkkk........',
-    '...kllllk.......',
-    '...kllllk.......',
-    '...kmllmk.......',
-    '..kmmmmmmk......',
-    '..kmmkmkmk......',
-    '.kmmmmmmmmk.....',
-    'kdmkkkkkkmk.....',
-    'kdk.sssss.k.....',
-    'kk.kmmmmmk......',
-    '...kdddddk......',
-    '...kddkkddk.....',
-    '...kdk..kdk.....',
-    '...klk..klk.....',
-    '................',
-  ],
-  heavyCoil: [
-    '................',
-    '................',
-    '......kkkk......',
-    '.....kllllk.....',
-    '.....kllllk.....',
-    '....kmllllmk....',
-    '....kmmmmmmk....',
-    '...kmmmmmmmmk...',
-    '..kmmkkkkmmmk...',
-    '.kdmssssssmdk...',
-    '.kdkkmmmmkkdk...',
-    '.kk.kddddddk.k..',
-    '....kddk.kddk...',
-    '...kddk...kddk..',
-    '...klk.....klk..',
-    '................',
-  ],
-  heavyCut: [
-    '................',
-    '...kkkk.........',
-    '..kllllk........',
-    '..kllllkk.......',
-    '..kmllmmmk......',
-    '.kmmmmmmmmk.....',
-    'kmmmmmmmmmmk....',
-    'kdmkkkkkkkmk....',
-    'kdk.ssssssmk....',
-    'kk..kmmmmmmk....',
-    '....kddddddk....',
-    '...kddk.kddk....',
-    '..kddk...kdk....',
-    '..klk....klk....',
-    '................',
-    '................',
-  ],
-  heavyHold: [
-    '................',
-    '................',
-    '.....kkkkk......',
-    '....klllllk.....',
-    '....klllllk.....',
-    '...kmlllllmk....',
-    '...kmmmmmmmk....',
-    '..kmmmmmmmmmk...',
-    '.kmmkkkkkmmmk...',
-    'kdmkssssskmdk...',
-    'kdk.kmmmmk.kdk..',
-    'kk.kddddddk.kk..',
-    '...kddk.kddk....',
-    '..kddk...kddk...',
-    '..klk.....klk...',
-    '................',
-  ],
-}
-
-let rollTextures: Record<string, Texture> | null = null
-function rollTexture(key: string): Texture | null {
-  if (!rollTextures) {
-    rollTextures = {}
-    for (const name in ROLL_ART) {
-      const rows = ROLL_ART[name]
-      const c = document.createElement('canvas'); c.width = 16; c.height = 16
-      const ctx = c.getContext('2d')!
-      // the same silhouette in flat white, so the rim can outline an authored roll pose too
-      const cw = document.createElement('canvas'); cw.width = 16; cw.height = 16
-      const cwx = cw.getContext('2d')!; cwx.fillStyle = '#ffffff'
-      for (let y = 0; y < rows.length; y++) for (let x = 0; x < 16; x++) {
-        const col = ROLL_COLORS[rows[y][x]]
-        if (col) { ctx.fillStyle = col; ctx.fillRect(x, y, 1, 1); cwx.fillRect(x, y, 1, 1) }
-      }
-      const t = Texture.from(c); t.source.scaleMode = 'nearest'
-      const tw = Texture.from(cw); tw.source.scaleMode = 'nearest'
-      rollTextures[name] = t
-      whiteFor.set(t, tw)
-    }
-  }
-  return rollTextures[key] ?? null
-}
-
-// Which pose owns this tick of the dodge state. The table lives in tuning (juice.roll.pose), so the
-// keys move with the sim's own timing numbers. Held per tick, never interpolated: an authored pose
-// that eases between frames is a transform again.
-function rollPose(stateTick: number): { key: string; leanDeg: number; hop: number } {
-  const table = tuning.juice.roll.pose
-  let row = table[0]
-  for (const r of table) if (stateTick >= r.tick) row = r
-  return row
-}
-
-// Authored swing silhouettes. Recovery hands the Kenney body back (`key: ''`) so the
-// fighter reads as "on the feet" the moment the blade is done. Lights share one pair;
-// the heavy gets its own plant / throw / hold so a still frame names the swing.
-function attackPose(p: Player): { key: string; leanDeg: number; hop: number } {
-  const s = tuning.player.attack.swings[p.swingIndex]
-  const tk = p.stateTick
-  if (p.reversalActionId === p.swingId && p.swingIndex === 0 && tk === 0 && Math.abs(p.dodgeDirX) > 0.45) {
-    // A lateral counter borrows the roll's authored extension for one frame before coiling. That is
-    // the missing motion match between the last tuck and the sword pose; vertical sheets keep their
-    // own viewpoint and use the rotational bridge below instead.
-    return { key: 'extend', leanDeg: 10, hop: 0 }
-  }
-  if (tk < s.startup) {
-    return s.heavy
-      ? { key: 'heavyCoil', leanDeg: -14, hop: -2 }
-      : { key: 'lightCoil', leanDeg: -8, hop: 0 }
-  }
-  if (tk < s.startup + s.active) {
-    return s.heavy
-      ? { key: 'heavyCut', leanDeg: 16, hop: 2 }
-      : { key: 'lightCut', leanDeg: 10, hop: 1 }
-  }
-  if (s.heavy && tk < s.startup + s.active + 8) return { key: 'heavyHold', leanDeg: 6, hop: 0 }
-  return { key: '', leanDeg: 0, hop: 0 }
-}
 
 export function updatePlayerView(v: EntityView, p: Player, world: World, alpha: number, time: number): void {
   const P = tuning.player
   const x = lerp(p.px, p.x, alpha), y = lerp(p.py, p.y, alpha)
   const feetY = y + p.radius + 1
   let sx = 1, sy = 1, rot = 0, hop = 0
-  let rollKey = ''
-  let attackKey = ''
-  let moveKey = ''
   let verticalRollFrame = -1
   const b = v.body
-  const speed = Math.hypot(p.vx, p.vy)
   const bladeEquipped = armOf(world) === ARM.blade && p.armed
-  const heroDirection = authoredDirectionFor(v, p, bladeEquipped)
-  const authoredBlade = heroDirection !== null
-  const art = playerArt.get(v)
+  const heroDirection = authoredDirectionFor(v, p)
+  const art = playerArt.get(v)!
+  const hero = (bladeEquipped ? art.armed : art.unarmed)[heroDirection]
 
   b.tint = 0xffffff
-  if (art && heroDirection) {
-    const hero = art.hero[heroDirection]
-    const frameName = heroFrameName(hero.sheet, p, world, time)
-    verticalRollFrame = verticalDodgeFrame(heroDirection, p.stateTick, P.dodge.travel)
-    if (p.state === 'dodge' && verticalRollFrame >= 0 && hero.roll) {
-      const frame = hero.roll.frame(rollClipFrame(hero.roll.def.clips!.roll, verticalRollFrame))
-      v.bindBody(frame.texture, frame.white)
-      b.anchor.set(frame.anchorX, frame.anchorY)
-      if (verticalRollFrame === 1 || verticalRollFrame === 2) {
-        // The compact tuck and boots-over-head apex both need a readable rotation axis at native
-        // scale. Turn them around their own centres: the compensating hop preserves the authored
-        // floor plane while separating helm, torso, and boots from one round floor-bound mass.
-        hop = 11
-      } else {
-        hop = VERTICAL_ROLL_HOP[verticalRollFrame]
-      }
-    } else {
-      const frame = hero.sheet.frame(frameName)
-      v.bindBody(frame.texture, frame.white)
-      b.anchor.set(frame.anchorX, frame.anchorY)
-    }
-  } else if (art) {
-    v.bindBody(art.stock, art.stockWhite)
-    b.anchor.set(0.5, 1)
+  // A depth-axis dodge plays the roll sheet for the ticks the body is actually airborne; the dodge
+  // clip's launch and land frames own the ends. A family with no roll sheet keeps its own clip.
+  if (p.state === 'dodge' && hero.roll) verticalRollFrame = verticalDodgeFrame(heroDirection, p.stateTick, P.dodge.travel)
+  if (verticalRollFrame >= 0) {
+    const frame = hero.roll!.frame(rollClipFrame(hero.roll!.def.clips!.roll, verticalRollFrame))
+    v.bindBody(frame.texture, frame.white)
+    b.anchor.set(frame.anchorX, frame.anchorY)
+    hop = VERTICAL_ROLL_HOP[verticalRollFrame]
+  } else {
+    const frame = hero.sheet.frame(heroFrameName(hero.sheet, p, world, time))
+    v.bindBody(frame.texture, frame.white)
+    b.anchor.set(frame.anchorX, frame.anchorY)
   }
 
-  if (authoredBlade) {
-    // Translation is simulation truth. Depth-axis dodges select four discrete authored turn keys
-    // above. The tuck begins the diagonal read and the already-inverted apex completes it; the
-    // outer keys remain untransformed, and no interpolation or squash manufactures extra poses.
-    if (verticalRollFrame === 1) rot = heroDirection === 'north' ? deg(14) : deg(-14)
-    else if (verticalRollFrame === 2) rot = heroDirection === 'north' ? deg(28) : deg(-28)
-  } else if (p.state === 'free') {
-    if (speed > 10) {
-      // Two authored silhouettes per plane: profile for lateral movement, front for vertical
-      // movement. Facing still follows aim, so retreating and circle-strafing never flip the sword
-      // away from the target. Reusing the combat palette keeps the 16 px body visually singular.
-      const alternate = (Math.floor(time * 10) & 1) !== 0
-      const vertical = Math.abs(p.vy) > Math.abs(p.vx) * 1.15
-      moveKey = vertical ? (alternate ? 'rise' : 'absorb') : (alternate ? 'lightCut' : 'lightCoil')
-      hop = alternate ? 1 : 0
-      rot = (p.vx / P.maxSpeed) * 0.035
-    } else {
-      sy = 1 + Math.sin(time * 4) * 0.025
-    }
-  } else if (p.state === 'dodge') {
-    // No transform of the standing sprite here at all: the body IS a different drawing on these
-    // ticks. All this branch does is pick the pose, lean it into the travel, and set how far off
-    // the floor it sits. Held per tick — an authored frame does not ease.
-    const pose = rollPose(p.stateTick)
-    rollKey = pose.key
-    const hx = Math.abs(p.dodgeDirX)                        // 1 = flat sideways roll, 0 = straight up/down
-    const dirSign = (p.dodgeDirX >= 0 ? 1 : -1) * p.facing  // the sprite is mirrored by facing
-    // the lean carries the heading on top of the mirror, and it is what a straight up/down roll has
-    // instead of one: a pose tipped off vertical, never a flattened idle
-    rot = deg(pose.leanDeg) * dirSign * (0.45 + 0.55 * hx)
-    hop = pose.hop
-  } else if (p.state === 'attack' && armOf(world) === ARM.bow) {
+  if (p.state === 'attack' && armOf(world) === ARM.bow) {
     const B = tuning.bow
     const tk = p.stateTick + alpha
     const lean = Math.cos(p.swingAngle)
@@ -567,55 +236,20 @@ export function updatePlayerView(v: EntityView, p: Player, world: World, alpha: 
       rot = lean * 0.28 * pop - lean * 0.08 * (1 - u)
       hop = 2.6 * pop
     }
-  } else if (p.state === 'attack') {
-    const pose = attackPose(p)
-    attackKey = pose.key
-    const lean = Math.cos(p.swingAngle)
-    const dirSign = (lean >= 0 ? 1 : -1) * p.facing
-    if (attackKey) {
-      // authored frame: do not squash it. Lean names the heading the way the roll does.
-      rot = deg(pose.leanDeg) * dirSign
-      hop = pose.hop
-      if (p.reversalActionId === p.swingId && p.swingIndex === 0) {
-        // Continue the roll's brake into the answer for two startup ticks. Simulation translation
-        // and startup remain untouched; this merely avoids a tuck -> upright-coil pose pop.
-        const bridge = 1 - Math.min(1, (p.stateTick + alpha) / 2)
-        const rollSign = (p.dodgeDirX >= 0 ? 1 : -1) * p.facing
-        rot += deg(10 + 18 * Math.abs(p.dodgeDirY)) * rollSign * bridge
-        hop += bridge
-      }
-    } else {
-      const s = P.attack.swings[p.swingIndex]
-      const tk = p.stateTick + alpha
-      const u = easeOutCubic((tk - s.startup - s.active) / s.recovery)
-      sx = lerp(s.heavy ? 1.18 : 1.08, 1, u)
-      sy = lerp(s.heavy ? 0.86 : 0.94, 1, u)
-      rot = lean * (s.heavy ? 0.16 : 0.08) * (1 - u)
-      if (s.heavy) hop = 1 * (1 - u)
-    }
-  } else if (p.state === 'dead') {
-    rot = HALF_PI * p.facing; b.tint = 0x777777
   }
 
-  if (!authoredBlade && v.squash > 0) { const q = v.squash / tuning.juice.squashTicks; sx *= 1 + 0.25 * q; sy *= 1 - 0.25 * q }
-
-  b.position.set(Math.round(x), Math.round(feetY - hop))
+  b.position.set(snapToTarget(x), snapToTarget(feetY - hop))
   // The side sheet is authored facing right and mirrors cleanly. Front/back sheets keep a stable
   // handed silhouette; exact diagonal intent remains visible in the mechanically truthful arc.
-  b.scale.set(sx * (heroDirection === 'side' || !authoredBlade ? p.facing : 1), sy)
+  b.scale.set(sx * (heroDirection === 'side' ? p.facing : 1), sy)
   b.rotation = rot
   // Horizontal authored melee is intentionally drawn a fraction above an equal-footed victim. At
   // exact contact both sprites otherwise share z and enemy insertion order deletes the attacker;
   // the fraction does not disturb normal north/south depth sorting.
-  b.zIndex = feetY + (authoredBlade && p.state === 'attack' ? 0.25 : 0)
-  // The authored clip already spends the hurt event on a distinct recoiling pose. Whitening that
-  // entire 32px drawing for the four frozen ticks turns the victim into the impact core and removes
-  // attribution; legacy sprites still need their texture flash because they have no hurt frame.
-  v.setFlash((p.flash > 0 || p.state === 'hurt') && !authoredBlade)
-  // the roll's own drawing wins over the standing sprite, but never over the hurt flash
-  if (rollKey && p.flash <= 0) { const t = rollTexture(rollKey); if (t) b.texture = t }
-  else if (attackKey && p.flash <= 0) { const t = rollTexture(attackKey); if (t) b.texture = t }
-  else if (moveKey && p.flash <= 0) { const t = rollTexture(moveKey); if (t) b.texture = t }
+  b.zIndex = feetY + (p.state === 'attack' ? 0.25 : 0)
+  // No hit flash on the player: every family spends the hurt event on its own recoiling drawing.
+  // Whitening that drawing for the four frozen ticks turns the victim into the impact core and
+  // removes attribution — which is why `hurt` is an authored frame and not a tint.
   b.alpha = p.iframes > 0 && p.state !== 'dead' ? ((p.iframes >> 2) & 1 ? 0.35 : 1) : 1
   // the shadow reports how close to the floor the body is. In the slide it stretches along the
   // travel and darkens: the body is not in the air, it is skimming.
@@ -624,96 +258,10 @@ export function updatePlayerView(v: EntityView, p: Player, world: World, alpha: 
     v.setShadow(x, feetY - 1, 12 + 8 * hx, 5 + 3 * (1 - hx), 0.44)
   } else v.setShadow(x, feetY - 1, 12 - hop * 0.4, 5 - hop * 0.2, 0.35 - hop * 0.02)
 
+  // The blade is IN the drawing on every armed cell, and the unarmed family is holding nothing, so
+  // the separate weapon sprite has one job left: the bow.
   if (armOf(world) === ARM.bow) updateBow(v, p, x, y, alpha, time)
-  else if (authoredBlade) {
-    if (verticalRollFrame >= 0) { restoreSword(v); updateSword(v, p, world, x, y, alpha, time, true) }
-    else if (v.weapon) v.weapon.visible = false
-  }
-  else { restoreSword(v); updateSword(v, p, world, x, y, alpha, time) }
-}
-
-function updateSword(v: EntityView, p: Player, world: World, x: number, y: number, alpha: number, time: number, separateRollWeapon = false): void {
-  const w = v.weapon!
-  if (!p.armed) { w.visible = false; return }
-  const P = tuning.player
-  const f = p.facing
-  // rest pose: blade up, resting on the shoulder
-  const restAngle = -HALF_PI - f * 0.45
-  const restX = x - f * 4, restY = y - 3 + Math.sin(time * 4) * 0.5
-  let angle = restAngle, wx = restX, wy = restY, inFront = f === 1, ws = 1
-
-  if (p.state === 'attack') {
-    const s = P.attack.swings[p.swingIndex]
-    const reach = swingReach(world, s)
-    const half = (reach.arcDeg * Math.PI / 180) / 2
-    const start = p.swingAngle - s.sweep * half
-    const end = start + s.sweep * half * 2           // never lerpAngle across this: the heavy arc is over 180 deg
-    const tk = p.stateTick + alpha
-    let a: number, r: number
-    if (tk < s.startup) {
-      if (s.heavy) {
-        // it keeps rising the whole wind-up, over-cocks past the start edge, then settles onto it
-        const t = tk / s.startup
-        const cock = start - s.sweep * 0.38
-        a = t < 0.75 ? lerpAngle(restAngle, cock, t / 0.75) : lerpAngle(cock, start, (t - 0.75) / 0.25)
-        r = lerp(3, 11, t)
-        ws = lerp(1, 1.26, t)
-      } else {
-        const u = easeOutCubic(tk / s.startup)
-        a = lerpAngle(restAngle, start, u)
-        r = lerp(3, 8, u)
-      }
-    } else if (tk < s.startup + s.active) {
-      const u = displayedSwingProgress(s, p.stateTick)
-      a = start + (end - start) * u
-      r = s.heavy ? lerp(12, 17, u) : 10
-      ws = s.heavy ? lerp(1.38, 1.55, u) : 1
-    } else {
-      // two-stage return: swing end -> aim direction -> shoulder, so the blade never sweeps around the back
-      const u = easeOutCubic((tk - s.startup - s.active) / s.recovery)
-      a = u < 0.4 ? lerpAngle(end, p.swingAngle, u / 0.4) : lerpAngle(p.swingAngle, restAngle, (u - 0.4) / 0.6)
-      r = lerp(s.heavy ? 17 : 10, 3, u)
-    }
-    angle = a; wx = x + Math.cos(a) * r; wy = y + Math.sin(a) * r * 0.8
-    inFront = s.heavy || Math.sin(a) > -0.3
-  } else if (p.state === 'dodge') {
-    // The blade is never deleted mid-roll — a weapon that blinks out of existence is the tell — but
-    // it must not merge with the compact body into a false floor ring. Carry it short on the exact
-    // back-travel axis through the turn, then bring it back to guard on the plant.
-    const d = P.dodge
-    const tk = p.stateTick + alpha
-    const roll = Math.atan2(p.dodgeDirY, p.dodgeDirX)
-    const trail = roll + Math.PI                       // straight back down the line he came from
-    const pull = clamp01(tk / 3)                       // three ticks to sweep the blade onto the line
-    if (tk < d.travel) {
-      const lateral = separateRollWeapon ? 3 * pull : 0
-      angle = lerpAngle(restAngle, trail, pull)
-      wx = x - Math.cos(roll) * (1 + 2 * pull) - Math.sin(roll) * lateral
-      wy = y - Math.sin(roll) * (1 + 2 * pull) + Math.cos(roll) * lateral
-      inFront = false
-      ws = lerp(1, 0.82, pull)
-    } else {
-      const u = easeOutCubic((tk - d.travel) / (d.total - d.travel))
-      const lateral = separateRollWeapon ? 3 : 0
-      const trailX = x - Math.cos(roll) * 3 - Math.sin(roll) * lateral
-      const trailY = y - Math.sin(roll) * 3 + Math.cos(roll) * lateral
-      angle = lerpAngle(trail, restAngle, u)
-      wx = lerp(trailX, restX, u)
-      wy = lerp(trailY, restY, u)
-      inFront = u > 0.6 && f === 1
-      ws = lerp(0.82, 1, u)
-    }
-  } else if (p.state === 'dead') {
-    w.visible = true; w.position.set(Math.round(x + f * 6), Math.round(y + 6)); w.rotation = HALF_PI + 0.3; w.zIndex = y - 1; return
-  }
-  w.visible = true
-  w.position.set(Math.round(wx), Math.round(wy))
-  w.rotation = angle + HALF_PI
-  w.zIndex = y + p.radius + 1 + (inFront ? 0.5 : -0.5)
-  w.scale.set(ws)
-  const hot = p.state === 'attack' && P.attack.swings[p.swingIndex].heavy
-  const dress = bladeDress(activeBoons(world), !!world.session.run?.primedBrand)
-  w.tint = dress === 'ember' ? 0xff8a20 : dress === 'veil' ? 0xc8b0ff : hot ? 0xffe8a0 : 0xffffff
+  else if (v.weapon) v.weapon.visible = false
 }
 
 type SwingArc = {

@@ -566,7 +566,7 @@ export class RewardOverlay {
     const W = tuning.view.width
     this.scrim.rect(0, 0, W, tuning.view.height).fill({ color: P.void, alpha: 0.76 })
     const settings = this.pausePage === 'settings'
-    const rows = settings ? 5 : leaving ? 3 : 2   // still, master, music, sound, rise
+    const rows = settings ? 6 : leaving ? 3 : 2   // still, master, music, sound, fullscreen, rise
     const foot = pauseFooter()
     const cardH = 56 + rows * 22 + (foot ? 28 : 16)
     const cardY = Math.round((tuning.view.height - cardH) / 2)
@@ -581,7 +581,8 @@ export class RewardOverlay {
       this.paintPauseMeter(W / 2, rowY + 22, 'MASTER', this.master, this.pauseFocus === 1)
       this.paintPauseMeter(W / 2, rowY + 44, 'MUSIC', this.music, this.pauseFocus === 2)
       this.paintPauseMeter(W / 2, rowY + 66, 'SOUND', this.sfx, this.pauseFocus === 3)
-      this.paintPauseRow(W / 2, rowY + 88, 'RISE', this.pauseFocus === 4)
+      this.paintPauseRow(W / 2, rowY + 88, 'FULLSCREEN', this.pauseFocus === 4)
+      this.paintPauseRow(W / 2, rowY + 110, 'RISE', this.pauseFocus === 5)
     } else {
       this.paintPauseRow(W / 2, rowY, 'RISE', this.pauseFocus === 0)
       if (leaving) {

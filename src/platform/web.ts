@@ -149,10 +149,15 @@ export function createWebPlatform(): Platform {
     // a 20% larger room, and it costs nothing in crispness because the scale stays a whole number.
     fullscreen: async on => {
       const want = on ?? !document.fullscreenElement
+      // requestFullscreen needs a transient user activation, which a key or click carries and
+      // polled gamepad input never does. Report the refusal instead of attempting a request the
+      // browser will reject, so the settings row can say "press F" rather than silently do nothing.
+      if (want && navigator.userActivation && !navigator.userActivation.isActive) return false
       try {
         if (!want) await document.exitFullscreen()
         else await document.documentElement.requestFullscreen({ navigationUI: 'hide' })
-      } catch { /* the browser refused; nothing to recover, the game keeps running windowed */ }
+        return true
+      } catch { return false /* the browser refused; the game keeps running windowed */ }
     },
     setRunActive: () => { /* a browser tab has no quit to guard */ },
     // A foreign set, delete, or clear all invalidate this tab's in-memory whole document. Stop

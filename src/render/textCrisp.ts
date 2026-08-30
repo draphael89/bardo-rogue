@@ -1,9 +1,9 @@
 import { Filter, GlProgram } from 'pixi.js'
 
 // Pixi rasterises Text through canvas2d fillText/strokeText, and canvas2d ALWAYS anti-aliases: there
-// is no flag to turn it off. At resolution 1 inside a 480x270 target that is invisible on its own,
-// but the target is then magnified by an integer scale of 5 or 6, so every grey anti-aliased pixel
-// becomes a 5x5 or 6x6 grey block and the pixel font reads as blurred. Measured on the death card
+// is no flag to turn it off. At resolution 1 inside the render target that is invisible on its own,
+// but the target is then magnified by an integer scale, so every grey anti-aliased pixel
+// becomes an NxN grey block and the pixel font reads as blurred. Measured on the death card
 // before this filter: the title row held 49 distinct colours with 41% of its pixels at intermediate
 // values, most of them from the 2px text stroke.
 //

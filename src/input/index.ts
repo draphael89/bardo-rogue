@@ -135,8 +135,9 @@ export class InputSystem {
     const arrowY = (keyActive('ArrowDown') ? 1 : 0) - (keyActive('ArrowUp') ? 1 : 0)
     if (arrowX || arrowY) this.mouseOwnsAim = false
 
-    // mouse aim in world space. Canvas -> the 480x270 render target, then through the INVERSE of the live world
-    // container transform, so shake / punch-zoom / camera roll cannot split the ray you see from the ray the sim uses.
+    // mouse aim in world space. Canvas -> the 640x360 render target, then through the INVERSE of the live world
+    // container transform, so the follow camera, world scale, shake, punch-zoom and camera roll cannot split
+    // the ray you see from the ray the sim uses.
     let mouseAimX = 0, mouseAimY = 0
     if (this.mouseSeen && this.mouseOwnsAim) {
       const rect = this.ra.app.canvas.getBoundingClientRect()

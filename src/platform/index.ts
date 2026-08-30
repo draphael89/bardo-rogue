@@ -30,7 +30,7 @@ export interface Platform {
   readonly saves: SaveStore
   persistHint(): void                                 // best effort, never throws, never blocks, never logs
   prefersReducedMotion(): boolean
-  fullscreen(on?: boolean): Promise<void>
+  fullscreen(on?: boolean): Promise<boolean>          // false: the host refused (e.g. no user activation) — the caller may say so
   setRunActive(active: boolean): void                 // so a host can ask before a quit throws a run away
   // Claim exclusive write ownership before any migration or recovery can write. `unavailable` is
   // deliberately read-only: a non-atomic fallback would merely move the data-loss race elsewhere.

@@ -153,11 +153,20 @@ export function moveWithWalls(a: Arena, e: { x: number; y: number }, dx: number,
 // contact is a face, a diagonal corner, or the arena boundary. Fixed work keeps replays deterministic.
 function furthestClear(a: Arena, e: { x: number; y: number }, axis: 'x' | 'y', from: number, delta: number, r: number): number {
   let clear = 0, blocked = 1
-  for (let i = 0; i < 12; i++) {
-    const mid = (clear + blocked) * 0.5
-    e[axis] = from + delta * mid
-    if (overlapsSolid(a, e.x, e.y, r)) blocked = mid
-    else clear = mid
+  if (axis === 'x') {
+    const y = e.y
+    for (let i = 0; i < 12; i++) {
+      const mid = (clear + blocked) * 0.5
+      if (overlapsSolid(a, from + delta * mid, y, r)) blocked = mid
+      else clear = mid
+    }
+  } else {
+    const x = e.x
+    for (let i = 0; i < 12; i++) {
+      const mid = (clear + blocked) * 0.5
+      if (overlapsSolid(a, x, from + delta * mid, r)) blocked = mid
+      else clear = mid
+    }
   }
   const tangent = from + delta * clear
   return exactFaceContact(a, e, axis, tangent, delta, r)
@@ -209,16 +218,16 @@ interface MovablePoint { x: number; y: number; vx?: number; vy?: number }
 // The push goes through the wall solver, not straight into x/y: a crowd pinning someone against a
 // wall must shove them along it, never into it. The fixed solver iterations in step.ts converge the
 // remainder when one body's share is blocked by a wall.
-export function separate(arena: Arena, a: MovablePoint, ra: number, b: MovablePoint, rb: number, wa: number, wb: number): void {
+export function separate(arena: Arena, a: MovablePoint, ra: number, b: MovablePoint, rb: number, wa: number, wb: number): boolean {
   const dx = b.x - a.x, dy = b.y - a.y
   const d2 = dx * dx + dy * dy
   const min = ra + rb
-  if (d2 >= min * min) return
+  if (d2 >= min * min) return false
   const d = Math.sqrt(d2)
   // Exact overlap gets a stable left/right answer from pair order instead of remaining fused forever.
   const nx = d > 0.0001 ? dx / d : 1, ny = d > 0.0001 ? dy / d : 0
   const sum = wa + wb
-  if (sum <= 0) return
+  if (sum <= 0) return true
   const push = min - d
   if (wa) {
     const ax = -nx * push * wa / sum, ay = -ny * push * wa / sum
@@ -232,4 +241,5 @@ export function separate(arena: Arena, a: MovablePoint, ra: number, b: MovablePo
     if (hit.hitX && b.vx != null && b.vx * bx > 0) b.vx = 0
     if (hit.hitY && b.vy != null && b.vy * by > 0) b.vy = 0
   }
+  return true
 }

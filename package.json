@@ -31,6 +31,8 @@
     "record-bots": "tsx tools/record-bot.ts --all",
     "smoke": "tsx tools/smoke.ts",
     "matrix": "tsx tools/matrix.ts",
+    "perf:sim": "tsx tools/perf-sim.ts",
+    "perf:render": "tsx tools/perf-render.ts",
     "realm-air": "tsx tools/realm-air.ts",
     "art": "tsx tools/art.ts",
     "site:build": "tsx tools/build-site.ts",

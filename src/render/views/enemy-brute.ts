@@ -655,8 +655,8 @@ function sparks(g: Graphics, cx: number, cy: number, aim: number, scale: number,
   }
 }
 
-// Integer-row ellipse (optionally an annulus). Rows, not g.ellipse(): a vector ellipse at 480x270
-// lands on half pixels and the NEAREST upscale doubles the smear.
+// Integer-row ellipse (optionally an annulus). Rows, not g.ellipse(): a vector ellipse in the render
+// target lands on half pixels and the NEAREST upscale doubles the smear.
 function blob(g: Graphics, cx: number, cy: number, rx: number, ry: number, irx = 0, iry = 0): void {
   if (rx < 1 || ry < 1) return
   for (let dy = -Math.round(ry); dy <= Math.round(ry); dy++) {

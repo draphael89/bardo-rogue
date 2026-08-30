@@ -2,6 +2,7 @@ import { Container, Text } from 'pixi.js'
 import { easeOutCubic } from './anim'
 import { fxRng } from './fxRng'
 import { simClock } from './hud'
+import { tuning } from '@/tuning'
 
 interface D { t: Text; born: number; life: number; x: number; y: number; heavy: boolean }
 
@@ -30,6 +31,9 @@ export class DamageNumbers {
         resolution: 1,
       })
       t.anchor.set(0.5, 1)
+      // The fx layer rides the world's 1.5x render scale (ADR 0002): counter-scale so each font px
+      // lands on one whole target px instead of rasterizing glyphs at a fractional scale.
+      t.scale.set(1 / tuning.view.worldScale)
       this.layer.addChild(t)
       d = { t, born: 0, life: 0, x: 0, y: 0, heavy }
     }

@@ -124,7 +124,9 @@ export class PostFx {
       resources: { gradeUniforms },
       resolution,
     })
-    this.ra.screen.filters = [this.grade]
+    // On `frame`, not `screen`: the letterbox paints the same starfield void as the target, and a
+    // grade applied to only one of them would split the sky into two blacks at the frame edge.
+    this.ra.frame.filters = [this.grade]
   }
 
   setReducedEffects(reduced: boolean) {
@@ -151,7 +153,7 @@ export class PostFx {
   }
 
   private syncFilters(aberrate: boolean) {
-    this.ra.screen.filters = aberrate ? [this.grade, this.filter] : [this.grade]
+    this.ra.frame.filters = aberrate ? [this.grade, this.filter] : [this.grade]
     this.aberrated = aberrate
   }
 
@@ -162,8 +164,12 @@ export class PostFx {
     }
     this.left -= dtSec
     const k = Math.max(0, Math.min(1, this.left / this.total))
+    // §6.8: this filter runs on the UPSCALED frame, so a raw offset lands between target pixels and
+    // reads as soft full-res gloss over hard pixels. Quantise to whole target pixels first, then
+    // convert to the filter's input pixels (physical: CSS scale x renderer resolution).
+    const px = this.ra.scale * this.ra.app.renderer.resolution
     const off = this.uniforms.uniforms.uOffset as Float32Array
-    off[0] = this.strength * k; off[1] = this.strength * k * 0.35
+    off[0] = Math.round(this.strength * k) * px; off[1] = Math.round(this.strength * k * 0.35) * px
     this.uniforms.update()
     if (!this.aberrated) this.syncFilters(true)
   }

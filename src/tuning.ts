@@ -22,7 +22,18 @@ export interface SwingDef {
 }
 
 export const tuning = {
-  view: { width: 480, height: 270 },
+  // The internal render target (ADR 0002): 640x360, integer-upscaled to the window; width is
+  // adaptive (app.ts fitViewWidth). `worldScale` is the world-render scale: sim space (16px tiles)
+  // draws onto the target at 1.5x, so tile art carries 24px per tile while every sim distance and
+  // speed stays in sim px. Render-side only — the sim never reads this block.
+  view: {
+    width: 640, height: 360, worldScale: 1.5,
+    // The follow camera (ADR 0001), the ONE home for camera feel. followLerp / lookaheadLerp
+    // are per 60Hz frame (dt-corrected in camera.ts); lookahead is px the view leads the aim.
+    // A room that fits the viewport collapses the clamp range (camera.ts clampFocus) and is
+    // centred exactly, which is what keeps today's rooms static under the same code path.
+    camera: { followLerp: 0.12, lookahead: 4, lookaheadLerp: 0.08 },
+  },
 
   player: {
     radius: 5,
@@ -146,7 +157,8 @@ export const tuning = {
   },
   run: {
     doorHalfW: 22,        // px: the open door is three tiles wide
-    doorEnterMaxY: 32,    // px: north wall-face row; overlapping it while the door is open enters
+    doorEnterDepth: 16,   // px past the door row's top edge; overlapping it while open enters (ADR 0001: relative to the door's row, not row 1)
+    doorEnterInset: 4,    // px west of an east door's own column where the entry overlap begins
     offeringRadius: 16,   // px: walk into the vessel to take it
     offeringHp: 1,        // extra max life, and a heal of the same
     rackRadius: 18,       // px: generous enough to read as a physical pickup, not pixel hunting
@@ -340,9 +352,8 @@ export const tuning = {
     flashTicks: 4, squashTicks: 6,
     hitFlashSec: 0.034,     // enemy white-flash on real time: two frames. Longer and the target is a
                             // featureless white blob for most of the hit-stop.
-    lookahead: 4, lookaheadLerp: 0.08,
     aberrationTicks: 3,
-    aberrationStrength: 2,  // screen px of red/blue split at the pulse peak
+    aberrationStrength: 2,  // TARGET px of red/blue split at the pulse peak, quantised to whole target pixels (§6.8)
     // Screen flash on an ordinary kill. It has to sit UNDER heavy contact (0.20) and under getting
     // hurt (0.25), or the most routine event in the fight is also the loudest and the next telegraph
     // is washed out by the last thing you killed. The shatter and the punch-zoom carry the release.

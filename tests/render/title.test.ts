@@ -136,16 +136,16 @@ describe('title menu', () => {
     expect(showBuildStrip({ hasRun: true, inTown: false, overlayOpen: true, dead: false, vows: 1 })).toBe(false)
   })
 
-  it('is three verbs on the gate, five on settings, one on credits', () => {
+  it('is three verbs on the gate, six on settings, one on credits', () => {
     expect(titleRows('menu')).toBe(3)
-    expect(titleRows('settings')).toBe(5)
+    expect(titleRows('settings')).toBe(6)
     expect(titleRows('credits')).toBe(1)
   })
 
   it('wraps focus so a pad player cannot walk off the card', () => {
     expect(wrapTitleFocus('menu', 0, -1)).toBe(2)
     expect(wrapTitleFocus('menu', 2, 1)).toBe(0)
-    expect(wrapTitleFocus('settings', 0, -1)).toBe(4)
+    expect(wrapTitleFocus('settings', 0, -1)).toBe(5)
     expect(wrapTitleFocus('credits', 0, 1)).toBe(0)
   })
 
@@ -160,7 +160,8 @@ describe('title menu', () => {
     expect(confirmTitle('settings', 1)).toEqual({ page: 'settings', focus: 1, act: 'none' })
     expect(confirmTitle('settings', 2)).toEqual({ page: 'settings', focus: 2, act: 'none' })
     expect(confirmTitle('settings', 3)).toEqual({ page: 'settings', focus: 3, act: 'none' })
-    expect(confirmTitle('settings', 4)).toEqual({ page: 'menu', focus: 1, act: 'none' })
+    expect(confirmTitle('settings', 4)).toEqual({ page: 'settings', focus: 4, act: 'fullscreen' })
+    expect(confirmTitle('settings', 5)).toEqual({ page: 'menu', focus: 1, act: 'none' })
     expect(confirmTitle('credits', 0)).toEqual({ page: 'menu', focus: 2, act: 'none' })
   })
 
@@ -181,7 +182,7 @@ describe('title menu', () => {
   it('opens Settings from the pause without giving the descent back', () => {
     expect(pauseRows('menu', true)).toBe(3)
     expect(pauseRows('menu', false)).toBe(2)
-    expect(pauseRows('settings', true)).toBe(5)
+    expect(pauseRows('settings', true)).toBe(6)
     expect(wrapPauseFocus('menu', 0, -1, true)).toBe(2)
     expect(wrapPauseFocus('menu', 1, 1, false)).toBe(0)
     expect(resolvePause('menu', 0, true, false)).toEqual({ page: 'menu', focus: 0, act: 'resume', abandonArmed: false })
@@ -190,7 +191,9 @@ describe('title menu', () => {
     expect(resolvePause('menu', 1, false, false)).toEqual({ page: 'settings', focus: 0, act: 'none', abandonArmed: false })
     expect(resolvePause('menu', 2, true, false)).toEqual({ page: 'settings', focus: 0, act: 'none', abandonArmed: false })
     expect(resolvePause('settings', 0, true, false)).toEqual({ page: 'settings', focus: 0, act: 'toggle-still', abandonArmed: false })
-    expect(resolvePause('settings', 4, true, false)).toEqual({ page: 'menu', focus: 2, act: 'none', abandonArmed: false })
+    // Row 4 mirrors the title's FULLSCREEN row; back moved to row 5 (one shared order).
+    expect(resolvePause('settings', 4, true, false)).toEqual({ page: 'settings', focus: 4, act: 'fullscreen', abandonArmed: false })
+    expect(resolvePause('settings', 5, true, false)).toEqual({ page: 'menu', focus: 2, act: 'none', abandonArmed: false })
     expect(pauseNudge('menu', 1)).toBe('none')
     expect(pauseNudge('settings', 1)).toBe('master')
     expect(pauseNudge('settings', 2)).toBe('music')

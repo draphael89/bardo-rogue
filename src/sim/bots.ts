@@ -115,7 +115,8 @@ function makeSliceBot(combat: Bot, toll: 'paid' | 'refused'): Bot {
       if (!world.session.preparedWeapon && world.arena.rack) routeToward(inp, world, world.arena.rack.x, world.arena.rack.y, orbit)
       else {
         const door = world.arena.doors.find(d => d.dir === 'north')!
-        routeToward(inp, world, (door.col + 0.5) * 16, 24, orbit)
+        // The door's own row, not the old hardcoded y=24 that assumed it at row 1 (ADR 0001).
+        routeToward(inp, world, (door.col + 0.5) * 16, (door.row + 0.5) * 16, orbit)
       }
       return inp
     }
@@ -125,7 +126,7 @@ function makeSliceBot(combat: Bot, toll: 'paid' | 'refused'): Bot {
       const dir = hasEast && (world.seed & 1) === 0 ? 'east' : 'north'
       const door = world.arena.doors.find(d => d.dir === dir) ?? world.arena.doors[0]
       const tx = dir === 'east' ? door.col * 16 + 4 : (door.col + 0.5) * 16
-      const ty = dir === 'east' ? (door.row + 0.5) * 16 : 24
+      const ty = (door.row + 0.5) * 16
       routeToward(inp, world, tx, ty, orbit)
       // The route is a suggestion, not a guarantee: a body wedged in the doorway or a waypoint that
       // oscillates would otherwise burn the whole tick budget. Flip the preferred side after a

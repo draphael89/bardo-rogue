@@ -227,3 +227,114 @@ Graphics-context, batch-root, and JS-heap claims separate rather than calling on
   not create, merge, close, or otherwise mutate it.
 - Merge: **not performed**. Deployment/publishing: **not performed**. Release: **not declared**.
 - Human Look acceptance: **OPEN**. Human Fun acceptance: **OPEN**.
+
+---
+
+# Addendum — the graphics overhaul run, and the two changes it took back
+
+**Date:** 2026-08-30, late
+**Branch:** `claude/game-graphics-overhaul-e99c1a`
+
+The user's question was the whole brief: *"How can we make the hero more beautiful and the opening
+area more beautiful? We still are using the kenney assets, no?"* This is what happened.
+
+## The honest answer first
+
+The **opening area is better**. The **hero is unchanged** — still Kenney stock tile 96, still a white
+blob, because `src/render/views/player.ts` only reaches for authored art when a blade is equipped and
+the whole opening is played unarmed. The unarmed body exists as a gated candidate and cannot ship
+without a human `pnpm art approve`. Nothing was smuggled into `art/approved/` or `public/assets/`.
+
+## Two changes were taken back after reading them at 1x
+
+The pass before this one built a new Gate and a new floor. Both measured better and both looked
+worse, and the eye wins.
+
+- **The Gate bake.** The rewrite recovered 13 px of apex that the old crown was clipping, gave the
+  slot a 1:4.5 aspect, and moved the frame's brightest static pixel onto the threshold. At 1x the
+  pylons and the arch face had come to share one value, so the pointed void between them stopped
+  reading as a void: the monument resolved into a flat rectangular slab with gold horizontal ticks —
+  a bookcase. Reverted to the committed arch, which has a stepped crown, ribbed unequal pylons and
+  an actual absence in the middle. The apex still clips ~3 px against world y 0; that is
+  pre-existing, it is §8.1 and §10.21, and it is the next real job on this monument. It is written
+  down here rather than fixed at 2am because the last agent to re-author this shape at speed lost
+  the arch.
+- **`bakeBardoGateSpill`, deleted.** Four hard plateaus of baked light marching south from the door.
+  At 1x it was a flat cream rectangle sitting on the plaza — a mis-placed floor tile, not light. The
+  authored shaft does this job properly and additively.
+- **Floor ramps LV[2] and LV[4], reverted.** LV[4] went to `grout / woodHi / coinBrass / boneDim /
+  gold`, five measured values one step apart against the old four — better on paper. But
+  `bardo_room.png` is the sheet all **fourteen** layouts pave from, so it did not land only on the
+  Bardo's embers: it put an olive-gold chip into Cocytus, whose `floorTint` is the palest and coldest
+  in the game, and it turned the Bardo plaza into khaki slabs butted against near-black ones. Warm
+  stopped being an intrusion and became half the floor, which cost the wine runner its status as
+  *the* warm thing in the room. LV[2] had a second, separate fault: its ramp put the warm on the
+  **shadow** face and the cool on the **lit** face, the exact reverse of §2.1 Law 4, and collapsed
+  body-to-lit to 0.0003 L — three distinct values where the file header claims five.
+
+The lesson is one line: **a ramp in `LV[]` is global, and per-room brightness has to come from the
+bake or the lightmap.** That is now written beside both ramps.
+
+## What shipped and stayed
+
+- **The light shaft.** Three authored 32×48 wedges (`shaft_01..03`) at 0.62/1.00/1.34 relative width
+  and 1.00/0.62/0.38 relative alpha, replacing two stretched Kenney `circle_noise` discs that ran at
+  an effective ~0.007 alpha — invisible, and §6.1/§10.11/§10.12 all at once. With the arch restored
+  the beam falls through a real opening onto the plaza, which is the concept sheet's own move.
+  `shaftAlpha` 0.13 → 0.30 after reading it at 1x; at 0.13 the beam was there and nobody could see it.
+- **Light hierarchy.** The Gate is the key at r140/s2.4; every other pool ranks under it. The
+  brightest pixel on both the title and the arrival frame is no longer a star.
+- **The landing.** Arrival is now *in* light: its own lamp, its own pool, warm value blocks on the
+  stone under the player's feet. The brass in that scatter went from two blocks in three to one —
+  at two in three the pool read as sand rather than firelight on slate.
+- **Hub depth** (`ambientDarkness` 0.44, `vignette` 0.40) as an opt-in preset override, so the other
+  thirteen layouts keep the tuning default.
+
+## Findings closed
+
+Seventeen review findings across four lenses. Fourteen fixed, three declined with reasons — the full
+per-finding ledger is in the PR description. Three worth repeating here:
+
+- The shaft sprites were destroyed and re-appended on every `rebind()`, so the beam drew *under* the
+  fog on first load and *over* it after any return through the Gate. They are now built once and only
+  aimed, and `Arena.shafts?: RoomShaft[]` became `Arena.shaft?: RoomShaft` so the type carries the
+  one-beam rule instead of a comment.
+- `tuning.juice.light.ambientDarkness` and `vignette` are dead knobs for the Bardo — the hub preset
+  overrides both. Said so in `tuning.ts` beside all three keys, since the same commit's `syncGrade()`
+  exists precisely because someone tuned a dead knob and concluded it was broken.
+- The `levelFor` comment claimed the un-pooled floor stayed "hash-mottled ... mostly level 1". It is
+  measured at **71.8 % level 0 / 17.2 % level 1 / 7.7 % / 3.2 %**, driven by the widened edge term,
+  not the hash. The A/B was captured both ways and the darker perimeter was kept deliberately; the
+  comment now records the measurement and names the one-character change back.
+
+## The hero, specifically
+
+`pnpm art:stress-hero` now runs **three** variants. The unarmed body — the one the opening is
+actually played in — passes **507/507 gates, zero waivers**, and its two exhibits are committed, so
+the lane is reproducible instead of resting on log lines in a gitignored cache. The script had a
+`weapon = "none"` branch that nothing could reach; it now has the call that reaches it.
+
+**Read the sheet at 4× before spending a Look decision on it.** The split crest passes §3.1 as two
+tabs with a void between them, and it reads as **horns** — the silhouette says minotaur, not fallen
+soldier. Every anchor is green and the character is still wrong. Fix the crest first.
+
+## Gates
+
+`pnpm typecheck` silent · `pnpm test` 918/918 in 80 files · `pnpm matrix -- --seeds 1-100`
+slice-kite 78/100, slice-naive 0/100, **0 seeds stranded** · `pnpm room:gate` **78/78**, Bardo
+frame-mean 0.044 (ceiling 0.300), highlight 0.10 % (ceiling 3.50 %), top-one focality 35.8 % at
+1.0 px (floor 4 % / 64 px) · `pnpm build` 2113 KB shipped, 177 files · `pnpm art:stress-hero` three
+variants green against six committed exhibits.
+
+**Replay hashes did not move.** `record-bots` was not run. `src/sim/arena.ts` changed, but only
+through `arena.level`, the props list and the presentation-only `shaft` field; `arena.solid` was not
+touched, and the four pinned fixtures pass inside the 918.
+
+## Still not beautiful
+
+1. The hero. Kenney tile 96 for the entire opening. This is the user's first question and it is still
+   open, because closing it needs a human approval this agent must not perform.
+2. The Gate's apex clips against the frame's top edge. §8.1 says no room ever touches it.
+3. The `keeperLamp` prop is a grey disc with a white candle. At 1x it reads as a lollipop, and there
+   are now two of them on the causeway.
+4. Caster, charger, warden and several weapon sprites are still Kenney. The rooms are not.

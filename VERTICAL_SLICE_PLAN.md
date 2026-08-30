@@ -52,6 +52,23 @@ letterbox and target sky now enter the shared frame grade from identical authore
 390×844 and 900×506 probes keep all four target boundaries continuous. The attended evidence and
 exact-head ledger are recorded in `MORNING_REPORT.md`.
 
+**Graphics overhaul, `claude/game-graphics-overhaul-e99c1a`.** The Bardo's light now has a source and
+a rank: the Gate is the key at r140/s2.4, every other pool sits a rank under it, and the arrival
+landing has its own lamp and its own pool so the player spawns *inside* light rather than beside it.
+Three authored 32×48 wedges (`shaft_01..03`) replace two stretched Kenney noise discs that were
+running at an effective ~0.007 alpha, and the beam falls through the Gate's own opening onto the
+plaza. The brightest pixel of both the title and the arrival frame is no longer a star. **Two changes
+from the same pass were taken back after reading them at 1×**: a re-authored Gate bake whose pylons
+and arch face came to share one value, so the monument resolved into a flat slab instead of an arch;
+and a `bakeBardoGateSpill` whose four baked plateaus read as a cream sticker on the plaza. The
+level-2 and level-4 floor ramps were reverted with them — `bardo_room.png` is the sheet all fourteen
+layouts pave from, so a brass ramp authored for the Bardo's embers also put an olive-gold chip into
+Cocytus, the coldest floor in the game. `pnpm art:stress-hero` now gates three variants including the
+**unarmed** body (507/507, zero waivers, two committed exhibits) — the one the whole opening is
+played in, and the one whose crest currently reads as horns. Room gate **78/78**; suite **918/918**;
+matrix 78/0 with zero stranded seeds; replay hashes unmoved. The hero in the shipping build is still
+Kenney tile 96: closing that needs a human `pnpm art approve`, which no agent may perform.
+
 The sections below are the plan as written. This block records what was executed against it, so the
 document does not become the next stale audit. Tests: **275 passing**; `pnpm matrix` 100/100 seeds
 resolve on both loop bots (kite 93%, naive 0%); `pnpm smoke` boots the title with a real keypress,

@@ -16,9 +16,9 @@ The final outputs retained the baseline hashes: replay `2949856924`, product loo
 
 ## Browser presentation
 
-The corrected render harness collects budget timings without CPU or heap sampling, includes `Presenter.handleEvents`, rejects page/console errors, repeats the Warden fixed-step hash, and checks dense purity before and after warmups. Optional CPU/heap attribution runs separately.
+The corrected render harness collects budget timings without CPU or heap sampling, includes `Presenter.handleEvents`, requires the Warden to be active before measurement, rejects page/console errors, repeats the Warden fixed-step hash, and checks dense purity before and after warmups. Optional CPU/heap attribution runs separately.
 
-At 1920x1080 DPR 1 under ANGLE SwiftShader, three 120-frame Warden batches after 30 warmups produced presentation-work p95 values of 2.1, 2.2, and 2.7 ms (median 2.2 ms). Event handling p95 was at most 0.1 ms. All runs repeated the same 150-tick hash, `107580697`.
+At 1920x1080 DPR 1 under ANGLE SwiftShader, three guarded 120-frame Warden batches after 120 warmups produced presentation-work p95 values of 2.7, 2.2, and 2.3 ms (median 2.3 ms). Event handling p95 was at most 0.1 ms. The Warden was active before every measurement, and all runs repeated the same 240-tick hash, `4108685788`.
 
 The 32-enemy / 64-projectile render-only diagnostic measured 34.8 ms p95 over 60 frames after 15 warmups. Its hash was `4105983526` before warmup, after warmup, and after measurement. These are software-renderer diagnostics, not physical-GPU claims.
 

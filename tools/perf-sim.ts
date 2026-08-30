@@ -11,9 +11,10 @@ import { makeBot, type BotName } from '../src/sim/bots'
 import { hashWorld } from '../src/sim/hash'
 import type { InputFrame } from '../src/sim/input'
 import { Metrics } from '../src/sim/metrics'
-import { replayFromJson, type Replay } from '../src/sim/replay'
+import { replayFromJson, runReplay as replaySimulation, type Replay } from '../src/sim/replay'
 import { stepWorld } from '../src/sim/step'
 import type { World } from '../src/sim/world'
+import { applyPlaytestCondition, conditionOfBundle } from '../src/playtest'
 
 type Mode = 'replay' | 'loop' | 'dense'
 
@@ -42,7 +43,12 @@ if (!Number.isInteger(denseTicks) || denseTicks < 1) usage('--ticks must be a po
 if (!Number.isInteger(enemies) || enemies < 0 || enemies > 32) usage('--enemies must be 0..32')
 if (!Number.isInteger(projectiles) || projectiles < 0 || projectiles > 64) usage('--projectiles must be 0..64')
 
-const replay = mode === 'replay' ? replayFromJson(readFileSync(replayPath, 'utf8')) : null
+const replayJson = mode === 'replay' ? readFileSync(replayPath, 'utf8') : null
+if (replayJson) {
+  const condition = conditionOfBundle(JSON.parse(replayJson))
+  if (condition) applyPlaytestCondition(condition)
+}
+const replay = replayJson ? replayFromJson(replayJson) : null
 const idle: InputFrame = { moveX: 0, moveY: 0, aimX: 1, aimY: 0, aimSoft: false, attack: false, attackHeld: false, heavy: false, dodge: false, restart: false }
 
 interface RunResult {
@@ -59,12 +65,10 @@ function consumeTick(world: World, metrics: Metrics, input: InputFrame): void {
 }
 
 function runReplay(replay: Replay): RunResult {
-  const world = createWorld(replay.seed, replay.scenario, { god: replay.god, ...(replay.meta ? { meta: replay.meta } : {}) })
-  const metrics = new Metrics()
   const start = performance.now()
-  for (const frame of replay.frames) consumeTick(world, metrics, frame)
+  const result = replaySimulation(replay)
   const elapsedMs = performance.now() - start
-  return { elapsedMs, ticks: world.tick, hash: hashWorld(world), outcome: metrics.summary() }
+  return { elapsedMs, ticks: result.world.tick, hash: result.hash, outcome: result.metrics.summary() }
 }
 
 function runLoop(): RunResult {

@@ -128,7 +128,15 @@ try {
     return { workMs, eventMs, renderMs, intervalsMs, hash: game.hash(), state: game.state() }
   }, { count, advance })
 
+  const requireWarden = async () => {
+    if (profile !== 'warden') return
+    const ready = await page.evaluate(() => (window as unknown as { __game: BrowserGame }).__game.world.enemies
+      .some(enemy => enemy.active && enemy.kind === 'warden'))
+    if (!ready) throw new Error('Warden is not active after warmup; increase --warmups before measuring')
+  }
+
   await runFrames(warmups, profile === 'warden')
+  await requireWarden()
   const hashAfterWarmup = await page.evaluate(() => (window as unknown as { __game: BrowserGame }).__game.hash())
   const measured = await runFrames(frames, profile === 'warden')
   if (profile === 'dense' && (setup.hash !== hashAfterWarmup || hashAfterWarmup !== measured.hash)) {
@@ -171,6 +179,7 @@ try {
     await page.reload()
     await setupProfile()
     await runFrames(warmups, profile === 'warden')
+    await requireWarden()
     if (args.cpu) {
       await cdp.send('Profiler.enable')
       await cdp.send('Profiler.setSamplingInterval', { interval: 100 })

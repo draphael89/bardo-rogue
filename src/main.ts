@@ -93,6 +93,7 @@ async function boot() {
   else if (ownership === 'unavailable') console.log('[save] exclusive browser save locking is unavailable; this session will not write')
   else if (loaded.preservationFailed) console.log('[save] damaged bytes could not be preserved; this session will not write')
   else if (loaded.source === 'damaged') console.log('[save] the save was damaged and no backup was usable; a fresh profile started, the damaged bytes are kept')
+  else if (loaded.raw) console.log('[save] this save was written by a newer build; it will not be overwritten')
   else if (loaded.source === 'backup') console.log(loaded.writable
     ? '[save] the live save was unreadable; recovered from the backup copy'
     : '[save] recovered progress from the backup copy; the unreadable live slot keeps this session read-only')
@@ -875,6 +876,7 @@ async function boot() {
     else if (ownership === 'unavailable') presenter.hud.showBanner('PROGRESS NOT SAVING', 'exclusive browser locking is unavailable', 3.5)
     else if (loaded.source === 'unreadable') presenter.hud.showBanner('SAVE COULD NOT BE READ', 'playing without saving, nothing will be overwritten', 3.5)
     else if (loaded.preservationFailed) presenter.hud.showBanner('SAVE WAS DAMAGED', 'playing read-only; damaged bytes could not be preserved', 3.5)
+    else if (loaded.raw) presenter.hud.showBanner('SAVE FROM A NEWER BUILD', 'playing without saving, nothing will be overwritten', 3.5)
     else if (loaded.source === 'backup') presenter.hud.showBanner(
       'SAVE RESTORED',
       loaded.writable ? 'recovered from the backup copy' : 'backup recovered; progress here will not be saved',

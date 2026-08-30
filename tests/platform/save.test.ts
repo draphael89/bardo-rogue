@@ -143,6 +143,14 @@ describe('loadSave recovery', () => {
     expect(loaded.save.meta.attempts).toBe(40)
   })
 
+  it('keeps a newer backup identifiable as future rather than restored', async () => {
+    const storage = new MemoryStorage()
+    const future = '{"schemaVersion":99,"meta":{"version":1,"attempts":40},"checkpoint":{"hp":3}}'
+    storage.setItem(backupKey(ID), future)
+    const loaded = await loadSave(createStorageSaveStore(storage), ID)
+    expect(loaded).toMatchObject({ source: 'backup', writable: false, raw: future })
+  })
+
   it('seeds a fresh profile from the system reduced-motion preference', async () => {
     const loaded = await loadSave(createStorageSaveStore(new MemoryStorage()), ID, { preferredReducedEffects: true })
     expect(loaded.source).toBe('default')

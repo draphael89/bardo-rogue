@@ -297,18 +297,18 @@ describe('enemy cadence and projectile authority', () => {
     const p = tangent.player
     p.dodgeTick = tuning.player.dodge.iStart
     const grazeR = p.radius + 3 + tuning.bullet.grazePx
-    tangent.fireProjectile(p.x + grazeR, p.y, 0, 0, 3, 20)
+    tangent.fireProjectile(p.x + grazeR, p.y, 0, 0, 3, 20, 0, 1, 0, 'bolt', 'caster')
     updateProjectiles(tangent)
     expect(tangent.events.some(event => event.type === 'graze')).toBe(true)
 
     const far = createWorld(1, 'empty')
-    const farShot = far.fireProjectile(far.player.x + grazeR + 0.001, far.player.y, 0, 0, 3, 20)!
+    const farShot = far.fireProjectile(far.player.x + grazeR + 0.001, far.player.y, 0, 0, 3, 20, 0, 1, 0, 'bolt', 'caster')!
     updateProjectiles(far)
     expect(farShot.active).toBe(true)
     expect(far.events.some(event => event.type === 'graze' || event.type === 'playerHurt')).toBe(false)
 
     const nonFinite = createWorld(1, 'empty')
-    const nonFiniteShot = nonFinite.fireProjectile(Number.NaN, nonFinite.player.y, 0, 0, 3, 20)!
+    const nonFiniteShot = nonFinite.fireProjectile(Number.NaN, nonFinite.player.y, 0, 0, 3, 20, 0, 1, 0, 'bolt', 'caster')!
     updateProjectiles(nonFinite)
     expect(nonFiniteShot.active).toBe(true)
   })

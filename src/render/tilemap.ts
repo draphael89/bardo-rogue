@@ -493,6 +493,16 @@ const C = {
   // budget nothing, and only the four single gold pixels beside the landing lamp are spent.
   coinBrass: 0x8a6a38,
   gold: 0xd4b060,
+  // The Seal's own names (§8.4.3, §1.3.6). `sky` is the opening onto the star-sky every threshold
+  // owes (§8.2.1); the numen pair is the one ramp allowed to say "a Seal's live edge" (§1.2) and it
+  // is spent here as PAINT, never as a light — the Ferryman's lantern stays the district's one cold
+  // source and nothing joins it (src/sim/arena.ts).
+  sky: 0x0e122c,
+  star: 0xb0c4ff,
+  iron: 0x26262e,
+  ironHi: 0x4c4c56,
+  numen: 0x2e8a80,
+  numenDim: 0x1a4a48,
 } as const
 
 function px(g: Graphics, x: number, y: number, w: number, h: number, color: number): void {
@@ -644,6 +654,175 @@ function bakeOcclusion(g: Graphics, arena: Arena): void {
       if (wallAt(I.c1 + 1, r)) px(g, (I.c1 + 1) * TILE - 2, r * TILE, 2, TILE, C.void)
     }
   }
+}
+
+// §8.1 "Every space floats." The district asserted that and then drew a paper cutout: an island's
+// last row simply stopped and the starfield began, so a mass twenty tiles across read as a decal
+// laid on the sky. The concept sheet sells the float with ROCK — under every rim the stone breaks
+// off, hangs, and pinches out into the void before the stars start — and with the one lit edge a
+// top-down camera can see, which is the rim of the drop facing it.
+//
+// Drawn only where a cell has content and the cell below is void, so this can never touch walkable
+// ground, a wall face, or a bridge that paves through one. Shell rooms have no such edge — their
+// wall ring sits on the last row — so this is the island rooms' own pass and costs the other
+// thirteen layouts nothing.
+//
+// §3.2.7: the rim is warm ONLY inside a named fire's reach. A warm line drawn along an unlit edge
+// is the same litter the causeway pass keeps banning — it makes the island look outlined rather
+// than lit.
+function bakeIslandUnderside(g: Graphics, arena: Arena): void {
+  const at = (c: number, r: number): number =>
+    c < 0 || r < 0 || c >= arena.cols || r >= arena.rows ? T.void : arena.base[r * arena.cols + c]
+  const warmAt = (wx: number, wy: number): boolean =>
+    arena.braziers.some(b => Math.hypot(wx - b.x, wy - b.y) < b.radius)
+  for (let r = 0; r < arena.rows - 1; r++) for (let c = 0; c < arena.cols; c++) {
+    if (at(c, r) === T.void || at(c, r + 1) !== T.void) continue
+    const top = (r + 1) * ROOM_ART_TILE
+    const warm = warmAt((c + 0.5) * TILE, (r + 1.4) * TILE)
+    for (let a = 0; a < ROOM_ART_TILE; a++) {
+      const gx = c * ROOM_ART_TILE + a
+      // Three frequencies, so the break reads as rock rather than as a dither: a coarse lobe over
+      // ~32 px, a block profile over ~8 px, a 1 px jitter, and a rare long spur.
+      const h = wearHash(gx, r, 211)
+      const lobe = wearHash(gx >> 5, r, 219) % 19
+      const block = wearHash(gx >> 3, r, 223) % 10
+      // Fingers, not lumps: 4 px wide and much longer than the mass, about one every 90 px.
+      const spur = wearHash(gx >> 2, r, 227) % 23 === 0 ? 14 + wearHash(gx >> 2, r, 229) % 22 : 0
+      const depth = 8 + lobe + block + (h % 4) + spur
+      // The lit lip, 2 px, on top of the fall, and BROKEN — an unbroken run of it read as a line
+      // ruled under the island rather than as light catching an uneven edge. This is the only warm
+      // the pass spends and it stays at B2; the fires still own every pixel above it.
+      if ((h >>> 3) % 4 !== 0) artPx(g, gx, top, 1, warm ? 2 : 1, warm ? C.naveWarm : C.slate1)
+      // The rock itself, falling through three steps. It has to be READABLE — cut first at
+      // grout/mortar it measured correct and rendered as nothing, because the lightmap multiplies
+      // and there is no lamp out here: B0 under a 0.5 ambient is the void it is standing against.
+      const a1 = 2 + Math.round(depth * 0.28), a2 = 2 + Math.round(depth * 0.62)
+      artPx(g, gx, top + 2, 1, a1 - 2, C.slate0)
+      artPx(g, gx, top + a1, 1, a2 - a1, C.seal0)
+      artPx(g, gx, top + a2, 1, Math.max(1, depth - a2), C.grout)
+      artPx(g, gx, top + depth - 1, 1, 1, C.mortar)
+      // A vertical striation every few columns keeps the mass from reading as one flat skirt.
+      if ((h >>> 7) % 5 === 0) artPx(g, gx, top + 2, 1, 2 + (h >>> 11) % 5, C.grout)
+      // The tail: a thinning scatter of loose stone under the break, so the mass DISSOLVES into
+      // the void instead of ending on a ruled edge. Three specks at most, and each one is checked
+      // against its own thinning odds, so the density falls with distance the way the concept's
+      // undersides do.
+      for (let k = 0; k < 3; k++) {
+        if ((wearHash(gx, r + k, 233) % 12) > 3 - k) continue
+        artPx(g, gx, top + depth + 2 + k * 4 + (h >>> 15) % 3, 1, 1 + (k === 0 ? 1 : 0), C.grout)
+      }
+    }
+  }
+}
+
+// THE EAST SEAL (§8.4.3). It foreshadows a waiting pantheon in SILHOUETTE ONLY, because legible
+// foreign iconography would break §8.4.2's pantheon-neutral hub — so nothing here is a rune, a
+// glyph, or a readable ornament. Three moves carry it, all of them shape:
+//
+//   1. VERTICAL STAVES where the whole district is horizontal running bond. One inversion of the
+//      masonry grammar, no symbols, and it reads foreign in a second from across the gap.
+//   2. A round-headed arch showing star-sky in its head (§8.2.1) and woven SHUT below it.
+//   3. One plaited band, cut entirely in shadow: the ribbons are the stone itself and only their
+//      grooves are drawn, so the knotwork is the DARK half of the pattern and never a lit ornament.
+//      That is the clause the generated lane could not hold — every control a provider exposes
+//      (detail, shading, outline) pushes toward legibility, while a loop of integer rects can
+//      promise a pattern never resolves into a glyph and satisfies §2.1 Law 5 by construction.
+//      That is why this is code and not a candidate, and why no generations were spent on it.
+//
+// The camera clamps at world x 768 (`clampFocus` over a 1024 px room), so this is only ever seen
+// from ten-odd tiles west, at the frame's edge. Everything is sized for that read.
+function bakeBardoSeal(g: Graphics, arena: Arena): void {
+  if (arena.kind !== 'bardo') return
+  const x0 = 59 * ROOM_ART_TILE, x1 = 63 * ROOM_ART_TILE   // the sealed mass, cols 59..62
+  const foot = 21 * ROOM_ART_TILE                          // its plinth row stays the district's
+  const top = 17 * ROOM_ART_TILE
+  const cx = 60.5 * ROOM_ART_TILE                          // on the sealed door, west of centre (§5.2)
+  const band = top + 20                                    // mid-line of the knot band
+  const spring = foot - 42, apex = spring - 18
+
+  // 1) The staves. Vertical grain where the whole district is horizontal running bond — one
+  //    inversion of the masonry grammar, no symbols. Widths run 9..17 px and the cut tops vary by
+  //    only a few, because the first cut of this towered and read as the rank of organ pipes the
+  //    Gate study already lost once.
+  for (let sx = x0; sx < x1;) {
+    const h = wearHash(sx, 17, 241)
+    const w = 9 + (h % 9)
+    const t = top + 2 + (h >>> 4) % 5
+    const body = (h >>> 9) % 3 === 0 ? C.nave0 : (h >>> 9) % 3 === 1 ? C.slate1 : C.seal0
+    artPx(g, sx, t, w - 1, foot - t, body)
+    artPx(g, sx + w - 1, t, 1, foot - t, C.mortar)                    // the joint between staves
+    if ((h >>> 17) % 3 === 0) artPx(g, sx + 2, t + 26 + (h >>> 19) % 40, w - 5, 2, C.grout)
+    sx += w
+  }
+
+  // 2) THE GABLE, and it is the whole silhouette. A steep pitched roof over a vertically grained
+  //    mass is Norse at a glance and is not one glyph, one rune or one legible ornament — §8.4.3
+  //    asks for a foreign shape and §8.4.2 forbids foreign iconography, and a roof pitch satisfies
+  //    both. The two slopes advance at different rates and the west eave is broken away (§8.2.4,
+  //    §5.2), so it is never a mirrored pediment.
+  for (let i = 0; i < 11; i++) {
+    const y = top - 4 - i * 4
+    const wW = Math.max(3, 44 - i * 4), wE = Math.max(2, 40 - i * 5)
+    artPx(g, cx - wW, y, wW + wE, 4, i > 7 ? C.seal0 : C.slate0)
+    artPx(g, cx - wW, y, 6, 4, C.slate1)                              // the rake, one connected run
+    if (i === 0) artPx(g, cx - wW, y, 15, 4, C.void)                  // the eave that fell (§8.2.4)
+  }
+  artPx(g, cx - 3, top - 50, 6, 7, C.iron)                            // the finial socket, empty
+
+  // 3) The knotwork: one horizontal band under the gable, and it is drawn ENTIRELY IN SHADOW. The
+  //    ribbon faces are the same value as the stone around them, so nothing here is a lit ornament;
+  //    the only marks are the grooves, and the over-strand's grooves cut the under-strand's face,
+  //    which is the whole of the over-under read. §8.4.3 literally — knotwork in shadow, silhouette
+  //    only, and a pattern that cannot resolve into a glyph. Two earlier cuts are why: two thin
+  //    strands on a numen field read at 1x as chain-link over a green door (exactly what the
+  //    generated lane produced), and three depth-shaded ribbons turned the band into herringbone
+  //    hatching that read as ornament, not shadow.
+  const AMP = 6, PERIOD = 22, TAU = Math.PI * 2
+  // The band's ground is slate0, not slate1: at slate1 it was the lightest continuous run on the
+  // whole mass and the knot stopped being shadow and started being a bright stripe.
+  artPx(g, x0 + 4, band - 11, x1 - x0 - 8, 22, C.slate0)
+  artPx(g, x0 + 4, band - 11, x1 - x0 - 8, 1, C.mortar)
+  artPx(g, x0 + 4, band + 10, x1 - x0 - 8, 1, C.mortar)
+  for (let x = x0 + 5; x < x1 - 5; x++) {
+    const sw = Math.sin((x / PERIOD) * TAU) * AMP
+    const aOver = Math.floor((x % (PERIOD * 2)) / PERIOD) === 0
+    for (const y of aOver ? [band - sw, band + sw] : [band + sw, band - sw]) {
+      const by = Math.round(y) - 4
+      artPx(g, x, by, 1, 8, C.mortar)                                 // the groove around the ribbon
+      artPx(g, x, by + 1, 1, 6, C.slate0)                             // the ribbon face: the stone itself
+    }
+  }
+
+  // 4) The arch, cut back through the staves and WALLED UP. Its head keeps the opening onto the
+  //    star-sky every threshold owes (§8.2.1); below the springing it is stone, with one incised
+  //    archivolt so the blocking reads as masonry rather than as a panel.
+  const half = (y: number): number => {
+    if (y >= spring) return 16
+    const dy = spring - y
+    return dy > 18 ? 0 : Math.round(Math.sqrt(324 - dy * dy) * 0.9)
+  }
+  for (let y = apex; y < foot; y++) {
+    const hw = half(y)
+    if (hw <= 0) continue
+    artPx(g, cx - hw - 6, y, 6, 1, C.nave0)                           // west jamb, the thick one
+    artPx(g, cx + hw, y, 5, 1, C.seal0)                               // east jamb
+    artPx(g, cx - hw, y, hw * 2, 1, y < spring ? C.sky : C.slate1)
+    if (y >= spring) { artPx(g, cx - hw, y, 2, 1, C.mortar); artPx(g, cx + hw - 2, y, 2, 1, C.mortar) }
+  }
+  for (const [ox, oy] of [[-6, 9], [5, 5]] as const) artPx(g, cx + ox, apex + oy, 1, 1, C.star)
+  for (let i = 0; i < 4; i++) artPx(g, cx - 14 + i * 8, spring + 8 + (i & 1) * 3, 6, 2, C.mortar)
+
+  // The live edge (§1.2): four pixels of numen in the deepest grooves on the west, low, where the
+  // chained beam outside comes in. PAINT, never a light — the district's one cold source stays the
+  // Ferryman's lantern and nothing joins it (src/sim/arena.ts).
+  for (const [ox, oy] of [[-13, -11], [-11, -8], [-15, -19], [-9, -6]] as const) {
+    artPx(g, cx + ox, foot + oy, 1, 1, oy > -10 ? C.numen : C.numenDim)
+  }
+  // The sill, and the anchor the beam stub outside is chained to.
+  artPx(g, cx - 24, foot - 6, 48, 5, C.iron)
+  artPx(g, cx - 24, foot - 6, 48, 1, C.ironHi)
+  artPx(g, cx - 30, foot - 30, 4, 3, C.iron)
+  artPx(g, cx - 34, foot - 29, 4, 1, C.ironHi)
 }
 
 // §5.3.2 the one large graphic form that is not axis-aligned to the tile grid: the gouge the
@@ -902,6 +1081,7 @@ export function buildTilemap(renderer: Renderer, atlas: Atlas, arena: Arena, flo
   c.addChild(wear, overlays)
   const g = new Graphics()
   bakeOcclusion(g, arena)
+  bakeIslandUnderside(g, arena)
   bakeBardoProcession(g, arena)
   bakeFurrow(g, arena)
   // The soot fan is the sunken bell's; the bardo district authors its own use marks. Keyed on the
@@ -911,6 +1091,7 @@ export function buildTilemap(renderer: Renderer, atlas: Atlas, arena: Arena, flo
   bakeBardoCauseway(g, arena)
   bakePropShadows(g, arena)
   bakeBardoGate(g, arena)
+  bakeBardoSeal(g, arena)
   c.addChild(g)
 
   const rt = RenderTexture.create({ width: arena.cols * ROOM_ART_TILE, height: arena.rows * ROOM_ART_TILE, scaleMode: 'nearest' })

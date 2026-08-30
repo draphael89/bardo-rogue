@@ -21,18 +21,25 @@ interface Mote {
   vy: number
   phase: number
   scale: number
+  /** The tint of the fire this mote rose out of, when that fire named one. */
+  src?: number
 }
 
 // Dust only exists where light finds it (ART_DIRECTION.md §3). Motes are seeded in the
 // room's own warm sources, never spread evenly over a room whose corners are meant to fall
 // to B0 — an even spread reads as sparkles on black, the opposite of a light hierarchy.
-function motePos(arena: World['arena'], i: number): { x: number; y: number } {
-  const src = arena.braziers.length
+function motePos(arena: World['arena'], i: number): { x: number; y: number; tint?: number } {
+  const src: { x: number; y: number; radius: number; tint?: number } = arena.braziers.length
     ? arena.braziers[i % arena.braziers.length]
     : { x: (arena.door.col + 0.5) * TILE, y: (arena.door.row + 2) * TILE, radius: 44 }
   const a = i * 2.399963                               // golden angle, so they never clump
   const rad = src.radius * 0.60 * Math.sqrt(((i * 37) % 100) / 100)
-  return { x: Math.round(src.x + Math.cos(a) * rad), y: Math.round(src.y + Math.sin(a) * rad * 0.7) }
+  // Dust only exists where light finds it — so it is the colour of the light that found it. These
+  // are seeded INSIDE a brazier, which makes them embers, and in the hub they were being painted
+  // the star-pane's cold #c8d0e0: sixty flecks of frost hanging over two fires. One in five still
+  // takes the room's own cold accent below, so the air over the arrival reads as ash and starlight
+  // mixed rather than as one temperature.
+  return { x: Math.round(src.x + Math.cos(a) * rad), y: Math.round(src.y + Math.sin(a) * rad * 0.7), tint: src.tint }
 }
 
 // Living air of the Threshold. Presentation-only: motes, haze, door bloom, shafts. Never touches the sim.
@@ -108,6 +115,7 @@ export class Atmosphere {
       this.motes.push({
         s,
         x: seed.x, y: seed.y, x0: seed.x, y0: seed.y,
+        src: seed.tint,
         vx: ((i * 13) % 7 - 3) * 0.35,
         vy: -A.moteSpeed * (0.35 + (i % 5) * 0.12),
         phase: i * 1.7,
@@ -134,6 +142,7 @@ export class Atmosphere {
       const seed = motePos(arena, i)
       m.x = m.x0 = seed.x
       m.y = m.y0 = seed.y
+      m.src = seed.tint
     }
   }
 
@@ -202,7 +211,7 @@ export class Atmosphere {
       m.s.position.set(Math.round(m.x), Math.round(m.y + Math.sin(this.t + m.phase) * 2))
       m.s.scale.set(m.scale / FX_UNIT)
       m.s.alpha = A.moteAlpha * fade * twinkle
-      m.s.tint = i % 5 === 0 ? air.moteAccent : air.moteTint
+      m.s.tint = i % 5 === 0 ? air.moteAccent : m.src ?? air.moteTint
     }
   }
 

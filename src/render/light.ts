@@ -231,7 +231,14 @@ export class Lighting {
     while (this.flameAcc >= 1) {
       this.flameAcc -= 1
       const bz = src[fxRng.light.int(0, src.length - 1)]
-      const tongue = brazierFlame(air)
+      // A tongue is the fire that MAKES this light, so it takes the source's own colour whenever
+      // the room names one — the same "dress tint still wins" rule the light itself already obeys.
+      // `air.keyTint` is only the fallback for a source that named none, and in the hub that
+      // fallback is the cold star-pane blue (#c8d0ff): every Bardo cresset was standing a pale
+      // periwinkle crystal on itself, up to 22 px, the largest and brightest object beside the
+      // player at the arrival. Read at 1x it was ice, not fire. Canon `ember` is what a named
+      // flame cools to as it rises.
+      const tongue = bz.tint === undefined ? brazierFlame(air) : { tint: bz.tint, tint1: 0xff7a18 }
       this.particles.flame(bz.x, bz.y - 6, tongue.tint, tongue.tint1)
     }
 

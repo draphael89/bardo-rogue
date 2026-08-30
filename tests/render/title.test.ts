@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { arrivalBanner, backPause, buildStripLadder, backTitle, confirmTitle, deathCarriedLadder, deathCarriedLine, deathClose, deathReachedLine, deathSentLine, deathTakenLine, duoFooter, hideFightChrome, hidePlaceCaption, homeBanner, keptLabel, meetingVeil, offerAct, offerCardHeight, offerSpoken, pauseFooter, pauseNudge, pauseRows, resolvePause, runStartBanner, shopAct, shopSpoken, showBuildStrip, titleDescend, titleDescentEase, titleNudge, titleRows, townTally, victoryKeptLine, wrapPauseFocus, wrapTitleFocus } from '@/render/titleMenu'
+import { arrivalBanner, backPause, buildStripLadder, backTitle, confirmTitle, deathCarriedLadder, deathCarriedLine, deathClose, deathReachedLine, deathSentLine, deathTakenLine, duoFooter, hideFightChrome, hidePlaceCaption, homeBanner, keptLabel, meetingVeil, offerAct, offerCardHeight, offerSpoken, pauseFooter, pauseNudge, pauseRows, resolvePause, runStartBanner, shopAct, shopSpoken, showBuildStrip, showFirstFightControls, titleDescend, titleDescentEase, titleNudge, titleRows, townTally, victoryKeptLine, wrapPauseFocus, wrapTitleFocus } from '@/render/titleMenu'
 import { TitleFlow } from '@/titleFlow'
 import { SHOP_COPY } from '@/sim/economy'
 import { clampSlider, nudgeSlider } from '@/sim/storage'
@@ -126,6 +126,14 @@ describe('title menu', () => {
     expect(arrivalBanner('wave1', 'THE THRESHOLD')).toBe('THE THRESHOLD')
     expect(runStartBanner('loop')).toBeNull()
     expect(runStartBanner('wave1')).toEqual({ title: 'DESCEND', sub: 'return with your name' })
+  })
+
+  it('spends the control legend once, in the fresh profile opening fight', () => {
+    expect(showFirstFightControls('loop', 1, 1, 'fighting')).toBe(true)
+    expect(showFirstFightControls('loop', 1, 1, 'town')).toBe(false)
+    expect(showFirstFightControls('loop', 1, 2, 'fighting')).toBe(false)
+    expect(showFirstFightControls('loop', 2, 1, 'fighting')).toBe(false)
+    expect(showFirstFightControls('wave1', 1, 1, 'fighting')).toBe(false)
   })
 
   it('names the keep on the way home, not THE BARDO again', () => {

@@ -33,6 +33,7 @@ export const PROP = {
   bellNW: 0, bellNE: 1, bellSW: 2, bellSE: 3,
   brazier: 4, ossuary: 5, shard: 6, pew: 7,
   reed: 8, prow: 9, pole: 10, pan: 11,
+  keeperLamp: 12, brazierCold: 13,
 } as const
 
 export type RoomKind = 'bardo' | 'threshold' | 'crossing' | 'shore'
@@ -512,7 +513,8 @@ function buildBardo(rng: Rng): Arena {
   const smith = { x: 15.5 * TILE, y: 22.5 * TILE }
   const forgeFire = { x: 18 * TILE, y: 21.2 * TILE }
   const bell = { x: 51 * TILE, y: 20 * TILE }                   // the reliquary, upright on the Shrine
-  const causeEmber = { x: 28.5 * TILE, y: 28.6 * TILE }
+  // The fire on the Keeper's column (§8.4.4): the causeway's key, kept burning for whoever lands.
+  const keeperFire = { x: 39.5 * TILE, y: 28.9 * TILE }
   // Battle scar across the arrival ground (§5.3.2): the causeway's one non-axis-aligned form.
   const furrow = { x0: 28 * TILE, y0: 30.8 * TILE, x1: 39 * TILE, y1: 28.6 * TILE }
 
@@ -521,16 +523,26 @@ function buildBardo(rng: Rng): Arena {
     { x: focal.x, y: focal.y, r: 120, s: 1.05 },
     { x: forgeFire.x, y: forgeFire.y, r: 90, s: 1.0 },
     { x: bell.x, y: bell.y, r: 80, s: 0.9 },
-    { x: causeEmber.x, y: causeEmber.y, r: 70, s: 0.85 },
+    // The causeway pools twice: under the Keeper's fire, and where the pilgrim actually lands —
+    // arrival is IN light (§3.2.3), not beside it. The fire's pool is pulled west of the column
+    // so the two circles overlap above the level-2 threshold the whole way: one continuous lit
+    // ground from the column to the landing, no dark ring between the pools. The landing centre
+    // matches playerStart below.
+    { x: keeperFire.x - 30, y: keeperFire.y + 14, r: 102, s: 1.05 },
+    { x: 33.5 * TILE, y: 30.5 * TILE, r: 68, s: 0.95 },
   ]
   // The pilgrimage wear line (§8.4.1): a level-2 ridge worn along the spine, slightly off-axis.
-  const spine = { x0: 33.5 * TILE, y0: 5 * TILE, x1: 32.8 * TILE, y1: 30 * TILE }
+  // It runs all the way into the landing, because that is where every walk has started (§2.2).
+  const spine = { x0: 33.5 * TILE, y0: 5 * TILE, x1: 32.8 * TILE, y1: 31.4 * TILE }
+  // The fainter fork the Ferryman's fares wear toward the pier — a broken trail, not a road.
+  const fork = { x0: 33 * TILE, y0: 30.2 * TILE, x1: 25.5 * TILE, y1: 29.6 * TILE }
   const levelFor = (R: IslandRect) => (c: number, r: number): number => {
     const px = (c + 0.5) * TILE, py = (r + 0.5) * TILE
     const dEdge = Math.min(c - R.c0, R.c1 - c, r - R.r0, R.r1 - r)
     let key = 0
     for (const p of pools) key = Math.max(key, (1 - Math.min(1, Math.hypot(px - p.x, py - p.y) / p.r)) * p.s)
     key = Math.max(key, (1 - Math.min(1, distToSeg(px, py, spine.x0, spine.y0, spine.x1, spine.y1) / 26)) * 0.78)
+    key = Math.max(key, (1 - Math.min(1, distToSeg(px, py, fork.x0, fork.y0, fork.x1, fork.y1) / 18)) * 0.68)
     const edge = Math.max(0, 1 - dEdge / 2) * 0.42
     const lift = Math.max(0.52, key) - edge + hash2(c, r, 31) * 0.12 - 0.06
     if (lift < 0.24) return 0
@@ -593,13 +605,14 @@ function buildBardo(rng: Rng): Arena {
   // PLAZA: braziers flank the Gate at differing Y (§5.2); the rack keeps clear floor to its east.
   furniture(31, 4, PROP.brazier)
   furniture(36, 5, PROP.brazier)
-  // CAUSEWAY: battlefield relics, the arrival ember, and the Keeper's broken column (§8.4.4).
-  furniture(28, 28, PROP.brazier)
+  // CAUSEWAY: battlefield relics reading "someone left" (§8.2.4) — a brazier gone cold, the
+  // toppled pew, the ossuary against the south wall — and the Keeper's column, the island's
+  // focal object (§8.4.6): it carries the one fire still kept, takes the key, occludes, casts.
+  // Same solid cells as ever; only what stands on them changed.
+  furniture(28, 28, PROP.brazierCold)
   furniture(29, 31, PROP.ossuary)
   furniture(37, 28, PROP.pew)
-  base[idx(39, 30)] = T.pillarBase
-  solid[idx(39, 30)] = 1
-  props.push({ x: 39 * TILE, y: 29 * TILE, tile: T.pillarTop, sortY: 31 * TILE, sheet: 'room' })
+  furniture(39, 30, PROP.keeperLamp)
   // FORGE: the Smith's ground; the forge fire has a body, and quenched slag sits by the west wall.
   furniture(18, 21, PROP.brazier)
   furniture(11, 24, PROP.shard)
@@ -620,7 +633,7 @@ function buildBardo(rng: Rng): Arena {
   base[idx(4, 15)] = T.capSouth
   base[idx(5, 15)] = T.capSouth
   props.push({ x: 4 * TILE, y: 11 * TILE, tile: T.pillarTop, sortY: 16 * TILE, sheet: 'room' })
-  furniture(6, 15, PROP.brazier)
+  furniture(6, 15, PROP.brazierCold)
   // East: the dark arch island beyond the chained stub, a sealed door in a foreign mass.
   for (let r = 17; r <= 20; r++) for (let c = 59; c <= 62; c++) base[idx(c, r)] = r === 17 ? T.wallFace : T.wallFaceB
   base[idx(60, 19)] = T.doorClosed
@@ -635,19 +648,22 @@ function buildBardo(rng: Rng): Arena {
     playerStart: { x: 33.5 * TILE, y: 30.5 * TILE },
     braziers: [
       // [0] is the key (§3.2.1): the Gate, gold — a crossing's colour (§8.2.2). Light climbs
-      // northward along the line: dim arrival ember, working forge fire, votive, then the Gate.
+      // northward along the line: the Keeper's arrival fire, working forge, votive, then the Gate.
       { x: 31 * TILE + 8, y: 4.8 * TILE, radius: 116, strength: 1.7, tint: 0xffd9a0 },
       { x: 36 * TILE + 8, y: 5.2 * TILE, radius: 72, strength: 0.8, tint: 0xffd9a0 },
       { x: forgeFire.x, y: forgeFire.y, radius: 86, strength: 1.3, tint: 0xff7a18 },
       { x: 46 * TILE, y: 21.8 * TILE, radius: 48, strength: 0.6, tint: 0xd4b060 },
-      { x: causeEmber.x, y: causeEmber.y, radius: 56, strength: 0.5 },
-      { x: 20.5 * TILE, y: 29.6 * TILE, radius: 40, strength: 0.45, tint: 0xd4b060 },
+      // The causeway's own key (§8.4.6): the cresset on the Keeper's column. Wide enough that
+      // the landing sits inside the pool — arrival is IN light, warm against the indigo.
+      { x: keeperFire.x, y: keeperFire.y, radius: 128, strength: 1.7, tint: 0xffc078 },
     ],
     windows: [
       { x: 37.5 * TILE, y: 3.5 * TILE, radius: 60, strength: 0.6 },
       { x: 47.5 * TILE, y: 17.5 * TILE, radius: 56, strength: 0.55 },
       { x: bell.x, y: bell.y, radius: 64, strength: 0.5 },
-      { x: 39.5 * TILE, y: 29.4 * TILE, radius: 30, strength: 0.4 },
+      // The Ferryman's lantern (§1.3.6): numen glass on the pier pole. A cold source — it marks
+      // the crossing to the beyond, so it does not join the braziers' warm family.
+      { x: 20.5 * TILE, y: 28.2 * TILE, radius: 46, strength: 0.8, tint: 0x2e8a80 },
     ],
     furrow, focal, rack, rackTaken: false, smith, smithNear: false,
     islands,

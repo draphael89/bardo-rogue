@@ -368,7 +368,7 @@ describe('code-generated sheets', () => {
     const room = await sharp('public/assets/sprites/bardo_room.png').metadata()
     const props = await sharp('public/assets/sprites/bardo_props.png').metadata()
     expect([room.width, room.height]).toEqual([8 * 24, 11 * 24])
-    expect([props.width, props.height]).toEqual([4 * 48, 3 * 48])
+    expect([props.width, props.height]).toEqual([4 * 48, 4 * 48])
   })
 
   for (const name of ['bardo_room', 'bardo_props']) {

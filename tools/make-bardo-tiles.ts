@@ -60,6 +60,11 @@ const P = {
   emberHi: [255, 204, 86] as C,
   emberLo: [176, 48, 16] as C,
   sky: [14, 18, 44] as C,
+  // §1.3.6 the numen ramp: Bardo only, only on what touches the beyond. Here: the Ferryman's
+  // lantern glass, the one carrier this sheet owns.
+  numenDim: [26, 74, 72] as C,
+  numen: [46, 138, 128] as C,
+  numenHi: [127, 232, 216] as C,
   // the open door is a hole you walk through, not a window of stars (run lane, kept verbatim)
   well: [4, 3, 10] as C,
   wellHi: [12, 8, 22] as C,
@@ -924,6 +929,9 @@ function prow32(): Uint8Array {
   return d
 }
 
+// The Ferryman's mooring pole. The lantern at its head is the one numen carrier on this sheet
+// (§1.3.6): an iron cage around glass that holds the beyond, not a flame. Cold light for a cold
+// crossing; the warm fires belong to the islands.
 function pole32(): Uint8Array {
   const { d, set } = make32()
   for (let y = 2; y < 31; y++) {
@@ -933,11 +941,92 @@ function pole32(): Uint8Array {
   }
   for (let y = 4; y < 10; y++) for (let x = 11; x < 21; x++) {
     const dx = (x - 15.5) / 4.6, dy = (y - 6.5) / 2.8
-    if (dx * dx + dy * dy > 1) continue
-    set(x, y, chance(x, y, 81, 30) ? P.gold : P.goldDim)
+    const r2 = dx * dx + dy * dy
+    if (r2 > 1) continue
+    if (r2 > 0.58) { set(x, y, P.iron); continue }        // the cage, in its own dark metal (§2.4)
+    set(x, y, y > 7 ? P.numenDim : P.numen)               // the glass: never shaded, two flat values (§2.8)
   }
-  set(15, 6, P.goldHot)
+  set(15, 6, P.numenHi); set(16, 6, P.numenHi)            // B5 core, 2 px (§1.2 budget)
+  set(12, 5, P.ironHi)                                    // one worn catch on the cage, key side
   set(14, 31, P.grout); set(16, 31, P.grout)
+  return d
+}
+
+// The Keeper's column (§8.4.4, §8.4.6): the arrival causeway's focal object. A broken column of
+// the same warm stone as the walls, an iron cresset set into the break, and the one fire on the
+// island that is still kept burning — the causeway's key light (§3.2.2). §4.2: in solid black it
+// is a column with a bowl of fire on a jagged crown; nothing else on the sheet has that head.
+function keeperLamp32(): Uint8Array {
+  const { d, set } = make32()
+  // contact shadow, south and 15° right (§3.2.8)
+  for (let x = 9; x < 25; x++) set(x, 30, P.grout)
+  for (let x = 12; x < 27; x++) set(x, 31, P.grout)
+  // plinth: two steps, lit on the north edge, falling to shadow east (§2.1 Law 2)
+  for (let y = 26; y < 30; y++) for (let x = 9; x < 24; x++) {
+    let col: C = P.wood
+    if (y === 26) col = P.boneLo
+    else if (x < 11) col = P.woodHi
+    else if (x > 20 || y === 29) col = P.woodLo
+    if (chance(x, y, 57, 8)) col = P.woodLo
+    set(x, y, col)
+  }
+  // shaft: 8 px, lit west edge, core shadow east, broken fluting in 1 px runs
+  for (let y = 9; y < 26; y++) {
+    set(12, y, P.boneLo)
+    set(13, y, P.woodHi)
+    for (let x = 14; x < 18; x++) set(x, y, P.wood)
+    set(18, y, P.woodLo)
+    set(19, y, P.mortar)
+    if (y % 5 < 2) set(15, y, P.woodLo)                   // fluting, broken, never full-length (§2.7)
+    if (chance(2, y, 58, 22)) set(16, y, P.woodLo)
+  }
+  set(17, 18, P.mortar); set(17, 19, P.mortar); set(16, 20, P.mortar)   // one crack, with a start and an end
+  // the broken crown: a jagged top the cresset was socketed into
+  for (const [x, y] of [[12, 8], [13, 7], [14, 8], [15, 7], [16, 8], [17, 7], [18, 8]] as const) {
+    set(x, y, P.boneLo)
+  }
+  // the cresset: iron dish, extremes touching (§2.4), underside falling to shadow
+  for (let x = 11; x < 21; x++) { set(x, 5, P.iron); set(x, 6, P.iron) }
+  for (let x = 12; x < 20; x++) set(x, 7, P.mortar)
+  set(11, 5, P.ironHi); set(12, 5, P.ironHi); set(15, 5, P.ironHi)      // worn rim, segmented
+  // the fire: coals, body, one hot core. The island's brightest static pixels sit here (§3.2.5).
+  for (let x = 13; x < 19; x++) set(x, 4, P.emberLo)
+  set(14, 4, P.ember); set(17, 4, P.ember)
+  for (let x = 14; x < 17; x++) set(x, 3, P.ember)
+  set(15, 2, P.emberHi); set(15, 1, P.emberHi)
+  set(14, 2, P.ember); set(16, 2, P.emberLo)
+  return d
+}
+
+// The same bowl as brazier32 with the fire long dead (§8.2.4: the bardo shows that someone left).
+// Cold coals under a skin of ash; the metal keeps its worn rim so it still reads as iron (§2.4).
+function brazierCold32(): Uint8Array {
+  const { d, set } = make32()
+  for (let x = 8; x < 28; x++) set(x, 30, P.grout)              // hard contact shadow, offset right
+  for (let x = 10; x < 26; x++) set(x, 29, P.grout)
+  for (const lx of [11, 16, 21]) for (let y = 20; y < 30; y++) {
+    const x = lx + Math.round((y - 20) * (lx === 16 ? 0 : lx < 16 ? -0.25 : 0.25))
+    set(x, y, P.boneLo); set(x + 1, y, P.woodLo)
+  }
+  for (let y = 12; y < 22; y++) for (let x = 6; x < 27; x++) {
+    const dx = (x - 16.2) / 10.4, dy = (y - 13) / 8.5
+    if (dx * dx + dy * dy > 1) continue
+    let col: C = P.iron
+    if (x < 9) col = P.ironHi
+    else if (x > 23) col = P.mortar
+    if (y > 19) col = P.mortar
+    if (chance(x, y, 44, 9)) col = P.mortar
+    set(x, y, col)
+  }
+  for (let x = 7; x < 26; x++) { set(x, 12, P.ironHi); set(x, 13, P.iron) }
+  for (let x = 8; x < 25; x += 6) set(x, 12, P.ironHi)           // worn rim, segmented (§2.4)
+  // the dead bed: charcoal at the bottom of its value range, no warm anywhere
+  for (let y = 13; y < 18; y++) for (let x = 9; x < 24; x++) {
+    const dx = (x - 16.2) / 7.2, dy = (y - 14) / 4.2
+    if (dx * dx + dy * dy > 1) continue
+    set(x, y, chance(x, y, 46, 34) ? P.void : P.mortar)
+  }
+  set(13, 15, P.boneLo); set(19, 16, P.boneLo)                   // two flecks of ash, nothing more
   return d
 }
 
@@ -959,6 +1048,7 @@ const props32 = [
   bellCells[0], bellCells[1], bellCells[2], bellCells[3],
   brazier32(), ossuary32(), shard32(), pew32(),
   reed32(), prow32(), pole32(), pan32(),
+  keeperLamp32(), brazierCold32(),
 ]
 const pRows = Math.ceil(props32.length / PCOLS)
 const pSheet = Buffer.alloc(PCOLS * PROP_CELL * pRows * PROP_CELL * 4)

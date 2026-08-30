@@ -1,7 +1,7 @@
 {
   "title": "Bardo Rogue",
   "subtitle": "First Gate: rooms-as-data, a generated route, a town that remembers",
-  "updated": "2026-08-30T02:03:00-04:00",
+  "updated": "2026-08-30T02:59:23-04:00",
   "now": "hero-stress-contract",
   "round": 6,
   "timeline": [
@@ -1036,6 +1036,10 @@
     {
       "t": "07:58",
       "text": "An eight-angle adversarial review of Phase 0 found ten findings; eight fixed, two investigated and rejected with evidence. The worst was a seam the tests could not see: the shell pause stops sample(), so the Enter that chose RESUME was still latched and confirmed the boon offer underneath. Also fixed: a held pad A could never open the pause card, abandon and playtest recording were mutually incoherent (now interlocked), the schema bump had broken the desktop smoke, and the master slider answered on a different loudness curve than the two beside it."
+    },
+    {
+      "t": "02:59",
+      "text": "The arrival causeway art pass: the first frame of gameplay now lands in light. The Keeper's column became a lamp column (new prop) whose cresset is the island's key — its pool is baked into the stone as quantized warm value blocks running from the column to the landing, so the pilgrim arrives on firelit ground a full band over the perimeter (measured: pool 0.21 B2 vs 0.11 B1; before, the centre was DARKER than the edge). The pilgrimage wear line runs into the landing as baked scuffs crossing tile boundaries; a cold brazier with its soot fan and the pier-damp stains say someone left; the Ferryman's pole carries a numen-glass lantern — the ramp's first machine-form entries in canon.json. Sim-neutral: every pinned hash stands, all room gates green."
     }
   ],
   "pieces": [

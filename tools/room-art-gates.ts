@@ -187,7 +187,7 @@ async function runtime(url: string, shotDir?: string): Promise<RuntimeRoom[]> {
 }
 
 await sourceSheet('public/assets/sprites/bardo_room.png', 8 * 24, 11 * 24)
-await sourceSheet('public/assets/sprites/bardo_props.png', 4 * 48, 3 * 48)
+await sourceSheet('public/assets/sprites/bardo_props.png', 4 * 48, 4 * 48)
 await materialSpan()
 negativeSpace(buildArena(new Rng(1), 'bardo'))
 const rooms = flag('url') ? await runtime(flag('url')!, flag('shot-dir')) : []

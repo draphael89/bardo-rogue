@@ -1,5 +1,5 @@
 import { Container, Sprite, RenderTexture, Graphics, type DestroyOptions, type Renderer } from 'pixi.js'
-import { TILE, T, interior, type Arena, type ArenaDoor, type ArenaShrine, type DoorMark, type ArenaOffering, type ArenaRack, doorOpens } from '@/sim/arena'
+import { TILE, T, PROP, interior, type Arena, type ArenaDoor, type ArenaShrine, type DoorMark, type ArenaOffering, type ArenaRack, doorOpens } from '@/sim/arena'
 import type { Atlas } from './atlas'
 import { OATH } from './oathMetal'
 import { tuning } from '@/tuning'
@@ -685,6 +685,90 @@ function bakeScorch(g: Graphics, arena: Arena): void {
   px(g, x - 5, y + 6, 10, 2, C.emberLo)
 }
 
+// The arrival causeway's evidence of use (§2.2, §5.3.3, §8.4.1): the pilgrimage wear scuffed
+// along the actual walk line — landing to bridge mouth — cold soot fanned around every fire
+// nobody relit (§8.2.4), and river damp tracked in from the Ferryman's pier. Bardo only; the
+// coordinates mirror buildBardo's causeway. Everything is a whole source pixel at alpha 1
+// (§2.1 Law 5), one step off the floor body, and jittered OFF the tile grid so the marks cross
+// slab and tile boundaries the way feet do.
+function bakeBardoCauseway(g: Graphics, arena: Arena): void {
+  if (arena.kind !== 'bardo') return
+  const S = ROOM_ART_SCALE
+  const floorAt = (wx: number, wy: number): boolean => {
+    const c = Math.floor(wx / TILE), r = Math.floor(wy / TILE)
+    if (c < 0 || r < 0 || c >= arena.cols || r >= arena.rows) return false
+    const t = arena.base[r * arena.cols + c]
+    return t >= 1 && t <= 60
+  }
+  // 0) The Keeper's fire, baked onto the stone (§3.2.7: bake the pool — the multiplied lightmap
+  //    can only reveal a baked colour, never exceed it, so the warmth must live in the art).
+  //    Two quantized rings of warm value blocks around the cresset's foot, denser near the fire,
+  //    block-scaled so they read as firelight on slabs rather than noise (§2.1 Law 1 macro).
+  //    The blocks sit one step over the pool body and stay B2-warm; the only brighter marks are
+  //    three 1 px goldDim glints hard by the column, inside the focal's own 64 px (§3.2.5).
+  const fire = { x: 39.5 * TILE, y: 30.6 * TILE }
+  const landing = { x: 33.5 * TILE, y: 30.5 * TILE }
+  for (let gy = 0; gy < 14; gy++) for (let gx = 0; gx < 30; gx++) {
+    const h = wearHash(gx, gy, 151)
+    const wx = 30 * TILE + gx * 6 + ((h >>> 4) % 5) - 2
+    const wy = 27.8 * TILE + gy * 6 + ((h >>> 10) % 5) - 2
+    const dFire = Math.hypot(wx - fire.x, wy - fire.y)
+    const dLand = Math.hypot(wx - landing.x, wy - landing.y)
+    const d = Math.min(dFire, dLand * 1.6)      // the landing's ring is tighter than the fire's
+    if (d > 92) continue
+    const keep = d < 34 ? (h & 7) < 6 : d < 62 ? (h & 7) < 3 : (h & 7) < 1
+    if (!keep || !floorAt(wx, wy)) continue
+    const w = 4 + (h >>> 14) % 6, ht = 2 + (h >>> 18) % 2
+    artPx(g, wx * S, wy * S, w, ht, (h >>> 20) % 3 === 0 ? C.nave0 : C.naveWarm)
+  }
+  for (const [ox, oy] of [[-9, 2], [6, 6], [-2, 10]] as const) {
+    artPx(g, (fire.x + ox) * S, (fire.y + oy) * S, 1, 1, C.goldDim)
+  }
+  // 1) The walk. Scuffs scatter densest on the line and thin off it — a soft edge made of hard
+  //    pixels. One step UP from the body (slate2); warm (naveWarm) inside the Keeper's pool,
+  //    which is how the wear and the light agree (§3.2.7); a sparse dark heel-gouge (grout).
+  const x0 = 33.5 * TILE, y0 = 31.5 * TILE, x1 = 32.9 * TILE, y1 = 24.5 * TILE
+  const steps = Math.round((y0 - y1) / 2)
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps
+    const h = wearHash(i, 7, 113)
+    const lat = ((h >>> 3) % 17) - 8
+    if (Math.abs(lat) > 3 && (h & 3) !== 0) continue
+    const wx = x0 + (x1 - x0) * t + lat
+    const wy = y0 + (y1 - y0) * t + ((h >>> 9) % 3) - 1
+    if (!floorAt(wx, wy)) continue
+    const warm = Math.hypot(wx - 39.5 * TILE, wy - 29.8 * TILE) < 52
+    const col = (h >>> 6) % 5 === 0 ? C.grout : warm ? C.naveWarm : C.slate2
+    artPx(g, wx * S, wy * S, 2 + ((h >>> 13) % 3), 1, col)
+  }
+  // 2) Cold soot fanned south and 15° right (§3.2.8) of every dead fire: it burned for years,
+  //    and then nobody came. Quantized hard-edged wedges (§6.6), all below the floor body.
+  for (const p of arena.props) {
+    if (p.sheet !== 'prop' || p.tile !== PROP.brazierCold) continue
+    const cx = p.x + 16
+    for (let i = 0; i < 4; i++) {
+      const t = i / 3
+      const half = Math.round(5 + t * 9)
+      const wy = p.sortY - 2 + i * 3
+      const wcx = cx + Math.round(t * 4)
+      if (!floorAt(wcx, wy)) continue
+      artPx(g, (wcx - half) * S, wy * S, (half * 2 + 1) * S, 2, C.grout)
+      artPx(g, (wcx - Math.round(half * 0.5)) * S, wy * S, (half + 1) * S, 2, C.mortar)
+    }
+  }
+  // 3) The damp the pier mouth tracks in: broken dark runs on the stone inside the west wall,
+  //    reaching east and thinning — the reason is the water, and the water is right there.
+  for (let i = 0; i < 14; i++) {
+    const h = wearHash(i, 3, 131)
+    const wx = 26.5 * TILE + (h % 26)
+    const wy = 29.5 * TILE - 6 + ((h >>> 8) % 14)
+    if (!floorAt(wx, wy)) continue
+    const w = 3 + (h >>> 16) % 5
+    artPx(g, wx * S, wy * S, w, 1, (h & 1) ? C.seal0 : C.mortar)
+    if ((h >>> 20) % 3 === 0) artPx(g, (wx + 1) * S, wy * S + 1, Math.max(2, w - 2), 1, C.grout)
+  }
+}
+
 // §3.2.8 cast shadows are fixed and hard: south, 15° right, length ≈ 0.4 × height,
 // a stepped silhouette rather than a blurred ellipse. A prop may overhang the void (the
 // skiff's prow, a Seal brazier) but its shadow may not: an opaque grey row on the starfield
@@ -776,6 +860,7 @@ export function buildTilemap(renderer: Renderer, atlas: Atlas, arena: Arena, flo
   // room's identity, not on islands-presence — a future walled room without a bell keeps its floor.
   if (arena.kind !== 'bardo') bakeScorch(g, arena)
   bakeGrit(g, arena)
+  bakeBardoCauseway(g, arena)
   bakePropShadows(g, arena)
   bakeBardoGate(g, arena)
   c.addChild(g)

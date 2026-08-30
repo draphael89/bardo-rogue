@@ -7,7 +7,7 @@ import { lerp, easeOutCubic, easeInCubic } from '../anim'
 import { swingProgress } from '@/sim/combat'
 import { activeBoons, hasBoon, swingReach } from '@/sim/boons'
 import { BLADE_SMEAR, bladeDress, type BladeDress } from '../bladeDress'
-import { EntityView, SPRITE, WEAPON, snapToTarget } from './shared'
+import { EntityView, WEAPON, snapToTarget } from './shared'
 import type { Sheet } from '../sheet'
 import { ARM, armOf } from '@/sim/weapons'
 import { updateBow } from './bow'
@@ -119,7 +119,7 @@ function authoredDirectionFor(v: EntityView, p: Player): HeroDirection {
 }
 
 export function createPlayerView(atlas: Atlas, layers: { entities: Container; shadows: Container }): EntityView {
-  const v = new EntityView(atlas, SPRITE.player, WEAPON.player, layers)
+  const v = new EntityView(atlas, null, WEAPON.player, layers)   // the body is authored in both families; only the bow still needs a weapon sprite
   // The armed family owns no roll sheet, and that is the contract rather than a gap: the rig refuses
   // to carry a greatsword through a tuck (the blade tip leaves the cell), so an armed depth-axis
   // dodge plays that family's own dive/fall/land with the blade still in hand.

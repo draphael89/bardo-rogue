@@ -34,8 +34,11 @@ export class EntityView {
   hitHeavy = false
   private owned: Sprite[] = []
   private normalTex; private whiteTex
-  constructor(atlas: Atlas, tile: number, weaponTile: number | null, layers: { entities: Container; shadows: Container }) {
-    this.normalTex = atlas.tile(tile); this.whiteTex = atlas.white(tile)
+  /** `tile` null means the body is authored and `bindBody` supplies it: nothing legacy is bound at
+   *  all, so a view that failed to bind renders nothing instead of quietly rendering as a Kenney knight. */
+  constructor(atlas: Atlas, tile: number | null, weaponTile: number | null, layers: { entities: Container; shadows: Container }) {
+    this.normalTex = tile === null ? Texture.EMPTY : atlas.tile(tile)
+    this.whiteTex = tile === null ? Texture.EMPTY : atlas.white(tile)
     this.body = new Sprite(this.normalTex); this.body.anchor.set(0.5, 1)
     layers.entities.addChild(this.body)
     if (weaponTile !== null) {

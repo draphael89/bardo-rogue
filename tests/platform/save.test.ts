@@ -263,7 +263,7 @@ describe('a read that failed is not a read that found nothing', () => {
       read: () => Promise.reject(new Error('EIO')),
       write: async (...args) => { writes++; await store.write(...args) },
     }, ID)
-    expect(loaded.source).toBe('unreadable')
+    expect(loaded.source).toBe('backup')
     expect(loaded.writable).toBe(false)
     expect(loaded.save.meta.attempts).toBe(5)
     expect(writes).toBe(0)

@@ -60,9 +60,9 @@ export async function loadSave(
     return {
       save: backup.save,
       writable: !live.failed && !preservationFailed,
-      // The backup still lets the player continue from real progress, but a failed live read is the
-      // reason this session is read-only and therefore the warning the shell must show.
-      source: live.failed ? 'unreadable' : 'backup',
+      // The backup is readable progress even when the live read failed. Keep that source so the
+      // shell can still export the recovered copy; `writable` independently keeps it read-only.
+      source: 'backup',
       ...(preservationFailed ? { preservationFailed: true as const } : {}),
     }
   }

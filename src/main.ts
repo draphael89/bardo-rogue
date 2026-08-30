@@ -15,7 +15,7 @@ import { Metrics } from '@/sim/metrics'
 import { DebugOverlay } from '@/debug/overlay'
 import { installApi } from '@/debug/api'
 import { makeBot, type BotName } from '@/sim/bots'
-import { decodeReplay, isEncodedReplay, quantizeFrame, replayToJson, type Replay, type EncodedReplay } from '@/sim/replay'
+import { decodeReplay, isEncodedReplay, MAX_REPLAY_FRAMES, quantizeFrame, replayToJson, type Replay, type EncodedReplay } from '@/sim/replay'
 import { downloadJson, Recorder } from '@/input/recorder'
 import { tuning } from '@/tuning'
 import { Text } from 'pixi.js'
@@ -44,7 +44,8 @@ async function boot() {
   // session interlocks that keep a bundle honest: PLAYTEST.md.
   const playtestRaw = q.get('playtest')
   const playtest = asPlaytestCondition(playtestRaw)
-  let replayCondition: PlaytestCondition | null = playtest
+  // Bots bypass playtest setup entirely, so they must not inherit its replay/export interlocks.
+  let replayCondition: PlaytestCondition | null = playtest && !botName ? playtest : null
   if (playtestRaw && !playtest) console.log(`[playtest] unknown condition "${playtestRaw}"; expected ${PLAYTEST_CONDITIONS.join(' | ')}`)
 
   // Widen the render target to the window's aspect before anything reads it, so the room is not
@@ -92,7 +93,9 @@ async function boot() {
   else if (ownership === 'unavailable') console.log('[save] exclusive browser save locking is unavailable; this session will not write')
   else if (loaded.preservationFailed) console.log('[save] damaged bytes could not be preserved; this session will not write')
   else if (loaded.source === 'damaged') console.log('[save] the save was damaged and no backup was usable; a fresh profile started, the damaged bytes are kept')
-  else if (loaded.source === 'backup') console.log('[save] the live save was unreadable; recovered from the backup copy')
+  else if (loaded.source === 'backup') console.log(loaded.writable
+    ? '[save] the live save was unreadable; recovered from the backup copy'
+    : '[save] recovered progress from the backup copy; the unreadable live slot keeps this session read-only')
   else if (loaded.source === 'unreadable') console.log('[save] this profile could not be read at all; nothing will be written over it')
   else if (!savable) console.log('[save] this save was written by a newer build; it will not be overwritten')
   // Two values on purpose: what the save document says, and what this session is actually rendering.
@@ -326,7 +329,10 @@ async function boot() {
       frame = replayFrames[replayIdx++]
       if (replayIdx >= replayFrames.length) { replayFrames = null; console.log('[replay] finished; back to live input') }
     } else frame = quantizeFrame(bot ? bot(world) : filterVerbs(live))
-    recorder.capture(frame)
+    if (!recorder.capture(frame)) {
+      console.log(`[replay] recording stopped at the ${MAX_REPLAY_FRAMES}-frame limit`)
+      presenter.hud.showBanner('RECORDING LIMIT REACHED', 'reload before recording another run', 3.5)
+    }
     stepWorld(world, frame)
     flushEvents()
     audio.setLayout(world.rooms[world.roomIndex]?.layout ?? 'bardo')
@@ -647,7 +653,14 @@ async function boot() {
   const exportPlaytestBundle = () => {
     // A snapshot, not a stop: the session keeps recording so a tester can export after every run.
     const snapshot = recorder.snapshot()
-    if (!snapshot) { presenter.hud.showBanner('NOTHING RECORDING', 'reload to arm the playtest', 2.2); return }
+    if (!snapshot) {
+      presenter.hud.showBanner(
+        recorder.limitReached ? 'RECORDING TOO LONG' : 'NOTHING RECORDING',
+        recorder.limitReached ? 'discard this run and reload' : 'reload to arm the playtest',
+        2.2,
+      )
+      return
+    }
     // The bundle IS a valid encoded replay with one extra key, so `pnpm sim -- --replay bundle.json`
     // replays it with no unwrapping. The condition rides along for the analyst, not the decoder.
     const bundle = {
@@ -862,9 +875,13 @@ async function boot() {
     else if (ownership === 'unavailable') presenter.hud.showBanner('PROGRESS NOT SAVING', 'exclusive browser locking is unavailable', 3.5)
     else if (loaded.source === 'unreadable') presenter.hud.showBanner('SAVE COULD NOT BE READ', 'playing without saving, nothing will be overwritten', 3.5)
     else if (loaded.preservationFailed) presenter.hud.showBanner('SAVE WAS DAMAGED', 'playing read-only; damaged bytes could not be preserved', 3.5)
+    else if (loaded.source === 'backup') presenter.hud.showBanner(
+      'SAVE RESTORED',
+      loaded.writable ? 'recovered from the backup copy' : 'backup recovered; progress here will not be saved',
+      3.5,
+    )
     else if (!savable) presenter.hud.showBanner('SAVE FROM A NEWER BUILD', 'playing without saving, nothing will be overwritten', 3.5)
     else if (loaded.source === 'damaged') presenter.hud.showBanner('SAVE WAS DAMAGED', 'a fresh start; the damaged file is kept', 3.5)
-    else if (loaded.source === 'backup') presenter.hud.showBanner('SAVE RESTORED', 'recovered from the backup copy', 3.0)
   }
 }
 

@@ -83,6 +83,18 @@ describe('replay format', () => {
       expect(() => decodeReplay(replay(count))).toThrow()
     }
   })
+  it('never emits a replay larger than the decoder accepts', () => {
+    const frames = new Array(MAX_REPLAY_FRAMES + 1) as ReturnType<typeof emptyInput>[]
+    expect(() => encodeReplay({ v: 1, seed: 1, scenario: 'empty', frames })).toThrow(/frame limit/)
+
+    const recorder = new Recorder()
+    recorder.start(1, 'empty', false)
+    recorder.frames = new Array(MAX_REPLAY_FRAMES).fill(emptyInput())
+    expect(recorder.capture(emptyInput())).toBe(false)
+    expect(recorder.recording).toBe(false)
+    expect(recorder.limitReached).toBe(true)
+    expect(recorder.last?.frames).toHaveLength(MAX_REPLAY_FRAMES)
+  })
   it('rejects encoded flag bits above the 32-bit range instead of truncating them', () => {
     expect(() => decodeReplay({
       v: 1, seed: 1, scenario: 'empty', runs: [[0, 0, 10000, 0, 2 ** 32, 1]],

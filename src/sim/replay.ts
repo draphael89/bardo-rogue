@@ -93,6 +93,7 @@ export function quantizeFrame(f: InputFrame): InputFrame {
 }
 
 export function encodeReplay(r: Replay): EncodedReplay {
+  if (r.frames.length > MAX_REPLAY_FRAMES) throw new Error(`replay exceeds the ${MAX_REPLAY_FRAMES}-frame limit`)
   const runs: EncodedRun[] = []
   for (const f of r.frames) {
     const flags = (f.aimSoft ? FLAG.aimSoft : 0) | (f.attack ? FLAG.attack : 0) | (f.dodge ? FLAG.dodge : 0) | (f.restart ? FLAG.restart : 0)

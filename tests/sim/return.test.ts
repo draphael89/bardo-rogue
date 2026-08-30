@@ -28,7 +28,7 @@ describe('giving the attempt back', () => {
 
   it('wakes you in the Bardo without paying for an uncleared room', () => {
     const world = descend()
-    expect(['THE ACHERON GATE', 'THE STYX GATE']).toContain(world.roomName)
+    expect(world.roomName).toBe('THE ACHERON GATE')
     expect(abandonRun(world)).toBe(true)
     expect(world.roomName).toBe('THE BARDO')
     expect(world.roomPhase).toBe('town')

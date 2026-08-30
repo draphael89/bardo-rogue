@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { captureCheckpoint, parseCheckpoint, restoreCheckpoint } from '@/sim/checkpoint'
 import { hashWorld } from '@/sim/hash'
-import { enterRoomById } from '@/sim/rooms'
+import { TILE } from '@/sim/arena'
+import { enterRoomById, tryEnterDoor } from '@/sim/rooms'
 import { Rng } from '@/sim/rng'
 import { serializeSave, parseSave, defaultSave } from '@/sim/save'
 import { createWorld } from '@/sim/scenarios'
 import { prepareWeapon, startRun } from '@/sim/session'
-import { buildSliceRooms, FIXED_ROUTE, installRoute, LATE_SHOP } from '@/sim/route'
+import { ASH_MARCH, buildSliceRooms, FIELD_FORK, FIRE_FORD, FIRST_GATE, FIXED_ROUTE, installRoute, LATE_SHOP, STYX_GATE, type RouteTemplate } from '@/sim/route'
 import { SLICE_ECHO_CUT } from '@/sim/content/waves'
 
 function beginFirstCombat(seed = 11) {
@@ -68,12 +69,14 @@ describe('node-boundary checkpoint', () => {
     expect(serializeSave(parsed.save)).toBe(raw)
   })
 
-  it('round-trips the chosen contract and unique clear ledger', () => {
+  it('round-trips the chosen contract and rejects a non-canonical clear ledger', () => {
     const live = beginFirstCombat()
+    enterRoomById(live, 'blade-path', 'door', 'blade')
     live.session.run!.contract = 'commit'
     live.session.run!.clearedRoomIds = ['threshold']
     const snap = captureCheckpoint(live)!
-    const parsed = parseCheckpoint({ ...snap, clearedRoomIds: ['threshold', 'threshold'] })!
+    expect(parseCheckpoint({ ...snap, clearedRoomIds: ['threshold', 'threshold'] })).toBeNull()
+    const parsed = parseCheckpoint(snap)!
     expect(parsed.contract).toBe('commit')
     expect(parsed.clearedRoomIds).toEqual(['threshold'])
 
@@ -81,6 +84,41 @@ describe('node-boundary checkpoint', () => {
     expect(restoreCheckpoint(fresh, parsed)).toBe(true)
     expect(fresh.session.run?.contract).toBe('commit')
     expect(fresh.session.run?.clearedRoomIds).toEqual(['threshold'])
+  })
+
+  it('rejects contradictory node-boundary truth instead of repairing it', () => {
+    const live = beginFirstCombat()
+    enterRoomById(live, 'veil-path', 'door', 'veil')
+    enterRoomById(live, 'black-step', 'door', 'hard')
+    enterRoomById(live, 'cocytus', 'door', 'hard')
+    live.session.run!.contract = 'cut'
+    live.session.run!.clearedRoomIds = ['threshold', 'veil-path', 'black-step']
+    const snap = captureCheckpoint(live)!
+    const invalid = [
+      { ...snap, contract: 'commit' as const },
+      { ...snap, contract: null },
+      { ...snap, clearedRoomIds: ['threshold', 'veil-path'] },
+      { ...snap, clearedRoomIds: ['veil-path', 'threshold', 'black-step'] },
+      { ...snap, clearedRoomIds: [...snap.clearedRoomIds, 'cocytus'] },
+      { ...snap, depth: snap.depth + 1 },
+      {
+        ...snap,
+        contract: null,
+        depth: 3,
+        history: [snap.history[0]!, snap.history[2]!, snap.history[3]!],
+        clearedRoomIds: ['threshold', 'black-step'],
+      },
+      { ...snap, history: [...snap.history.slice(0, 2), snap.history[1]!, ...snap.history.slice(2)] },
+    ]
+    for (const damaged of invalid) {
+      expect(parseCheckpoint(damaged)).toBeNull()
+      const fresh = createWorld(11, 'loop')
+      const before = hashWorld(fresh)
+      expect(restoreCheckpoint(fresh, damaged)).toBe(false)
+      expect(hashWorld(fresh)).toBe(before)
+      expect(fresh.session.run).toBeNull()
+      expect(fresh.rooms[fresh.roomIndex]?.id).toBe('bardo')
+    }
   })
 
   it('defaults fields missing from an older checkpoint', () => {
@@ -126,6 +164,38 @@ describe('node-boundary checkpoint', () => {
     expect(fresh.rooms[fresh.roomIndex]?.id).toBe('cocytus')
   })
 
+  it.each([
+    LATE_SHOP,
+    FIELD_FORK,
+    FIRE_FORD,
+    STYX_GATE,
+    ASH_MARCH,
+  ])('keeps every first exit of retained route $id contract-free after restore', (template: RouteTemplate) => {
+    for (const exit of template.nodes[0]!.edges) {
+      const live = createWorld(23, 'loop')
+      prepareWeapon(live, 'blade')
+      startRun(live, FIRST_GATE.nodes[0]!.id)
+      installRoute(live, buildSliceRooms(template, FIXED_ROUTE), template)
+      enterRoomById(live, template.nodes[0]!.id)
+      const snap = captureCheckpoint(live)!
+      expect(parseCheckpoint({ ...snap, contract: 'cut' })).toBeNull()
+      const restored = createWorld(23, 'loop')
+      expect(restoreCheckpoint(restored, snap)).toBe(true)
+      restored.doorOpen = true
+      const door = restored.arena.doors.find(candidate => candidate.dir === exit.dir)!
+      if (exit.dir === 'north') {
+        restored.player.x = (door.col + 0.5) * TILE
+        restored.player.y = door.row * TILE
+      } else {
+        restored.player.x = door.col * TILE
+        restored.player.y = (door.row + 0.5) * TILE
+      }
+      tryEnterDoor(restored)
+      expect(restored.transitionTarget).toBe(exit.to)
+      expect(restored.session.run?.contract).toBeNull()
+    }
+  })
+
   it('hashes both the contract and ordered clear ledger', () => {
     const a = beginFirstCombat(17)
     const b = beginFirstCombat(17)
@@ -141,7 +211,7 @@ describe('node-boundary checkpoint', () => {
   it('drops a damaged checkpoint and keeps the profile', () => {
     const raw = serializeSave({
       ...defaultSave(),
-      meta: { version: 1, attempts: 4, victories: 1, remembrances: 0, rerollUnlocked: false, vesselUnlocked: false, unlockedWeapons: ['blade'] },
+      meta: { ...defaultSave().meta, attempts: 4, victories: 1 },
       checkpoint: { version: 1, roomId: 'threshold' } as never,
     })
     const parsed = parseSave(raw)

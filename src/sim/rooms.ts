@@ -10,6 +10,7 @@ import { clearBulletTime } from './combat'
 import { recordRoomEntry, restoreRunHealth, smithWaiting, startRun, storeRunHealth, type RoomReward } from './session'
 import { beginRoomFight, offerRite, type RiteId } from './rites'
 import { contractForDestination } from './contracts'
+import { FIRST_GATE } from './route'
 
 export interface RoomExit {
   dir: DoorDir
@@ -189,7 +190,8 @@ export function tryEnterDoor(world: World): void {
       if (leavingTown && !startRun(world, ex.to)) return
       // The first physical fork is the contract. Record it at the same authority that accepts the
       // door overlap, so previews, the echo, rewards, checkpoints, and Minos all read one choice.
-      if (!leavingTown && room.id === 'threshold' && world.session.run?.result === 'active' && !world.session.run.contract) {
+      if (!leavingTown && room.id === 'threshold' && world.session.run?.result === 'active'
+        && world.session.run.map?.template === FIRST_GATE.id && !world.session.run.contract) {
         const contract = contractForDestination(ex.to)
         if (contract) world.session.run.contract = contract.id
       }

@@ -110,7 +110,6 @@ export function installApi(host: {
           preparedWeapon: w.session.preparedWeapon,
           remembrances: w.session.meta.remembrances,
           lastBanked: w.session.lastBanked,
-          lastAttempt: w.session.lastAttempt ? { ...w.session.lastAttempt } : null,
           meta: { ...w.session.meta },
           run: w.session.run ? {
             seed: w.session.run.seed,

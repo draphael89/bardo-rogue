@@ -5,7 +5,7 @@ import { ARM, grantArm, type ArmId } from './weapons'
 import type { RiteId } from './rites'
 import { isContractId, type ContractId } from './contracts'
 import { Rng } from './rng'
-import { FIRST_GATE, buildSliceRooms, installRoute, mapFromRooms, templateById, templateForSeed, type RouteNodeKind, type RunMap } from './route'
+import { FIRST_GATE, buildSliceRooms, installRoute, mapFromRooms, templateById, templateForSeed, type RouteNodeKind, type RouteTemplate, type RunMap } from './route'
 import { enterRoomById } from './rooms'
 import type { MysteryChoice, MysteryOffer, RewardFamily, RewardOffer, RiteAnswer, RiteOffer, RoomPhase, RoomVisit, ShopGood, ShopOffer } from './session'
 import type { World } from './world'
@@ -92,7 +92,7 @@ export interface RunCheckpoint {
   pendingShop: CheckpointShop | null
   pendingMystery: CheckpointMystery | null
   mysteryHunt: boolean
-  /** The answer the Smith has not spoken to yet. Session state, not run state, but it dies with a reload. */
+  /** The active attempt's Unburied answer. A terminal result promotes LEAVE into durable Smith meta. */
   lastMystery: MysteryChoice | null
   obols: number
   rerolls: number
@@ -195,7 +195,9 @@ export function captureCheckpoint(world: World): RunCheckpoint | null {
  */
 export function restoreCheckpoint(world: World, snap: RunCheckpoint): boolean {
   if (world.scenario !== 'loop') return false
-  if (snap.version !== 1) return false
+  const parsed = parseCheckpoint(snap)
+  if (!parsed) return false
+  snap = parsed
   // Build the route this snapshot implies and ask it about the room FIRST. Returning false further
   // down — after the run is installed, the player armed and the route replaced — left the caller
   // holding a live run it had just been told did not restore: the player stood in the Bardo while
@@ -400,16 +402,53 @@ function parseAnswer(v: unknown): RiteAnswer | undefined {
   return undefined
 }
 
-function inferFirstGateContract(history: readonly CheckpointVisit[], map: CheckpointMap | null, roomId: string): ContractId | null | undefined {
+function canonicalContract(history: readonly CheckpointVisit[], template: RouteTemplate, roomId: string): ContractId | null | undefined {
   // Contract fields were added without changing checkpoint v1. Only the live first-gate topology
   // owns this choice; the five retired spines resume with their original, contract-free content.
-  if (map && map.template !== FIRST_GATE.id) return null
+  if (template.id !== FIRST_GATE.id) return null
   const cut = roomId === 'veil-path' || history.some(v => v.id === 'veil-path')
   const commit = roomId === 'blade-path' || history.some(v => v.id === 'blade-path')
   if (cut && commit) return undefined
   if (cut) return 'cut'
   if (commit) return 'commit'
   return null
+}
+
+interface CanonicalNodeState {
+  contract: ContractId | null
+  clearedRoomIds: string[]
+}
+
+function canonicalNodeState(
+  seed: number,
+  map: CheckpointMap | null,
+  roomId: string,
+  depth: number,
+  history: readonly CheckpointVisit[],
+): CanonicalNodeState | null {
+  const template = map ? templateById(map.template) : templateForSeed(seed)
+  if (!template || template.nodes.length === 0) return null
+  if (map && routeSignature(map) !== routeSignature({ nodes: template.nodes })) return null
+  if (history.length === 0 || history.length !== depth) return null
+  if (history[0]!.id !== template.nodes[0]!.id || history[history.length - 1]!.id !== roomId) return null
+  const nodes = new Map(template.nodes.map(node => [node.id, node]))
+  const seen = new Set<string>()
+  for (let i = 0; i < history.length; i++) {
+    const visit = history[i]!
+    if (!nodes.has(visit.id) || seen.has(visit.id)) return null
+    seen.add(visit.id)
+    if (i === 0) continue
+    const previous = nodes.get(history[i - 1]!.id)!
+    const edge = previous.edges.find(candidate => candidate.to === visit.id)
+    if (!edge || (visit.via !== undefined && visit.via !== edge.mark)) return null
+  }
+  const contract = canonicalContract(history, template, roomId)
+  if (contract === undefined) return null
+  return { contract, clearedRoomIds: history.slice(0, -1).map(visit => visit.id) }
+}
+
+function sameStrings(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index])
 }
 
 /** Unknown JSON → a checkpoint or null. Damage drops the run, never the profile. */
@@ -425,10 +464,11 @@ export function parseCheckpoint(input: unknown): RunCheckpoint | null {
   const roomId = id(input.roomId)
   if (seed === null || hp === null || maxHp === null || depth === null || boonBits === null || boundaryRng === null) return null
   if (!roomId || !isArm(input.weapon)) return null
-  let contract: ContractId | null = null
-  if (input.contract !== undefined && input.contract !== null) {
+  const hasContract = Object.prototype.hasOwnProperty.call(input, 'contract')
+  let suppliedContract: ContractId | null = null
+  if (hasContract && input.contract !== null) {
     if (!isContractId(input.contract)) return null
-    contract = input.contract
+    suppliedContract = input.contract
   }
   if (hp < 0 || maxHp < 1 || depth < 0) return null
   if (typeof input.phase !== 'string' || !Object.prototype.hasOwnProperty.call(PHASE, input.phase)) return null
@@ -451,20 +491,15 @@ export function parseCheckpoint(input: unknown): RunCheckpoint | null {
     if (!visit) return null
     history.push(visit)
   }
-  const clearedRoomIds: string[] = []
-  if (input.clearedRoomIds !== undefined) {
+  const hasClearedRooms = Object.prototype.hasOwnProperty.call(input, 'clearedRoomIds')
+  const suppliedClearedRoomIds: string[] = []
+  if (hasClearedRooms) {
     if (!Array.isArray(input.clearedRoomIds)) return null
     for (const raw of input.clearedRoomIds) {
       const room = id(raw)
       if (!room) return null
-      if (!clearedRoomIds.includes(room)) clearedRoomIds.push(room)
-    }
-  } else {
-    // Checkpoints are persisted only on roomEnter. The last visit is therefore the room about to
-    // replay, while every earlier unique visit completed before its exit could be crossed.
-    if (history.length === 0 || history[history.length - 1]!.id !== roomId) return null
-    for (const visit of history.slice(0, -1)) {
-      if (!clearedRoomIds.includes(visit.id)) clearedRoomIds.push(visit.id)
+      if (suppliedClearedRoomIds.includes(room)) return null
+      suppliedClearedRoomIds.push(room)
     }
   }
   const map = parseMap(input.map)
@@ -473,11 +508,12 @@ export function parseCheckpoint(input: unknown): RunCheckpoint | null {
   const pendingShop = parseShop(input.pendingShop)
   const pendingMystery = parseMystery(input.pendingMystery)
   if (map === undefined || pendingReward === undefined || pendingRite === undefined || pendingShop === undefined || pendingMystery === undefined) return null
-  if (contract === null) {
-    const inferred = inferFirstGateContract(history, map, roomId)
-    if (inferred === undefined) return null
-    contract = inferred
-  }
+  const canonical = canonicalNodeState(seed, map, roomId, depth, history)
+  if (!canonical) return null
+  if (hasContract && suppliedContract !== canonical.contract) return null
+  if (hasClearedRooms && !sameStrings(suppliedClearedRoomIds, canonical.clearedRoomIds)) return null
+  const contract = canonical.contract
+  const clearedRoomIds = canonical.clearedRoomIds
   const mysteryHunt = input.mysteryHunt === undefined ? false : flag(input.mysteryHunt)
   if (mysteryHunt === null) return null
   const obols = input.obols === undefined ? 0 : int(input.obols)
@@ -538,7 +574,7 @@ export function normalizeCheckpoint(cp: RunCheckpoint): RunCheckpoint {
     boonBits: cp.boonBits,
     boons: cp.boons.map(b => ({ id: b.id, stacks: b.stacks })),
     history: cloneHistory(cp.history),
-    clearedRoomIds: [...new Set(cp.clearedRoomIds)],
+    clearedRoomIds: [...cp.clearedRoomIds],
     riteAnswer: cp.riteAnswer,
     riteBoonOwed: cp.riteBoonOwed,
     riteDebt: cp.riteDebt,

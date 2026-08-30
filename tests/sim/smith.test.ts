@@ -8,6 +8,7 @@ import { enterRoomById } from '@/sim/rooms'
 import { abandonRun, returnToHub } from '@/sim/return'
 import { ensureUtility, pinUtility } from '@/sim/route'
 import { createWorld } from '@/sim/scenarios'
+import { defaultSave, parseSave, serializeSave } from '@/sim/save'
 import { prepareWeapon, smithWaiting, startRun } from '@/sim/session'
 import { stepWorld } from '@/sim/step'
 import { tuning } from '@/tuning'
@@ -22,6 +23,10 @@ function walkToSmith(world: ReturnType<typeof createWorld>): void {
   world.player.x = smith.x
   world.player.y = smith.y
   stepWorld(world, emptyInput())
+}
+
+function strikeSmith(world: ReturnType<typeof createWorld>): void {
+  stepWorld(world, { ...emptyInput(), attack: true })
 }
 
 function armThenConfirm(world: ReturnType<typeof createWorld>, extra: Record<string, unknown> = {}): void {
@@ -61,12 +66,13 @@ describe('the Smith', () => {
     const world = inTown()
     world.session.meta.remembrances = tuning.economy.smith.rerollCost
     walkToSmith(world)
+    expect(world.session.meta.rerollUnlocked).toBe(false)
+    expect(world.session.meta.remembrances).toBe(tuning.economy.smith.rerollCost)
+    strikeSmith(world)
     expect(world.session.meta.rerollUnlocked).toBe(true)
     expect(world.session.meta.remembrances).toBe(0)
     expect(world.events.some(e => e.type === 'rerollUnlocked')).toBe(true)
-    world.session.meta.remembrances = 9
-    walkToSmith(world)
-    expect(world.session.meta.remembrances).toBe(9)
+    strikeSmith(world)
     expect(world.events.filter(e => e.type === 'rerollUnlocked')).toHaveLength(1)
   })
 
@@ -75,6 +81,8 @@ describe('the Smith', () => {
     world.session.meta.rerollUnlocked = true
     world.session.meta.remembrances = tuning.economy.smith.vesselCost
     walkToSmith(world)
+    expect(world.session.meta.vesselUnlocked).toBe(false)
+    strikeSmith(world)
     expect(world.session.meta.vesselUnlocked).toBe(true)
     expect(world.session.meta.remembrances).toBe(0)
     expect(world.player.maxHp).toBe(tuning.player.hp + tuning.economy.smith.vesselAmount)
@@ -134,7 +142,7 @@ describe('the Smith', () => {
     expect(world.events.some(e => e.type === 'smithSpoke' && e.beat === 'unburied')).toBe(false)
   })
 
-  it('names the one you left even when the same step buys the cup', () => {
+  it('names the one you left before a later strike buys the cup', () => {
     const world = createWorld(7, 'loop')
     prepareWeapon(world, 'blade')
     startRun(world, 'threshold')
@@ -158,10 +166,14 @@ describe('the Smith', () => {
     world.session.meta.rerollUnlocked = true
     world.session.meta.remembrances = tuning.economy.smith.vesselCost
     walkToSmith(world)
-    expect(world.session.meta.vesselUnlocked).toBe(true)
-    expect(world.events.some(e => e.type === 'vesselUnlocked')).toBe(true)
+    expect(world.session.meta.vesselUnlocked).toBe(false)
+    expect(world.events.some(e => e.type === 'vesselUnlocked')).toBe(false)
     expect(world.events.some(e => e.type === 'smithSpoke' && e.beat === 'unburied')).toBe(true)
     expect(world.events.some(e => e.type === 'smithSpoke' && e.beat === 'vesselSold')).toBe(false)
+    strikeSmith(world)
+    expect(world.session.meta.vesselUnlocked).toBe(true)
+    expect(world.events.some(e => e.type === 'vesselUnlocked')).toBe(true)
+    expect(world.events.some(e => e.type === 'smithSpoke' && e.beat === 'vesselSold')).toBe(true)
     world.events.length = 0
     world.player.x += 80
     stepWorld(world, emptyInput())
@@ -180,13 +192,65 @@ describe('the Smith', () => {
       beat: contract,
       line: SMITH_LINES[contract],
     })
-    expect(world.session.lastAttempt).toBeNull()
+    expect(world.session.meta.pendingSmithContract).toBeNull()
 
     world.events.length = 0
     world.player.x += 80
     stepWorld(world, emptyInput())
     walkToSmith(world)
     expect(world.events.some(e => e.type === 'smithSpoke' && e.beat === contract)).toBe(false)
+  })
+
+  it.each(['commit', 'cut'] as const)('keeps the pending %s sentence across reload and consumes it durably', contract => {
+    const world = inTown()
+    prepareWeapon(world, 'blade')
+    startRun(world, 'threshold')
+    world.session.run!.contract = contract
+    expect(abandonRun(world)).toBe(true)
+
+    const firstSave = parseSave(serializeSave({
+      ...defaultSave(),
+      meta: { ...world.session.meta, unlockedWeapons: [...world.session.meta.unlockedWeapons] },
+    })).save
+    const reloaded = createWorld(2, 'loop', { meta: firstSave.meta })
+    walkToSmith(reloaded)
+    expect(reloaded.events.find(e => e.type === 'smithSpoke')).toMatchObject({ beat: contract })
+    expect(reloaded.session.meta.pendingSmithContract).toBeNull()
+
+    const consumedSave = parseSave(serializeSave({
+      ...firstSave,
+      meta: { ...reloaded.session.meta, unlockedWeapons: [...reloaded.session.meta.unlockedWeapons] },
+    })).save
+    const reloadedAgain = createWorld(2, 'loop', { meta: consumedSave.meta })
+    walkToSmith(reloadedAgain)
+    expect(reloadedAgain.events.some(e => e.type === 'smithSpoke' && e.beat === contract)).toBe(false)
+  })
+
+  it('speaks Unburied first and leaves a pending contract for the next approach', () => {
+    const world = createWorld(2, 'loop', {
+      meta: {
+        ...defaultSave().meta,
+        pendingSmithUnburied: true,
+        pendingSmithContract: 'cut',
+      },
+    })
+    walkToSmith(world)
+    expect(world.events.find(e => e.type === 'smithSpoke')).toMatchObject({ beat: 'unburied' })
+    expect(world.session.meta.pendingSmithContract).toBe('cut')
+    world.events.length = 0
+    world.player.x += 80
+    stepWorld(world, emptyInput())
+    walkToSmith(world)
+    expect(world.events.find(e => e.type === 'smithSpoke')).toMatchObject({ beat: 'cut' })
+  })
+
+  it('discards an unheard response when a new descent starts', () => {
+    const world = createWorld(2, 'loop', {
+      meta: { ...defaultSave().meta, pendingSmithContract: 'commit' },
+    })
+    prepareWeapon(world, 'blade')
+    expect(startRun(world, 'threshold')).toBe(true)
+    expect(world.session.meta.pendingSmithContract).toBeNull()
   })
 
   it('does not speak again until you step away', () => {
@@ -254,5 +318,11 @@ describe('offer reforging', () => {
     const c = createWorld(1, 'loop')
     c.session.meta.vesselUnlocked = true
     expect(hashWorld(c)).not.toBe(hashWorld(b))
+    const d = createWorld(1, 'loop')
+    d.session.meta.pendingSmithContract = 'cut'
+    expect(hashWorld(d)).not.toBe(hashWorld(b))
+    const e = createWorld(1, 'loop')
+    e.session.lastMystery = 'leave'
+    expect(hashWorld(e)).not.toBe(hashWorld(b))
   })
 })

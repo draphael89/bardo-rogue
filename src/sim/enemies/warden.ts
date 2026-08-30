@@ -105,7 +105,7 @@ function fireCompanion(world: World, e: Enemy): void {
   else if (companion === WARDEN_PATTERN.slam) {
     const W = tuning.warden
     if (!e.hitDone && e.stateTick > 0 && e.stateTick <= W.slamTicks) {
-      if (enemyRadialAttack(world, e, W.slamRadius, W.slamDamage)) e.hitDone = true
+      enemyRadialAttack(world, e, W.slamRadius, W.slamDamage)
     }
   } else {
     const _never: never = companion
@@ -118,15 +118,25 @@ function updateAttack(world: World, e: Enemy): void {
   e.vx = 0; e.vy = 0
   if (e.pattern === WARDEN_PATTERN.slam) {
     if (!e.hitDone && e.stateTick > 0 && e.stateTick <= W.slamTicks) {
-      if (enemyRadialAttack(world, e, W.slamRadius, W.slamDamage)) e.hitDone = true
+      enemyRadialAttack(world, e, W.slamRadius, W.slamDamage)
+      if (world.session.run && world.session.run.result !== 'active') return
     }
-    if (e.patternStep === 0 && e.stateTick > 0) { fireCompanion(world, e); e.patternStep = 1 }
+    if (e.patternStep === 0 && e.stateTick > 0) {
+      fireCompanion(world, e)
+      if (world.session.run && world.session.run.result !== 'active') return
+      e.patternStep = 1
+    }
   } else if (e.pattern === WARDEN_PATTERN.ring) {
     if (e.patternStep === 0 && e.stateTick > 0) { looseRing(world, e); e.patternStep = 1 }
-    if (e.patternStep === 1 && e.stateTick > 0) { fireCompanion(world, e); e.patternStep = 2 }
+    if (e.patternStep === 1 && e.stateTick > 0) {
+      fireCompanion(world, e)
+      if (world.session.run && world.session.run.result !== 'active') return
+      e.patternStep = 2
+    }
   } else if (e.pattern === WARDEN_PATTERN.fan) {
     if (e.patternStep === 0 && e.stateTick > 0) { looseFan(world, e); e.patternStep = 1 }
     fireCompanion(world, e)
+    if (world.session.run && world.session.run.result !== 'active') return
   }
   if (e.stateTick >= wardenAttackTicks(e)) { e.state = 'recover'; e.stateTick = 0 }
 }

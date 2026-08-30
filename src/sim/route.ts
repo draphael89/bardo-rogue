@@ -526,12 +526,12 @@ export interface MapPlan {
  * The exits strip is the plan. The footer already names this floor — a HERE row
  * would reprint ACHERON GATE on top of THE ACHERON GATE.
  */
-export function mapPlan(rooms: RoomDef[], fromId: string): MapPlan {
+export function mapPlan(rooms: RoomDef[], fromId: string, contractForkEnabled = false): MapPlan {
   const room = rooms.find(r => r.id === fromId)
   const exits = room?.exits ?? []
   const doors = exits.map(ex => {
     const dest = rooms.find(r => r.id === ex.to)
-    const contract = fromId === 'threshold' ? contractForDestination(ex.to) : null
+    const contract = contractForkEnabled && fromId === 'threshold' ? contractForDestination(ex.to) : null
     return {
       mark: ex.mark,
       markLabel: contract?.label ?? doorMarkLabel(ex.mark, ex.to),

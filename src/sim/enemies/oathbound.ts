@@ -80,7 +80,8 @@ export function updateOathbound(world: World, e: Enemy): void {
       else { e.vx = 0; e.vy = 0 }
       const activeStart = O.lungeTicks, activeEnd = O.lungeTicks + O.active
       if (!e.hitDone && e.stateTick > activeStart && e.stateTick <= activeEnd) {
-        if (enemyArcAttack(world, e, O.hitRadius, O.hitArcDeg, O.damage)) e.hitDone = true
+        enemyArcAttack(world, e, O.hitRadius, O.hitArcDeg, O.damage)
+        if (world.session.run && world.session.run.result !== 'active') return
       }
       if (e.stateTick >= activeEnd) { e.state = 'recover'; e.stateTick = 0 }
       break

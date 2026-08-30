@@ -6,7 +6,7 @@ import type { WaveDef } from './waves'
 import { dressArena } from './dress'
 import { arenaKind } from './layouts'
 import { assignDoorRoles, roomsFor, type RoomDef } from './rooms'
-import { makeSessionState, townMaxHp, type GameSessionState, type MetaStateV1, type RoomPhase } from './session'
+import { makeSessionState, townMaxHp, type GameSessionState, type MetaState, type RoomPhase } from './session'
 
 export const SLOW_FULL = 1000   // scale unit for slowRate, not a tunable
 
@@ -153,7 +153,7 @@ export class World {
   attemptStart = 0
   session: GameSessionState
 
-  constructor(seed: number, scenario: string, meta?: MetaStateV1) {
+  constructor(seed: number, scenario: string, meta?: MetaState) {
     this.seed = seed
     this.scenario = scenario
     this.rng = new Rng(streamSeed(seed, STREAM.gameplay))

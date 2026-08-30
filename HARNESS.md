@@ -109,7 +109,7 @@ Available once the page has booted (`await page.waitForFunction(() => !!window._
 
 ## Record and replay
 
-A replay is `{ v: 1, seed, scenario, god?, meta?: MetaStateV1, frames: InputFrame[] }` (`src/sim/replay.ts`). Replay v1 deliberately records inputs, not a content revision: it is a same-build regression artifact, not a portable archival save. Re-record fixtures after intentional simulation or content changes; their pinned hashes expose drift in the current tree. On disk it is run-length
+A replay is `{ v: 1, seed, scenario, god?, meta?: MetaStateV1 | MetaStateV2, frames: InputFrame[] }` (`src/sim/replay.ts`). The container remains v1; older embedded V1 meta loads with no pending Smith response, while new recordings preserve V2. Replay v1 deliberately records inputs, not a content revision: it is a same-build regression artifact, not a portable archival save. Re-record fixtures after intentional simulation or content changes; their pinned hashes expose drift in the current tree. On disk it is run-length
 encoded: `runs: [moveX, moveY, aimX, aimY, flags, count]` with axes as ints x10000 and flags bits
 `1 aimSoft, 2 attack, 4 dodge, 8 restart, 16 attackHeld, 32 confirm, 64 choice-left, 128 choice-right, 256 heavy, 512 reroll`
 (the table in `src/sim/replay.ts` is the source of truth; `pnpm test` fails if this line drifts from it). The browser quantizes every frame to 1/10000 before the sim sees it, so

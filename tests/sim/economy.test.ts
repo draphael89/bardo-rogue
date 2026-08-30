@@ -154,7 +154,7 @@ describe('remembrances', () => {
     clearAndClaim(won)
     finishRun(won, 'won')
     expect(won.session.lastBanked).toBe(tuning.economy.remembrancePerDepth + tuning.economy.remembranceOnVictory)
-    expect(won.session.lastAttempt).toEqual({ contract: null, result: 'won', killedBy: 'none' })
+    expect(won.session.meta.pendingSmithContract).toBeNull()
   })
 
   it('includes the bank in the loop hash', () => {

@@ -1,6 +1,6 @@
 import { Container, Graphics, Text } from 'pixi.js'
 import type { DoorMark } from '@/sim/arena'
-import { mapPlan, type MapPlan } from '@/sim/route'
+import { FIRST_GATE, mapPlan, type MapPlan } from '@/sim/route'
 import type { World } from '@/sim/world'
 import { tuning } from '@/tuning'
 import { fadeToBlack, label, placeLeft, typeBehindPlate, P } from './ui'
@@ -67,7 +67,7 @@ export class RouteMap {
     this.root.visible = show
     if (!show) return
     const path = run.roomHistory.map(v => v.id).join('>')
-    const plan = mapPlan(world.rooms, room.id)
+    const plan = mapPlan(world.rooms, room.id, run.map?.template === FIRST_GATE.id)
     const next = plan.doors.map(d => `${d.mark}:${d.dest}:${d.detail ?? ''}`).join('|')
     const nextKey = `${tuning.view.width}|${path}|${next}|${plan.then ?? ''}`
     if (nextKey !== this.key) {

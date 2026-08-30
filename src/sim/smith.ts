@@ -27,14 +27,10 @@ export const SMITH_LINES: Record<SmithBeat, string> = {
   owned: 'It is already in the steel. Go.',
 }
 
-function beatOf(world: World, bought: 'reroll' | 'vessel' | null): SmithBeat {
+function beatOf(world: World): SmithBeat {
   const m = world.session.meta
-  // The one you left is the first thing he is allowed to say. A cup bought on the same
-  // step still stays; its line waits for the next approach.
-  if (world.session.lastMystery === 'leave') return 'unburied'
-  if (world.session.lastAttempt?.contract) return world.session.lastAttempt.contract
-  if (bought === 'reroll') return 'sold'
-  if (bought === 'vessel') return 'vesselSold'
+  if (m.pendingSmithUnburied) return 'unburied'
+  if (m.pendingSmithContract) return m.pendingSmithContract
   if (m.rerollUnlocked && m.vesselUnlocked) return 'owned'
   if (m.rerollUnlocked) return 'vesselWait'
   if (m.victories > 0) return 'afterVictory'
@@ -42,8 +38,8 @@ function beatOf(world: World, bought: 'reroll' | 'vessel' | null): SmithBeat {
   return 'stranger'
 }
 
-/** Walk-in, once per approach. Buying is the same verb as taking the blade. */
-export function tryTalkSmith(world: World): void {
+/** Approach starts the meeting. A later light-action edge makes the purchase deliberate. */
+export function tryTalkSmith(world: World, confirm: boolean): void {
   if (world.roomPhase !== 'town') return
   const smith = world.arena.smith
   if (!smith) return
@@ -56,8 +52,15 @@ export function tryTalkSmith(world: World): void {
     world.arena.smithNear = false
     return
   }
-  if (world.arena.smithNear) return
-  world.arena.smithNear = true
+  if (!world.arena.smithNear) {
+    world.arena.smithNear = true
+    const beat = beatOf(world)
+    if (beat === 'unburied') world.session.meta.pendingSmithUnburied = false
+    if (beat === 'commit' || beat === 'cut') world.session.meta.pendingSmithContract = null
+    world.emit({ type: 'smithSpoke', beat, line: SMITH_LINES[beat], x: smith.x, y: smith.y })
+    return
+  }
+  if (!confirm) return
 
   const meta = world.session.meta
   const s = tuning.economy.smith
@@ -74,8 +77,7 @@ export function tryTalkSmith(world: World): void {
     applyTownHealth(world)
     world.emit({ type: 'vesselUnlocked', cost: s.vesselCost, remembrances: meta.remembrances })
   }
-  const beat = beatOf(world, bought)
-  if (beat === 'unburied') world.session.lastMystery = null
-  if (beat === 'commit' || beat === 'cut') world.session.lastAttempt = null
+  if (!bought) return
+  const beat = bought === 'reroll' ? 'sold' : 'vesselSold'
   world.emit({ type: 'smithSpoke', beat, line: SMITH_LINES[beat], x: smith.x, y: smith.y })
 }

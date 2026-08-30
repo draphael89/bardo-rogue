@@ -61,6 +61,9 @@ export function hashWorld(world: World): number {
     int(session.meta.attempts); int(session.meta.victories); int(session.meta.remembrances)
     flag(session.meta.rerollUnlocked)
     flag(session.meta.vesselUnlocked)
+    flag(session.meta.pendingSmithUnburied)
+    byte(session.meta.pendingSmithContract === 'commit' ? 1 : session.meta.pendingSmithContract === 'cut' ? 2 : 0)
+    byte(session.lastMystery ? MYSTERY[session.lastMystery] + 1 : 0)
     byte(session.preparedWeapon ? ARM[session.preparedWeapon] + 1 : 0)
     const run = session.run
     flag(!!run)

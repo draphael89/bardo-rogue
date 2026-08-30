@@ -57,12 +57,6 @@ export interface MysteryOffer {
 /** How the run answered the realm's one rite. `null` until it has been asked and answered. */
 export type RiteAnswer = null | 'paid' | 'refused'
 
-export interface AttemptSummary {
-  contract: ContractId | null
-  result: Exclude<RunResult, 'active'>
-  killedBy: DeathKind
-}
-
 export interface RunState {
   seed: number
   weapon: ArmId
@@ -114,24 +108,60 @@ export interface MetaStateV1 {
   unlockedWeapons: ArmId[]
 }
 
+export interface MetaStateV2 {
+  version: 2
+  attempts: number
+  victories: number
+  remembrances: number
+  rerollUnlocked: boolean
+  vesselUnlocked: boolean
+  unlockedWeapons: ArmId[]
+  pendingSmithUnburied: boolean
+  pendingSmithContract: ContractId | null
+}
+
+export type MetaState = MetaStateV1 | MetaStateV2
+
 export interface GameSessionState {
-  meta: MetaStateV1
+  meta: MetaStateV2
   preparedWeapon: ArmId | null
   run: RunState | null
   /** Remembrances banked by the last finished attempt. Town reads this on the way home. */
   lastBanked: number
   /** What you told the Unburied, if you met him. Town reads this once. */
   lastMystery: MysteryChoice | null
-  /** Compact account of the finished descent. Town reads this once. */
-  lastAttempt: AttemptSummary | null
 }
 
-export function defaultMetaState(): MetaStateV1 {
-  return { version: 1, attempts: 0, victories: 0, remembrances: 0, rerollUnlocked: false, vesselUnlocked: false, unlockedWeapons: ['blade'] }
+export function defaultMetaState(): MetaStateV2 {
+  return {
+    version: 2,
+    attempts: 0,
+    victories: 0,
+    remembrances: 0,
+    rerollUnlocked: false,
+    vesselUnlocked: false,
+    unlockedWeapons: ['blade'],
+    pendingSmithUnburied: false,
+    pendingSmithContract: null,
+  }
+}
+
+export function normalizeMetaState(meta: MetaState = defaultMetaState()): MetaStateV2 {
+  return {
+    version: 2,
+    attempts: Math.max(0, Math.floor(meta.attempts)),
+    victories: Math.max(0, Math.floor(meta.victories)),
+    remembrances: Math.max(0, Math.floor(meta.remembrances)),
+    rerollUnlocked: !!meta.rerollUnlocked,
+    vesselUnlocked: !!meta.vesselUnlocked,
+    unlockedWeapons: meta.unlockedWeapons.includes('blade') ? [...meta.unlockedWeapons] : ['blade', ...meta.unlockedWeapons],
+    pendingSmithUnburied: meta.version === 2 && !!meta.pendingSmithUnburied,
+    pendingSmithContract: meta.version === 2 ? meta.pendingSmithContract : null,
+  }
 }
 
 /** Town and every fresh descent wear the banked cup. The shop cup dies with the attempt. */
-export function townMaxHp(meta: MetaStateV1): number {
+export function townMaxHp(meta: MetaState): number {
   return tuning.player.hp + (meta.vesselUnlocked ? tuning.economy.smith.vesselAmount : 0)
 }
 
@@ -141,29 +171,20 @@ export function applyTownHealth(world: World): void {
   world.player.hp = max
 }
 
-export function smithWaiting(meta: MetaStateV1): boolean {
+export function smithWaiting(meta: MetaState): boolean {
   const s = tuning.economy.smith
   if (!meta.rerollUnlocked) return meta.remembrances >= s.rerollCost
   if (!meta.vesselUnlocked) return meta.remembrances >= s.vesselCost
   return false
 }
 
-export function makeSessionState(meta: MetaStateV1 = defaultMetaState()): GameSessionState {
+export function makeSessionState(meta: MetaState = defaultMetaState()): GameSessionState {
   return {
-    meta: {
-      version: 1,
-      attempts: Math.max(0, Math.floor(meta.attempts)),
-      victories: Math.max(0, Math.floor(meta.victories)),
-      remembrances: Math.max(0, Math.floor(meta.remembrances ?? 0)),
-      rerollUnlocked: !!meta.rerollUnlocked,
-      vesselUnlocked: !!meta.vesselUnlocked,
-      unlockedWeapons: meta.unlockedWeapons.includes('blade') ? [...meta.unlockedWeapons] : ['blade', ...meta.unlockedWeapons],
-    },
+    meta: normalizeMetaState(meta),
     preparedWeapon: null,
     run: null,
     lastBanked: 0,
     lastMystery: null,
-    lastAttempt: null,
   }
 }
 
@@ -183,9 +204,10 @@ export function startRun(world: World, firstRoomId: string): boolean {
   // (replay.ts), so a recorded attempt still reproduces exactly.
   const runSeed = streamSeed(world.seed, STREAM.gameplay ^ Math.imul(attempt, 0x45d9f3b))
   world.session.meta.attempts = attempt
+  world.session.meta.pendingSmithUnburied = false
+  world.session.meta.pendingSmithContract = null
   world.session.lastBanked = 0
   world.session.lastMystery = null
-  world.session.lastAttempt = null
   world.player.hp = world.player.maxHp = townMaxHp(world.session.meta)
   world.session.run = {
     seed: runSeed,
@@ -276,7 +298,11 @@ export function finishRun(world: World, result: Exclude<RunResult, 'active'>): v
     + (result === 'won' ? tuning.economy.remembranceOnVictory : 0)
   world.session.meta.remembrances += gained
   world.session.lastBanked = gained
-  world.session.lastAttempt = { contract: run.contract, result, killedBy: run.killedBy }
+  if (world.session.lastMystery === 'leave') {
+    world.session.meta.pendingSmithUnburied = true
+    world.session.lastMystery = null
+  }
+  if (run.contract) world.session.meta.pendingSmithContract = run.contract
   world.roomPhase = 'resolved'
   world.phaseTick = world.tick
   world.emit({ type: 'remembrancesBanked', amount: gained, total: world.session.meta.remembrances })

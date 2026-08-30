@@ -28,6 +28,9 @@ export class Particles {
   private decalSprite: Sprite
   private stamp = new Sprite()
   private decalContainer = new Container()
+  // Pixi caches a batcher by render-root InstructionSet, so a fresh empty Container per clear is
+  // retained by that cache. One renderer-owned empty root clears every room without cache growth.
+  private decalClearRoot = new Container()
   private hostileFloorThreat = false
   private dustFrames: readonly Texture[]
   readonly max = 1500
@@ -62,7 +65,7 @@ export class Particles {
   clear() {
     for (const p of this.live) { p.s.visible = false; this.pool.push(p) }
     this.live.length = 0
-    if (this.renderer) this.renderer.render({ container: new Container(), target: this.decalRt, clear: true })
+    if (this.renderer) this.renderer.render({ container: this.decalClearRoot, target: this.decalRt, clear: true })
   }
 
   private spawn(tex: Texture, x: number, y: number, o: Partial<P> & { tint?: number; tint1?: number; blend?: 'add' | 'normal' } = {}): P | null {

@@ -828,8 +828,7 @@ function bakeGrit(g: Graphics, arena: Arena): void {
  * the caller sets afterwards because there are two build sites (first mount and every room entry),
  * and a tint applied at one of them would give the realm a floor on arrival and lose it on rebuild.
  */
-export function buildTilemap(renderer: Renderer, atlas: Atlas, arena: Arena, floorTint = 0xffffff): TilemapView {
-  const c = new Container()
+export function buildTilemap(renderer: Renderer, atlas: Atlas, arena: Arena, floorTint: number, c: Container): TilemapView {
   const overlays = new Container()
   for (let r = 0; r < arena.rows; r++) for (let col = 0; col < arena.cols; col++) {
     const i = r * arena.cols + col
@@ -867,7 +866,10 @@ export function buildTilemap(renderer: Renderer, atlas: Atlas, arena: Arena, flo
 
   const rt = RenderTexture.create({ width: arena.cols * ROOM_ART_TILE, height: arena.rows * ROOM_ART_TILE, scaleMode: 'nearest' })
   renderer.render({ container: c, target: rt, clear: true })
-  c.destroy({ children: true })
+  // Keep the render root (and its Pixi InstructionSet/batcher cache), but release everything drawn
+  // through it. Pixi only destroys an owned GraphicsContext when `context` is explicit here:
+  // `{ children: true }` alone strands every baked path/triangulation buffer on each room rebuild.
+  for (const child of c.removeChildren()) child.destroy({ children: true, context: true })
   const sprite = new Sprite(rt)
   sprite.scale.set(1 / ROOM_ART_SCALE)
   // The stone only. The starfield underlay and the door cluster are separate surfaces, so the void
@@ -888,7 +890,7 @@ export function buildTilemap(renderer: Renderer, atlas: Atlas, arena: Arena, flo
   if (shrine) door.addChild(shrine.root)
   const nativeDestroy = door.destroy.bind(door)
   door.destroy = (options?: boolean | DestroyOptions) => {
-    nativeDestroy(typeof options === 'boolean' ? { children: true } : { children: true, ...options })
+    nativeDestroy(typeof options === 'boolean' ? { children: true, context: true } : { children: true, context: true, ...options })
   }
 
   return {

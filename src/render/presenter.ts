@@ -102,6 +102,9 @@ export class Presenter {
   // The one you left. The kind is still a Hoplite; this set is how the room knows which body waded in.
   private huntIds = new Set<number>()
   private propSprites: Sprite[] = []
+  // Pixi caches a batcher per render-root InstructionSet and never evicts that cache. Reusing one
+  // offscreen root keeps room bakes bounded while its children are rebuilt for each arena.
+  private tileBakeRoot = new Container()
   private reducedEffects = false
   private hardLock = new HardLockFeedback()
   // Last valid floor-space pose lets target loss release outward instead of popping with no cause.
@@ -116,7 +119,7 @@ export class Presenter {
     const L = ra.layers
     L.underlay.addChild(this.voidG)
     this.rebuildVoid()
-    this.tilemap = buildTilemap(ra.app.renderer, atlas, world.arena, floorTintFor(world))
+    this.tilemap = buildTilemap(ra.app.renderer, atlas, world.arena, floorTintFor(world), this.tileBakeRoot)
     L.floor.addChild(this.tilemap.sprite, this.tilemap.door)
     for (const p of world.arena.props) {
       const s = makePropSprite(atlas, p)
@@ -1067,7 +1070,7 @@ export class Presenter {
     for (const s of this.propSprites) s.destroy()
     this.propSprites = []
     this.rebuildVoid()
-    this.tilemap = buildTilemap(this.ra.app.renderer, this.atlas, this.world.arena, floorTintFor(this.world))
+    this.tilemap = buildTilemap(this.ra.app.renderer, this.atlas, this.world.arena, floorTintFor(this.world), this.tileBakeRoot)
     L.floor.addChild(this.tilemap.sprite, this.tilemap.door)
     for (const p of this.world.arena.props) {
       const s = makePropSprite(this.atlas, p)

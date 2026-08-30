@@ -9,10 +9,14 @@ if [ -z "$BLENDER" ]; then BLENDER="$(command -v blender || true)"; fi
 if [ -z "$BLENDER" ] && [ -x /Applications/Blender.app/Contents/MacOS/Blender ]; then
   BLENDER=/Applications/Blender.app/Contents/MacOS/Blender
 fi
-if [ -z "$BLENDER" ] || ! command -v "$BLENDER" >/dev/null 2>&1; then
+if [ -n "$BLENDER" ]; then BLENDER="$(command -v "$BLENDER" 2>/dev/null || true)"; fi
+if [ -z "$BLENDER" ]; then
   echo "[stress] Blender not found; set BLENDER or install blender on PATH" >&2
   exit 1
 fi
+# macOS app bundles locate their Python/fonts relative to the real executable. A Homebrew-style
+# PATH symlink otherwise launches far enough to print warnings and then crashes before our script.
+BLENDER="$(node -e 'process.stdout.write(require("fs").realpathSync(process.argv[1]))' "$BLENDER")"
 ROOT=.art-cache/spike/stress
 
 run_variant() {

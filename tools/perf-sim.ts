@@ -11,7 +11,7 @@ import { makeBot, type BotName } from '../src/sim/bots'
 import { hashWorld } from '../src/sim/hash'
 import type { InputFrame } from '../src/sim/input'
 import { Metrics } from '../src/sim/metrics'
-import { replayFromJson, runReplay as replaySimulation, type Replay } from '../src/sim/replay'
+import { quantizeFrame, replayFromJson, runReplay as replaySimulation, type Replay } from '../src/sim/replay'
 import { stepWorld } from '../src/sim/step'
 import type { World } from '../src/sim/world'
 import { applyPlaytestCondition, conditionOfBundle } from '../src/playtest'
@@ -76,7 +76,7 @@ function runLoop(): RunResult {
   const bot = makeBot(botName)
   const metrics = new Metrics()
   const start = performance.now()
-  for (let tick = 0; tick < 18000 && world.returns === 0; tick++) consumeTick(world, metrics, bot(world))
+  for (let tick = 0; tick < 18000 && world.returns === 0; tick++) consumeTick(world, metrics, quantizeFrame(bot(world)))
   const elapsedMs = performance.now() - start
   return {
     elapsedMs,

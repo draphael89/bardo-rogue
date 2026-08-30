@@ -50,7 +50,7 @@ await page.waitForFunction(() => !!(window as unknown as { __game?: unknown })._
 // Pause once, and take the title down FIRST. A loop boot holds the title over the living hub, and
 // it is opaque enough that measuring through it reads the same card seven times -- which is what
 // the first version of this tool did, and it duly reported that every realm was identical.
-const ids = await page.evaluate(() => {
+const route = await page.evaluate(() => {
   const g = (window as any).__game
   g.title(false)
   g.pause(true)
@@ -58,13 +58,20 @@ const ids = await page.evaluate(() => {
   const hooks = (g.loop as any).hooks
   if (typeof hooks?.render !== 'function') throw new Error('realm-air: Loop.hooks.render is unreachable')
   ;(window as any).__realmRender = () => hooks.render(1, 1 / 60)
-  return (g.world.rooms as Array<{ id: string }>).map(r => r.id).filter((id: string) => id !== 'bardo')
+  // Install the actual attempt-seeded route before enumerating it. `threshold` may not exist on a
+  // Styx opening, but gotoRoom still installs that route; reading the fixture first would then skip
+  // Styx/Phlegethon or measure a different room under their requested names.
+  g.gotoRoom('threshold', { skipRite: true })
+  return {
+    template: g.world.session.run?.map?.template ?? 'unknown',
+    ids: (g.world.rooms as Array<{ id: string }>).map(r => r.id).filter((id: string) => id !== 'bardo'),
+  }
 })
 
 if (writeShots) mkdirSync(outDir, { recursive: true })
 const rooms: Room[] = []
 const skipped: string[] = []
-for (const id of ids) {
+for (const id of route.ids) {
   const info = await page.evaluate(({ id, settle, visualFrames }) => {
     const g = (window as any).__game
     g.gotoRoom(id, { skipRite: true })
@@ -121,6 +128,7 @@ const failed = violations.length > 0 || (minMedian !== null && median.d < minMed
 
 console.log(JSON.stringify({
   seed,
+  template: route.template,
   visualFrames,
   crop: CROP,
   // `warm` is the ledger's own claim, made checkable: a wine hall and a gold bank must read redder

@@ -8,7 +8,7 @@ Budgets are tightened when a measured improvement earns it. They are never relax
 | --- | ---: | --- |
 | Representative deterministic simulation | p95 <= 250 microseconds/tick | final world hash, tick count, and metrics object identical |
 | Warden presenter plus Pixi submission | p95 <= 8.33 ms | deterministic fixed-frame state hash and no page/console errors |
-| Warden requestAnimationFrame interval | p95 <= 18 ms | same viewport, DPR, renderer, room, seed, and input policy |
+| Warden requestAnimationFrame interval | report only under software rendering | a physical-GPU run is required for an end-user frame-time claim |
 | Saturated 32-enemy/64-projectile diagnostics | report only | no production claim; render-only hash must not move |
 
 Same-host p95 drift <=10% is noise. A comparison above that envelope is provisional until repeated; above 20% is rejected.

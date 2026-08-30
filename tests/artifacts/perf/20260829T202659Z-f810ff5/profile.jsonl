@@ -1,7 +1,0 @@
-{"profile":"replay-sim.cpuprofile","workload":"pinned replay repeated 3000 times","primary":"resolveOverlaps","self_percent":28.8476}
-{"profile":"dense-sim.cpuprofile","workload":"32 enemies and 64 projectiles repeated 100 times","primary":"updateProjectiles","self_percent":43.2325}
-{"profile":"dense-sim.heapprofile","workload":"32 enemies and 64 projectiles","note":"sampled allocations include tsx startup; qualitative attribution only"}
-{"profile":"dense-sim.sample.txt","workload":"32 enemies and 64 projectiles for 10 seconds","note":"independent macOS sample confirms CPU-bound V8 execution and young-generation collection"}
-{"profile":"render-warden.cpuprofile","workload":"240 Warden frames","renderer":"ANGLE SwiftShader","note":"presenter plus Pixi submission; no physical-GPU claim"}
-{"profile":"render-dense.cpuprofile","workload":"240 render-only saturated frames","renderer":"ANGLE SwiftShader","primary":"Pixi Graphics geometry rebuild"}
-{"profile":"render-dense.heapprofile","workload":"240 render-only saturated frames","primary":"Pixi rect, batch, fill, and clone allocation"}

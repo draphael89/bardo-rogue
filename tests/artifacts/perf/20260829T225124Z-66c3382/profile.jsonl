@@ -1,5 +1,0 @@
-{"profile":"final-replay.cpuprofile","head":"66c3382","workload":"pinned replay repeated 1000 times","primary":"updatePlayer","self_percent":14.7957}
-{"profile":"final-dense.cpuprofile","head":"66c3382","workload":"32 enemies and 64 friendly projectiles repeated 40 times","primary":"resolveOverlaps","self_percent":26.9717}
-{"profile":"final-dense.heapprofile","head":"66c3382","workload":"32 enemies and 64 projectiles","note":"sampled allocation remains startup contaminated; GC self CPU 1.73 percent"}
-{"profile":"final-render-warden.cpuprofile","head":"66c3382","renderer":"ANGLE SwiftShader","work_p95_ms":2.8,"note":"no physical GPU claim"}
-{"profile":"final-render-dense.cpuprofile","head":"66c3382","renderer":"ANGLE SwiftShader","work_p95_ms":42.2,"note":"render-only hash unchanged; Pixi Graphics remains unresolved"}

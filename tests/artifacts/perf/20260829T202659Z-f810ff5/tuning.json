@@ -1,7 +1,0 @@
-{
-  "os_tuning_applied": false,
-  "reason": "No global kernel, Spotlight, power, SIP, scheduler, turbo, or SMT changes were authorized or needed for source-level prioritization.",
-  "sleep_prevention": "existing machine assertions; benchmark commands run while on AC power",
-  "thermal_frequency_capture": "not available without privileged powermetrics",
-  "comparison_rule": "A/B runs must use this same host and be interleaved; renderer fingerprint must match"
-}

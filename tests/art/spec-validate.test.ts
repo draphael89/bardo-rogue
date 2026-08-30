@@ -54,6 +54,7 @@ describe('validateCompileSpec', () => {
     ['clip naming an unknown frame', s => { s.clips = { c: { frames: ['gone'], timing: 'ticks', ticks: [1] } } }, /unknown frame "gone"/],
     ['unknown kind', s => { (s as { kind: string }).kind = 'monster' }, /unknown kind/],
     ['valueLift out of range', s => { s.valueLift = { targetMean: 1.2 } }, /targetMean/],
+    ['placement profile without a palette', s => { s.colourPlacement = 'veteran' }, /requires palette/],
   ]
   for (const [name, mutate, err] of cases) {
     it(`rejects ${name}`, () => {
@@ -80,6 +81,7 @@ describe('validateSheetDef (strengthened)', () => {
     ['mirror without east facing', d => { d.facing = 'south' }, /mirror requires facing "east"/],
     ['a non-finite socket', d => { d.frames.hurt.sockets = { hand: [Number.NaN, 3] } }, /socket "hand"/],
     ['a socket outside the cell', d => { d.frames.hurt.sockets = { hand: [33, 3] } }, /socket "hand"/],
+    ['placement profile without a ramp', d => { d.colourPlacement = 'veteran' }, /requires a declared ramp/],
   ]
   for (const [name, mutate, err] of cases) {
     it(`rejects ${name}`, () => {

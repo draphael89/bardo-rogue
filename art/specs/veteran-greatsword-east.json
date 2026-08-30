@@ -35,6 +35,7 @@
     "minShare": 0.22,
     "minDelta": 0.16
   },
+  "colourPlacement": "veteran",
   "frames": [
     {
       "name": "idle",

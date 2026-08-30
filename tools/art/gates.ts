@@ -7,9 +7,10 @@
 // failure here is a build failure, not a note.
 import { createHash } from 'node:crypto'
 import sharp from 'sharp'
-import type { SheetDef } from '../../src/render/sheet'
+import type { ColourPlacementRule, SheetDef } from '../../src/render/sheet'
 import type { CompileReport } from './compile'
 import { canon, luminance, rgbToHex, hexToRgb, weberContrast, type RGB } from './palette'
+import { placementProfile } from './placement'
 
 /**
  * Two severities, by epistemic status rather than mood:
@@ -91,6 +92,8 @@ interface CellStats {
   meanLum: number
   /** Colour histogram as hex -> count, for inter-frame identity. */
   hist: Map<string, number>
+  /** Per-colour bbox inside the cell, for placement grammar. */
+  colourBounds: Map<string, { x: number; y: number; w: number; h: number }>
   /** Per-pixel opacity, for checks that must know where the DRAWING is, not just its bbox. */
   mask: Uint8Array
   /** Centroid of opaque mass, in cell pixels. */
@@ -99,6 +102,31 @@ interface CellStats {
   /** Number of 4-connected opaque components. */
   components: number
   hash: string
+  detailDensity: number
+}
+
+/**
+ * Share of adjacent opaque pixel pairs whose colour changes.
+ *
+ * Alpha edges describe silhouette complexity, not surface detail, so transparent neighbours are
+ * excluded. Right/down pairs count each adjacency once. This reproduces the audit's code-world
+ * baselines: roughly 15.9% for the room sheet and 20.8% for the prop sheet.
+ */
+export function measureDetailDensity(pixels: Uint8Array, width: number, height: number, x0 = 0, y0 = 0, w = width, h = height): number {
+  let pairs = 0, changes = 0
+  for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) {
+    const i = (y * width + x) * 4
+    if (pixels[i + 3] === 0) continue
+    for (const [dx, dy] of [[1, 0], [0, 1]] as const) {
+      const nx = x + dx, ny = y + dy
+      if (nx >= x0 + w || ny >= y0 + h || nx >= width || ny >= height) continue
+      const j = (ny * width + nx) * 4
+      if (pixels[j + 3] === 0) continue
+      pairs++
+      if (pixels[i] !== pixels[j] || pixels[i + 1] !== pixels[j + 1] || pixels[i + 2] !== pixels[j + 2]) changes++
+    }
+  }
+  return pairs ? changes / pairs : 0
 }
 
 function cellStats(ctx: GateContext, name: string, index: number): CellStats {
@@ -107,6 +135,7 @@ function cellStats(ctx: GateContext, name: string, index: number): CellStats {
   const ox = (index % def.cols) * cell, oy = Math.floor(index / def.cols) * cell
   const mask = new Uint8Array(cell * cell)
   const hist = new Map<string, number>()
+  const bounds = new Map<string, { x0: number; y0: number; x1: number; y1: number }>()
   let opaque = 0, lumSum = 0, sx = 0, sy = 0
   let x0 = cell, y0 = cell, x1 = -1, y1 = -1
   // Duplicate detection hashes the cell's VISIBLE identity: full RGBA for opaque pixels, a single
@@ -130,6 +159,9 @@ function cellStats(ctx: GateContext, name: string, index: number): CellStats {
       if (y > y1) y1 = y
       const hex = rgbToHex(c)
       hist.set(hex, (hist.get(hex) ?? 0) + 1)
+      const b = bounds.get(hex) ?? { x0: cell, y0: cell, x1: -1, y1: -1 }
+      b.x0 = Math.min(b.x0, x); b.y0 = Math.min(b.y0, y); b.x1 = Math.max(b.x1, x); b.y1 = Math.max(b.y1, y)
+      bounds.set(hex, b)
     }
   }
   const hash = createHash('sha1').update(Buffer.from(hashParts)).digest('hex')
@@ -154,8 +186,11 @@ function cellStats(ctx: GateContext, name: string, index: number): CellStats {
     name, index, opaque,
     bbox: x1 < x0 ? null : { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 },
     meanLum: opaque ? lumSum / opaque : 0,
-    hist, mask, cx: opaque ? sx / opaque : 0, cy: opaque ? sy / opaque : 0,
+    hist,
+    colourBounds: new Map([...bounds].map(([hex, b]) => [hex, { x: b.x0, y: b.y0, w: b.x1 - b.x0 + 1, h: b.y1 - b.y0 + 1 }])),
+    mask, cx: opaque ? sx / opaque : 0, cy: opaque ? sy / opaque : 0,
     components, hash,
+    detailDensity: measureDetailDensity(pixels, width, ctx.height, ox, oy, cell, cell),
   }
 }
 
@@ -269,6 +304,45 @@ export function runGates(ctx: GateContext): GateResult[] {
   const stats = Object.entries(def.frames)
     .sort((a, b) => a[1].i - b[1].i)
     .map(([name, f]) => cellStats(ctx, name, f.i))
+
+  // Surface churn is class-relative. Characters earn more internal edges than a quiet floor or prop,
+  // but even the noisiest approved actor stays under 70%. The environment caps are measured from the
+  // code-authored reference sheets named in OPENING_AUDIT §7, not guessed from a candidate.
+  const densityCap: Record<SheetDef['kind'], number> = { character: 0.70, prop: 0.25, tile: 0.18, effect: 0.45 }
+  const maxDensity = stats.reduce((m, s) => Math.max(m, s.detailDensity), 0)
+  add('detail-density', maxDensity <= densityCap[def.kind],
+    `max adjacent-colour churn ${(maxDensity * 100).toFixed(1)}% (class cap ${(densityCap[def.kind] * 100).toFixed(0)}%)`,
+    'fail', 'OPENING_AUDIT §7 Article III')
+
+  // A palette is only an alphabet. These rules make it grammar: a correct colour can still fail for
+  // taking over a frame or sprawling across the whole silhouette. Measure the worst frame so one bad
+  // pose cannot hide in a sheet-wide average.
+  if (def.ramp) {
+    let rules: Record<string, ColourPlacementRule> | undefined
+    let profileError = ''
+    try { if (def.colourPlacement) rules = placementProfile(def.colourPlacement, def.ramp) } catch (error) { profileError = (error as Error).message }
+    add('colour-placement-contract', !!rules,
+      rules ? `${def.colourPlacement}: ${Object.keys(rules).length}/${def.ramp.length} ramp colours constrained` : profileError || 'no per-colour placement profile declared',
+      'fail', 'OPENING_AUDIT §7 Article II')
+    if (rules) {
+      const colors = canon().colors
+      for (const name of def.ramp) {
+        const rule = rules[name]
+        if (!rule || !colors[name]) continue
+        const hex = colors[name].hex
+        let share = 0, bboxW = 0, bboxH = 0
+        for (const s of stats) {
+          share = Math.max(share, s.opaque ? (s.hist.get(hex) ?? 0) / s.opaque : 0)
+          const b = s.colourBounds.get(hex)
+          if (b) { bboxW = Math.max(bboxW, b.w / def.cell); bboxH = Math.max(bboxH, b.h / def.cell) }
+        }
+        const ok = share <= rule.maxShare && bboxW <= rule.maxWidth && bboxH <= rule.maxHeight
+        add(`colour-placement:${name}`, ok,
+          `max share ${(share * 100).toFixed(1)}%/${(rule.maxShare * 100).toFixed(1)}%, bbox ${(bboxW * 100).toFixed(1)}x${(bboxH * 100).toFixed(1)}%/${(rule.maxWidth * 100).toFixed(1)}x${(rule.maxHeight * 100).toFixed(1)}%`,
+          'fail', 'OPENING_AUDIT §7 Article II')
+      }
+    }
+  }
 
   // B5 mass. NOT §11.1's highlight budget, which is a FRAME gate: it measures "static-art pixels" on
   // a captured frame or the baked room texture, where 8% is right because the room is most of the

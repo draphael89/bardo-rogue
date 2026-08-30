@@ -70,6 +70,20 @@ describe('objective gates', () => {
     expect(dup.ok).toBe(false)
     expect(dup.severity).toBe('fail')
   })
+  it('detail-density rejects surface churn above the asset-class budget', async () => {
+    const noisy = await ctx([body()], { kind: 'prop' })
+    expect(gate(runGates(noisy), 'detail-density').ok).toBe(false)
+    const quiet = await ctx([(x, y) => x >= 6 && x <= 25 && y >= 8 && y <= 27 ? 'slateHi' : null], { kind: 'prop' })
+    expect(gate(runGates(quiet), 'detail-density').ok).toBe(true)
+  })
+  it('colour placement rejects a legal colour used too widely or too often', async () => {
+    const veteranBody = (x: number, y: number): string | null => body()(x, y) === 'slateHi' ? 'ironHi' : body()(x, y)
+    const c = await ctx([veteranBody], {
+      ramp: ['mortar', 'seal0', 'iron', 'ironHi', 'purple0', 'purple2', 'purple3', 'boneLo', 'boneDim', 'bone', 'brickLo', 'brick', 'brickHi', 'cope', 'gold'],
+      colourPlacement: 'veteran',
+    })
+    expect(gate(runGates(c), 'colour-placement:ironHi').ok).toBe(false)
+  })
   it('a socket off the drawing hard-fails, including one inside the bbox but on empty pixels', async () => {
     const c = await ctx([body()])
     c.def.frames.f0.sockets = { tip: [2, 2] }                  // empty corner, far from the body

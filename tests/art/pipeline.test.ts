@@ -7,7 +7,7 @@ import { Texture } from 'pixi.js'
 import sharp from 'sharp'
 import { bindSheet, validateSheetDef, type SheetDef } from '../../src/render/sheet'
 import { compileSheet, validateClipRefs, type CompileReport, type CompileSpec } from '../../tools/art/compile'
-import { makeContext, runGates, summarise } from '../../tools/art/gates'
+import { makeContext, measureDetailDensity, runGates, summarise } from '../../tools/art/gates'
 import { canon, rgbToHex, type RGB } from '../../tools/art/palette'
 import { verifyApproval } from '../../tools/art/approve'
 import { authoredFxFrame, quantizeFxAlpha, quantizeFxRotation } from '../../src/render/fxUnits'
@@ -390,6 +390,18 @@ describe('authored effect sprites', () => {
 // only contract-checks the two authored character sheets. Palette discipline is the whole thesis of
 // this pipeline, so the lane that produces most of the screen cannot be the one lane exempt from it.
 describe('code-generated sheets', () => {
+  it('keeps the room and prop detail density inside their measured class budgets', async () => {
+    const cases = [
+      ['bardo_room.png', 0.18, 0.159],
+      ['bardo_props.png', 0.25, 0.208],
+    ] as const
+    for (const [name, cap, baseline] of cases) {
+      const { data, info } = await sharp(`public/assets/sprites/${name}`).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+      const density = measureDetailDensity(new Uint8Array(data.buffer, data.byteOffset, data.length), info.width, info.height)
+      expect(density, name).toBeLessThanOrEqual(cap)
+      expect(density, `${name} measured baseline moved`).toBeCloseTo(baseline, 2)
+    }
+  })
   it('locks the native 24px room and 48px prop source contracts', async () => {
     const room = await sharp('public/assets/sprites/bardo_room.png').metadata()
     const props = await sharp('public/assets/sprites/bardo_props.png').metadata()

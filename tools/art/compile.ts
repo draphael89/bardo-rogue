@@ -18,6 +18,7 @@ import { validateSheetDef } from '../../src/render/sheet'
 import { canon, subset, nearestIndex, luminance, rgbToHex, liftLightness, solveLiftGamma, type PaletteSubset, type RGB } from './palette'
 import { isProductionPath, verifyApproval } from './approve'
 import { tuning } from '../../src/tuning'
+import { placementProfile } from './placement'
 
 /** Timing fields that make a tuning node a window a clip can legitimately hang off. */
 // `aimTicks` is tuning.caster's own window name (src/tuning.ts:302) — the 24 ticks of aim. Without it
@@ -136,6 +137,8 @@ export interface CompileSpec {
   waivers?: Array<{ gate: string; reason: string }>
   /** Restrict the target palette to a named ramp. Default: all of canon. */
   palette?: string[]
+  /** Named rules shared by every sheet/facing of one visual identity. */
+  colourPlacement?: string
   /** Drop pixels that are decisively green (generators are asked for a #00ff00 matte). */
   chromaKey?: boolean
   /**
@@ -210,6 +213,11 @@ export function validateCompileSpec(spec: CompileSpec, where: string): void {
   if (spec.palette) {
     const known = canon().colors
     for (const n of spec.palette) if (!known[n]) fail(`palette names unknown canon colour "${n}"`)
+  }
+  if (spec.colourPlacement !== undefined) {
+    if (!spec.palette) fail('colourPlacement requires palette')
+    if (typeof spec.colourPlacement !== 'string' || !spec.colourPlacement) fail('colourPlacement must name a profile')
+    try { placementProfile(spec.colourPlacement, spec.palette ?? []) } catch (error) { fail((error as Error).message) }
   }
   if (!Array.isArray(spec.frames) || spec.frames.length === 0) fail('frames must be a non-empty array')
   const cells = spec.cols * spec.rows
@@ -777,6 +785,7 @@ export async function compileSheet(spec: CompileSpec, specPath = '<inline>'): Pr
     cell, cols: spec.cols, rows: spec.rows,
     palette: canon().name,
     ...(spec.palette ? { ramp: [...spec.palette] } : {}),
+    ...(spec.colourPlacement ? { colourPlacement: spec.colourPlacement } : {}),
     maxColors,
     ...(spec.facing ? { facing: spec.facing } : {}),
     ...(spec.mirror !== undefined ? { mirror: spec.mirror } : {}),

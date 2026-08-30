@@ -23,6 +23,7 @@
     "cope",
     "gold"
   ],
+  "colourPlacement": "veteran",
   "maxColors": 16,
   "facing": "south",
   "frames": {

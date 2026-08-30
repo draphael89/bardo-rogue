@@ -24,6 +24,7 @@
     "ember",
     "wood"
   ],
+  "colourPlacement": "brute",
   "maxColors": 16,
   "facing": "east",
   "mirror": true,

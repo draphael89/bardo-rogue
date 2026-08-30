@@ -167,7 +167,7 @@ function overlapsDoor(px: number, py: number, door: ArenaDoor): boolean {
     case 'east': {
       const cy = (door.row + 0.5) * TILE
       if (Math.abs(py - cy) > tuning.run.doorHalfW) return false
-      return px >= door.col * TILE - 4
+      return px >= door.col * TILE - tuning.run.doorEnterInset
     }
     default: { const _e: never = door.dir; return _e }
   }

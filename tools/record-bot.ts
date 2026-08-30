@@ -14,6 +14,9 @@ const FIXTURES: Array<{ bot: BotName; scenario: string; seed: number; out: strin
   { bot: 'kite', scenario: 'full', seed: 2, out: 'replays/kite-full-s2.json', god: true },
   { bot: 'naive-melee', scenario: 'wave1', seed: 3, out: 'replays/naive-wave1-s3.json' },
   { bot: 'idle', scenario: 'wave1', seed: 5, out: 'replays/idle-wave1-s5.json' },
+  // The only fixture that builds the Bardo: pins the island hub (rack, Gate, route) that the
+  // wave/full fixtures never construct, so hub geometry can no longer drift unpinned.
+  { bot: 'slice-kite', scenario: 'loop', seed: 7, out: 'replays/slice-kite-loop-s7.json' },
 ]
 
 const args = Object.fromEntries(process.argv.slice(2).map((a, i, arr) => a.startsWith('--') ? [a.slice(2), arr[i + 1] ?? '1'] : []).filter(x => x.length))

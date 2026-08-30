@@ -158,6 +158,7 @@ export const tuning = {
   run: {
     doorHalfW: 22,        // px: the open door is three tiles wide
     doorEnterDepth: 16,   // px past the door row's top edge; overlapping it while open enters (ADR 0001: relative to the door's row, not row 1)
+    doorEnterInset: 4,    // px west of an east door's own column where the entry overlap begins
     offeringRadius: 16,   // px: walk into the vessel to take it
     offeringHp: 1,        // extra max life, and a heal of the same
     rackRadius: 18,       // px: generous enough to read as a physical pickup, not pixel hunting

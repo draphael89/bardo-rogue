@@ -36,9 +36,12 @@ of a shaded `brickLo`/`brick` lane, cutting sheet median luminance 0.4122 -> 0.3
 still green — an honest half-fix that leaves the actor brighter than the hero. The warden, caster and
 charger were deliberately left alone: each passes every automated gate and each fails the one test
 the gates cannot run, and all three need a new silhouette rather than a polish pass. Typecheck exit
-0, 918/918, matrix 78/0 with zero stranded seeds, replay hashes unmoved and `record-bots` correctly
-not run. **Every Kenney placeholder still ships** — `SPRITE` is still seven `tiny_dungeon.png`
-indices — because wiring is a separate change and only the hero's replacement is ready for it.
+0, 930/930, matrix 78/0 with zero stranded seeds, replay hashes unmoved and `record-bots` correctly
+not run. **The wiring has since happened, for the hero alone.** `EntityView.tile` is nullable and
+`createPlayerView` passes null, so the player's body is authored with no Kenney fallback behind it: a
+view that failed to bind draws a hole, which is a bug report, rather than a knight, which is a
+regression that ships. The caster, charger, warden, Oath-Bound and dummy are still `tiny_dungeon.png`
+indices, as are the weapon sprites — the player's own bow still borrows one.
 
 **Art cycle checkpoints (2026-08-30, `codex/bardo-first-sixty-seconds`).** Room source art now has a
 locked 24px tile / 48px prop contract while simulation and layout remain 16px / 32px logical. The
@@ -85,9 +88,10 @@ level-2 and level-4 floor ramps were reverted with them — `bardo_room.png` is 
 layouts pave from, so a brass ramp authored for the Bardo's embers also put an olive-gold chip into
 Cocytus, the coldest floor in the game. `pnpm art:stress-hero` now gates three variants including the
 **unarmed** body (507/507, zero waivers, two committed exhibits) — the one the whole opening is
-played in, and the one whose crest currently reads as horns. Room gate **78/78**; suite **918/918**;
-matrix 78/0 with zero stranded seeds; replay hashes unmoved. The hero in the shipping build is still
-Kenney tile 96: closing that needs a human `pnpm art approve`, which no agent may perform.
+played in, and the one whose crest currently reads as horns. Room gate **78/78**; suite **930/930**;
+matrix 78/0 with zero stranded seeds; replay hashes unmoved. The human `pnpm art approve` has since
+been given: **the hero in the shipping build is the authored Veteran**, and Kenney tile 96 no longer
+draws the player in any facing.
 
 The sections below are the plan as written. This block records what was executed against it, so the
 document does not become the next stale audit. Tests: **275 passing**; `pnpm matrix` 100/100 seeds

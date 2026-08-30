@@ -43,7 +43,7 @@ for a in "${ACTORS[@]}"; do
   pnpm art compile "art/specs/actors/$a/$a-east.json" | tee "$OUT/compile.log"
   echo "[cc] evidence $a"
   node tools/spike/evidence-cc.mjs --compiled "$OUT/compiled" --out "$OUT" --actor "$a" \
-    --compare "public/assets/sprites/bardo_hero,public/assets/sprites/bardo_brute"
+    --compare "public/assets/sprites/bardo_veteran_unarmed_east,public/assets/sprites/bardo_brute"
   node tools/spike/silhouette-cc.mjs "$OUT/compiled/bardo_${a}_east" | tee "$OUT/silhouette.log"
   node tools/spike/palette-share-cc.mjs "$OUT/compiled/bardo_${a}_east.png" | tee "$OUT/palette-share.log"
 done

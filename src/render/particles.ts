@@ -10,10 +10,11 @@ import { SPAWN } from './spawnInk'
 interface P { s: Sprite; frames: readonly Texture[] | null; spin: number; vx: number; vy: number; life: number; maxLife: number; drag: number; grav: number; scale0: number; scale1: number; rot: number; alpha0: number; alpha1: number; ground: number | null; tint0: number; tint1: number | null; sgn: number; unit: number }
 
 // Authored FX sprites are 16x16 (tools/make-bardo-fx.ts). `scale0`/`scale1` stay in screen pixels, so
-// the sprite scale is size/unit. shatter() passes BODY_UNIT because it scales a body texture, not an
-// effect: its numbers were tuned against that divisor and are left exactly alone.
+// the sprite scale is size/unit. shatter() is the exception: a body chip is drawn at the same
+// source-to-world ratio as the body it broke off, so it passes that ratio with `unit: 1`.
 const FX = FX_UNIT
-const BODY_UNIT = 64
+// World px across one shatter chip — the size it has always been for a 1:1 Kenney body.
+const CHIP_PX = 2
 
 // §6.1: rotation quantises to 16 steps. A freely rotating sprite over the render target resamples its
 // own pixels every frame, which is the loudest "not pixel art" tell there is.
@@ -211,19 +212,35 @@ export class Particles {
   }
 
   // The enemy's own pixels fly apart along the hit direction, fall, and settle.
+  //
+  // A body's SOURCE pixels are not its WORLD pixels: an authored sheet is cut with
+  // `orig = cell / worldScale` (render/sheet.ts), so a 64px cell is drawn 42.67px wide. Everything
+  // spatial here is therefore measured through `k` — the texture's own source-to-world ratio, which
+  // is 1 for the Kenney tiles and 1/1.5 for authored art — so the cloud keeps the corpse's real
+  // footprint and a chip stays the same size as the pixel it broke off.
   shatter(body: Sprite, x: number, y: number, angle: number) {
     const tex = body.texture
     const fw = tex.frame.width, fh = tex.frame.height
-    const step = 2
+    const k = tex.orig.width / fw
+    const w = tex.orig.width, h = tex.orig.height
+    // Chips are CHIP_PX of world, not of source: without this the 64px cell ran four times the loop
+    // a 32px one did and buried the frame in twice-too-coarse debris.
+    const step = Math.max(1, Math.round(CHIP_PX / k))
     for (let py = 0; py < fh; py += step) for (let px = 0; px < fw; px += step) {
       if (fxRng.particles.next() < 0.35) continue
       const key = `${tex.uid}:${px}:${py}`
       let sub = this.subTex.get(key)
-      if (!sub) { sub = new Texture({ source: tex.source, frame: new Rectangle(tex.frame.x + px, tex.frame.y + py, step, step) }); this.subTex.set(key, sub) }
-      const ox = (px - fw / 2) * (body.scale.x < 0 ? -1 : 1), oy = py - fh
+      // `step` need not divide the cell — 3 does not divide 64 — so the last row and column are
+      // clipped to what is left. Unclipped they slice two pixels into the neighbouring frame of the
+      // sheet, or off the end of the PNG, and Pixi bounds-checks neither.
+      if (!sub) { sub = new Texture({ source: tex.source, frame: new Rectangle(tex.frame.x + px, tex.frame.y + py, Math.min(step, fw - px), Math.min(step, fh - py)) }); this.subTex.set(key, sub) }
+      // A chip starts where its pixel was DRAWN, so it is measured from the sprite's own
+      // registration, not the cell's middle: an authored body hangs from a foot pivot (0.94 of the
+      // cell down), so a centre-pivot cloud detached ~11px below the corpse and missed its head.
+      const ox = (px * k - body.anchor.x * w) * (body.scale.x < 0 ? -1 : 1), oy = py * k - body.anchor.y * h
       const a = angle + fxRng.particles.signed(1.4)
       const sp = fxRng.particles.range(40, 130)
-      this.spawn(sub, x + ox, y + body.height / 2 + oy, { vx: Math.cos(a) * sp + fxRng.particles.signed(30), vy: Math.sin(a) * sp - 40 - fxRng.particles.next() * 40, maxLife: fxRng.particles.range(0.6, 1.1), drag: 0.96, grav: 260, scale0: 64 * (step / 2), scale1: 64 * (step / 2), rot: fxRng.particles.signed(12), alpha0: 1, alpha1: 0.6, ground: y + fxRng.particles.range(6, 12), unit: BODY_UNIT })
+      this.spawn(sub, x + ox, body.position.y + oy, { vx: Math.cos(a) * sp + fxRng.particles.signed(30), vy: Math.sin(a) * sp - 40 - fxRng.particles.next() * 40, maxLife: fxRng.particles.range(0.6, 1.1), drag: 0.96, grav: 260, scale0: k, scale1: k, rot: fxRng.particles.signed(12), alpha0: 1, alpha1: 0.6, ground: y + fxRng.particles.range(6, 12), unit: 1 })
     }
   }
 

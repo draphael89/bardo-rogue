@@ -8,6 +8,7 @@ import type { EnemyKind, HitSource, SimEvent } from '@/sim/events'
 import { tuning } from '@/tuning'
 import { EntityView, createPlayerView, createEnemyView, updatePlayerView, updateEnemyView, makePropSprite, BoltView, ArrowView, EchoView, MirrorBoltView, drawAimLine, drawSwingArc, drawSwingTip, drawBowAim } from './views'
 import { updatePlayerRim } from './views/player'
+import { snapToTarget } from './views/shared'
 import { promiseFrame } from './clipSelect'
 import { ARM, armOf } from '@/sim/weapons'
 import { buildTilemap, SHRINE_INK, type TilemapView } from './tilemap'
@@ -930,7 +931,10 @@ export class Presenter {
     else {
       const rx = Math.round(this.recoilX), ry = Math.round(this.recoilY)
       const v = this.playerView
-      v.body.position.set(v.body.position.x + rx, v.body.position.y + ry)
+      // Back onto the target grid. The views place a body with snapToTarget, and one whole WORLD px
+      // is 1.5 target px, so an odd jolt left the sprite on a half target pixel and put the crawling
+      // outline back for exactly the frames after a landed hit.
+      v.body.position.set(snapToTarget(v.body.position.x + rx), snapToTarget(v.body.position.y + ry))
       if (v.weapon) v.weapon.position.set(v.weapon.position.x + rx, v.weapon.position.y + ry)
     }
   }
@@ -1009,8 +1013,10 @@ export class Presenter {
     const reaction = enemyReactionTransform({
       ratio: q, hitClass: v.hitClass, hitKind: v.hitKind, hitHeavy: v.hitHeavy, hitAngle: v.hitAngle,
     })
-    v.body.position.x += reaction.dx
-    v.body.position.y += reaction.dy - reaction.lift
+    // Snapped for the same reason as the player's recoil above: the shove is measured in world px,
+    // and the body was placed on the target grid.
+    v.body.position.x = snapToTarget(v.body.position.x + reaction.dx)
+    v.body.position.y = snapToTarget(v.body.position.y + reaction.dy - reaction.lift)
     v.body.rotation += reaction.bodyLean
     if (v.weapon) {
       v.weapon.position.x += reaction.dx

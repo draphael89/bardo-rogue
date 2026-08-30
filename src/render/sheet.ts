@@ -114,7 +114,13 @@ export interface SheetFrameView {
   /** Normalised anchor (0..1), which is what Pixi's `anchor` wants. */
   anchorX: number
   anchorY: number
-  /** Socket positions in cell pixels, relative to the cell's top-left. */
+  /**
+   * Socket positions in WORLD pixels, measured from the frame's own pivot (right/down positive) —
+   * the space every consumer actually works in. The sidecar authors them in cell pixels from the
+   * cell's top-left, but a cell is no longer a world square (`cut()` below cuts it to
+   * `cell / worldScale`), so handing those numbers out raw invites adding 64ths of a cell to a
+   * position measured in 42.67ths. Converted once, here, where the two spaces meet.
+   */
   sockets: Record<string, readonly [number, number]>
 }
 
@@ -190,6 +196,15 @@ export function validateSheetDef(def: SheetDef, where: string): void {
   }
 }
 
+/** Cell pixels from the top-left -> world pixels from the pivot. `logical / cell` is 1 / worldScale. */
+function worldSockets(f: SheetFrame, cell: number, logical: number): Record<string, readonly [number, number]> {
+  if (!f.sockets) return EMPTY_SOCKETS
+  const k = logical / cell
+  const out: Record<string, readonly [number, number]> = {}
+  for (const [name, [sx, sy]] of Object.entries(f.sockets)) out[name] = [(sx - f.pivot[0]) * k, (sy - f.pivot[1]) * k]
+  return out
+}
+
 /**
  * Bind a sheet definition to its loaded textures.
  *
@@ -231,7 +246,7 @@ export function bindSheet(def: SheetDef, source: Texture, whiteSource: Texture):
         white: cut(whiteSource, f.i),
         anchorX: f.pivot[0] / def.cell,
         anchorY: f.pivot[1] / def.cell,
-        sockets: f.sockets ?? EMPTY_SOCKETS,
+        sockets: worldSockets(f, def.cell, logical),
       }
       cache.set(key, view)
       return view

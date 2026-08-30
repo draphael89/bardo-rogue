@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-30
 **Branch:** `codex/bardo-first-sixty-seconds`
-**Recorded proof head before the final report updates:** `d7648a4523b7fdf837244fc0a749d33c292325cb`
+**Recorded proof head before the final report updates:** `8efaedd529c9b25dfe1e2cbea36b52934210d02e`
 **Reconciled main:** `2b82d61c9103a34b9abdc535afe165efbad4f630`
 
 The branch now delivers a coherent first minute: the title belongs to the Bardo Gate; DESCEND makes
@@ -36,6 +36,10 @@ its original 16px logical grid.
   that actually reaches the Landing.
 - `f9e3521`, `f1cf1d6`, `d7648a4` — screenshot, strip, pose, room, and realm evidence now fail
   loudly on browser errors, missing evidence, or skipped rooms, and document that failure boundary.
+- `3d028bc`, `fdc267e` — matrix, ad-hoc headless simulation, and loop performance probes now
+  quantize bot frames at the same input boundary as the live browser, recorder, and replay path.
+- `8efaedd` — the desktop import gate separately waits for durable bytes and the renderer's success
+  acknowledgement, closing a recurrent cross-process observation race without weakening either assertion.
 
 ## The three inherited polish gaps
 
@@ -135,17 +139,17 @@ user-only gates.** No agent or automated play awarded them.
 |---|---|
 | Typecheck | `pnpm typecheck` green |
 | Full suite | `pnpm test` — 77 files, 911 tests green |
-| Loop matrices | `pnpm matrix` — kite 100/100 resolved, 79 wins; naive 100/100 resolved, 0 wins |
+| Loop matrices | Corrected production-input `pnpm matrix` — kite 100/100 resolved, 81 wins; naive 100/100 resolved, 0 wins. The extended 1–1,000 pass resolves 1,000/1,000 for both policies, with 806 skilled wins and zero mash wins |
 | Pinned replay | `slice-kite-loop-s7.json` hash `1142161593`, won |
 | Web package | `pnpm build` green; shipped 2.110 MB vs 4.096 MB budget, 174 files |
-| Browser smoke | `pnpm smoke -- --url http://localhost:5201 --seed N` green with real keyboard and both endings on all six production route families: first-gate seed 1, Ash March seed 2, field-fork seed 4, late-shop seed 8, Styx Gate seed 10, and Fire Ford seed 31. Toll rendering is required only on routes that actually reach the Landing; early deaths and bankless spines no longer create a false failure |
+| Browser smoke | `pnpm smoke -- --url http://localhost:5201 --seed N` green with real keyboard and both endings on all six production route families: first-gate seed 1, Ash March seed 2, field-fork seed 4, late-shop seed 8, Styx Gate seed 10, and Fire Ford seed 31. A broader production-input soak passed 94 distinct compatible seed pairs (188 full runs) through hub, toll where present, offer, boss/victory or death, and return with zero browser errors. Toll rendering is required only on routes that actually reach the Landing; early deaths and bankless spines no longer create a false failure |
 | Viewport transitions | `pnpm smoke:viewport -- --url http://localhost:5201` green through 640×360 → 1400×600 → 390×844 → 1920×700 → 900×506 → 640×360 across title menu/Settings/Credits, game HUD, and pause menu/Settings; target and UI bounds remain contained, tick stays 0 |
 | Room art | `pnpm room:gate` owns every render and is green across the fresh pre-run Bardo plus all 12 production route layouts, including the named Styx and Phlegethon nodes, dimensions, alpha, palette, material spans, negative space, value, highlights, focality, and browser errors; two complete outputs are byte-identical at SHA-256 `4464422c2d45fdd404d0ac49c3d645a6e4c971720c5413750e23a2549a8d4884` |
 | Realm separation | `pnpm realm-air -- --url http://localhost:5201 --seed N` installs the real seeded route before measuring it and owns every render. Exact repeat pairs are byte-identical for first-gate seed 1 (`ff8533e3…`, median 11.31), Fire Ford seed 31 (`9cb35419…`, 10.61), and Styx Gate seed 10 (`2bc3a662…`, 10.79); zero skipped rooms, browser errors, or temperature violations. No arbitrary pass threshold invented |
 | Regeneration | `pnpm palette`, `pnpm assets`, and `pnpm tiles` deterministic; the 192×288 room sheet and 192×192 prop sheet regenerate byte-identically with no unexplained drift |
 | Shipping sprite gates | 78/3 waived general, 144/2 hero, 144/4 north, 40/1 north roll, 145/2 south, 40/1 south roll; zero blocking |
 | Candidate stress | `pnpm art:stress-hero` green for dagger and heavy; all four regenerated 1×/black-test artifacts byte-identical to committed exhibits; candidate-only, with in-game motion and user Look still open |
-| Desktop | Exact current `pnpm desktop:build` and `pnpm smoke:desktop` are green on the first run across 23 checks and 6 launches |
+| Desktop | Exact current `pnpm desktop:build` and `pnpm smoke:desktop` are green across 23 checks and 6 launches. After correcting the import gate's cross-process observation race, 30 consecutive complete smokes (180 launches) passed with no recurrence |
 | Performance | SwiftShader exact-head probes: Warden render p50 1.2 ms / p95 2.2 ms; synthetic 32-enemy + 64-projectile render stress p50 24–25 ms / p95 31–32 ms with render-only hash unchanged. Pinned replay and dense sim each repeated 100× with stable hashes; stress figures are not a native-GPU or Fun claim |
 | Deterministic visual evidence | `pnpm shot ... --visualMs N` owns every render from before boot and exits nonzero on page/console errors. Three independent exact-current live-bot captures at seed 7 / tick 400 + visual 500 ms are byte-identical, SHA-256 `b9e4fa9db6383cd281cb4d2cf57317af232167a831a4559cdb54a4279b928f3d`; this player-facing exhibit omits the replay diagnostic while the separate pinned-replay lane retains hash truth. Three title boots are byte-identical at `c1318840345230773edac472c8d31e25f78f4ce3b719954c83a85075abfc4bb4`; two independent captures match at each of the four descent phases. The exact replay strip captures all 12 requested frames at ticks 400–433 and repeats at SHA-256 `e8094445c4233d3427d3cb2f21ee32ff783ec03d2b9b4a0638862685c47b2a27`; the pose atlas captures 35/35 requested states. |
 | Viewport boundary evidence | 390×844 title SHA-256 `ed3d89b4a1a7225ce1100589116c275c75575a0593648811d3066cd01fc9b8d1`; 390×844 game `ebcc7c8c21b34bdd12d1ce29f1439aa953f863a8efc15f8d492e6d5659fd3969`; 900×506 title `becb27e095f6a2f2b0e3c4348b3de7344fc90e81e4e510c0d30ecd39855c7446` |
@@ -156,10 +160,23 @@ seeded FX streams. The evidence lane now swallows rAF before boot and invokes th
 hook itself in fixed quanta. The older `096aca...` / `779fa...` screenshot hashes are invalidated;
 the hashes above are the clean-room replacements. This is a tooling correction, not a visual change.
 
-The first desktop smoke observed one banner-timing failure on the import-durability assertion
-(`ROOM CLEARED` replaced the expected acknowledgement). An isolated rerun passed the same durable
-write assertion plus all corruption and relaunch checks. It is recorded as a single timing flake,
-not silently converted into a clean first run.
+The extended soak also challenged two earlier metrics instead of preserving them as theatre. First,
+the matrix and ad-hoc bot runner had bypassed `quantizeFrame`, while the browser, recorder, and replay
+all use it. The first hash divergence is tick 18; seed 46 used to win only in the full-precision
+matrix, while the production browser loses in 4,332 ticks. The corrected headless run now matches
+that browser outcome and hash `2281899549`, and the corrected 1,000-seed matrix remains in band.
+Second, the desktop import check twice sampled `ROOM CLEARED` after the imported bytes were already
+visible on disk. Atomic rename visibility can precede delivery of the completed IPC promise by a
+microtask; the product was waiting correctly, but the test treated disk visibility as proof that the
+renderer continuation had already run. The gate still rejects success at 75 ms during the forced
+250 ms write, then separately requires the imported bytes and `SAVE IMPORTED`. Thirty consecutive
+complete smokes passed after the correction.
+
+A Pixi resource probe forced 400 room rebuilds. `renderer.texture._managedTextures.items` grew from
+50 to 450 keys because `GCManagedHash.remove` retains null tombstones, but live entries and live
+renderer-backed GPU sources remained flat at 50; each replaced floor source was null and the current
+floor source remained GPU-backed. Raw registry-key growth is therefore not a texture-leak signal;
+the explicit tilemap `textureSource` destruction is working.
 
 ## Custody and release ledger
 

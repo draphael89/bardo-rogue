@@ -45,6 +45,13 @@ export function fitViewWidth(override = 0): number {
   return Math.max(640, Math.min(1024, Math.round((tuning.view.height * aspect) / 16) * 16))
 }
 
+export function fitPhysicalScale(w: number, h: number, width: number, height: number, dpr: number): number {
+  const fit = Math.min(w * dpr / width, h * dpr / height)
+  if (fit < 1) return fit
+  const integer = Math.floor(fit)
+  return integer / fit < 0.7 ? fit : integer
+}
+
 // `viewOverride` must arrive HERE, not be assigned onto the returned app: the initial resize()
 // below already fits the target, and an override assigned after the fact was discarded until the
 // next real resize event on any non-16:9 window.
@@ -100,9 +107,10 @@ export async function createRenderApp(parent: HTMLElement, viewOverride = 0): Pr
       const width = tuning.view.width
       // integer scale in PHYSICAL pixels (crisp on 2x displays); fall back to a fractional fit when the integer
       // scale would waste more than ~30% of the window
-      const fit = Math.min(w * dpr / width, h * dpr / height)
-      let phys = Math.max(1, Math.floor(fit))
-      if (phys / fit < 0.7) phys = fit
+      // Below native size, fitting beats cropping: a small window must still expose the whole title
+      // and playfield. At native size and above, prefer whole physical pixels unless that would waste
+      // more than ~30% of the window.
+      const phys = fitPhysicalScale(w, h, width, height, dpr)
       const s = phys / dpr
       ra.scale = s
       app.renderer.resize(w, h)

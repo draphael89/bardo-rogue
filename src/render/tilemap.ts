@@ -565,6 +565,11 @@ function bakeBardoGate(g: Graphics, arena: Arena): void {
     [cx - 14, foot - 67, 7], [cx - 7, foot - 74, 5],
     [cx + 2, foot - 74, 5], [cx + 8, foot - 67, 6],
   ] as const) artPx(g, x, y, w, 1, C.goldDim)
+  // One broken inner arris catches the Gate key from the west. Keeping the east edge dark makes
+  // this illumination rather than an outlined icon, while the gaps preserve the monument's age.
+  for (const [y, h] of [[foot - 59, 9], [foot - 45, 7], [foot - 33, 6]] as const) {
+    artPx(g, cx - 18, y, 1, h, C.goldDim)
+  }
 
   // Torn ceremonial cloth: enough wine to tie the monument to the Bardo mat, never enough to
   // compete with the runner. It hangs outside the opening so the destination remains black.

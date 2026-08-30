@@ -153,7 +153,7 @@ console.log(JSON.stringify({
   errors,
 }, null, 2))
 
-// Only exits non-zero when a bar was actually asked for, so the bare command stays a measurement.
+// Separation remains a measurement unless a bar is requested; skipped rooms and browser errors always fail.
 if (failed) {
   console.error(`realm-air FAILED: ${violations.length} temperature violation(s), ${skipped.length} skipped room(s), ${errors.length} browser error(s)` +
     (minMedian !== null && median.d < minMedian ? `; median separation ${median.d.toFixed(2)} is under ${minMedian}` : ''))

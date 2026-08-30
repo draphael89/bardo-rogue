@@ -20,7 +20,12 @@ import { isProductionPath, verifyApproval } from './approve'
 import { tuning } from '../../src/tuning'
 
 /** Timing fields that make a tuning node a window a clip can legitimately hang off. */
-const WINDOW_KEYS = ['startup', 'active', 'recovery', 'windup', 'total', 'travel', 'freeze', 'draw', 'lungeTicks']
+// `aimTicks` is tuning.caster's own window name (src/tuning.ts:302) — the 24 ticks of aim. Without it
+// listed here, `ref: "caster"` resolves to an object the check calls window-less and the compile
+// throws, so a Lampad sheet could not bind the one sim clip it has. Adding the name is the smallest
+// honest fix; the alternative — renaming the caster's window inside tuning.ts — edits a file
+// stepWorld reaches and drags the replay-hash protocol into an art compile for zero art gain.
+const WINDOW_KEYS = ['startup', 'active', 'recovery', 'windup', 'total', 'travel', 'freeze', 'draw', 'lungeTicks', 'aimTicks']
 
 /**
  * Resolve every sim-timed clip's `ref` against tuning, and fail the compile if it does not land on a

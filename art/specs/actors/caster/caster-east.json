@@ -1,0 +1,194 @@
+{
+  "id": "actor.caster.east",
+  "kind": "character",
+  "input": ".art-cache/actors/caster/master-east.png",
+  "output": ".art-cache/actors/caster/compiled/bardo_caster_east.png",
+  "sidecar": ".art-cache/actors/caster/compiled/bardo_caster_east.json",
+  "cell": 64,
+  "cols": 3,
+  "rows": 3,
+  "maxColors": 16,
+  "palette": [
+    "mortar",
+    "grout",
+    "woodLo",
+    "sky",
+    "iron",
+    "ironHi",
+    "slateHi",
+    "ashField",
+    "ashFieldLit",
+    "boneLo",
+    "boneDim",
+    "bone"
+  ],
+  "facing": "east",
+  "mirror": true,
+  "fit": "grid",
+  "chromaKey": false,
+  "coverage": 0.5,
+  "valueLift": false,
+  "salience": {
+    "minShare": 0.22,
+    "minDelta": 0.16
+  },
+  "frames": [
+    {
+      "name": "idle",
+      "i": 0,
+      "pivot": [
+        32,
+        62
+      ],
+      "sockets": {
+        "lamp": [
+          42,
+          39
+        ]
+      }
+    },
+    {
+      "name": "strafeA",
+      "i": 1,
+      "pivot": [
+        32,
+        62
+      ],
+      "sockets": {
+        "lamp": [
+          39,
+          39
+        ]
+      }
+    },
+    {
+      "name": "strafeB",
+      "i": 2,
+      "pivot": [
+        32,
+        62
+      ],
+      "sockets": {
+        "lamp": [
+          44,
+          40
+        ]
+      }
+    },
+    {
+      "name": "settle",
+      "i": 3,
+      "pivot": [
+        32,
+        62
+      ],
+      "sockets": {
+        "lamp": [
+          42,
+          39
+        ]
+      }
+    },
+    {
+      "name": "aimRise",
+      "i": 4,
+      "pivot": [
+        32,
+        62
+      ],
+      "sockets": {
+        "lamp": [
+          41,
+          43
+        ]
+      }
+    },
+    {
+      "name": "aimLock",
+      "i": 5,
+      "pivot": [
+        32,
+        62
+      ],
+      "sockets": {
+        "lamp": [
+          37,
+          45
+        ]
+      }
+    },
+    {
+      "name": "release",
+      "i": 6,
+      "pivot": [
+        32,
+        62
+      ],
+      "sockets": {
+        "lamp": [
+          39,
+          36
+        ]
+      }
+    },
+    {
+      "name": "recover",
+      "i": 7,
+      "pivot": [
+        32,
+        62
+      ],
+      "sockets": {
+        "lamp": [
+          43,
+          41
+        ]
+      }
+    },
+    {
+      "name": "hurt",
+      "i": 8,
+      "pivot": [
+        32,
+        62
+      ],
+      "sockets": {
+        "lamp": [
+          34,
+          34
+        ]
+      }
+    }
+  ],
+  "clips": {
+    "strafe": {
+      "frames": [
+        "strafeA",
+        "strafeB"
+      ],
+      "timing": "ticks",
+      "ticks": [
+        6,
+        6
+      ],
+      "loop": true
+    },
+    "aim": {
+      "frames": [
+        "aimRise",
+        "aimLock",
+        "release",
+        "recover"
+      ],
+      "timing": "sim",
+      "sim": {
+        "ref": "caster"
+      }
+    }
+  },
+  "provenance": {
+    "provider": "blender-mannequin-spike",
+    "model": "blender-eevee ortho pitch 20deg, actor caster, cell 64, sun 1.07, ambient 1.75"
+  },
+  "registrationNote": "Pivots and sockets are COMPUTED from projected rig bones (rig.json), not judged. Candidate output only: .art-cache/actors, never public/assets."
+}

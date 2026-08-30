@@ -81,7 +81,8 @@ Objective observations: the causeway centre now measures roughly twice the perim
 four Bardo islands retain 82.6%–95.2% negative space; the Bardo frame remains below the highlight
 budget and retains a concentrated focal peak. The exact room gate samples all 13 production-loop
 layouts once across the real first-gate, Fire Ford, and Styx Gate spines; the dedicated Styx and
-Phlegethon nodes are asserted separately from alternate dresses. UI panels remain comfortable at native size and above,
+Phlegethon nodes are asserted separately from alternate dresses, and Bardo is captured before any
+run is installed so its HUD is the fresh first-minute state. UI panels remain comfortable at native size and above,
 real keyboard input reaches the first fight, and reduced motion snaps the descent instead of animating it.
 At 390×844 and 900×506, the sampled sky values now remain continuous across every target boundary;
 the tracked portrait frames preserve the complete title and Bardo rather than clipping either.
@@ -122,7 +123,7 @@ user-only gates.** No agent or automated play awarded them.
 | Web package | `pnpm build` green; shipped 2.110 MB vs 4.096 MB budget, 174 files |
 | Browser smoke | `pnpm smoke -- --url http://localhost:5201` green, real keyboard and both endings |
 | Viewport transitions | `pnpm smoke:viewport -- --url http://localhost:5201` green through 640×360 → 1400×600 → 390×844 → 1920×700 → 900×506 → 640×360 across title menu/Settings/Credits, game HUD, and pause menu/Settings; target and UI bounds remain contained, tick stays 0 |
-| Room art | `pnpm room:gate` owns every render and is green across all 13 production-loop layouts, including the named Styx and Phlegethon nodes, dimensions, alpha, palette, material spans, negative space, value, highlights, focality, and browser errors; two complete outputs are byte-identical at SHA-256 `0fc6d1c6abe6eda42d8f608ba55d392c11084af4415a784685ead0d015135988` |
+| Room art | `pnpm room:gate` owns every render and is green across the fresh pre-run Bardo plus all 12 production route layouts, including the named Styx and Phlegethon nodes, dimensions, alpha, palette, material spans, negative space, value, highlights, focality, and browser errors; two complete outputs are byte-identical at SHA-256 `4464422c2d45fdd404d0ac49c3d645a6e4c971720c5413750e23a2549a8d4884` |
 | Realm separation | `pnpm realm-air -- --url http://localhost:5201` owns every render; three clean-room outputs are byte-identical. Median RGB distance 11.31, closest 2.95, widest 16.91, zero temperature violations; no arbitrary pass threshold invented |
 | Regeneration | `pnpm palette`, `pnpm assets`, and `pnpm tiles` deterministic; the 192×288 room sheet and 192×192 prop sheet regenerate byte-identically with no unexplained drift |
 | Shipping sprite gates | 78/3 waived general, 144/2 hero, 144/4 north, 40/1 north roll, 145/2 south, 40/1 south roll; zero blocking |

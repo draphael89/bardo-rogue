@@ -161,27 +161,16 @@ async function runtime(url: string, shotDir?: string): Promise<RuntimeRoom[]> {
       ;(window as any).__roomGateRender = () => hooks.render(1, 1 / 60)
     })
 
-    const targets = await page.evaluate((includeBardo) => {
-      const g = (window as unknown as { __game: any }).__game
-      const bardo = includeBardo ? [{ id: 'bardo', layout: 'bardo', template: 'town' }] : []
-      // This call installs the real seeded route. It may return false when that route opens at Styx,
-      // but the route is still installed; enumerate it only after this boundary.
-      g.gotoRoom('threshold', { skipRite: true })
-      const template = g.world.session.run?.map?.template ?? 'unknown'
-      return bardo.concat(g.world.rooms
-        .filter((room: any) => room.id !== 'bardo')
-        .map((room: any) => ({ id: room.id, layout: room.layout, template })))
-    }, seed === 1) as Array<{ id: string; layout: string; template: string }>
-
-    for (const target of targets) {
-      if (seenLayouts.has(target.layout)) continue
-      const actual = await page.evaluate((id) => {
+    type Target = { id: string; layout: string; template: string }
+    const capture = async (target: Target, enter: boolean): Promise<void> => {
+      if (seenLayouts.has(target.layout)) return
+      const actual = await page.evaluate(({ id, enter }) => {
         const g = (window as unknown as { __game: any }).__game
         g.title(false)
-        g.gotoRoom(id, { skipRite: true }); g.step(1)
+        if (enter) { g.gotoRoom(id, { skipRite: true }); g.step(1) }
         for (let i = 0; i < 40; i++) (window as any).__roomGateRender()
         return { id: g.state().room.id as string, layout: g.state().room.layout as string }
-      }, target.id)
+      }, { id: target.id, enter })
       if (actual.id !== target.id || actual.layout !== target.layout) {
         throw new Error(`room-art-gates: requested ${target.id}/${target.layout}, remained in ${actual.id}/${actual.layout}`)
       }
@@ -226,6 +215,25 @@ async function runtime(url: string, shotDir?: string): Promise<RuntimeRoom[]> {
         `${(frame.topOneNearShare * 100).toFixed(1)}% of full top-1% set within 64px of player/focal; nearest ${frame.topOneNearest.toFixed(1)}px (${source})`)
       rooms.push(room)
       seenLayouts.add(target.layout)
+    }
+
+    // The fresh Bardo must be measured before `gotoRoom` installs an active run. Capturing it after
+    // that boundary produces the right masonry under the wrong first-minute HUD state.
+    if (seed === 1) await capture({ id: 'bardo', layout: 'bardo', template: 'town' }, false)
+    const targets = await page.evaluate(() => {
+      const g = (window as unknown as { __game: any }).__game
+      // This call installs the real seeded route. It may return false when that route opens at Styx,
+      // but the route is still installed; enumerate it only after this boundary.
+      g.gotoRoom('threshold', { skipRite: true })
+      const template = g.world.session.run?.map?.template ?? 'unknown'
+      return g.world.rooms
+        .filter((room: any) => room.id !== 'bardo')
+        .map((room: any) => ({ id: room.id, layout: room.layout, template }))
+    }) as Target[]
+
+    for (const target of targets) {
+      if (seenLayouts.has(target.layout)) continue
+      await capture(target, true)
     }
     await page.close()
   }

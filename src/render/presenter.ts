@@ -309,7 +309,6 @@ export class Presenter {
         case 'playerHurt':
           this.camera.addTrauma(J.traumaHurt); this.camera.kick(ev.angle, 4)
           this.particles.hitSparks(ev.x, ev.y, ev.angle, 6, 0xff6060)
-          this.playerView.squash = J.squashTicks
           this.flash(0.25, 0xff2020)
           this.postfx.pulse(); this.lastHurtAngle = ev.angle // juice hook
           break
@@ -1017,7 +1016,11 @@ export class Presenter {
     // and the body was placed on the target grid.
     v.body.position.x = snapToTarget(v.body.position.x + reaction.dx)
     v.body.position.y = snapToTarget(v.body.position.y + reaction.dy - reaction.lift)
-    v.body.rotation += reaction.bodyLean
+    // The shove is kept for every kind — being knocked off the blade is the reaction. The LEAN is
+    // for puppets only: 17 degrees on an authored hurt frame resamples the drawing for the whole
+    // hit-stop, which is the same defect as the squash next door (views/enemies.ts) on the other
+    // channel. Those bodies answer the blow with a drawing; they must not be bent as well.
+    if (!EntityView.authoredHitReaction(v.hitKind)) v.body.rotation += reaction.bodyLean
     if (v.weapon) {
       v.weapon.position.x += reaction.dx
       v.weapon.position.y += reaction.dy - reaction.lift
@@ -1199,7 +1202,6 @@ export class Presenter {
       v.update(lerp(b.px, b.x, slowAlpha), lerp(b.py, b.y, slowAlpha), b.angle, this.time)
       this.stampTrail(v, b, dtSec, tuning.juice.trail.arrowPx, (x, y) => this.particles.echoTrail(x, y))
     }
-    if (w.freeze <= 0 && this.playerView.squash > 0) this.playerView.squash -= dtSec * 60
     updatePlayerView(this.playerView, p, w, alpha, this.time)
     if (!p.armed && this.playerView.weapon) this.playerView.weapon.visible = false
     this.contactReaction(dtSec)

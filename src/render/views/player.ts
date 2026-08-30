@@ -3,7 +3,7 @@ import type { Container, Graphics } from 'pixi.js'
 import type { Atlas } from '../atlas'
 import type { World, Player } from '@/sim/world'
 import { tuning } from '@/tuning'
-import { lerp, easeOutCubic, easeInCubic } from '../anim'
+import { lerp, easeInCubic } from '../anim'
 import { swingProgress } from '@/sim/combat'
 import { activeBoons, hasBoon, swingReach } from '@/sim/boons'
 import { BLADE_SMEAR, bladeDress, type BladeDress } from '../bladeDress'
@@ -195,7 +195,7 @@ export function updatePlayerView(v: EntityView, p: Player, world: World, alpha: 
   const P = tuning.player
   const x = lerp(p.px, p.x, alpha), y = lerp(p.py, p.y, alpha)
   const feetY = y + p.radius + 1
-  let sx = 1, sy = 1, rot = 0, hop = 0
+  let hop = 0
   let verticalRollFrame = -1
   const b = v.body
   const bladeEquipped = armOf(world) === ARM.blade && p.armed
@@ -218,30 +218,29 @@ export function updatePlayerView(v: EntityView, p: Player, world: World, alpha: 
     b.anchor.set(frame.anchorX, frame.anchorY)
   }
 
+  // The bow's body read is a settle and a recoil along ONE axis, and nothing else. This branch used
+  // to squash the body non-uniformly and rotate it freely, which was legal only while it warped the
+  // 16 px Kenney stock tile the authored veteran replaced (the guard that confined it went with that
+  // tile in 939887f). It cannot apply to an authored sheet: ART_DIRECTION §6.1/§10.12 forbid freely
+  // rotating pixel art, and a rotated, non-uniformly scaled sprite cannot map texels 1:1 to target
+  // pixels, which is the whole point of cutting these sheets against `view.worldScale`.
+  // The draw and the loose still read, because the body was never carrying them: the draw is the
+  // procedural whole-pixel bow and string (`drawBowAim`), the loose is the camera lean and kick
+  // (`juice.bow`), and `hop` is a vertical offset that `snapToTarget` lands on a whole target pixel.
   if (p.state === 'attack' && armOf(world) === ARM.bow) {
     const B = tuning.bow
     const tk = p.stateTick + alpha
-    const lean = Math.cos(p.swingAngle)
-    if (tk < B.draw) {
-      const u = easeInCubic(tk / B.draw)
-      sx = 1 + 0.10 * u; sy = 1 - 0.12 * u
-      rot = -lean * 0.16 * u
-      hop = -1.2 * u
-    } else {
-      const u = easeOutCubic(Math.min(1, (tk - B.draw) / B.recover))
-      const pop = tk < B.draw + 5 ? 1 - (tk - B.draw) / 5 : 0
-      sx = lerp(1.22, 1, u) + 0.14 * pop
-      sy = lerp(0.80, 1, u) - 0.10 * pop
-      rot = lean * 0.28 * pop - lean * 0.08 * (1 - u)
-      hop = 2.6 * pop
-    }
+    if (tk < B.draw) hop = -1.2 * easeInCubic(tk / B.draw)
+    else hop = 2.6 * (tk < B.draw + 5 ? 1 - (tk - B.draw) / 5 : 0)
   }
 
   b.position.set(snapToTarget(x), snapToTarget(feetY - hop))
   // The side sheet is authored facing right and mirrors cleanly. Front/back sheets keep a stable
   // handed silhouette; exact diagonal intent remains visible in the mechanically truthful arc.
-  b.scale.set(sx * (heroDirection === 'side' ? p.facing : 1), sy)
-  b.rotation = rot
+  // Mirroring is the only scale the body takes, and the only rotation is none: unit magnitude on both
+  // axes is what keeps one source pixel one target pixel.
+  b.scale.set(heroDirection === 'side' ? p.facing : 1, 1)
+  b.rotation = 0
   // Horizontal authored melee is intentionally drawn a fraction above an equal-footed victim. At
   // exact contact both sprites otherwise share z and enemy insertion order deletes the attacker;
   // the fraction does not disturb normal north/south depth sorting.

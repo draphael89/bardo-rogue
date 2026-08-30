@@ -61,7 +61,11 @@ export function updateEnemyView(v: EntityView, e: Enemy, world: World, alpha: nu
 
   let sx = pose.sx, sy = pose.sy, tint = pose.tint
   const rot = pose.rot, hop = pose.hop
-  if (v.squash > 0) { const q = v.squash / tuning.juice.squashTicks; sx *= 1 + 0.3 * q; sy *= 1 - 0.3 * q }
+  // Puppets only. A body that answers the blow with an authored drawing has already zeroed its own
+  // transforms (views/enemy-brute.ts), and a 1.30x/0.70x stretch on top of that is a nearest-neighbour
+  // resample of the hurt frame for the whole hit-stop — the same "bend the drawing back into a puppet"
+  // this game gave the art up to stop.
+  if (v.squash > 0 && !EntityView.authoredHitReaction(e.kind)) { const q = v.squash / tuning.juice.squashTicks; sx *= 1 + 0.3 * q; sy *= 1 - 0.3 * q }
   if (v.redFlash > 0) tint = 0xff5a5a
 
   b.position.set(snapToTarget(x), snapToTarget(feetY - hop))

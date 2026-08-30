@@ -456,23 +456,9 @@ export const tuning = {
       // A head-on wall ends travel immediately. It needs a firmer, local answer than the normal
       // foot plant, but stays far below taking damage so collision never impersonates a hit.
       wallTrauma: 0.09, wallKick: 1.15, wallDust: 5, wallSparks: 3,
-      // The roll's own animation table. Each row owns dodge-state ticks from `tick` up to the next
-      // row: an authored 16 px pose (drawn in src/render/views/player.ts, not a transform of the
-      // standing sprite), how far that pose leans into the travel, and how close to the floor it
-      // sits. `key: ''` hands the body back to the standing sprite. Ticks are dodge-state ticks, so
-      // these move with `player.dodge.travel`/`total` — launch, dive, the two tuck halves that show
-      // the body actually turning over, the extend into the brake, the plant, and the rise.
-      pose: [
-        { tick: 0, key: 'launch', leanDeg: 9, hop: 0 },
-        { tick: 1, key: 'dive', leanDeg: 22, hop: 1 },   // hold the flat dive through the beam
-        { tick: 6, key: 'tuckA', leanDeg: 6, hop: -1 },  // curl only after the column is cleared
-        { tick: 8, key: 'tuckB', leanDeg: -7, hop: -1 },
-        { tick: 10, key: 'extend', leanDeg: 10, hop: 0 },
-        { tick: 12, key: 'plant', leanDeg: 4, hop: 0 },
-        { tick: 14, key: 'absorb', leanDeg: 2, hop: 0 },
-        { tick: 16, key: 'rise', leanDeg: 1, hop: 0 },
-        { tick: 19, key: '', leanDeg: 0, hop: 0 },
-      ] as { tick: number; key: string; leanDeg: number; hop: number }[],
+      // The roll's poses are no longer a table here. The authored roll sheets carry their own frames
+      // and the renderer derives which one is up from dodge-state ticks against `player.dodge`
+      // (src/render/clipSelect.ts), so a timing edit belongs there, not in a parallel list here.
     },
     // Poise break. Only the heavy breaks a brute, so only that one earns the camera.
     stagger: { trauma: 0.10, bruteTrauma: 0.26, bruteZoom: 1.02, bruteFlash: 0.10 },

@@ -766,7 +766,7 @@ if ACTOR == "warden":
     # truth, not the rig failing. The renderer today draws the warden from a code-authored table
     # with no facing logic at all, so two authored facings is strictly more than it has.
     FACINGS = ["south", "north"]
-    SHEET = dict(cell=72, cols=4, rows=4, mirror=False,
+    SHEET = dict(cell=72, cols=4, rows=4, mirror=False, colourPlacement="warden",
                  palette=["mortar", "seal0", "nave0", "nave1", "nave2", "purple0", "purple2", "purple3",
                           "boneLo", "boneDim", "bone", "gold"],
                  sockets={f: ["mask"] for f in FRAME_ORDER},
@@ -875,7 +875,7 @@ elif ACTOR == "oathbound":
     # selected. These eight names, in this order.
     FRAME_ORDER = ["idle", "chase", "windupEarly", "windupCommit", "release", "contact", "recover", "hurt"]
     FACINGS = ["east", "south", "north"]
-    SHEET = dict(cell=64, cols=4, rows=2, mirror=True,
+    SHEET = dict(cell=64, cols=4, rows=2, mirror=True, colourPlacement="oathbound",
                  palette=["mortar", "seal0", "iron", "ironHi", "brickLo", "brick", "brickHi", "gold"],
                  sockets={f: (["maulHead"] if f in ("windupEarly", "windupCommit", "release", "contact") else [])
                           for f in FRAME_ORDER},
@@ -905,7 +905,7 @@ else:
     }
     FRAME_ORDER = ["idle", "struck"]
     FACINGS = ["south"]
-    SHEET = dict(cell=64, cols=2, rows=1, mirror=False,
+    SHEET = dict(cell=64, cols=2, rows=1, mirror=False, colourPlacement="dummy",
                  palette=["mortar", "seal0", "iron", "ironHi", "purple0", "purple2", "purple3",
                           "boneLo", "boneDim", "bone", "brickLo", "brick", "brickHi", "cope", "gold"],
                  sockets={f: [] for f in FRAME_ORDER},

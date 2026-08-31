@@ -25,6 +25,7 @@
     "emberHi"
   ],
   "colourPlacement": "caster",
+  "maxWidthToHeight": 0.5,
   "facing": "east",
   "mirror": true,
   "fit": "grid",
@@ -73,7 +74,7 @@
       ],
       "sockets": {
         "lamp": [
-          43,
+          42,
           38
         ]
       }
@@ -102,7 +103,7 @@
       "sockets": {
         "lamp": [
           42,
-          40
+          38
         ]
       }
     },
@@ -115,8 +116,8 @@
       ],
       "sockets": {
         "lamp": [
-          40,
-          43
+          41,
+          39
         ]
       }
     },
@@ -129,8 +130,8 @@
       ],
       "sockets": {
         "lamp": [
-          37,
-          34
+          39,
+          37
         ]
       }
     },
@@ -157,8 +158,8 @@
       ],
       "sockets": {
         "lamp": [
-          30,
-          33
+          39,
+          37
         ]
       }
     }

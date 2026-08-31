@@ -45,10 +45,11 @@ the score is not inflated: the latest critic still asks for a more luminous arch
 which is a deeper projection/material gap than another small ornament can honestly close.
 
 **Revision 7 — first enemy identity candidate.** The Lampad rig no longer draws a thin humanoid
-inside a body-height crook. A lower, broader wax bell, centred wick and chest-height dead lantern
-make the 1× silhouette read as one walking funeral lamp. The east candidate clears **106/106** art
-gates with zero waivers; all nine frames sit at Weber **+1.50 to +1.60** over the rendered floor,
-and every pose keeps an enclosed crook eye. Two weaker iterations are preserved with rejection
+inside a body-height crook. A lower wax bell, centred wick, tall enclosed crook and chest-height
+steady lantern make the 1× silhouette read as one walking funeral lamp while every pose stays at or
+below the caster's locked 0.5 width/height ceiling. The east candidate clears **109/109** art gates
+with zero waivers; all nine frames sit at Weber **+1.54 to +1.64** over the rendered floor, and every
+pose keeps an enclosed crook eye. Two weaker iterations are preserved with rejection
 receipts. This is candidate evidence only: no master is approved, no production asset is replaced,
 and the Kenney caster remains until human Look and approval.
 

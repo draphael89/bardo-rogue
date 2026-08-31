@@ -41,6 +41,7 @@ afterAll(() => rmSync(dir, { recursive: true, force: true }))
 const spec = (over: Partial<CompileSpec> = {}): CompileSpec => ({
   id: 'test.approve', kind: 'prop', input: srcPng, output: join(dir, 'out.png'),
   cell: 32, cols: 1, rows: 1, maxColors: 8, coverage: 0.4, salience: false, despeckle: false,
+  palette: ['slate0', 'iron', 'ironHi', 'bone'], colourPlacement: 'pipeline-fixture',
   frames: [{ name: 'block', i: 0, pivot: [16, 30] }],
   ...over,
 })

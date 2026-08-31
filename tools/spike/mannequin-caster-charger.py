@@ -280,8 +280,8 @@ if ACTOR == "caster":
     bone("head", V(0, -0.6, HIP + 10), V(0, -1.8, HIP + 13.5), "chest")
     # The crook is BODY, not a weapon. That is what puts its rise inside the height gate's own bbox
     # measurement and still clears the 52px cap on a 64 cell — so the sheet ships waiver-free.
-    bone("crook", V(0, 3.5, HIP + 8), V(0, 3.5, HIP + 24), "chest")
-    bone("lampArm", V(0, 3.5, HIP + 24), V(0, -9.5, HIP + 24), "crook")
+    bone("crook", V(0, 3.5, HIP + 8), V(0, 3.5, HIP + 30), "chest")
+    bone("lampArm", V(0, 3.5, HIP + 30), V(0, -9.5, HIP + 30), "crook")
     bone("lamp", V(0, -9.5, HIP + 17), V(0, -9.5, HIP + 1), "lampArm")
     for side, sx in (("R", 1), ("L", -1)):
         bone("thigh" + side, V(2.2 * sx, 0, HIP), V(2.2 * sx, 0, HIP - 11), "pelvis")
@@ -328,16 +328,16 @@ if ACTOR == "caster":
     # NO GATE CAN SEE IT: `components` in tools/art/gates.ts counts opaque ISLANDS, and a hole is not
     # an island. It is verified by reading the 1x black test, nine frames, and that is the first thing
     # to check. If the hole has closed, thicken the bars and reopen it before judging anything else.
-    box("crookStem", V(0, 3.5, HIP + 16.0), 0.9, 1.0, 8.0, "crook", MAT_IRON)
-    box("crookTop", V(0, -3.0, HIP + 23.0), 0.9, 7.5, 1.0, "lampArm", MAT_IRON)
-    box("crookFront", V(0, -9.5, HIP + 20.5), 0.9, 1.0, 3.5, "lampArm", MAT_IRON)
+    box("crookStem", V(0, 3.5, HIP + 19.0), 0.9, 1.0, 11.0, "crook", MAT_IRON)
+    box("crookTop", V(0, -3.0, HIP + 29.0), 0.9, 7.5, 1.0, "lampArm", MAT_IRON)
+    box("crookFront", V(0, -9.5, HIP + 26.5), 0.9, 1.0, 3.5, "lampArm", MAT_IRON)
     # The eye. A FIRST pass built this as one 11x4px slot spanning the whole arm, and the 1x black
     # test read it as a placard held overhead rather than as a hook: the hole was right, the
     # proportion was not. Kept small and set back against the stem, the arm reads as a lamp bracket
     # and the void still measures 6.5 x 3 px against the >= 3x3 minimum.
-    box("crookEyeFloor", V(0, -0.75, HIP + 17.0), 0.85, 3.25, 1.0, "lampArm", MAT_IRON_CREV)
-    box("crookEyeFront", V(0, -4.5, HIP + 20.0), 0.85, 0.5, 2.0, "lampArm", MAT_IRON)
-    box("crookSpec", V(0, -3.0, HIP + 24.1), 0.6, 3.0, 0.35, "lampArm", MAT_IRON_SP)
+    box("crookEyeFloor", V(0, -0.75, HIP + 23.0), 0.85, 3.25, 1.0, "lampArm", MAT_IRON_CREV)
+    box("crookEyeFront", V(0, -4.5, HIP + 26.0), 0.85, 0.5, 2.0, "lampArm", MAT_IRON)
+    box("crookSpec", V(0, -3.0, HIP + 30.1), 0.6, 3.0, 0.35, "lampArm", MAT_IRON_SP)
 
     # --- the lamp: a 6x6px cage on a short chain, at the PROJECTED position of the sim's own
     # bolt origin — e.radius + 4 = 9 world px along the aim (src/sim/enemies/caster.ts:116). Keeping
@@ -377,8 +377,8 @@ if ACTOR == "caster":
         "strafeA": BASE + legs(-24, 16, 20, 6) + [
             ("R", "crook", "X", -3), ("R", "lamp", "X", 10), ("T", "pelvis", (0, 0, -0.9)),
         ],
-        "strafeB": BASE + legs(18, -22, 8, 22) + [
-            ("R", "crook", "X", 3), ("R", "lamp", "X", -9), ("T", "pelvis", (0, 0, -1.1)),
+        "strafeB": BASE + legs(16, -18, 8, 18) + [
+            ("R", "crook", "X", 2), ("R", "lamp", "X", -5), ("T", "pelvis", (0, 0, -1.1)),
         ],
         # MOTION STOPS. Both heels down for the only time on the sheet, lamp dead still and plumb,
         # head lifts. Read this frame TEMPORALLY: two heels dropping is 2px and would not survive
@@ -387,22 +387,22 @@ if ACTOR == "caster":
         # §6.7's ANNOUNCE, 24 ticks before contact against a 12-tick minimum. The ENTIRE column
         # changes shape, so the windup reads in solid black across the room.
         "aimRise": BASE + legs(-12, 9, 12, 5) + [
-            ("R", "crook", "X", 18), ("R", "spine", "X", -6), ("R", "lamp", "X", -7),
+            ("R", "crook", "X", 8), ("R", "spine", "X", -6), ("R", "lamp", "X", -5),
             ("T", "pelvis", (0, 0, -1.1)),
         ],
         # From casterLockTick() = round(24 * 0.66) = tick 16: the tick the angle stops tracking you.
         # Crook at full forward, trailing leg straight and locked, head UP for the only time here.
         # The pose says committed because the sim IS committed; the last third is yours to cross.
         "aimLock": BASE + legs(-16, 13, 4, 0) + [
-            ("R", "crook", "X", 30), ("R", "spine", "X", -7), ("R", "head", "X", -26),
+            ("R", "crook", "X", 10), ("R", "spine", "X", -7), ("R", "head", "X", -20),
             ("R", "lamp", "X", -2), ("T", "pelvis", (0, 0, -1.2)),
         ],
         # A RECOVER frame, not an aim frame: the sim fires at stateTick >= aimTicks and switches to
         # 'recover' in the same tick, so an aim-state release pose would never be displayed for a
         # single tick. The only backward recoil in the roster — the shot knocks her off her own line.
         "release": BASE + legs(-9, 16, 10, 2) + [
-            ("R", "crook", "X", -6), ("R", "spine", "X", -12), ("R", "pelvis", "X", -5),
-            ("R", "lamp", "X", 8), ("T", "pelvis", (0, 0.9, -0.6)),
+            ("R", "crook", "X", 5), ("R", "spine", "X", -7), ("R", "pelvis", "X", -3),
+            ("R", "lamp", "X", 4), ("T", "pelvis", (0, 0.5, -0.6)),
         ],
         # The pendulum keeps moving after she has stopped, which is what makes a top-heavy vertical
         # mass read as heavy rather than as a stick.
@@ -410,17 +410,16 @@ if ACTOR == "caster":
             ("R", "crook", "X", 7), ("R", "head", "X", 8), ("R", "lamp", "X", -8),
             ("T", "pelvis", (0, 0, -0.8)),
         ],
-        # The column TOPPLES toward the cut: legs trail behind the hips, the crook swings past
-        # vertical, the lamp overshoots outside the body contour. No other actor can topple, because
-        # none of them is a pole — the 0.60 centre of gravity and the punish mechanic are one idea.
+        # The column buckles toward the cut without surrendering the caster's narrow class read:
+        # the base compresses, the head folds, and the lamp overshoots inside the crook's envelope.
         # There is no death frame: presenter.ts shatters whatever texture is on screen on 'kill', so
         # `hurt` IS the frame that shatters, and it is drawn to shatter well.
         "hurt": BASE + [
-            ("R", "pelvis", "X", -16), ("R", "spine", "X", -14), ("R", "head", "X", -18),
-            ("R", "crook", "X", -22), ("R", "lamp", "X", 18),
-            ("R", "thighR", "X", 26), ("R", "shinR", "X", 30),
-            ("R", "thighL", "X", 34), ("R", "shinL", "X", 22),
-            ("T", "pelvis", (0, 2.2, -1.6)),
+            ("R", "pelvis", "X", -4), ("R", "spine", "X", -4), ("R", "head", "X", -8),
+            ("R", "crook", "X", 8), ("R", "lamp", "X", 4),
+            ("R", "thighR", "X", 16), ("R", "shinR", "X", 20),
+            ("R", "thighL", "X", 18), ("R", "shinL", "X", 16),
+            ("T", "pelvis", (0, 0.6, -0.5)),
         ],
     }
     FRAME_ORDER = ["idle", "strafeA", "strafeB", "settle", "aimRise",
@@ -431,6 +430,7 @@ if ACTOR == "caster":
         "palette": ["mortar", "grout", "woodLo", "sky", "iron", "ironHi", "slateHi",
                     "ashField", "ashFieldLit", "boneLo", "boneDim", "bone", "ember", "emberHi"],
         "colourPlacement": "caster",
+        "maxWidthToHeight": 0.5,
         "sockets": SOCKETS,
         "clips": {
             "strafe": {"frames": ["strafeA", "strafeB"], "timing": "ticks",
@@ -575,6 +575,7 @@ if ACTOR == "charger":
     SHEET = {
         "cell": 36, "cols": 4, "rows": 2, "mirror": True,
         "palette": ["mortar", "iron", "ironHi", "naveWarm", "coinBrass", "boneLo", "boneDim", "bone"],
+        "colourPlacement": "charger",
         "sockets": SOCKETS,
         "clips": {
             # NO contact key: tuning.charger has no `active` phase and compile.ts rejects a contact

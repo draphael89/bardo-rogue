@@ -93,6 +93,8 @@ export interface SheetDef {
   ramp?: string[]
   /** Named per-colour grammar shared by every facing of one identity. */
   colourPlacement?: string
+  /** Optional class silhouette ceiling, measured from each frame's opaque bbox. */
+  maxWidthToHeight?: number
   maxColors: number
   /** The direction the art is drawn facing. `mirror` says the opposite side is served by flipping. */
   facing?: 'east' | 'south' | 'north' | 'none'
@@ -172,6 +174,9 @@ export function validateSheetDef(def: SheetDef, where: string): void {
   if (def.colourPlacement !== undefined) {
     if (!def.ramp) fail('colourPlacement requires a declared ramp')
     if (typeof def.colourPlacement !== 'string' || !def.colourPlacement) fail('colourPlacement must name a profile')
+  }
+  if (def.maxWidthToHeight !== undefined && (!Number.isFinite(def.maxWidthToHeight) || def.maxWidthToHeight <= 0)) {
+    fail('maxWidthToHeight must be greater than 0')
   }
   if (!def.frames || Object.keys(def.frames).length === 0) fail('frames is empty')
   const cells = def.cols * def.rows

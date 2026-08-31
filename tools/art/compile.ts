@@ -139,6 +139,8 @@ export interface CompileSpec {
   palette?: string[]
   /** Named rules shared by every sheet/facing of one visual identity. */
   colourPlacement?: string
+  /** Optional class silhouette ceiling, measured from each compiled frame's opaque bbox. */
+  maxWidthToHeight?: number
   /** Drop pixels that are decisively green (generators are asked for a #00ff00 matte). */
   chromaKey?: boolean
   /**
@@ -218,6 +220,9 @@ export function validateCompileSpec(spec: CompileSpec, where: string): void {
     if (!spec.palette) fail('colourPlacement requires palette')
     if (typeof spec.colourPlacement !== 'string' || !spec.colourPlacement) fail('colourPlacement must name a profile')
     try { placementProfile(spec.colourPlacement, spec.palette ?? []) } catch (error) { fail((error as Error).message) }
+  }
+  if (spec.maxWidthToHeight !== undefined && (!Number.isFinite(spec.maxWidthToHeight) || spec.maxWidthToHeight <= 0)) {
+    fail('maxWidthToHeight must be greater than 0')
   }
   if (!Array.isArray(spec.frames) || spec.frames.length === 0) fail('frames must be a non-empty array')
   const cells = spec.cols * spec.rows
@@ -786,6 +791,7 @@ export async function compileSheet(spec: CompileSpec, specPath = '<inline>'): Pr
     palette: canon().name,
     ...(spec.palette ? { ramp: [...spec.palette] } : {}),
     ...(spec.colourPlacement ? { colourPlacement: spec.colourPlacement } : {}),
+    ...(spec.maxWidthToHeight !== undefined ? { maxWidthToHeight: spec.maxWidthToHeight } : {}),
     maxColors,
     ...(spec.facing ? { facing: spec.facing } : {}),
     ...(spec.mirror !== undefined ? { mirror: spec.mirror } : {}),

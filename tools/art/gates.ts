@@ -317,14 +317,16 @@ export function runGates(ctx: GateContext): GateResult[] {
   // A palette is only an alphabet. These rules make it grammar: a correct colour can still fail for
   // taking over a frame or sprawling across the whole silhouette. Measure the worst frame so one bad
   // pose cannot hide in a sheet-wide average.
-  if (def.ramp) {
-    let rules: Record<string, ColourPlacementRule> | undefined
-    let profileError = ''
+  let rules: Record<string, ColourPlacementRule> | undefined
+  let profileError = ''
+  if (!def.ramp) profileError = 'no palette ramp declared'
+  else {
     try { if (def.colourPlacement) rules = placementProfile(def.colourPlacement, def.ramp) } catch (error) { profileError = (error as Error).message }
-    add('colour-placement-contract', !!rules,
-      rules ? `${def.colourPlacement}: ${Object.keys(rules).length}/${def.ramp.length} ramp colours constrained` : profileError || 'no per-colour placement profile declared',
-      'fail', 'OPENING_AUDIT §7 Article II')
-    if (rules) {
+  }
+  add('colour-placement-contract', !!rules,
+    rules ? `${def.colourPlacement}: ${Object.keys(rules).length}/${def.ramp!.length} ramp colours constrained` : profileError || 'no per-colour placement profile declared',
+    'fail', 'OPENING_AUDIT §7 Article II')
+  if (rules && def.ramp) {
       const colors = canon().colors
       for (const name of def.ramp) {
         const rule = rules[name]
@@ -347,7 +349,18 @@ export function runGates(ctx: GateContext): GateResult[] {
           `max share ${(share * 100).toFixed(1)}%/${(rule.maxShare * 100).toFixed(1)}% (${shareFrame || 'none'}), bbox ${(bboxW * 100).toFixed(1)}x${(bboxH * 100).toFixed(1)}%/${(rule.maxWidth * 100).toFixed(1)}x${(rule.maxHeight * 100).toFixed(1)}% (${bboxWFrame || 'none'} / ${bboxHFrame || 'none'})`,
           'fail', 'OPENING_AUDIT §7 Article II')
       }
+  }
+
+  if (def.maxWidthToHeight !== undefined) {
+    let ratio = 0, frame = ''
+    for (const s of stats) {
+      if (!s.bbox) continue
+      const r = s.bbox.w / s.bbox.h
+      if (r > ratio) { ratio = r; frame = s.name }
     }
+    add('class-proportion', ratio <= def.maxWidthToHeight,
+      `max width/height ${ratio.toFixed(3)} (${frame || 'none'}), ceiling ${def.maxWidthToHeight.toFixed(3)}`,
+      'fail', 'ART_DIRECTION §4.3.2')
   }
 
   // B5 mass. NOT §11.1's highlight budget, which is a FRAME gate: it measures "static-art pixels" on

@@ -5,13 +5,22 @@
 // the malformation and expects a path-specific error, so a future loosening shows up as a red test
 // with the fault named.
 import { describe, it, expect } from 'vitest'
+import { readdirSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { Texture } from 'pixi.js'
 import { validateCompileSpec, type CompileSpec } from '../../tools/art/compile'
 import { bindSheet, validateSheetDef, type SheetDef } from '../../src/render/sheet'
 
+const VETERAN_RAMP = [
+  'mortar', 'seal0', 'iron', 'ironHi', 'purple0', 'purple2', 'purple3', 'boneLo',
+  'boneDim', 'bone', 'brickLo', 'brick', 'brickHi', 'cope', 'gold',
+]
+
 const goodSpec = (): CompileSpec => ({
   id: 'test.actor', kind: 'character', input: 'in.png', output: 'out.png',
   cell: 32, cols: 2, rows: 1, maxColors: 8,
+  palette: VETERAN_RAMP,
+  colourPlacement: 'veteran',
   frames: [
     { name: 'idle', i: 0, pivot: [16, 30] },
     { name: 'hurt', i: 1, pivot: [16, 30], sockets: { hand: [10, 12] } },
@@ -54,7 +63,7 @@ describe('validateCompileSpec', () => {
     ['clip naming an unknown frame', s => { s.clips = { c: { frames: ['gone'], timing: 'ticks', ticks: [1] } } }, /unknown frame "gone"/],
     ['unknown kind', s => { (s as { kind: string }).kind = 'monster' }, /unknown kind/],
     ['valueLift out of range', s => { s.valueLift = { targetMean: 1.2 } }, /targetMean/],
-    ['placement profile without a palette', s => { s.colourPlacement = 'veteran' }, /requires palette/],
+    ['placement profile without a palette', s => { delete s.palette }, /requires palette/],
   ]
   for (const [name, mutate, err] of cases) {
     it(`rejects ${name}`, () => {
@@ -63,6 +72,20 @@ describe('validateCompileSpec', () => {
       expect(() => validateCompileSpec(s, 't')).toThrow(err)
     })
   }
+
+  it('keeps every checked-in compile spec on a colour-placement profile', () => {
+    const files = (dir: string): string[] => readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
+      const path = join(dir, entry.name)
+      return entry.isDirectory() ? files(path) : entry.name.endsWith('.json') ? [path] : []
+    })
+    for (const path of files('art/specs')) {
+      const spec = JSON.parse(readFileSync(path, 'utf8')) as Partial<CompileSpec>
+      if (!Array.isArray(spec.frames)) continue
+      expect(spec.palette?.length, `${path} palette`).toBeGreaterThan(0)
+      expect(spec.colourPlacement, `${path} colourPlacement`).toBeTruthy()
+      expect(() => validateCompileSpec(spec as CompileSpec, path)).not.toThrow()
+    }
+  })
 })
 
 describe('validateSheetDef (strengthened)', () => {

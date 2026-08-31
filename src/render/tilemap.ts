@@ -287,7 +287,7 @@ function makeRackCluster(rack: ArenaRack): { root: Container; sync(taken: boolea
       // One hard-edged reflected line, on the steel itself. This is proximity feedback without a
       // glow field, particle, or icon: the nearby hero supplies the light and the blade answers.
       const r = rackSpecularRect(rack)
-      specular.rect(r.x, r.y, r.width, r.height).fill({ color: 0xfff0c8, alpha: Math.min(0.9, 0.18 + amount * 0.72) })
+      specular.rect(r.x, r.y, r.width, r.height).fill({ color: C.slateHi, alpha: Math.min(0.9, 0.18 + amount * 0.72) })
     },
   }
 }
@@ -498,6 +498,7 @@ const C = {
   slate1: 0x2e3a4e,
   slate2: 0x425066,
   slate3: 0x58667c,
+  slateHi: 0x76849a,
   nave0: 0x343c4c,
   naveWarm: 0x5c503a,
   emberLo: 0xb03010,

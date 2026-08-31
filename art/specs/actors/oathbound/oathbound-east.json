@@ -18,6 +18,7 @@
     "brickHi",
     "gold"
   ],
+  "colourPlacement": "oathbound",
   "facing": "east",
   "mirror": true,
   "fit": "grid",

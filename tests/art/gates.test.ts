@@ -58,6 +58,20 @@ const gate = (rs: GateResult[], id: string): GateResult => {
 }
 
 describe('objective gates', () => {
+  it('fails the colour-placement contract when a sheet omits its ramp', async () => {
+    expect(gate(runGates(await ctx([body()])), 'colour-placement-contract').ok).toBe(false)
+  })
+
+  it('enforces a declared width-to-height ceiling', async () => {
+    const wide = await ctx([body()])
+    ;(wide.def as SheetDef & { maxWidthToHeight: number }).maxWidthToHeight = 0.5
+    expect(gate(runGates(wide), 'class-proportion').ok).toBe(false)
+
+    const narrow = await ctx([body(10, 4, 21, 29)])
+    ;(narrow.def as SheetDef & { maxWidthToHeight: number }).maxWidthToHeight = 0.5
+    expect(gate(runGates(narrow), 'class-proportion').ok).toBe(true)
+  })
+
   it('edge-clearance fails when content touches a cell edge', async () => {
     const rs = runGates(await ctx([body(0, 6, 27, 29)]))       // west edge contact
     expect(gate(rs, 'frame:f0:edge-clearance').ok).toBe(false)

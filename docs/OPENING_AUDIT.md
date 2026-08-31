@@ -21,9 +21,11 @@ four-way equality without changing collision. The named concept exhibits still w
 composition pairs, so §15 item 5 and the scorecard remain open rather than being awarded by metric.
 
 **Actor-candidate note, 2026-08-30:** the Lampad now has a rig-only east candidate whose walking
-funeral-lamp silhouette clears 106/106 gates with zero waivers and maintains Weber +1.50 to +1.60
-across all nine frames. The two failed carrier/placard iterations have rejection receipts. It is not
-approved or integrated, so the Kenney inventory and scorecard below remain unchanged.
+funeral-lamp silhouette clears 109/109 gates with zero waivers, stays at or below the caster's locked
+0.5 width/height ceiling in every pose, and maintains Weber +1.54 to +1.64 across all nine frames.
+The chest-height lantern carries a steady flame. The two failed carrier/placard iterations have
+rejection receipts. It is not approved or integrated, so the Kenney inventory and scorecard below
+remain unchanged.
 
 ---
 

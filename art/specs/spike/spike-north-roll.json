@@ -8,6 +8,7 @@
   "cols": 2,
   "rows": 2,
   "maxColors": 16,
+  "colourPlacement": "veteran",
   "palette": [
     "mortar",
     "seal0",

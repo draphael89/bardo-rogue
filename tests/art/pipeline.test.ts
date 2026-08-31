@@ -11,7 +11,8 @@ import { makeContext, measureDetailDensity, runGates, summarise } from '../../to
 import { canon, rgbToHex, type RGB } from '../../tools/art/palette'
 import { verifyApproval } from '../../tools/art/approve'
 import { authoredFxFrame, quantizeFxAlpha, quantizeFxRotation } from '../../src/render/fxUnits'
-import { heroFrameName } from '../../src/render/views/player'
+import { heroFrameName, heroMirrorScale } from '../../src/render/views/player'
+import { rackSpecularRect } from '../../src/render/tilemap'
 import { createWorld } from '../../src/sim/scenarios'
 import { ARM } from '../../src/sim/weapons'
 import { tuning } from '../../src/tuning'
@@ -537,6 +538,23 @@ describe('review findings', () => {
     expect(heroFrameName(sheet, world.player, world, 0, 'pickupAnticipate')).toBe('pickupAnticipate')
     // Candidate wiring is inert until the named frame exists in a human-approved sheet.
     expect(heroFrameName(sheet, world.player, world, 0, 'pickupContact')).toBe('idle')
+  })
+
+  it('turns a side pickup pose toward the rack instead of the current aim', () => {
+    expect(heroMirrorScale('side', 1, Math.PI)).toBe(-1)
+    expect(heroMirrorScale('side', -1, 0)).toBe(1)
+    expect(heroMirrorScale('side', -1)).toBe(-1)
+    expect(heroMirrorScale('north', -1, Math.PI)).toBe(1)
+  })
+
+  it('draws the rack specular as exactly one target pixel on target-grid edges', () => {
+    const rack = { x: 28.5 * 16, y: 8.3 * 16 }
+    const r = rackSpecularRect(rack)
+    const scale = tuning.view.worldScale
+    for (const edge of [rack.x + r.x, rack.y + r.y, rack.x + r.x + r.width, rack.y + r.y + r.height]) {
+      expect(edge * scale).toBeCloseTo(Math.round(edge * scale), 10)
+    }
+    expect(r.height * scale).toBe(1)
   })
 
   it('pose fit preserves aspect instead of stretching a cropped silhouette', async () => {

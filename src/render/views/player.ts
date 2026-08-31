@@ -34,6 +34,12 @@ const clipSelection = new WeakMap<EntityView, ClipSelection>()
 const freeDirection = new WeakMap<EntityView, HeroDirection>()
 export type PlayerPoseOverride = { frame: 'pickupAnticipate' | 'pickupContact' | 'pickupSettle'; angle: number }
 
+export function heroMirrorScale(direction: HeroDirection, facing: number, poseAngle?: number): number {
+  if (direction !== 'side') return 1
+  if (poseAngle === undefined) return facing
+  return Math.cos(poseAngle) < 0 ? -1 : 1
+}
+
 // Clip names in play order: swings[i] maps to SWING_CLIPS[i] in every armed sidecar.
 const SWING_CLIPS = ['light1', 'light2', 'heavy'] as const
 // What every hero sheet must carry, and what only an armed one must. The unarmed family cannot
@@ -246,7 +252,7 @@ export function updatePlayerView(v: EntityView, p: Player, world: World, alpha: 
   // handed silhouette; exact diagonal intent remains visible in the mechanically truthful arc.
   // Mirroring is the only scale the body takes, and the only rotation is none: unit magnitude on both
   // axes is what keeps one source pixel one target pixel.
-  b.scale.set(heroDirection === 'side' ? p.facing : 1, 1)
+  b.scale.set(heroMirrorScale(heroDirection, p.facing, pose?.angle), 1)
   b.rotation = 0
   // Horizontal authored melee is intentionally drawn a fraction above an equal-footed victim. At
   // exact contact both sprites otherwise share z and enemy insertion order deletes the attacker;

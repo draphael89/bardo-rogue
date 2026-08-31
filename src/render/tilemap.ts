@@ -246,6 +246,13 @@ function inStamp(x: number, y: number): boolean {
   return sy >= 0 && sy < STAMP_H && sx >= 0 && sx < STAMP_W && LIFE_STAMP[sy][sx] === 'X'
 }
 
+export function rackSpecularRect(rack: Pick<ArenaRack, 'x' | 'y'>): { x: number; y: number; width: number; height: number } {
+  const scale = tuning.view.worldScale
+  const targetX = Math.round((rack.x - 4) * scale) / scale
+  const targetY = Math.round((rack.y - 10) * scale) / scale
+  return { x: targetX - rack.x, y: targetY - rack.y, width: 8, height: 1 / scale }
+}
+
 function makeRackCluster(rack: ArenaRack): { root: Container; sync(taken: boolean): void; proximity(amount: number): void } {
   const root = new Container()
   root.position.set(rack.x, rack.y)
@@ -279,7 +286,8 @@ function makeRackCluster(rack: ArenaRack): { root: Container; sync(taken: boolea
       if (amount <= 0) return
       // One hard-edged reflected line, on the steel itself. This is proximity feedback without a
       // glow field, particle, or icon: the nearby hero supplies the light and the blade answers.
-      specular.rect(-4, -10, 8, 1).fill({ color: 0xfff0c8, alpha: Math.min(0.9, 0.18 + amount * 0.72) })
+      const r = rackSpecularRect(rack)
+      specular.rect(r.x, r.y, r.width, r.height).fill({ color: 0xfff0c8, alpha: Math.min(0.9, 0.18 + amount * 0.72) })
     },
   }
 }

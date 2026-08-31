@@ -33,6 +33,8 @@ const CANDIDATE_SHEETS = {
   bardo_warden_south: '/.art-cache/actors/warden/compiled/bardo_warden_south',
 } as const
 
+const HERO_CANDIDATE = '/.art-cache/pixellab/hero-light1/compiled/bardo_veteran_greatsword_south'
+
 type ProductionSheetName = (typeof SHEETS)[number]
 type CandidateSheetName = keyof typeof CANDIDATE_SHEETS
 export type SheetName = ProductionSheetName | CandidateSheetName
@@ -68,9 +70,13 @@ export async function loadAtlas(manifest: Record<string, string[]>): Promise<Atl
   // are data: URLs.
   await Assets.init()
 
-  const candidateMode = import.meta.env.DEV && new URLSearchParams(location.search).get('actorCandidate') === '1'
+  const params = new URLSearchParams(location.search)
+  const candidateMode = import.meta.env.DEV && params.get('actorCandidate') === '1'
+  const heroCandidateMode = import.meta.env.DEV && params.get('heroCandidate') === '1'
   const requested: Array<readonly [SheetName, string]> = [
-    ...SHEETS.map(name => [name, `${base}sprites/${name}`] as const),
+    ...SHEETS.map(name => [name, heroCandidateMode && name === 'bardo_veteran_greatsword_south'
+      ? HERO_CANDIDATE
+      : `${base}sprites/${name}`] as const),
     ...(candidateMode
       ? Object.entries(CANDIDATE_SHEETS).map(([name, path]) => [name as CandidateSheetName, path] as const)
       : []),

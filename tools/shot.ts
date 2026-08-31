@@ -17,6 +17,7 @@ const out = args.out ?? (args.replay ? `shots/replay-${args.replay.split('/').po
 const debug = args.debug ?? '0'
 const url = args.url ?? 'http://localhost:5173'
 const actorCandidate = args.actorCandidate === '1'
+const heroCandidate = args.heroCandidate === '1'
 const stepwise = args.stepwise === '1'
 // A page screenshot at the harness's usual 1920x1080 viewport is a 3x enlargement of the
 // 640x360 target. `--oneX 1` is the art-review lane: one PNG pixel is one target pixel.
@@ -69,7 +70,7 @@ page.on('pageerror', e => errors.push('pageerror: ' + e.message))
 // save=off: a capture must not depend on whether this machine has played before (a persisted
 // reducedEffects would cap flashes and camera movement in every shot). Pass --save on to opt out.
 const save = args.save === 'on' ? '' : '&save=off'
-await page.goto(`${url}/?scenario=${scenario}&seed=${seed}&debug=${debug}&mute=${mute}${save}${bot ? `&bot=${bot}` : ''}${actorCandidate ? '&actorCandidate=1' : ''}`)
+await page.goto(`${url}/?scenario=${scenario}&seed=${seed}&debug=${debug}&mute=${mute}${save}${bot ? `&bot=${bot}` : ''}${actorCandidate ? '&actorCandidate=1' : ''}${heroCandidate ? '&heroCandidate=1' : ''}`)
 await page.waitForFunction(() => !!(window as unknown as { __game?: unknown }).__game, null, {
   timeout: 15000,
   ...(visualMs !== null ? { polling: 50 } : {}), // rAF polling cannot wake when the evidence lane owns rAF

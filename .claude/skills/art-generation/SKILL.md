@@ -28,12 +28,19 @@ that.
 |---|---|---|
 | Anything with a **clip** (hero, enemies, any animation) | **Blender rig** (`tools/spike/`) | The rig gives frame consistency by construction: 6 sheets, 1 823 gate assertions, 54 s. `edit_image` redrew one garment three different ways across three frames **at one seed**. |
 | **Radially symmetric / silhouette-dominant** props — brazier, bowl, bell, jar, lantern, cauldron | **PixelLab** | The recipe in §2 produced a brazier that reads better than the hand-coded one, on palette, gate-green, correct in a real 1× frame. |
-| Props whose read depends on **projection** — anvil, bench, cart, table | **Code or rig** | PixelLab returned an isometric anvil twice, at two canvases. No ramp fixes projection. |
+| Props whose read depends on **projection** — anvil, bench, cart, table | **Code** (`pnpm tiles`, the `props32` array beside `brazier32()` in `tools/make-bardo-tiles.ts`) | PixelLab returned an isometric anvil twice, at two canvases. No ramp fixes projection. |
 | Floors, walls, autotiles | **Code** (`pnpm tiles`) | 20.4 % edge density, slabs crossing tile boundaries, wear paths following real traffic, a bake coupled to the light pools. Parametric behaviour, not an image. `create_topdown_tileset` is **untested here** — say so rather than assume. |
 | Particles, decals, impacts, swing arcs | **Code** (`pnpm fx`) | They track `tuning.ts`. A sprite cannot. |
 | Light, grade, camera, anything reacting to sim state | **Runtime** (`src/render/`) | §12.1. |
 | Title screen, HUD | **Code** — there is no asset | `src/render/title.ts` is `Graphics.rect()` and `Text` over the living hub. |
 | Concept art, marketing, key art | **gpt-image** | 79 000 colours, no alpha, no grid. Judge against it; never condition on it (see §7). |
+
+Rig or code, when both could apply: **a clip decides it.** The rig exists for frame-to-frame
+consistency, so an asset with no animation has nothing to buy there — a static prop is code.
+
+Sections 2–6 are the generated lane only. If §1 routes your asset to code, you are done here: go to
+`pnpm tiles` / `pnpm fx`, and none of the gen spec, ramp, receipt or approval machinery applies —
+code sheets are gated by `pnpm room:gate` and their own tests instead.
 
 If the brief contains "not", "without", or a comparison to another asset, it is **not a noun** — route
 it to the rig or to code. ~58 generations shipped zero pixels on that mistake.
@@ -86,7 +93,7 @@ records provenance the MCP path does not.
 bible prompt is ~1 900 characters carrying twelve literal hex codes, and it tells the model "no text,
 no labels" in the same breath. Swapping it in changes the exact variable that produced the
 measurement. **Treat it as the thing to test next, not as the proven path** — run it on the brazier,
-compare against 42.7 % / 7 colours, and then rewrite this section with whichever won.
+compare against 41.8 % / 7 colours, and then rewrite this section with whichever won.
 
 Three more reasons the dry-run body is not directly copyable to the MCP:
 
@@ -100,28 +107,60 @@ Three more reasons the dry-run body is not directly copyable to the MCP:
 ## 3. Canvas: generate big, let the compiler vote
 
 `reduce()` in `tools/art/compile.ts` downsamples **by voting in palette space**, and mapping to the
-palette *before* voting is the load-bearing ordering. That is the whole mechanism. Measured, one
-brazier master at 192 px compiled to four cells:
+palette *before* voting is the load-bearing ordering. That is the whole mechanism.
+
+**Edge density**, everywhere in this skill: of the opaque pixels whose right or down neighbour is
+**also opaque**, the share where that neighbour is a different RGB. Excluding the silhouette edge is
+what makes the number comparable across sizes — perimeter over area grows as a sprite shrinks, so
+counting the outline makes every small sprite look busier for free. (Re-measured 2026-08-30 after the
+first table here turned out to be unreproducible. No repo tool computes it — this does, and the
+table below is one brazier master at 192 px compiled to three cells:
+
+```js
+// .art-cache/density.mjs — run with `pnpm exec node .art-cache/density.mjs <png>...`
+// It must live inside the repo: .art-cache is gitignored, and node resolves sharp from node_modules.
+import sharp from 'sharp'
+for (const f of process.argv.slice(2)) {
+  const { data, info } = await sharp(f).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+  const { width: w, height: h } = info
+  const at = (x, y) => (x < 0 || y < 0 || x >= w || y >= h) ? null : data.subarray((y * w + x) * 4, (y * w + x) * 4 + 4)
+  const op = p => p && p[3] !== 0
+  const key = p => `${p[0]},${p[1]},${p[2]}`
+  let pairs = 0, diff = 0, opaque = 0
+  const colours = new Set()
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const p = at(x, y); if (!op(p)) continue
+    opaque++; colours.add(key(p))
+    for (const q of [at(x + 1, y), at(x, y + 1)]) { if (!op(q)) continue; pairs++; if (key(q) !== key(p)) diff++ }
+  }
+  console.log(`${(100 * diff / pairs).toFixed(1)}%\t${colours.size} colours\t${w}x${h}\t${f}`)
+}
+```
 
 | | edge density | colours |
 |---|---|---|
-| the 192 px master, raw | 36.6 % | 41 |
-| → 96 px cell (2×) | 53.4 % | **12** |
-| → 64 px cell (3×) | 51.9 % | **10** |
-| → 48 px cell (4×) | **47.6 %** | **10** |
-| the same object generated natively at 48 px | **74.2 %** | **36** |
-| code-authored props, for reference | 26.2–41.2 % | 9–10 |
+| the 192 px master, raw | 35.7 % | 41 |
+| → 96 px cell (2×) | 47.0 % | **12** |
+| → 64 px cell (3×) | 49.5 % | **10** |
+| → 48 px cell (4×) | 48.6 % | **10** |
+| the same object generated natively at 48 px | 47.9–65.3 % | **10–36** |
+| `bardo_props.png`, code-authored, whole sheet | 20.8 % | 31 |
 
-Read it carefully, because the obvious reading is wrong:
+Read it carefully, because two obvious readings are wrong:
 
-- **The colour budget is the big win, and 2× already buys it** — 41 → 12. `prop` budget is 12
-  (`art/palette/canon.json`).
-- **Density rises off the master** (36.6 → 47-53 %) and that is expected, not a defect: edge density
-  is a ratio *per painted pixel*, and a smaller sprite is proportionally more edge.
-- **The comparison that matters is at the same output size.** Against a native 48 px generation, the
-  4× path halves density and thirds the colours. That is the argument for the rule.
-- **4× measured best on density**; ≥2× satisfies the budget. Do not read the curve as finer than it
-  is — it is one object at four cells.
+- **The colour budget is the whole win, and 2× already buys it** — 41 → 12. `prop` budget is 12
+  (`art/palette/canon.json`). The compiler enforces it whatever the source size; generating big is
+  what gives the vote enough pixels to be a vote.
+- **Density is flat across cells.** 47.0 / 49.5 / 48.6 is one object inside 2.5 points. An earlier
+  version of this table showed a clean monotone fall and claimed 4× "measured best on density" —
+  that was an artifact of an unstated definition. **There is no density curve. Pick the canvas for
+  the palette vote, not for a density number.**
+- **Density rises off the master** (35.7 → 47–49 %) and that is expected: a smaller sprite is
+  proportionally more edge even with the outline excluded.
+- **Native-size generation is not uniformly worse on density** — a column came back at 47.9 %, level
+  with the compiled path. It is worse where the subject is complex (anvil 65.3 %, market stall
+  54.4 %) and it is worse on *colours* every time the subject has any. The colour column is the
+  argument; do not lean on density.
 
 This contradicts the global `pixellab` skill's "never downscale pixel art", and the exception is
 narrow: never **resample**. A palette-space vote is not a resample.
@@ -207,6 +246,12 @@ so a new master can silently change what a future generation is conditioned on.
   real 64 px patch of lit causeway it matched the palette and **lost the subject** — it returned a
   barrel for an anvil.
 - ~~"Generate at the target size."~~ See §3.
+- ~~"The anvil is worth one more PixelLab try with the bible prompt."~~ **Not struck — untested, and
+  the two are in tension.** The anvil verdict is n=2 under the short subject line, and the bible
+  prompt (§2.1) is the one that carries the class silhouette rule, i.e. the exact control the anvil
+  failed. Retesting it is legitimate; shipping it on the current evidence is not.
+  **`art/specs/probe/prop-anvil.json` is a checked-in negative result, not a template** — it compiles
+  cleanly and still routes the wrong way. Read its `registrationNote` before reusing it.
 - ~~"Condition on the concept boards."~~ They are 45° isometric at ~79 000 colours with a gold-framed
   glowing gate — what §8.2.2 and §10.22 forbid. Reference beats rule when they disagree, which is the
   mechanical cause of twelve gold-framed gates. **Judge against them; never condition on them.**
@@ -241,7 +286,7 @@ truncation at ~4 and ~6 frames, which is exactly the failure the global skill do
 
 `kind: "prop"` and an `output` under `.art-cache` are what keep a candidate out of production: the
 approval checkpoint keys on the output path (`tools/art/approve.ts`), so a candidate lane physically
-cannot ship. Result: **7 colours, 42.7 % density, PASS 10 gates 0 blocking.**
+cannot ship. Result, re-run from this file alone: **7 colours, 41.8 % density, PASS 9 gates 0 blocking.**
 
 ## 10. What needs a human
 

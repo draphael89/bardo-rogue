@@ -40,5 +40,5 @@
     "model": "create_image_pixflux (MCP), seed 3, 192x192, forced canon ramp",
     "promptFile": "art/prompts/probe_anvil_192.txt"
   },
-  "registrationNote": "CANDIDATE ONLY, .art-cache. Generated at 192px against a 48px cell so the compiler's 4x palette-space vote does the density reduction it exists for. NOTE the ramp: an earlier run copied the brazier's ramp wholesale, which left ember/emberHi in it, and the compiler duly mapped the anvil's wooden stump into orange fire. A ramp is per-asset; copying one is a bug, not a shortcut."
+  "registrationNote": "NEGATIVE RESULT, not a template. The anvil came back isometric at both canvases and §1 of .claude/skills/art-generation routes projection-dependent props to code (pnpm tiles), not to PixelLab. This spec is kept because it compiles cleanly and is the evidence for that rule. CANDIDATE ONLY, .art-cache. Generated at 192px against a 48px cell so the compiler's 4x palette-space vote does the density reduction it exists for. NOTE the ramp: an earlier run copied the brazier's ramp wholesale, which left ember/emberHi in it, and the compiler duly mapped the anvil's wooden stump into orange fire. A ramp is per-asset; copying one is a bug, not a shortcut."
 }

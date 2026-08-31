@@ -6,7 +6,7 @@ const [ref, name, description, view = 'low top-down'] = process.argv.slice(2)
 const buf = await sharp(ref).png().toBuffer()
 const m = await sharp(buf).metadata()
 const body = {
-  description, name, view, template_id: 'humanoid', no_background: true, seed: 21,
+  description, name, view, template_id: 'mannequin', no_background: true, seed: 21,
   reference_image: { type: 'base64', base64: buf.toString('base64'), format: 'png' },
   image_size: { width: m.width, height: m.height },
 }

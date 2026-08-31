@@ -8,9 +8,15 @@ have no MCP tool, which is where the model quality actually lives. All read `PIX
 | Driver | Endpoint | What it is for |
 | --- | --- | --- |
 | `generate-pro.mjs <cfg.json>` | `POST /generate-image-v2` | The **Pro** model. Takes a `style_image` with per-channel `style_options` (palette / outline / detail / shading) and up to four `reference_images` each with its own `usage_description`. Returns 16 candidates per call. |
-| `create-character-v3.mjs <ref.png> <name> <desc>` | `POST /create-character-v3` | Rotates one south-facing reference into 8 consistent directions. |
+|  `create-character-v3.mjs <ref.png> <name> <desc>` | `POST /create-character-v3` | Rotates one south-facing reference into 8 consistent directions. |
 | `transfer-outfit.mjs <ref.png> <outDir> <frames…>` | `POST /transfer-outfit-v2` | Applies one appearance across 2-16 frames. **See the caveat in the art-generation skill: it redraws rather than restyles, so it does NOT preserve pose.** |
 | `fetch-character.mjs <id> <outDir>` | `GET /characters/{id}` | Downloads the 8 rotations. Note the field is `rotation_urls`, not `rotations`. |
 
 The measured recipe, and what each lever actually did, is recorded in
 `.claude/skills/art-generation` §2.2. Read that before spending.
+
+**`template_id` for a humanoid is `mannequin`, not `humanoid`.** The valid set is
+`bear, cat, dog, horse, lion, mannequin`. An invalid value does NOT fail the create call — the
+character rotates into its 8 directions perfectly and only the SKELETON is left unfitted, so the
+mistake surfaces much later as `animate_character` failing every direction with
+`Template not found`. Check `animation_count` after animating, not just the create response.

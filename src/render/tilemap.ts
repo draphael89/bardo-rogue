@@ -253,6 +253,11 @@ export function rackSpecularRect(rack: Pick<ArenaRack, 'x' | 'y'>): { x: number;
   return { x: targetX - rack.x, y: targetY - rack.y, width: 4, height: 1 / scale }
 }
 
+export function rackProximityAmount(distance: number, specularRadius: number, rackRadius: number): number {
+  const span = Math.max(1, specularRadius - rackRadius)
+  return Math.max(0, Math.min(1, (specularRadius - distance) / span))
+}
+
 function makeRackCluster(rack: ArenaRack): { root: Container; sync(taken: boolean): void; proximity(amount: number): void } {
   const root = new Container()
   root.position.set(rack.x, rack.y)

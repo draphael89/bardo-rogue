@@ -12,7 +12,7 @@ import { canon, rgbToHex, type RGB } from '../../tools/art/palette'
 import { verifyApproval } from '../../tools/art/approve'
 import { authoredFxFrame, quantizeFxAlpha, quantizeFxRotation } from '../../src/render/fxUnits'
 import { heroFrameName, heroMirrorScale, pickupPhaseFrame } from '../../src/render/views/player'
-import { rackSpecularRect } from '../../src/render/tilemap'
+import { rackProximityAmount, rackSpecularRect } from '../../src/render/tilemap'
 import { createWorld } from '../../src/sim/scenarios'
 import { ARM } from '../../src/sim/weapons'
 import { tuning } from '../../src/tuning'
@@ -545,6 +545,11 @@ describe('review findings', () => {
     }
     expect(r.width).toBe(4) // the whole steel blade and no air beside it
     expect(r.height * scale).toBe(1)
+  })
+
+  it('keeps rack proximity finite when live tuning collapses the fade band', () => {
+    expect(rackProximityAmount(18, 18, 18)).toBe(0)
+    expect(rackProximityAmount(17, 18, 18)).toBe(1)
   })
 
   it('holds pickup contact for the plant, then cancels settle into held movement', () => {

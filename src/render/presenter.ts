@@ -12,7 +12,7 @@ import type { PlayerPoseOverride } from './views/player'
 import { snapToTarget } from './views/shared'
 import { promiseFrame } from './clipSelect'
 import { ARM, armOf } from '@/sim/weapons'
-import { buildTilemap, SHRINE_INK, type TilemapView } from './tilemap'
+import { buildTilemap, rackProximityAmount, SHRINE_INK, type TilemapView } from './tilemap'
 import { Camera, clampFocus } from './camera'
 import { drawVoidUnderlay } from './starfield'
 import { TILE } from '@/sim/arena'
@@ -1243,8 +1243,7 @@ export class Presenter {
     }
     const rack = w.arena.rack
     const rackDistance = rack ? Math.hypot(rack.x - p.x, rack.y - p.y) : Infinity
-    const pickupSpan = tuning.view.pickup.specularRadius - tuning.run.rackRadius
-    this.tilemap.setRackProximity((tuning.view.pickup.specularRadius - rackDistance) / pickupSpan)
+    this.tilemap.setRackProximity(rackProximityAmount(rackDistance, tuning.view.pickup.specularRadius, tuning.run.rackRadius))
     updatePlayerView(this.playerView, p, w, alpha, this.time, this.pickupPose(w))
     if (!p.armed && this.playerView.weapon) this.playerView.weapon.visible = false
     this.contactReaction(dtSec)

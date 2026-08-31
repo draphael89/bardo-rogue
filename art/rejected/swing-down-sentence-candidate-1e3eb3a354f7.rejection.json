@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "file": "swing-down-sentence-candidate-1e3eb3a354f7.png",
+  "sha256": "1e3eb3a354f764cfbec218368e3e93ea3b31b1d464403eaae660f00bd1429cd9",
+  "originalFile": ".art-cache/pixellab/hero-light1/review/swing-down-sentence-candidate.png",
+  "rejectedAt": "2026-08-31T11:56:18.345Z",
+  "recordedBy": "codex",
+  "reason": "Mechanically gate-green, but rejected at native 1x because the generated Commit frame has heavier sword clusters and a darker torso than the approved rig-authored hero, so it does not improve readability or caliber.",
+  "manifest": {
+    "file": "swing-down-sentence-candidate-1e3eb3a354f7.manifest.json",
+    "sha256": "f2da006fe7b701d17a8d60a9f060a5622400b4cd6a3065ac458386be6c8c0112"
+  }
+}

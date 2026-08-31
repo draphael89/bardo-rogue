@@ -1,0 +1,114 @@
+{
+  "version": 1,
+  "status": "managed_object_family_complete_not_admitted",
+  "createdAt": "2026-08-31T09:57:45Z",
+  "purpose": "Prove PixelLab's persistent managed-object lane on one Bardo-native stateful set piece after the generated enemy candidates failed identity-specific compile gates.",
+  "balanceBefore": 678,
+  "budget": {
+    "expectedGenerations": 40,
+    "overnightSpentBefore": 74,
+    "overnightCeiling": 400,
+    "minimumReserve": 100
+  },
+  "request": {
+    "tool": "create_1_direction_object",
+    "size": 192,
+    "view": "top-down",
+    "description": "A monumental underworld judgment bell suspended from a squat chipped basalt yoke, one heavy dark bronze bell with a restrained gold oath band and a visible iron clapper, broad readable silhouette, ancient Greek funerary geometry, isolated transparent background, north-left key light, no floor, no pedestal, no glow, no flames, no text, no extra objects. The bell and yoke fill the canvas while preserving clear empty space around the silhouette."
+  },
+  "providerResult": {
+    "status": "completed",
+    "objectId": "4233d9cf-7ba5-4475-afb4-eaf5d140a0cf",
+    "groupId": "5b34b9df-7514-473f-aa30-c9214d9da21e",
+    "actualGenerationsSpent": 20,
+    "balanceAfter": 658,
+    "source": ".art-cache/pixellab/bell-object/source-192.png",
+    "nativeReview": "Accept for managed-object state and animation trials. At 96px the single bell, basalt yoke, gold band and clapper remain distinct; the Greek meander and hanging geometry suit a judgment set piece without a floor or baked effect."
+  },
+  "compileTrial": {
+    "spec": ".art-cache/pixellab/bell-object/bell-candidate.json",
+    "sourceSha256Prefix": "4c7fa684e0c78803",
+    "result": "not admitted",
+    "at96": "24 gates, 2 blocking: detail-density 51.4% vs prop cap 25%; boneLo bbox 54.2x58.3% vs provisional 50x50%",
+    "at64": "24 gates, 3 blocking; downsampling did not cure the detail heuristic and weakened material placement",
+    "decision": "Keep the 96px form for the provider capability proof. Do not bypass the known detail-density judge or write runtime assets."
+  },
+  "crackedStateRequest": {
+    "status": "completed",
+    "tool": "create_object_state",
+    "objectId": "4233d9cf-7ba5-4475-afb4-eaf5d140a0cf",
+    "stateName": "Cracked",
+    "seed": 84142,
+    "editDescription": "The exact same bell and basalt yoke after one catastrophic judgment strike: add one bold diagonal fracture through the bronze bell, bend the bottom rim slightly inward at the impact point, and leave the iron clapper hanging visibly off-center. Preserve the exact yoke, Greek meander, gold oath band, proportions, camera, transparent background, north-left light, palette and single-object silhouette. No missing bell, no rubble cloud, no floor, no glow, no magic, no text, no extra object.",
+    "expectedGenerations": 20,
+    "stateObjectId": "dbed5581-996b-404d-81b5-86f3fc88a2c5",
+    "actualGenerationsSpent": 20,
+    "balanceAfter": 638,
+    "source": ".art-cache/pixellab/bell-object/cracked-192.png",
+    "nativeReview": "Accept. At 96px the state preserves the yoke, camera, gold band and identity while the diagonal fracture, bent rim and off-center clapper read immediately without effects or debris."
+  },
+  "swingAnimationRequest": {
+    "status": "completed",
+    "tool": "animate_object",
+    "objectId": "4233d9cf-7ba5-4475-afb4-eaf5d140a0cf",
+    "mode": "v3",
+    "frameCount": 6,
+    "keepFirstFrame": true,
+    "displayName": "judgment_bell_swing",
+    "animationDescription": "One slow, heavy pendulum swing of the bronze bell: begin exactly centered and still, swing the bell body left while the iron clapper lags behind, pass back through center, swing right with the clapper lagging opposite, then settle toward the exact centered hanging pose. The basalt yoke, suspension, Greek meander and camera remain perfectly fixed in every frame. Preserve one bell, one clapper, the gold oath band, transparent background, north-left light and the exact object identity. No yoke movement, no camera motion, no ringing glyphs, no glow, no sound waves, no sparks, no debris, no extra objects.",
+    "expectedGenerations": 4,
+    "actualGenerationsSpent": 4,
+    "balanceAfter": 634,
+    "animationGroupId": "97b425eb-7e04-4691-a86f-10aaeab6440c",
+    "animationId": "1610d12d-7751-4e6b-8c43-898bed9ede3d",
+    "providerReportedFrames": 7,
+    "nativeContactSheet": ".art-cache/pixellab/bell-object/swing-96.png",
+    "nativeReview": "Accept as a capability proof. The seven-frame arc reads as a heavy left-to-right pendulum swing; the yoke silhouette stays fixed, one bell and one clapper persist, and no effects appear. Stone texture and lighting drift subtly across the fixed yoke, so it is not yet runtime-admissible.",
+    "stopCondition": "Reject if the yoke moves, the bell or clapper duplicates, the arc changes scale, or the loop cannot return to the exact base pose."
+  },
+  "swingCompileTrial": {
+    "spec": ".art-cache/pixellab/bell-object/bell-swing-candidate.json",
+    "sourceSha256Prefix": "ab98e0180f03b6ce",
+    "result": "not admitted",
+    "gateCounts": { "total": 67, "blocking": 7 },
+    "blockers": [
+      "detail-density 52.9% vs the known prop judge cap 25%",
+      "two provisional bell material-placement limits",
+      "four light-direction judges on the moving half of the arc"
+    ],
+    "decision": "The provider's managed-object graph is proven end to end, but the animation is not promoted. The generic planted-feet gate was correctly restricted to character clips; the remaining failures belong to the art and provisional material profile."
+  },
+  "bookendedSwingRequest": {
+    "status": "completed",
+    "tool": "animate_object",
+    "objectId": "4233d9cf-7ba5-4475-afb4-eaf5d140a0cf",
+    "mode": "v3",
+    "frameCount": 6,
+    "keepFirstFrame": true,
+    "customStartAndEnd": ".art-cache/pixellab/bell-object/source-192.png",
+    "displayName": "judgment_bell_swing_bookended",
+    "animationDescription": "Between the supplied identical first and last frames, swing only the bronze bell body in one heavy pendulum arc: left, through center, right, then back to the exact supplied centered pose. The iron clapper lags naturally opposite the bell. The basalt yoke, suspension ropes, Greek meander, canvas, scale, palette, north-left lighting and every pixel above the bell's suspension pin remain fixed to the supplied endpoints. Preserve exactly one bell and one clapper. No yoke motion, no camera motion, no lighting change, no texture change, no glow, no sound waves, no sparks, no debris, no extra objects.",
+    "expectedGenerations": 4,
+    "actualGenerationsSpent": 4,
+    "balanceAfter": 630,
+    "animationGroupId": "fa977a9e-aba8-41fe-acad-d6024a32b84d",
+    "animationId": "670a91db-2335-46de-ae34-8359c2938db1",
+    "providerReportedFrames": 7,
+    "nativeContactSheet": ".art-cache/pixellab/bell-object/bookended-96.png",
+    "nativeReview": "Reject for runtime. Identical endpoints eliminate the loop pop and reduce light-direction drift from four frames to one, but the requested heavy swing collapses into mostly vertical squash and subtle tilt. Provider frame 0 and frame 6 are byte-identical to each other but not to the supplied source; the managed endpoint control redraws the endpoint rather than preserving supplied pixels.",
+    "endpointEvidence": {
+      "sourceSha256Prefix": "4c7fa684e0c78803",
+      "frame0And6Sha256Prefix": "2ac4f52f1543ad77",
+      "upperRegionDifferenceFromSuppliedSource": "73.67% of pixels above row 84"
+    },
+    "compileResult": "62 gates, 4 blocking after representing the duplicate endpoint as an alias: detail-density, two provisional material-placement bounds, and swing4 light-direction 0.42 vs 0.35.",
+    "reason": "This is a distinct controlled candidate, not a retry: exact identical endpoints directly test whether PixelLab's object start/end controls cure loop closure and fixed-yoke drift measured in the first V3 swing.",
+    "decision": "Stop spending on this animation. The uncontrolled clip has the stronger motion; the bookended clip has the cleaner loop. Neither satisfies both at once. Keep the excellent base and Cracked state as the useful managed-object result."
+  },
+  "overnightSpendAfter": 122,
+  "stopConditions": [
+    "Reject before any state or animation spend if the bell is not a single isolated transparent object, the clapper or yoke is incoherent, the projection fights the room, or the silhouette fails at native game scale.",
+    "Do not retry a failed or timed-out request without reconciling balance and returned object IDs.",
+    "Do not select, approve, or write the object into public assets without compile gates and a native 1x room capture."
+  ]
+}

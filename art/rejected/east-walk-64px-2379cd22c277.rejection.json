@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "file": "east-walk-64px-2379cd22c277.png",
+  "sha256": "2379cd22c2771705abe307084856d7dda83425c355fa48869de23252752f4caa",
+  "originalFile": ".art-cache/pixellab/jaguar-oathbound/east-walk-64px.png",
+  "rejectedAt": "2026-08-31T11:56:18.345Z",
+  "recordedBy": "codex",
+  "reason": "Rejected at native 1x because the armed walking template drops the tower shield and club across the clip, erasing the Oath-Bound guard silhouette and gameplay truth.",
+  "manifest": {
+    "file": "east-walk-64px-2379cd22c277.manifest.json",
+    "sha256": "91fd9d5a5222a9c45dc11984549589206a298f1c018212db906bb3d25137dc16"
+  }
+}

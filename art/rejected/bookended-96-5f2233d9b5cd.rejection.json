@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "file": "bookended-96-5f2233d9b5cd.png",
+  "sha256": "5f2233d9b5cda045ddbe9d02bc17501c93c192eba6d8dfd4167f4b68b24b4d9e",
+  "originalFile": ".art-cache/pixellab/bell-object/bookended-96.png",
+  "rejectedAt": "2026-08-31T11:56:18.345Z",
+  "recordedBy": "codex",
+  "reason": "Rejected for runtime because identical endpoint controls improve loop closure and lighting stability but collapse the requested heavy pendulum swing into mostly vertical squash and subtle tilt."
+}

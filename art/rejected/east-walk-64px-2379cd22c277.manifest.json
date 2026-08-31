@@ -1,0 +1,138 @@
+{
+  "version": 1,
+  "status": "east_family_compiled_not_admitted",
+  "createdAt": "2026-08-31T08:04:00Z",
+  "sourceCharacterId": "f27bf373-3df3-44d4-ade5-e5e972fc3a9e",
+  "sourceLabel": "Jaguar Warrior S2",
+  "purpose": "Create a shield-bearing sibling state before testing the already-paid Jaguar animations against the Oath-Bound runtime contract. The shield is gameplay truth for this enemy, so the unshielded source was rejected rather than disguised as admissible art.",
+  "balanceBefore": 726,
+  "expectedCost": {
+    "minimum": 20,
+    "maximum": 40
+  },
+  "stateCharacterId": "4bbaaebb-c4e6-4494-9594-62f09515a144",
+  "providerResponse": {
+    "status": "completed",
+    "cost": "approximately 20-40 generations, resolved by canvas size",
+    "actualGenerationsSpent": 40,
+    "balanceAfter": 686,
+    "groupId": "2be2a17f-4ea8-44ff-b97b-f9ad652fd5f5",
+    "directions": 8,
+    "size": [144, 144],
+    "animations": [],
+    "note": "linked via group_id; provider reports inherited skeleton eligibility for later animation"
+  },
+  "nativeRotationReview": {
+    "tool": "Aseprite 1.3.17.2",
+    "contactSheet": ".art-cache/pixellab/jaguar-oathbound/rotations-64px.png",
+    "decision": "accept for one-direction animation pilot",
+    "observations": [
+      "All eight rotations preserve one jaguar-skull helm, one tower shield and one club.",
+      "The shield remains a dominant readable vertical mass at native scale, so the Oath-Bound guard is no longer hidden or semantically false.",
+      "The state is high top-down and visually denser than the rig cast; runtime tint and room-light capture remain required before wider generation."
+    ]
+  },
+  "eastAttackRequest": {
+    "status": "completed",
+    "mode": "v3",
+    "directions": ["east"],
+    "frame_count": 8,
+    "keep_first_frame": true,
+    "expectedGenerations": 3,
+    "animation_name": "oathbound_guard_club_attack",
+    "action_description": "From the exact guarded idle, brace the tall tower shield toward the opponent, draw the short obsidian-toothed club over the right shoulder, plant both feet, perform one committed diagonal club strike while the shield stays between torso and opponent, then settle back toward the same guard. Preserve exactly one shield in the left hand, one club in the right hand, the jaguar-skull helm, spotted pelt, body identity, high top-down camera, transparent background and north-left key light. The shield never changes hand, shrinks, vanishes or merges with the body. No extra limbs, no detached equipment, no magic, no glow, no impact trail, no camera motion.",
+    "animationGroupId": "f8f29f54-93e0-46ef-9456-9dea082494b7",
+    "providerReportedFrames": 9,
+    "providerReportedGenerations": 3,
+    "actualGenerationsSpent": 3,
+    "balanceAfter": 683,
+    "animationId": "15dc591e-88f8-48ae-8e35-0fe08bf10631",
+    "nativeContactSheet": ".art-cache/pixellab/jaguar-oathbound/east-attack-64px.png",
+    "nativeReview": "Accept for compiler trial. One club and one shield persist through all nine frames. The east-facing shield correctly reads edge-on at guard and turns broad during the committed strike; no baked trail or detached equipment appears."
+  },
+  "eastWalkRequest": {
+    "status": "rejected",
+    "mode": "template",
+    "directions": ["east"],
+    "template_animation_id": "walking-4-frames",
+    "animation_name": "oathbound_guard_walk",
+    "expectedGenerations": 1,
+    "animationGroupId": "2d95caac-d7eb-4fc3-9527-62ad55ae76d7",
+    "actualGenerationsSpent": 1,
+    "balanceAfter": 682,
+    "nativeContactSheet": ".art-cache/pixellab/jaguar-oathbound/east-walk-64px.png",
+    "decision": "reject",
+    "reason": "All four template frames dropped both the tower shield and the club. This confirms template locomotion is unsuitable for armed character states, not merely for the hero greatsword.",
+    "stopCondition": "Reject if any frame drops, duplicates, changes hands, or merges the shield or club."
+  },
+  "eastWalkV3Request": {
+    "status": "completed",
+    "mode": "v3",
+    "directions": ["east"],
+    "frame_count": 4,
+    "keep_first_frame": true,
+    "expectedGenerations": 2,
+    "animationGroupId": "afec0a80-f8b8-4dda-a327-58a0ba8d37d8",
+    "providerReportedFrames": 5,
+    "providerReportedGenerations": 2,
+    "actualGenerationsSpent": 2,
+    "balanceAfter": 680,
+    "animationId": "cf50c320-7602-458f-9747-694ae1539051",
+    "nativeContactSheet": ".art-cache/pixellab/jaguar-oathbound/east-walk-v3-64px.png",
+    "nativeReview": "Accept for compiler trial. All five frames retain one edge-on shield and one club; the stance and feet change without identity drift or baked effects.",
+    "animation_name": "oathbound_guard_walk_v3",
+    "action_description": "Take one heavy guarded step forward while keeping the tall tower shield continuously raised in the left hand and the short obsidian-toothed club continuously held in the right hand. The shield and club are part of the silhouette in every frame and never disappear, swap hands, shrink, bend or merge with the body. Preserve the exact jaguar-skull helm, spotted pelt, dark teal armour, identity, high top-down east view, transparent background and north-left key light. No attack, no swing, no magic, no glow, no trail, no camera motion.",
+    "stopCondition": "Reject unless both pieces of equipment remain readable in every frame and at least two locomotion frames are distinct at native scale."
+  },
+  "eastHurtV3Request": {
+    "status": "completed",
+    "mode": "v3",
+    "directions": ["east"],
+    "frame_count": 4,
+    "keep_first_frame": true,
+    "expectedGenerations": 2,
+    "animationGroupId": "dc938731-ebb3-4837-a75f-2257e2db015d",
+    "providerReportedFrames": 5,
+    "providerReportedGenerations": 2,
+    "actualGenerationsSpent": 2,
+    "balanceAfter": 678,
+    "animationId": "496251be-67f2-4129-b16d-3bba6a403ff8",
+    "nativeContactSheet": ".art-cache/pixellab/jaguar-oathbound/east-hurt-v3-64px.png",
+    "nativeReview": "Accept for compiler trial. The guard compresses into a clear shield-first recoil while one shield and one club remain attached through all five frames; no flash, trail or duplicate equipment appears.",
+    "animation_name": "oathbound_guard_hurt_v3",
+    "action_description": "Recoil sharply from one heavy impact against the raised tower shield, shoulders and shield snapping backward before regaining the guarded stance. Keep the tall shield continuously in the left hand and the short obsidian-toothed club continuously in the right hand in every frame. Preserve the exact jaguar-skull helm, spotted pelt, dark teal armour, identity, high top-down east view, transparent background and north-left key light. No counterattack, no dropped equipment, no extra limbs, no magic, no glow, no impact flash, no trail, no camera motion.",
+    "stopCondition": "Reject unless the recoil reads at native scale and both equipment pieces remain attached throughout."
+  },
+  "eastCompileTrial": {
+    "spec": ".art-cache/pixellab/jaguar-oathbound/oathbound-east-candidate.json",
+    "master": ".art-cache/pixellab/jaguar-oathbound/master-east.png",
+    "sourceSha256Prefix": "8cb05934d47e7d99",
+    "result": "reject before north/south spend",
+    "gateCounts": {
+      "total": 93,
+      "blockingWithoutLift": 17,
+      "blockingWithMeasuredBruteLift": 10
+    },
+    "observations": [
+      "A measured target-mean lift of 0.27 fixed all nine ground-separation blockers without bleaching the skull or shield at native scale.",
+      "The candidate still violates all seven rig-authored Oath-Bound colour-placement rules and three north-key light-direction judges; those are identity/projection mismatches, not compiler mechanics.",
+      "The generated attack preserves the shield but turns the short club into a thin thrusting point and introduces small cyan contact pixels. It is not a truthful club sentence.",
+      "No north or south animation calls were purchased because the east proof failed both the repository gates and semantic weapon continuity."
+    ],
+    "stagingPreview": ".art-cache/staging/actor.oathbound.pixellab.east-8cb05934/bardo_oathbound_east.png"
+  },
+  "request": {
+    "character_id": "f27bf373-3df3-44d4-ade5-e5e972fc3a9e",
+    "state_name": "Oathbound Guard",
+    "edit_description": "The same underworld jaguar warrior in a guarded combat-ready stance, now carrying a tall rectangular blackened-bronze tower shield in the left hand and the same short obsidian-toothed club in the right. The shield is a dominant readable vertical silhouette from every direction, covers the torso when facing an attacker, has a chipped iron rim and one restrained ochre oath mark, and never merges with the body or club. Preserve exactly the same bone jaguar-skull helm, spotted pelt, dark teal quilted armour, ochre bindings, identity, proportions, high top-down camera, pixel cluster scale, transparent background, and north-left key light. No extra limbs, no floating equipment, no glow, no magic, no impact effects.",
+    "override_width": 144,
+    "override_height": 144,
+    "seed": 84141,
+    "use_color_palette_from_reference": true
+  },
+  "stopConditions": [
+    "Do not animate this state until all eight rotations preserve one shield, one club, identity, projection and silhouette clarity.",
+    "Do not retry a failed or timed-out request without reconciling balance, character siblings and returned IDs.",
+    "Do not promote it as Oath-Bound art unless the authored shield makes the mechanical guard readable at native scale."
+  ]
+}

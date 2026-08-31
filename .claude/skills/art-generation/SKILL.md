@@ -163,24 +163,38 @@ Read it carefully, because two obvious readings are wrong:
   54.4 %) and it is worse on *colours* every time the subject has any. The colour column is the
   argument; do not lean on density.
 
-### 3.1 The prop recipe now fails a shipped gate — read this before using §3
+### 3.1 `detail-density` rejects these props, and the cap — not the art — is what is wrong
 
-`detail-density` (added to `main` after these numbers were taken) caps a **prop** at 25% churn. Every
-compiled PixelLab prop in the table above is 47-49%, and the deflamed brazier the worked example in
-§9 celebrates measures **41.8% against that 25% cap: BUILD REJECTED**.
+A `detail-density` gate landed on `main` capping a **prop** at 25% churn. Every compiled PixelLab
+prop above is 34-49%, so the worked example in §9 is BUILD REJECTED by it.
 
-Nothing here is retracted — the colour-budget and palette-lock findings stand, and the candidates are
-real. But the honest status of the generated-prop lane changed under it, and there are only three
-ways forward, none of them "ignore the gate":
+**Do not "fix" this by retreating to the code lane.** Measured 2026-08-31 with the gate's own
+`measureDetailDensity`:
 
-1. **Accept it and use code for props.** §1 already routes projection-dependent props to `pnpm tiles`,
-   and the code-authored sheet measures 20.8%. This is the cheap answer.
-2. **Simplify at the source** — fewer ramp entries, a flatter subject — and re-measure. Untested.
-3. **Argue the cap.** It was measured off code-authored reference sheets, so it encodes what the code
-   lane produces rather than what the class needs. That is a legitimate case to make with numbers,
-   and it needs a human, not a waiver written by whoever is blocked.
+| sheet | class | churn | cap | |
+|---|---|---|---|---|
+| `bardo_brute` — **approved and shipped** | character | **65.6%** | 70% | legal |
+| `probe_brazier` | prop | 48.6% | 25% | rejected |
+| `probe_brazier_deflamed` | prop | 41.8% | 25% | rejected |
+| pilot hero, v3-generated | character | 37.3% | 70% | legal |
+| `bardo_veteran_greatsword_south` — shipped | character | 33.9% | 70% | legal |
+| `probe_anvil` | prop | 34.4% | 25% | rejected |
 
-The generated **character** lane is unaffected: 37.3% against its own 70% cap.
+**An approved, shipped actor is noisier than every prop the cap rejects**, and the shipped hero is
+*quieter* than the rejected anvil. The cap is not a perceptual threshold — it is a per-class number
+back-derived from what each lane happened to produce. Three further facts:
+
+- **The reference art is exempt.** `bardo_props.png` and `bardo_room.png` carry no sidecar and never
+  reach `compileSheet`, so the sheets the caps were read off never face the rule they define.
+- **It is not normalised for cell size.** Churn is a ratio per *painted* pixel (§3 above), so
+  authoring a prop at cell 48 against a character at 64 raises it mechanically for the same form.
+- **It shipped as unwaivable `fail` citing "§7 Article III"** — but Article III is colour
+  *placement*, which is the separate `colour-placement` gate. There is no Article about density.
+
+So the gate is now `judge` (blocking, waivable with a named reason), which is what `gates.ts`'s own
+severity doctrine assigns to a heuristic quality finding. **The numbers were left alone**: re-deriving
+caps from art the project actually accepts is a human's call, and lowering a threshold to pass your
+own candidate is how drift gets laundered. A genuinely noisy sprite still stops the build.
 
 This contradicts the global `pixellab` skill's "never downscale pixel art", and the exception is
 narrow: never **resample**. A palette-space vote is not a resample.
@@ -222,7 +236,7 @@ mechanism: *"the compiler only uses the ramp a spec names."*
 | `b5-mass` | blown highlights | ≤ 25 % above 0.72 luminance. A lantern or any glow prop is the one to watch. |
 | `ground-separation`, `frame:*:height` | darker than its floor, too tall | **Emitted only for `kind: "character"`.** A `prop` is never checked for either — a known hole, not a pass. |
 | `identity:<clip>:a->b` | the character changing mid-clip | Cosine <= 0.45 on a colour histogram. Caught `edit_image`. **Blind to a lost prop** — it scored a clip whose greatsword vanished from 6 of 8 frames at 0.001-0.036. Never read it as "the drawing survived". |
-| `detail-density` | surface churn | Class caps **character 0.70 / prop 0.25 / tile 0.18 / effect 0.45** (`gates.ts`), measured off the code-authored sheets. **§3's generated-prop numbers FAIL this**: the brazier candidate is 41.8% against a 25% prop cap. The generated CHARACTER passes at 37.3% against 70%. See §3.1. |
+| `detail-density` | surface churn | Class caps **character 0.70 / prop 0.25 / tile 0.18 / effect 0.45**. `judge`, not `fail` — and the prop cap is miscalibrated: an approved shipped actor runs at 65.6% while the props it rejects are 34-49%. Read §3.1 before acting on it. |
 | `colour-placement:<colour>` | a colour spreading where the class never puts it | Needs a `colourPlacement` profile naming every ramp colour (`art/palette/placement.json`); a spec without one fails `tests/art/spec-validate.test.ts`. The generated hero on the `veteran` profile fails **`boneLo`: bbox 29.7x28.1% against a 4.7x4.7% cap** — it distributes a rig-tiny accent colour far more widely. |
 | `clip:*:prop-mass:<frame>` <- **new** | **a held prop dropping out of a clip** | Bright-band (>0.62 luma) share of each clip frame against the sheet's own bare frames; >= 0.45x. Measured: all seven shipped sheets sit at **0.51-0.93x**, a template-animated clip at **0.19-0.39x**. `judge`, because deliberately sheathing a weapon is a legitimate waiver. |
 

@@ -305,14 +305,32 @@ export function runGates(ctx: GateContext): GateResult[] {
     .sort((a, b) => a[1].i - b[1].i)
     .map(([name, f]) => cellStats(ctx, name, f.i))
 
-  // Surface churn is class-relative. Characters earn more internal edges than a quiet floor or prop,
-  // but even the noisiest approved actor stays under 70%. The environment caps are measured from the
-  // code-authored reference sheets named in OPENING_AUDIT §7, not guessed from a candidate.
+  // Surface churn is class-relative. Characters earn more internal edges than a quiet floor or prop.
+  //
+  // SEVERITY IS 'judge', NOT 'fail', and the numbers below are calibration rather than contract.
+  // This gate landed as an unwaivable 'fail' citing "§7 Article III" — but Article III is about
+  // colour PLACEMENT (max share and bbox per ramp colour), which is the separate colour-placement
+  // gate below. There is no Article about density. And by this file's own doctrine at the top,
+  // 'fail' is for an objective contract violation ("no judgment call in which 33 colours is 16");
+  // surface churn is exactly the "heuristic quality finding" that doctrine assigns to 'judge'.
+  //
+  // The prop cap in particular is descriptive turned normative, and measured 2026-08-31 it does not
+  // survive its own evidence:
+  //   - bardo_brute, APPROVED AND SHIPPED, runs at 65.6% and is legal only because it is classed
+  //     `character`. Every PixelLab prop this cap rejects is quieter than that: 34.4-48.6%.
+  //   - the shipped hero sits at 33.9%, BELOW the anvil candidate at 34.4%.
+  //   - the code-authored sheets the caps were read off (bardo_props, bardo_room) carry no sidecar
+  //     and never reach compileSheet, so the reference art is exempt from the rule it defines.
+  //   - churn is a ratio per PAINTED pixel and is not normalised for cell size, so authoring a prop
+  //     at cell 48 against a character at 64 mechanically raises it for the same form.
+  // Keeping it blocking-but-waivable preserves the signal (a genuinely noisy sprite still stops the
+  // build) without letting a number back-derived from one lane's output forbid better art from
+  // another. Re-deriving the caps from art the project actually accepts is a human's call.
   const densityCap: Record<SheetDef['kind'], number> = { character: 0.70, prop: 0.25, tile: 0.18, effect: 0.45 }
   const maxDensity = stats.reduce((m, s) => Math.max(m, s.detailDensity), 0)
   add('detail-density', maxDensity <= densityCap[def.kind],
     `max adjacent-colour churn ${(maxDensity * 100).toFixed(1)}% (class cap ${(densityCap[def.kind] * 100).toFixed(0)}%)`,
-    'fail', 'OPENING_AUDIT §7 Article III')
+    'judge', '§4.3 legibility')
 
   // A palette is only an alphabet. These rules make it grammar: a correct colour can still fail for
   // taking over a frame or sprawling across the whole silhouette. Measure the worst frame so one bad

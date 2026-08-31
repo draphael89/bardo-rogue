@@ -1,8 +1,17 @@
 import { Container, Sprite, RenderTexture, Graphics, type DestroyOptions, type Renderer } from 'pixi.js'
 import { TILE, T, PROP, interior, type Arena, type ArenaDoor, type ArenaShrine, type DoorMark, type ArenaOffering, type ArenaRack, doorOpens } from '@/sim/arena'
-import type { Atlas } from './atlas'
+import type { Atlas, RoomSheet } from './atlas'
 import { OATH } from './oathMetal'
 import { tuning } from '@/tuning'
+
+/**
+ * Which room sheet a layout paves from. Every layout shares `bardo_room.png` except the Bardo hub,
+ * which has its own byte-identical fork at the same indices — so hub art can be replaced without
+ * repainting Cocytus or Asphodel. Indices are deliberately unchanged, which is what keeps the
+ * `tile >= 1 && tile <= 60` floor tests in this file correct for both sheets.
+ */
+export const roomSheetFor = (atlas: Atlas, arena: Arena): RoomSheet =>
+  arena.kind === 'bardo' ? atlas.hub : atlas.room
 
 // Static floor/walls baked into one texture; door clusters (sprites + marks) change with open state.
 // `door` is a Container so every exit rides with presenter addChild / destroy. destroy() always
@@ -135,11 +144,11 @@ function paintMark(g: Graphics, mark: DoorMark): void {
   }
 }
 
-function makeDoorCluster(atlas: Atlas, d: ArenaDoor): { root: Container; setOpen: (open: boolean) => void } {
+function makeDoorCluster(atlas: Atlas, room: RoomSheet, d: ArenaDoor): { root: Container; setOpen: (open: boolean) => void } {
   const root = new Container()
-  const spr = new Sprite(atlas.room(T.doorClosed))
-  const wingA = new Sprite(atlas.room(T.doorOpen))
-  const wingB = new Sprite(atlas.room(T.doorOpen))
+  const spr = new Sprite(room(T.doorClosed))
+  const wingA = new Sprite(room(T.doorOpen))
+  const wingB = new Sprite(room(T.doorOpen))
   const mark = new Graphics()
   if (d.mark) paintMark(mark, d.mark)
   const glow = new Sprite(atlas.light('circle'))
@@ -178,7 +187,7 @@ function makeDoorCluster(atlas: Atlas, d: ArenaDoor): { root: Container; setOpen
     setOpen(roomOpen) {
       // The cluster owns the exit gating, so a second caller can never forget it.
       const open = doorOpens(d, roomOpen)
-      spr.texture = atlas.room(open ? T.doorOpen : T.doorClosed)
+      spr.texture = room(open ? T.doorOpen : T.doorClosed)
       const show = open && !!d.mark
       wingA.visible = wingB.visible = show
       mark.visible = show
@@ -1094,6 +1103,7 @@ function bakeGrit(g: Graphics, arena: Arena): void {
  * and a tint applied at one of them would give the realm a floor on arrival and lose it on rebuild.
  */
 export function buildTilemap(renderer: Renderer, atlas: Atlas, arena: Arena, floorTint: number, c: Container): TilemapView {
+  const room = roomSheetFor(atlas, arena)
   const overlays = new Container()
   for (let r = 0; r < arena.rows; r++) for (let col = 0; col < arena.cols; col++) {
     const i = r * arena.cols + col
@@ -1101,13 +1111,13 @@ export function buildTilemap(renderer: Renderer, atlas: Atlas, arena: Arena, flo
     // the sky between an island room's masses, and a baked void tile would freeze a second one.
     // The invariant lives in the SHEET — tools/make-bardo-tiles.ts emits cell 0 alpha-0 — so the
     // bake needs no per-tile branch.
-    const s = new Sprite(atlas.room(arena.base[i]))
+    const s = new Sprite(room(arena.base[i]))
     s.position.set(col * ROOM_ART_TILE, r * ROOM_ART_TILE)
     s.scale.set(ROOM_ART_SCALE)
     c.addChild(s)
     const o = arena.overlay[i]
     if (o >= 0) {
-      const os = new Sprite(atlas.room(o))
+      const os = new Sprite(room(o))
       os.position.set(col * ROOM_ART_TILE, r * ROOM_ART_TILE)
       os.scale.set(ROOM_ART_SCALE)
       overlays.addChild(os)
@@ -1144,7 +1154,7 @@ export function buildTilemap(renderer: Renderer, atlas: Atlas, arena: Arena, flo
   sprite.tint = floorTint
 
   const door = new Container()
-  const clusters = (arena.doors.length ? arena.doors : [arena.door]).map(d => makeDoorCluster(atlas, d))
+  const clusters = (arena.doors.length ? arena.doors : [arena.door]).map(d => makeDoorCluster(atlas, room, d))
   for (const c of clusters) door.addChild(c.root)
   const gift = arena.offering ? makeOfferingCluster(atlas, arena.offering) : null
   if (gift) door.addChild(gift.root)

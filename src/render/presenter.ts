@@ -12,7 +12,7 @@ import type { PlayerPoseOverride } from './views/player'
 import { snapToTarget } from './views/shared'
 import { promiseFrame } from './clipSelect'
 import { ARM, armOf } from '@/sim/weapons'
-import { buildTilemap, rackProximityAmount, SHRINE_INK, type TilemapView } from './tilemap'
+import { buildTilemap, rackProximityAmount, roomSheetFor, SHRINE_INK, type TilemapView } from './tilemap'
 import { Camera, clampFocus } from './camera'
 import { drawVoidUnderlay } from './starfield'
 import { TILE } from '@/sim/arena'
@@ -127,8 +127,9 @@ export class Presenter {
     this.rebuildVoid()
     this.tilemap = buildTilemap(ra.app.renderer, atlas, world.arena, floorTintFor(world), this.tileBakeRoot)
     L.floor.addChild(this.tilemap.sprite, this.tilemap.door)
+    const propRoom = roomSheetFor(atlas, world.arena)
     for (const p of world.arena.props) {
-      const s = makePropSprite(atlas, p)
+      const s = makePropSprite(atlas, propRoom, p)
       this.propSprites.push(s)
       L.entities.addChild(s)
     }
@@ -1121,8 +1122,9 @@ export class Presenter {
     this.rebuildVoid()
     this.tilemap = buildTilemap(this.ra.app.renderer, this.atlas, this.world.arena, floorTintFor(this.world), this.tileBakeRoot)
     L.floor.addChild(this.tilemap.sprite, this.tilemap.door)
+    const propRoom = roomSheetFor(this.atlas, this.world.arena)
     for (const p of this.world.arena.props) {
-      const s = makePropSprite(this.atlas, p)
+      const s = makePropSprite(this.atlas, propRoom, p)
       this.propSprites.push(s)
       L.entities.addChild(s)
     }

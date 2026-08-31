@@ -685,6 +685,14 @@ const out = 'public/assets/sprites/bardo_room.png'
 await sharp(sheet, { raw: { width: COLS * ROOM_CELL, height: ROWS * ROOM_CELL, channels: 4 } }).png().toFile(out)
 console.log('wrote', out, COLS * ROOM_CELL, 'x', ROWS * ROOM_CELL, '(' + tiles.length + ' tiles)')
 
+// The Bardo hub paves from its OWN copy of this sheet, at identical indices. bardo_room.png serves
+// the other thirteen layouts, so replacing a hub tile cannot reach Cocytus or Asphodel — which is
+// exactly how the brass level-4 ramp escaped once before (see LV[4]). The two files start
+// byte-identical and diverge only as hub art is promoted into bardo_hub.png.
+const hubOut = 'public/assets/sprites/bardo_hub.png'
+await sharp(sheet, { raw: { width: COLS * ROOM_CELL, height: ROWS * ROOM_CELL, channels: 4 } }).png().toFile(hubOut)
+console.log('wrote', hubOut, COLS * ROOM_CELL, 'x', ROWS * ROOM_CELL, '(hub fork)')
+
 const preview = 'public/progress/shots/tiles-r4.png'
 await sharp(sheet, { raw: { width: COLS * ROOM_CELL, height: ROWS * ROOM_CELL, channels: 4 } })
   .resize(COLS * ROOM_CELL * 6, ROWS * ROOM_CELL * 6, { kernel: 'nearest' })
@@ -695,7 +703,7 @@ console.log('wrote', preview)
 const manPath = 'public/assets/manifest.json'
 if (existsSync(manPath)) {
   const man = JSON.parse(readFileSync(manPath, 'utf8')) as { sprites: string[] }
-  for (const f of ['bardo_room.png', 'bardo_props.png']) {
+  for (const f of ['bardo_room.png', 'bardo_hub.png', 'bardo_props.png']) {
     if (!man.sprites.includes(f)) man.sprites.push(f)
   }
   writeFileSync(manPath, JSON.stringify(man, null, 2) + '\n')

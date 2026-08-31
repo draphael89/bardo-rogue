@@ -554,6 +554,7 @@ describe('review findings', () => {
     for (const edge of [rack.x + r.x, rack.y + r.y, rack.x + r.x + r.width, rack.y + r.y + r.height]) {
       expect(edge * scale).toBeCloseTo(Math.round(edge * scale), 10)
     }
+    expect(r.width).toBe(4) // the whole steel blade and no air beside it
     expect(r.height * scale).toBe(1)
   })
 

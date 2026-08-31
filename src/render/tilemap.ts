@@ -248,9 +248,9 @@ function inStamp(x: number, y: number): boolean {
 
 export function rackSpecularRect(rack: Pick<ArenaRack, 'x' | 'y'>): { x: number; y: number; width: number; height: number } {
   const scale = tuning.view.worldScale
-  const targetX = Math.round((rack.x - 4) * scale) / scale
+  const targetX = Math.round((rack.x - 2) * scale) / scale
   const targetY = Math.round((rack.y - 10) * scale) / scale
-  return { x: targetX - rack.x, y: targetY - rack.y, width: 8, height: 1 / scale }
+  return { x: targetX - rack.x, y: targetY - rack.y, width: 4, height: 1 / scale }
 }
 
 function makeRackCluster(rack: ArenaRack): { root: Container; sync(taken: boolean): void; proximity(amount: number): void } {

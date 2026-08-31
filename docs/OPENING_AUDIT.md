@@ -394,6 +394,35 @@ thing about it** is doing neither invention nor constraint satisfaction — it h
 front of it. That is `edit_image`, `inpaint_image` and `correct_pixelart`, and it is the one mode this
 project has never tried.
 
+### The lane, per asset class — measured
+
+One test per class, same palette, same room, same measurements. **The axis every row turns on is not
+"which tool draws better" — PixelLab often draws better — it is whether the asset must RECEIVE the
+room's light and the clip's timing, or may carry its own.**
+
+| Class | Lane | Evidence |
+|---|---|---|
+| **Hero, enemies — anything with a clip** | **Rig, decisively** | The rig gives frame consistency by construction: 6 sheets, 1 823 gate assertions, 54 s. `edit_image` redrew one garment three different ways across three frames at the same seed. Generation on hero identity is 0 for 10 historically, because every hero constraint is a *relation*. |
+| **Floors, walls, autotiles** | **Code, decisively** | 20.4 % edge density, slabs that cross tile boundaries, wear paths that follow real traffic, a bake coupled to the room's light pools. None of that is a static image — it is parametric behaviour a generated tile cannot have. **PixelLab's `create_topdown_tileset` is untested here**; say so rather than assume. |
+| **Props and set pieces** | **Split, and this is the real trade** | PixelLab draws a *better object*: its anvil, column and stall each read in one second, where the code lane's `pew` and `shard` are ambiguous brown and grey masses. But measured at 48 px with canon locked: **edge density 74.2 / 71.9 / 72.4 % against the code props' 38.1 / 41.2 / 26.2 % and the floor's 20.4 %** — two to three-and-a-half times the churn of the world they sit in. The anvil used **36 colours** against the code lane's 9–10. |
+| **Particles, decals, impacts, swing arcs** | **Code, no contest** | They track `tuning.ts`. A sprite cannot. |
+| **Title screen and UI** | **Code — there is no asset to generate** | The title is `Graphics.rect()` and `Text` held over the *living hub*, which is the best composition decision in the project: the first frame a player sees is the room they are about to stand in. The only generable thing here is separate key art, and that is gpt-image's job, not PixelLab's. |
+| **Concept art, marketing, key art** | **gpt-image** | 79 000 colours, no alpha discipline, no grid — useless as an asset, excellent as a target. Judge against it; never condition on it. |
+
+**What the palette lock does and does not buy.** Locked, pixflux returned **0 off-canon colours and 0
+partial-alpha pixels** on all three props — two of the repo's hard gates passed outright, which is
+genuinely better than any other generated lane has managed. It still failed the colour budget and the
+density budget on the same images. The audit's own line, now measured twice: **the palette lock is an
+alphabet, not a grammar.** It fixes *which* colours appear and nothing about *how many, where, or how
+busy*.
+
+**The structural finding, and it is the one that generalises.** Composite those props into a real 1×
+frame and the mismatch is not density or palette — it is that **they carry their own baked lighting**.
+The column is lit from its left while the room's key is the brazier to its right. The game's props are
+drawn to *receive* a light pool; a generated sprite bakes one in. No prompt fixes that, because the
+generator does not have the room. It is the same shape as the failure that killed the edit lane and
+the same shape as the twelve gold-framed gates: **the generator cannot see the other term.**
+
 ### Ownership
 
 | Medium | Owns | Why |

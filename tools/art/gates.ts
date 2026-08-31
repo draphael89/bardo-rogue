@@ -593,12 +593,14 @@ export function runGates(ctx: GateContext): GateResult[] {
       const close = Math.hypot(seq[0].cx - seq[seq.length - 1].cx, seq[0].cy - seq[seq.length - 1].cy)
       add(`clip:${clipName}:loop-closure`, close <= def.cell * 0.5, `first/last centroid gap ${close.toFixed(1)}px`, 'judge')
     }
-    // Planted feet: the pivot is the contract's promise that the sprite meets the floor in the same
-    // place all clip long. Drift here is the foot-sliding the stride formula exists to prevent. The
+    // Planted feet: a CHARACTER pivot is the contract's promise that the sprite meets the floor in
+    // the same place all clip long. Props can legitimately pivot around a hinge or suspension point;
+    // treating a swinging bell's changing bottom edge as feet reports motion as a defect. Drift here
+    // is the foot-sliding the stride formula exists to prevent. The
     // old tolerance was 35% of the cell — 11px on the hero, which is not a tolerance but an absence.
     // Registered sheets pass with spread 0 by construction. A clip declared `grounded: false` (the
     // airborne rolls) is exempt: there the pivot spread IS the lift, not a defect.
-    if (clip.grounded !== false) {
+    if (def.kind === 'character' && clip.grounded !== false) {
       const pivots = clip.frames.map(n => def.frames[resolve(n)].pivot[1])
       const spread = Math.max(...pivots) - Math.min(...pivots)
       add(`clip:${clipName}:planted-feet`, spread <= 2,

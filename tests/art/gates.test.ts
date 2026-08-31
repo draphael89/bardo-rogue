@@ -147,6 +147,12 @@ describe('judged gates', () => {
     c.def.clips = { walk: { frames: ['f0', 'f1'], timing: 'ticks', ticks: [6, 6], loop: true } }
     expect(gate(runGates(c), 'clip:walk:planted-feet').ok).toBe(false)
   })
+  it('does not treat a prop hinge as planted feet', async () => {
+    const c = await ctx([body(), body(4, 6, 27, 28)], { kind: 'prop' })
+    c.def.frames.f1.pivot = [16, 26]
+    c.def.clips = { swing: { frames: ['f0', 'f1'], timing: 'ticks', ticks: [6, 6], loop: true } }
+    expect(runGates(c).some(g => g.gate === 'clip:swing:planted-feet')).toBe(false)
+  })
   it('identity is judged within a clip, never between unrelated atlas neighbours', async () => {
     // Adjacent atlas cells are unrelated poses (hurt sits beside light1Start), so comparing them
     // pairwise measured atlas layout rather than identity. No PAIRWISE gate may exist between two

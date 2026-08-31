@@ -244,11 +244,17 @@ function matTile(part: 'body' | 'north' | 'south'): Uint8Array {
   for (let y = 0; y < ROOM_CELL; y++) for (let x = 0; x < ROOM_CELL; x++) {
     t.pixel(x, y, hash(x, y, 61) % 17 === 0 ? P.purple0 : P.purple1)
   }
-  // Three broken folds converge rather than forming vertical rails.
-  for (const [fx, sign] of [[5, 1], [13, -1], [18, 1]] as const) {
+  // ONE fold per cell, because the runner is three cells wide and cloth that narrow has two or
+  // three folds across it — not nine. Three folds per cell gave exactly that: 3 x 3 vertical rails
+  // resetting every 24px, which read as corduroy at 1x once the checker beneath them was gone and
+  // stopped hiding them. The drift is also steeper now (1px every 4 rows against every 6): a line
+  // that barely moves over a cell is a rail whatever it is called, and a fold has to wander to read
+  // as fabric lying on stone.
+  {
+    const fx = 9
     for (let y = 1; y < ROOM_CELL - 1; y++) {
-      if ((y + fx) % 7 === 0) continue
-      const x = fx + Math.floor(y / 6) * sign
+      if ((y + fx) % 7 === 0) continue                  // the fold breaks rather than running whole
+      const x = fx + Math.floor(y / 4)
       t.pixel(x, y, P.purple0)
       if (y % 3 !== 0) t.pixel(x + 1, y, P.purple2)
     }

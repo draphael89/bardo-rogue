@@ -282,10 +282,21 @@ function makeRackCluster(rack: ArenaRack): { root: Container; sync(taken: boolea
       markPx(rackG, x - 3, 4, 6, 7, 0x4b4650)
     }
     if (!taken) {
-      markPx(rackG, -2, -19, 4, 23, 0xd8e0e8)
-      markPx(rackG, -1, -18, 2, 21, 0xfff0c8)
-      markPx(rackG, -8, 0, 16, 3, 0x8c5028)
-      markPx(rackG, -3, 3, 6, 7, 0x3a2018)
+      // The blade was two near-identical off-canon whites (#d8e0e8 over #fff0c8, luminance 223 and
+      // 239) which made a 4px flat white slab — measured at 252 in a rendered plaza frame whose top
+      // 0.1% starts at 238. A STATIC PROP was the brightest object in the room, brighter than either
+      // fire, which is exactly what §3.2.5 forbids, and with no value break inside it it read as a
+      // glitch rather than as steel.
+      //
+      // A blade seen edge-on is a dark spine with ONE lit edge, so that is what it is now: slate1
+      // body, slate3 on the side facing the key, one brick pixel of edge at 155 — under `gold` at
+      // 178 and far under the fires. It does not need to be pre-lit, because proximity() already
+      // draws the specular when the hero is near; that is the moment the steel is supposed to answer.
+      markPx(rackG, -2, -19, 4, 23, C.slate1)
+      markPx(rackG, 0, -19, 2, 23, C.slate3)
+      markPx(rackG, 1, -18, 1, 21, C.brick)
+      markPx(rackG, -8, 0, 16, 3, C.woodHi)
+      markPx(rackG, -3, 3, 6, 7, C.woodLo)
     }
   }
   paint(false)

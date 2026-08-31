@@ -48,9 +48,21 @@ const RUNG_GAP = 7         // px between the marching rungs: three of them span 
 // upward. The `maulHead` socket is the physical point the tell hangs its emissive charge and falling
 // motes on; drive it from the hidden legacy weapon's transform instead and the glow floats.
 const bruteArt = new WeakMap<EntityView, Sheet>()
+const oathArt = new WeakMap<EntityView, { east: Sheet; north: Sheet; south: Sheet }>()
 
 export function bindBruteArt(v: EntityView, atlas: Atlas): void {
   bruteArt.set(v, atlas.sheet('bardo_brute'))
+  v.markAuthoredReaction()
+}
+
+export function bindOathArt(v: EntityView, atlas: Atlas): void {
+  oathArt.set(v, {
+    east: atlas.sheet('bardo_oathbound_east'),
+    north: atlas.sheet('bardo_oathbound_north'),
+    south: atlas.sheet('bardo_oathbound_south'),
+  })
+  v.markAuthoredReaction()
+  v.markAuthoredGuard()
 }
 
 export function bruteFrameName(sheet: Sheet, e: Enemy): string {
@@ -116,7 +128,10 @@ export function updateBruteView(v: EntityView, e: Enemy, f: EnemyFrame, out: Pos
   } else if (e.state === 'stagger') {
     rot = -e.facing * 0.5 + Math.sin(time * 55) * 0.05; sx = 0.9; sy = 1.1
   } else sy = 1 + Math.sin(time * 3) * 0.03
-  const art = bruteArt.get(v)
+  const oath = oathArt.get(v)
+  const art = oath
+    ? Math.sin(e.aimAngle) < -0.35 ? oath.north : Math.sin(e.aimAngle) > 0.35 ? oath.south : oath.east
+    : bruteArt.get(v)
   updateBruteWeapon(v, e, f.x, f.y, f.alpha, hop)
   if (art) {
     const frame = art.frame(bruteFrameName(art, e))
@@ -546,7 +561,7 @@ function updateBruteImpact(v: EntityView, e: Enemy, f: EnemyFrame): void {
     // between them at chest height — where hammer meets body — instead of on his own feet.
     rec.x = Math.round(f.x + Math.cos(rec.aim) * 6)
     rec.y = Math.round(f.y + Math.sin(rec.aim) * 6 - 4)
-    rec.power = e.hitDone ? TIER_CONNECT : TIER_WHIFF   // flesh blows out; stone only sparks
+    rec.power = (e.kind === 'oathbound' ? 0.62 : 1) * (e.hitDone ? TIER_CONNECT : TIER_WHIFF)
   }
   if (e.state !== 'attack') rec.fired = false
   const dt = f.time - rec.t0

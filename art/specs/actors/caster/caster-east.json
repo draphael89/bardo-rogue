@@ -20,7 +20,9 @@
     "ashFieldLit",
     "boneLo",
     "boneDim",
-    "bone"
+    "bone",
+    "ember",
+    "emberHi"
   ],
   "facing": "east",
   "mirror": true,

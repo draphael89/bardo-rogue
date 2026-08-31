@@ -260,13 +260,11 @@ if ACTOR == "caster":
     #   two segments, never a continuous edge run and never on the body.
     MAT_SHROUD = make_mat("shroud", canon_srgb("#33302A"))        # -> ashField / ashFieldLit
     MAT_GLASS = make_flat("glass", canon_srgb("#0E122C"))         # -> sky, FLAT and UNSHADED (§2.8).
-    #   At 1x it is a hole in the cage: a DEAD lamp. No star pixel (half a pixel at canon density,
-    #   riding a swinging lamp, so it flickers), no ember pilot light — src/render/lampadInk.ts
-    #   already inks this actor entirely wine-dark, so the tell is the FX layer lighting a dead pane,
-    #   which is a value AND hue change on the same 3x3 px. The lamp is drawn cold and stays cold.
     MAT_OUT_IRON = make_flat("outIron", canon_srgb("#0A0C12"))    # -> mortar
     MAT_OUT_CLTH = make_flat("outCloth", canon_srgb("#0C0E16"))   # -> grout
     MAT_OUT_WAX = make_flat("outWax", canon_srgb("#261A16"))      # -> woodLo
+    MAT_FLAME = make_flat("flame", canon_srgb("#FF7A18"))         # -> ember
+    MAT_FLAME_HI = make_flat("flameHi", canon_srgb("#FFCC56"))    # -> emberHi
 
     bpy.ops.object.mode_set(mode="EDIT")
     bone("root", V(0, 2, 0), V(0, 5, 0))
@@ -349,7 +347,10 @@ if ACTOR == "caster":
     box("lampBack", V(0, -6.4, HIP - 1.5), 1.2, 0.4, 2.2, "lamp", MAT_IRON_CREV)
     box("lampRim", V(0, -9.5, HIP + 0.8), 0.9, 2.4, 0.3, "lamp", MAT_IRON_SP)
     box("lampPane", V(0, -12.4, HIP - 1.6), 1.0, 0.35, 1.5, "lamp", MAT_GLASS)
-    box("lampWick", V(0, -11.0, HIP - 0.4), 0.4, 0.4, 0.4, "lamp", MAT_WAX_HI)
+    # This steady flame makes the hanging mass read as a lamp before its first attack. The hostile
+    # wine ray still owns state; this only fixes the actor's idle noun at native scale.
+    box("lampFlame", V(-1.7, -11.0, HIP - 1.0), 0.4, 1.5, 1.5, "lamp", MAT_FLAME)
+    box("lampWick", V(-1.8, -11.5, HIP - 0.1), 0.3, 0.6, 0.7, "lamp", MAT_FLAME_HI)
     box("lampFoot", V(0, -9.5, HIP - 4.2), 1.3, 2.6, 0.4, "lamp", MAT_OUT_IRON)
 
     marker("feetCenter", V(0, 0, -2.2), "feetCenter")
@@ -428,7 +429,7 @@ if ACTOR == "caster":
     SHEET = {
         "cell": 64, "cols": 3, "rows": 3, "mirror": True,
         "palette": ["mortar", "grout", "woodLo", "sky", "iron", "ironHi", "slateHi",
-                    "ashField", "ashFieldLit", "boneLo", "boneDim", "bone"],
+                    "ashField", "ashFieldLit", "boneLo", "boneDim", "bone", "ember", "emberHi"],
         "sockets": SOCKETS,
         "clips": {
             "strafe": {"frames": ["strafeA", "strafeB"], "timing": "ticks",
@@ -442,11 +443,11 @@ if ACTOR == "caster":
     }
 
 # ================================================================= THE EMPUSA (sim kind `charger`)
-# One shorn bronze limb, severed at the hip, that hovers, folds at the knee, and kicks. The only
-# actor in the roster with no head, no face, no eye, and no foot on the ground. A dead-level straight
-# chord is the only non-lumpy contour in the cast, and a knee is the most legible coil a 17px
-# silhouette can hold: the freeze and the commit are ONE JOINT ANGLE, not an ornament that has to
-# survive downscale. It is also the literal myth — the Empusa's one brazen leg.
+# One shorn bronze limb, severed at the hip, that carries a small funerary mask and trailing shroud.
+# The first candidate was mythically literal but product-weak: at 1x in the room it read as a dropped
+# weapon, and its own dash effects erased what little body it had. The mask makes it a hostile being
+# without surrendering the Empusa's one-brazen-leg thesis; the leg is still the longest, flattest
+# contour in the cast, and the freeze/commit is still one joint angle rather than added ornament.
 if ACTOR == "charger":
     HOVER = 8.0           # shin centreline height. A HOVER height, not a leg length.
 
@@ -455,6 +456,8 @@ if ACTOR == "charger":
     #   actor is also the edge that hits you: the bright thing is the part that touches you.
     MAT_IRON = make_mat("iron", canon_srgb("#393942"))        # -> iron / ironHi. The thigh stub: the
     #   dark aft end is what says the limb was CUT. No hole is needed to say it.
+    MAT_BONELO = make_flat("boneLo", canon_srgb("#5A4E42"))  # -> boneLo, FLAT. The jaw plane
+    #   gives the mask depth without spending the bone highlight below the eye.
     MAT_BONE = make_flat("boneFlat", canon_srgb("#90806C"))   # -> boneDim, FLAT. The knee knuckle.
     #   Flat, not shaded, for the reason mannequin.py already records: a shaded warm lane leaks
     #   across boneLo / goldDim / boneDim / gold at every exposure.
@@ -475,18 +478,39 @@ if ACTOR == "charger":
     bone("hipStub", V(0, 12.0, HOVER + 0.4), V(0, 7.5, HOVER), "root")
     bone("shinC", V(0, 7.5, HOVER), V(0, -9.0, HOVER - 0.8), "hipStub")
     bone("heelC", V(0, -9.0, HOVER - 0.8), V(0, -13.0, HOVER - 2.6), "shinC")
+    # The mask gets one real joint. The leg has always carried the mechanical coil, but without a
+    # separate neck the creature could not look down its promised lane; reviewers correctly read
+    # the freeze as a rotated limb under a passive blob. One nod is enough bodily intent.
+    bone("headC", V(0, 9.8, HOVER + 7.2), V(0, 4.2, HOVER + 10.2), "hipStub")
     bpy.ops.object.mode_set(mode="OBJECT")
 
     limb("thighStub", "hipStub", 1.4, MAT_IRON, fat=1.0)
     box("hipCut", V(0, 12.3, HOVER + 0.5), 1.3, 0.45, 1.3, "hipStub", MAT_SLIT)
-    # THE KNEE KNUCKLE, and it is a SHAPE, not a colour: it survives the black test with zero pixels
-    # of material information. A convex knob riding on TOP of the limb's rear third, breaking the top
-    # contour above the shin plate. It sits at the BACK of the travel axis on purpose — the eye is
-    # never invited forward to look for a face, and knob-behind / taper-ahead states facing in one
-    # frame of solid black. The hook is also the thing that MOVES: at coilLock it rises while the
-    # body narrows and drops, so the same pixels carry the identity AND the telegraph.
-    sphere("knuckle", V(0, 8.2, HOVER + 4.2), 2.0, 2.5, 2.7, "hipStub", MAT_BONE)
-    box("knuckleCap", V(0, 8.2, HOVER + 6.3), 1.4, 1.8, 0.4, "hipStub", MAT_BONEHI)
+    # THE HUNCHED CREATURE. The previous masked hip still had one fatal ratio: a 4px rear mass on a
+    # 20px brass chord, so its black test remained a boot with a decorative cuff. This body spends
+    # the available height on one connected hunch, pushes a jaw unmistakably ahead of the hood, and
+    # leaves the brazen leg as the longest contour rather than the only contour. All masses stay on
+    # hipStub: the body holds while the one joint coils, which preserves the attack's mechanical read.
+    sphere("shroud", V(0, 11.7, HOVER + 5.5), 4.2, 4.8, 5.8, "hipStub", MAT_IRON)
+    box("shroudCut", V(0, 15.0, HOVER + 1.5), 2.8, 1.2, 1.8, "hipStub", MAT_SLIT,
+        rot=(radians(-18), 0, 0))
+    box("neck", V(0, 8.8, HOVER + 8.0), 2.0, 2.2, 3.6, "headC", MAT_IRON,
+        rot=(radians(18), 0, 0))
+    sphere("hood", V(0, 8.0, HOVER + 10.2), 3.2, 4.1, 4.7, "headC", MAT_IRON)
+    # A three-plane death mask in profile: pale brow, dim face, low jaw. The snout is proud of the
+    # hood by more than one native pixel, so the silhouette itself says head even in solid black.
+    box("mask", V(0, 4.2, HOVER + 9.8), 2.2, 1.8, 3.2, "headC", MAT_BONEHI)
+    box("maskBrow", V(0, 2.8, HOVER + 11.7), 1.8, 1.0, 0.7, "headC", MAT_BONEHI)
+    box("maskSnout", V(0, 1.7, HOVER + 9.5), 1.6, 1.2, 1.35, "headC", MAT_BONE)
+    box("maskJaw", V(0, 3.0, HOVER + 7.2), 1.8, 1.6, 1.0, "headC", MAT_BONELO,
+        rot=(radians(-12), 0, 0))
+    box("maskEye", V(0, 2.25, HOVER + 10.25), 0.8, 0.35, 0.5, "headC", MAT_SLIT)
+    # Two swept iron locks produce a forked, trailing top contour. They are identity, not glow: brass
+    # hair failed the light-direction gate and would compete with the limb that owns contact.
+    box("hairFlameA", V(0, 11.0, HOVER + 14.0), 1.6, 1.6, 2.8, "headC", MAT_IRON,
+        rot=(radians(-30), 0, 0))
+    box("hairFlameB", V(0, 13.0, HOVER + 12.4), 1.2, 1.4, 2.4, "headC", MAT_IRON,
+        rot=(radians(-42), 0, 0))
     # MEASURED CORRECTION to the spec, which asks for a BOX here ("a plate, not a sausage") on the
     # grounds that flat faces quantize cleanly. They quantize too cleanly: a box's camera-facing side
     # is ONE surface orientation, so it renders at ONE k and lands on ONE canon name. The first
@@ -502,7 +526,7 @@ if ACTOR == "charger":
     marker("feetCenter", Vector((0, 0, 0)), "feetCenter")
     marker("heel", arm.matrix_world @ V(0, -11.0, HOVER - 1.0), "heelC")
 
-    def knee(elev, heel=0, hover=0.0, pitch=0.0):
+    def knee(elev, heel=0, hover=0.0, pitch=0.0, look=0.0):
         """`elev` is the shin chord's ELEVATION above the level lunge, in degrees — the one joint
         angle that is the whole animation. Rotating about X by -elev lifts the heel back and up.
 
@@ -514,32 +538,33 @@ if ACTOR == "charger":
         angle labels were the approximation, so this poses by elevation and HOLDS THE BBOX TABLE
         (and the air-gap channel, which is the other measurable the design hangs on).
         """
-        return [("R", "hipStub", "X", pitch), ("R", "shinC", "X", -elev),
+        return [("R", "hipStub", "X", pitch), ("R", "headC", "X", look),
+                ("R", "shinC", "X", -elev),
                 ("R", "heelC", "X", heel), ("T", "hipStub", (0, 0, hover))]
 
     POSES = {
         # A bronze shin with a bone knob, floating. Authored distinct from hoverA by the heel drop so
         # the `duplicate-frames` gate cannot fire on a byte-identical pair.
-        "idle": knee(33, heel=-8, hover=0.0),
+        "idle": knee(24, heel=-8, hover=0.0),
         # Two cells buy the orbit its life; the sim already circles at orbitSpeed 1.6. No banking
         # roll: a roll about the travel axis projects to nothing in an east-only profile, so it is
         # animation that costs a frame and shows zero pixels.
-        "hoverA": knee(30, heel=-14, hover=0.6),
-        "hoverB": knee(24, heel=-26, hover=2.0),
+        "hoverA": knee(30, heel=-14, hover=0.6, look=-3),
+        "hoverB": knee(24, heel=-26, hover=2.0, look=3),
         # The window where aimAngle still tracks the player: the limb is still turning.
-        "coilDraw": knee(42, heel=10, hover=-0.6),
+        "coilDraw": knee(42, heel=10, hover=-0.6, look=10),
         # THE frame the design hangs on, entered at exactly chargerLockTick() = freezeTicks 16 -
         # commitLead 9 = 7. The telegraph is a body that gets SMALLER, where every other actor in the
         # roster telegraphs by getting BIGGER. Two measurable channels: the width drops ~20%, and the
         # whole body DROPS toward the floor, closing the air gap it has been advertising.
-        "coilLock": knee(64, heel=26, hover=-2.0),
+        "coilLock": knee(52, heel=22, hover=-2.0, look=18),
         # Never dead flat: a perfectly straight limb reads as a stick, and 4deg keeps one contour
         # break. One frame held for all 30 dash ticks; the afterimages and 2.7 px/tick of real travel
         # carry the rest. The longest, flattest frame any actor in this game owns.
-        "lunge": knee(4, heel=-4, hover=0.2),
+        "lunge": knee(4, heel=-4, hover=0.2, look=-10),
         # It overshot. The punish window drawn as a POSTURE, not as a pause: the lowest the body ever
         # sits while alive.
-        "skid": knee(34, heel=-30, hover=-3.0),
+        "skid": knee(34, heel=-30, hover=-3.0, look=-6),
         # hp is 2, so this is almost always the last frame it is alive in — authored already broken.
         # The one frame where the brightest mass is not the topmost pixel.
         "hurt": knee(74, heel=40, hover=-4.0, pitch=14),

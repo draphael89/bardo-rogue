@@ -1030,7 +1030,7 @@ export class Presenter {
     // for puppets only: 17 degrees on an authored hurt frame resamples the drawing for the whole
     // hit-stop, which is the same defect as the squash next door (views/enemies.ts) on the other
     // channel. Those bodies answer the blow with a drawing; they must not be bent as well.
-    if (!EntityView.authoredHitReaction(v.hitKind)) v.body.rotation += reaction.bodyLean
+    if (!v.authoredReaction && !EntityView.authoredHitReaction(v.hitKind)) v.body.rotation += reaction.bodyLean
     if (v.weapon) {
       v.weapon.position.x += reaction.dx
       v.weapon.position.y += reaction.dy - reaction.lift
@@ -1168,7 +1168,7 @@ export class Presenter {
       if (gf > 0) this.guardFlash.set(id, gf); else this.guardFlash.delete(id)
       // The authored hit frame carries the reaction in the body drawing. Whitening it here would
       // turn the victim into the impact core for most of hit-stop and erase attribution.
-      v.setFlash(hf > 0 && !EntityView.authoredHitReaction(e.kind))
+      v.setFlash(hf > 0 && !v.authoredReaction && !EntityView.authoredHitReaction(e.kind))
       if (v.squash > 0 || v.redFlash > 0) this.flinchBody(v)
     }
     for (const b of w.projectiles) {
@@ -1233,7 +1233,8 @@ export class Presenter {
       if (e.debt) drawDebt(this.fxGraphics, this.groundFx, e, slowAlpha)
       if (e.brand > 0) drawBrandPips(this.fxGraphics, e, slowAlpha)
       if (e.burn > 0) drawBurn(this.fxGraphics, this.groundFx, e, slowAlpha, this.time)
-      if (guardUp(e)) drawGuard(this.fxGraphics, e, slowAlpha, this.guardFlash.get(e.id) ?? 0)
+      if (guardUp(e)) drawGuard(this.fxGraphics, e, slowAlpha, this.guardFlash.get(e.id) ?? 0,
+        this.enemyViews.get(e.id)?.authoredGuard ?? false)
     }
     if (armOf(w) === ARM.bow) drawBowAim(this.fxGraphics, p, alpha)
     else {
@@ -1438,7 +1439,8 @@ function drawSpawnTells(g: Graphics, world: World, still: boolean): void {
 // the arc is present exactly when a light blow would be turned, and gone the instant it would land -
 // when the shade is burning, staggered, or committed to its own swing. A player never has to be told
 // the rule, only shown it twice.
-function drawGuard(g: Graphics, e: Enemy, alpha: number, flash: number): void {
+function drawGuard(g: Graphics, e: Enemy, alpha: number, flash: number,
+                   authored: boolean): void {
   const x = Math.round(lerp(e.px, e.x, alpha))
   const y = Math.round(lerp(e.py, e.y, alpha))
   const span = (tuning.oathbound.guardArcDeg * Math.PI) / 360
@@ -1451,6 +1453,36 @@ function drawGuard(g: Graphics, e: Enemy, alpha: number, flash: number): void {
   const squash = 0.72
   const steps = 22
   const struck = flash > 0
+  // The candidate sheet draws the tower leaf, its guard-up posture, and its release itself. Filling
+  // the old procedural hoplon over that drawing turns the actor into a gold wall prop. A compact
+  // body-bound edge tracks the exact protected direction instead; on a turned blow it blooms into a
+  // brief contour while the existing sparks and camera response carry impact.
+  if (authored) {
+    const a = e.aimAngle
+    const tx = -Math.sin(a)
+    const ty = Math.cos(a) * squash
+    const rr = e.radius + 3
+    const bodyCy = y - 13
+    const bx = x + Math.cos(a) * rr
+    const by = bodyCy + Math.sin(a) * rr * squash
+    for (let i = -3; i <= 3; i++) {
+      g.rect(Math.round(bx + tx * i + Math.cos(a)), Math.round(by + ty * i + Math.sin(a) * squash), 1, 1)
+    }
+    g.fill({ color: OATH.edge, alpha: 0.95 })
+    for (let i = -2; i <= 2; i++) {
+      g.rect(Math.round(bx + tx * i), Math.round(by + ty * i), 1, 1)
+    }
+    g.fill({ color: struck ? OATH.struck : OATH.rim, alpha: 0.95 })
+    g.rect(Math.round(bx), Math.round(by), 2, 2).fill({ color: struck ? OATH.struck : OATH.body, alpha: 1 })
+    if (struck) {
+      for (let i = 0; i <= 14; i++) {
+        const rimA = e.aimAngle - span + (span * 2 * i) / 14
+        g.rect(Math.round(x + Math.cos(rimA) * r1), Math.round(cy + Math.sin(rimA) * r1 * squash), 1, 1)
+      }
+      g.fill({ color: OATH.struck, alpha: 0.95 })
+    }
+    return
+  }
   for (let rr = r0; rr <= r1 + 1; rr++) {
     for (let i = 0; i <= steps; i++) {
       const a = e.aimAngle - span + (span * 2 * i) / steps

@@ -1,6 +1,7 @@
 import { Graphics as GraphicsCtor } from 'pixi.js'
 import type { Container, Graphics } from 'pixi.js'
 import type { Atlas } from '../atlas'
+import type { Sheet } from '../sheet'
 import type { Enemy } from '@/sim/world'
 import type { Arena } from '@/sim/arena'
 import { raycastSolidDistance } from '@/sim/collision'
@@ -10,6 +11,7 @@ import { lerp, clamp01, easeOutCubic, easeOutBack, lerpAngle } from '../anim'
 import { casterLockTick } from '@/sim/enemies/caster'
 import { EntityView, HALF_PI, type EnemyFrame, type Pose } from './shared'
 import { LAMPAD } from '../lampadInk'
+import { tickClipFrame } from '../clipSelect'
 
 // Presentation for "cross the line or cut the bolt": a telegraph that searches, hardens on the
 // exact tick the sim commits, and a bolt shaped like something you are meant to cut.
@@ -37,6 +39,27 @@ const TINT_SEVER_2 = LAMPAD.tintSever2
 // Remember the authoritative arena supplied by updateEnemyView without broadening that hot API or
 // duplicating room bounds in presentation.
 const casterArena = new WeakMap<Enemy, Arena>()
+const casterArt = new WeakMap<EntityView, Sheet>()
+
+export function bindCasterArt(v: EntityView, atlas: Atlas): void {
+  casterArt.set(v, atlas.sheet('bardo_caster_east'))
+  v.markAuthoredReaction()
+}
+
+export function casterFrameName(sheet: Sheet, e: Enemy, time: number, speed: number): string {
+  if (e.flash > 0 || e.state === 'stagger') return 'hurt'
+  if (e.state === 'aim') {
+    const clip = sheet.def.clips!.aim
+    return e.stateTick < casterLockTick() ? clip.frames[0] : clip.frames[1]
+  }
+  if (e.state === 'recover') {
+    const clip = sheet.def.clips!.aim
+    return e.stateTick < 3 ? clip.frames[2] : clip.frames[3]
+  }
+  if (e.state === 'position' && speed > 4) return tickClipFrame(sheet.def.clips!.strafe, time)
+  if (e.state === 'position') return 'settle'
+  return 'idle'
+}
 
 export function updateCasterView(v: EntityView, e: Enemy, f: EnemyFrame, out: Pose, arena: Arena): void {
   casterArena.set(e, arena)
@@ -80,6 +103,16 @@ export function updateCasterView(v: EntityView, e: Enemy, f: EnemyFrame, out: Po
     hop = Math.sin(time * 5) * 1; sy = 1 + Math.sin(time * 5) * 0.03
   }
   updateCasterWeapon(v, e, f.x, f.y, f.alpha, f.time)
+  const art = casterArt.get(v)
+  if (art) {
+    const authored = art.frame(casterFrameName(art, e, time, f.speed))
+    v.bindBody(authored.texture, authored.white)
+    v.body.anchor.set(authored.anchorX, authored.anchorY)
+    if (v.weapon) v.weapon.visible = false
+    // The sheet owns body, crook, lamp, recoil, and hurt. Puppet transforms and tint would bend or
+    // flatten the very drawings this candidate exists to evaluate.
+    sx = 1; sy = 1; rot = 0; hop = 0; tint = 0xffffff
+  }
   out.sx = sx; out.sy = sy; out.rot = rot; out.hop = hop; out.tint = tint
 }
 

@@ -4,17 +4,32 @@ import type { Container } from 'pixi.js'
 import { tuning } from '@/tuning'
 import { lerp } from '../anim'
 import { EntityView, SPRITE, WEAPON, snapToTarget, type EnemyFrame, type Pose } from './shared'
-import { bindBruteArt, updateBruteView } from './enemy-brute'
-import { updateCasterView } from './enemy-caster'
-import { updateChargerView } from './enemy-charger'
+import { bindBruteArt, bindOathArt, updateBruteView } from './enemy-brute'
+import { bindCasterArt, updateCasterView } from './enemy-caster'
+import { bindChargerArt, updateChargerView } from './enemy-charger'
 import { updateDummyView } from './enemy-dummy'
-import { updateWardenView } from './enemy-warden'
+import { bindWardenArt, updateWardenView } from './enemy-warden'
 import { OATH } from '../oathMetal'
 
 export function createEnemyView(atlas: Atlas, e: Enemy, layers: { entities: Container; shadows: Container }): EntityView {
-  const w = e.kind === 'brute' || e.kind === 'oathbound' ? WEAPON.brute : e.kind === 'caster' ? WEAPON.caster : null
-  const v = new EntityView(atlas, SPRITE[e.kind], w, layers)
-  if (e.kind === 'brute' || e.kind === 'oathbound') bindBruteArt(v, atlas)
+  const candidate = e.kind === 'caster' ? atlas.hasSheet('bardo_caster_east')
+    : e.kind === 'charger' ? atlas.hasSheet('bardo_charger_east')
+      : e.kind === 'oathbound' ? atlas.hasSheet('bardo_oathbound_east')
+        : e.kind === 'warden' ? atlas.hasSheet('bardo_warden_south')
+          : false
+  const w = candidate ? null
+    : e.kind === 'brute' || e.kind === 'oathbound' ? WEAPON.brute
+      : e.kind === 'caster' ? WEAPON.caster
+        : null
+  const v = new EntityView(atlas, candidate ? null : SPRITE[e.kind], w, layers)
+  if (e.kind === 'brute') bindBruteArt(v, atlas)
+  else if (e.kind === 'oathbound') {
+    if (candidate) bindOathArt(v, atlas)
+    else bindBruteArt(v, atlas)
+  }
+  else if (e.kind === 'caster' && candidate) bindCasterArt(v, atlas)
+  else if (e.kind === 'charger' && candidate) bindChargerArt(v, atlas)
+  else if (e.kind === 'warden' && candidate) bindWardenArt(v, atlas)
   return v
 }
 
@@ -65,7 +80,7 @@ export function updateEnemyView(v: EntityView, e: Enemy, world: World, alpha: nu
   // transforms (views/enemy-brute.ts), and a 1.30x/0.70x stretch on top of that is a nearest-neighbour
   // resample of the hurt frame for the whole hit-stop — the same "bend the drawing back into a puppet"
   // this game gave the art up to stop.
-  if (v.squash > 0 && !EntityView.authoredHitReaction(e.kind)) { const q = v.squash / tuning.juice.squashTicks; sx *= 1 + 0.3 * q; sy *= 1 - 0.3 * q }
+  if (v.squash > 0 && !v.authoredReaction && !EntityView.authoredHitReaction(e.kind)) { const q = v.squash / tuning.juice.squashTicks; sx *= 1 + 0.3 * q; sy *= 1 - 0.3 * q }
   if (v.redFlash > 0) tint = 0xff5a5a
 
   b.position.set(snapToTarget(x), snapToTarget(feetY - hop))
@@ -75,7 +90,7 @@ export function updateEnemyView(v: EntityView, e: Enemy, world: World, alpha: nu
   b.zIndex = feetY
   // The Brute owns an authored recoil frame; a full white replacement would delete that pose on
   // precisely the contact ticks it was drawn for. Puppet enemies retain their silhouette flash.
-  if (e.kind !== 'warden') v.setFlash(e.flash > 0 && e.kind !== 'dummy' && !EntityView.authoredHitReaction(e.kind))
+  if (e.kind !== 'warden') v.setFlash(e.flash > 0 && e.kind !== 'dummy' && !v.authoredReaction && !EntityView.authoredHitReaction(e.kind))
   if (e.kind === 'warden') v.setShadow(x, feetY - 1, 32 - hop * 0.35, 11 - hop * 0.15, 0.48 - hop * 0.02)
   else if (e.kind === 'brute' || e.kind === 'oathbound') v.setShadow(x, feetY - 1, 25, 8, 0.43)
   else v.setShadow(x, feetY - 1, 14 - hop * 0.5, 6 - hop * 0.2, 0.35 - hop * 0.02)

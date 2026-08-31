@@ -13,12 +13,16 @@ const LO = 0.80, HI = 1.15, STEP = 0.005
 // ramp: the canon names the compile spec declares. lanes: authored Blender base colours.
 export const ACTORS = {
   // The Judge is made of the room's SECOND stone family (canon `nave`), never `slate`, which is the
-  // floor he stands on. Bone is a three-step flat mask so the value peak sits at the head.
+  // floor he stands on. A wine-dark inner body separates the walking sentence from the Hall's
+  // masonry; bone is a three-step flat mask so the value peak still sits at the head.
   warden: {
-    ramp: ['mortar', 'seal0', 'nave0', 'nave1', 'nave2', 'boneLo', 'boneDim', 'bone', 'gold'],
+    ramp: ['mortar', 'seal0', 'nave0', 'nave1', 'nave2', 'purple0', 'purple2', 'purple3',
+      'boneLo', 'boneDim', 'bone', 'gold'],
     lanes: [
       { name: 'MAT_WSTONE', hex: '#505A68', family: 'wstone', shaded: true, expect: ['nave1', 'nave2'] },
       { name: 'MAT_WSTONE_DARK', hex: '#343C4C', family: 'wstone', shaded: false, expect: ['nave0'] },
+      { name: 'MAT_WINE', hex: '#8A3A4C', family: 'wine', shaded: true, expect: ['purple2', 'purple3'] },
+      { name: 'MAT_WINE_DARK', hex: '#2A0E1C', family: 'wine', shaded: false, expect: ['purple0'] },
       { name: 'MAT_MASK_LO', hex: '#5A4E42', family: 'bone', shaded: false, expect: ['boneLo'] },
       { name: 'MAT_MASK', hex: '#90806C', family: 'bone', shaded: false, expect: ['boneDim'] },
       { name: 'MAT_MASK_HI', hex: '#D0C0A8', family: 'bone', shaded: false, expect: ['bone'] },

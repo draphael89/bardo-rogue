@@ -521,6 +521,9 @@ const C = {
   woodHi: 0x5c4230,
   purple0: 0x2a0e1c,
   boneLo: 0x5a4e42,
+  // The cope's own value and its one bright segment (bakeWallCope re-lays them off the tile grid).
+  boneDim: 0x90806c,
+  brick: 0x949cac,
   goldDim: 0x8c7040,
   // Two canon names the map did not carry yet, for the warm marks the causeway bake scatters on
   // ground the paving already says is lit. L 0.428 and 0.698: coinBrass stays under the 0.70
@@ -572,6 +575,37 @@ function bakeMaterialWear(g: Graphics, arena: Arena): void {
     const w = 2 + (h >>> 17) % 4
     artPx(g, x, y, w, 1, h & 1 ? C.grout : C.slate0)
     if ((h >>> 23) % 3 === 0) artPx(g, x + 1, y + 1, Math.max(1, w - 2), 1, C.mortar)
+  }
+}
+
+/**
+ * Break the cope's repeat.
+ *
+ * `capNorth` is ONE 24px cell stamped 72 times in the hub, in runs up to eighteen tiles, and its
+ * `brick` segments — the single brightest element on any wall (§3.2.5 keeps architecture out of the
+ * top rank, so this is the whole highlight budget) — land at x 2-4, 12-14 and 23 in every one of
+ * them. Measured off the sheet, that is a perfectly periodic dashed line the length of the plaza.
+ *
+ * The sheet cannot fix it: one cell cannot vary against itself. So this does for walls exactly what
+ * `bakeMaterialWear` already does for floors — coordinate-authored marks that ignore the tile grid.
+ * Per cell it erases some segments back to cope value and re-lays one at a hash-chosen offset, so
+ * the dashes stay the same DENSITY and the same value, and stop being on a 24px beat.
+ */
+function bakeWallCope(g: Graphics, arena: Arena): void {
+  for (let r = 0; r < arena.rows; r++) for (let c = 0; c < arena.cols; c++) {
+    if (arena.base[r * arena.cols + c] !== T.capNorth) continue
+    const h = wearHash(c, r, 137)
+    const ox = c * ROOM_ART_TILE, oy = r * ROOM_ART_TILE
+    // The authored segments, in native cell px. Rows 21-22 are the cope's own two rows.
+    const seg = [2, 12, 23]
+    for (let i = 0; i < seg.length; i++) {
+      // Erase two of three on average. Painted in cope value, so the cope line stays unbroken.
+      if (((h >>> (i * 3)) & 3) === 0) continue
+      artPx(g, ox + seg[i], oy + 21, 3, 2, C.boneDim)
+    }
+    // …and put one back somewhere this cell chose for itself.
+    const nx = 1 + (h >>> 11) % (ROOM_ART_TILE - 4)
+    artPx(g, ox + nx, oy + 21, 3, 1, C.brick)
   }
 }
 
@@ -1127,6 +1161,7 @@ export function buildTilemap(renderer: Renderer, atlas: Atlas, arena: Arena, flo
   bakeMaterialWear(wear, arena)
   c.addChild(wear, overlays)
   const g = new Graphics()
+  bakeWallCope(g, arena)
   bakeOcclusion(g, arena)
   bakeIslandUnderside(g, arena)
   bakeBardoProcession(g, arena)

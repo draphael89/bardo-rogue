@@ -381,7 +381,10 @@ function windowHalf(side: 'l' | 'r'): Uint8Array {
   else starPane(t.set, 0, 12, 3, 12, 6, 16)
   const mx = side === 'l' ? 14 : 1                 // bone mullion, one band, no specular
   for (let y = 3; y <= 12; y++) t.set(mx, y, P.boneLo)
-  for (let x = 0; x < SIZE; x++) { t.set(x, 13, P.woodLo); t.set(x, 14, P.mortar); t.set(x, 15, P.grout) }
+  // The occlusion strip is INHERITED from wallFace above, at its native 24px rows. Re-writing it
+  // here on the 16px logical grid is what put a 1 px jog in the wall-to-floor shadow wherever a
+  // window or a relief sat inside a plain wall run: wallFace lays woodLo/woodLo/mortar/grout on
+  // rows 20-23, and `set` on logical rows 13-15 lands one row off it.
   return t.d
 }
 
@@ -428,7 +431,10 @@ function relief(): Uint8Array {
   t.set(6, 7, P.mortar); t.set(9, 7, P.mortar)
   for (let x = 6; x < 10; x++) t.set(x, 10, P.mortar)
   for (let x = 5; x < 11; x++) t.set(x, 12, P.woodLo)   // cast shadow under the brow
-  for (let x = 0; x < SIZE; x++) { t.set(x, 13, P.woodLo); t.set(x, 14, P.mortar); t.set(x, 15, P.grout) }
+  // The occlusion strip is INHERITED from wallFace above, at its native 24px rows. Re-writing it
+  // here on the 16px logical grid is what put a 1 px jog in the wall-to-floor shadow wherever a
+  // window or a relief sat inside a plain wall run: wallFace lays woodLo/woodLo/mortar/grout on
+  // rows 20-23, and `set` on logical rows 13-15 lands one row off it.
   return t.d
 }
 

@@ -13,6 +13,13 @@ stopped ticks, while held movement cancels settle into the armed run instead of 
 through the rack. The candidate remains in `.art-cache` pending human Look and approval, so the
 scorecard below is intentionally not regraded yet.
 
+**Composition note, 2026-08-30:** the rendered-frame blind spot is now covered for three named Bardo
+moments. Arrival, central axis and Gate plaza each pass a full-band centre-lift check at 640×360/1×
+(0.089 vs 0.033, 0.093 vs 0.055, and 0.149 vs 0.049 respectively), plus the existing value,
+highlight and top-one focality gates. A source-backed north threshold now breaks the axis's former
+four-way equality without changing collision. The named concept exhibits still win all three blind
+composition pairs, so §15 item 5 and the scorecard remain open rather than being awarded by metric.
+
 ---
 
 ## 1. Executive verdict

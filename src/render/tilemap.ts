@@ -647,6 +647,17 @@ function bakeBardoProcession(g: Graphics, arena: Arena): void {
     px(g, x - reach - 3, y, 1, 1, C.coinBrass)
     px(g, x + reach + 3, y, 1, 1, C.coinBrass)
   }
+
+  // The Gate is still beyond the camera at the central junction, so the ordinary broken setts
+  // cannot terminate the visible route. One larger floor threshold sits under the kept waylight:
+  // a dark bed, two unequal B3 courses, and only two B4 catches on the inner arris. It is a next
+  // step rather than a second Gate — no frame, glyph, B5 pixel, glow, or mirrored full-width bar.
+  const tx = 33.2 * TILE, ty = 17.35 * TILE
+  px(g, tx - 29, ty - 1, 58, 4, C.iron)
+  px(g, tx - 27, ty, 19, 2, C.goldDim)
+  px(g, tx + 5, ty, 22, 2, C.goldDim)
+  px(g, tx - 8, ty, 5, 1, C.gold)
+  px(g, tx + 5, ty, 4, 1, C.gold)
 }
 
 // §2.1 Law 3. Wherever two surfaces meet, darken the joint. The wall tiles carry their own

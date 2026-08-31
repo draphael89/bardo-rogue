@@ -34,6 +34,16 @@ frames can replace the eight receipted production masters. Current proof is type
 through `pnpm record-bots` (`slice-kite-loop-s7` hash `2495559391`; the other three hashes unchanged),
 and all fixtures are green.
 
+**Revision 6 — Bardo moment coverage.** `pnpm room:gate -- --url ...` now captures the arrival,
+central axis and Gate plaza as distinct 640×360 target frames instead of allowing one spawn frame to
+stand in for the whole oversized district. All three pass the live value, highlight, top-one and
+centre-lift checks: arrival 0.089/B1 vs 0.033/B0, axis 0.093/B1 vs 0.055/B0, plaza 0.149/B1 vs
+0.049/B0. The axis gained one source-backed processional threshold and unequal pylons without
+changing a solid cell; the Shrine's existing votive now visibly terminates the east branch. The
+named concept exhibits still won all three blind composition pairs. That failure remains open and
+the score is not inflated: the latest critic still asks for a more luminous architectural terminus,
+which is a deeper projection/material gap than another small ornament can honestly close.
+
 ---
 
 # Bardo Vertical Slice Plan (historical header)
@@ -47,6 +57,14 @@ and all fixtures are green.
 ---
 
 ## STATUS — what has since been built
+
+**Bardo composition gate (2026-08-30).** The live room gate now samples the first-minute arrival,
+axis and plaza separately at 1× and blocks unless each playable centre is at least one canonical
+value band over its outer frame. The three frames are green, and all 11 production layouts remain
+covered. The central crossing no longer presents four equal exits: a lit north-south course, unequal
+solid pylons and one kept waylight establish the next threshold, while the moved Shrine votive gives
+the east branch a visible subordinate endpoint. Repeated blind comparisons still prefer the named
+concepts on all three compositions. Structural acceptance is green; comparative Look is not.
 
 **Opening-art phase 2 (2026-08-30).** The technical blind spots named by the opening audit are now
 executable contracts: authored sheets assert 1:1 source/target texels after `worldScale`, palette

@@ -1,6 +1,6 @@
 // Pro image generation driver (async job + poll). node .art-cache/pl/gen.mjs <config.json>
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
-import { dirname } from 'node:path'
+import { readFileSync, writeFileSync, mkdirSync, readdirSync, rmSync } from 'node:fs'
+import { dirname, basename } from 'node:path'
 import sharp from 'sharp'
 
 // Node does not read .env.local on its own, and only `pnpm art` passes --env-file-if-exists.
@@ -59,6 +59,14 @@ const walk = (o) => {
 walk(job)
 if (!found.length) { console.error('no images in result:', JSON.stringify(job).slice(0, 600)); process.exit(1) }
 mkdirSync(dirname(cfg.out), { recursive: true })
+// Clear the previous OUTPUT FAMILY, not just the paths about to be written. A 16-image result lands
+// on out-0..out-15 and a single-image result on out.png, so a re-run whose payload count changed
+// left the old numbered candidates sitting beside the new ones, indistinguishable from current
+// output. Only reached once `found` is non-empty, so a failed run never destroys the last good set.
+const dir = dirname(cfg.out), stem = basename(cfg.out).replace(/\.png$/, '')
+for (const f of readdirSync(dir)) {
+  if (f === `${stem}.png` || new RegExp(`^${stem}-\\d+\\.png$`).test(f)) rmSync(`${dir}/${f}`, { force: true })
+}
 found.forEach((b64, i) => {
   const p = found.length > 1 ? cfg.out.replace(/\.png$/, `-${i}.png`) : cfg.out
   writeFileSync(p, Buffer.from(b64, 'base64'))

@@ -625,9 +625,14 @@ function bakeWallCope(g: Graphics, arena: Arena): void {
     // corner or a plain wall tile, where this pass draws over the atlas sprite and leaves a bright
     // smear that belongs to no tile. The lay-back loop below already fits (max x 20 + 3 = 23).
     for (const x of [2, 12, 23]) artPx(g, ox + x, oy + 21, Math.min(3, ROOM_ART_TILE - x), 2, C.boneDim)
-    for (let i = 0; i < 3; i++) {
+    // Same COUNT, same AREA, same THICKNESS. Keeping only the count was the second version of the
+    // very mistake the note above records: the authored segments are 3+3+1 px wide over TWO rows,
+    // 14 px, and laying three 3x1 segments back restored 9 px on ONE row -- a highlight 5 px smaller
+    // and half as thick in every cap cell, which dims the wall edge across the hub's long runs
+    // exactly as erasing two of three did. Widths 3+2+2 over two rows is 14 px again.
+    for (const [i, w] of [3, 2, 2].entries()) {
       const nx = 1 + i * 7 + (h >>> (i * 5)) % 6
-      artPx(g, ox + nx, oy + 21, 3, 1, C.brick)
+      artPx(g, ox + nx, oy + 21, w, 2, C.brick)
     }
   }
   // The three EDGE caps carry the same defect over 108 more placements: capEdge lays a boneDim tick

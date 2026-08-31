@@ -46,6 +46,11 @@ const walk = o => { if (!o || typeof o !== 'object') return
   if (typeof o.base64 === 'string' && o.base64.length > 400) found.push(o.base64)
   for (const v of Array.isArray(o) ? o : Object.values(o)) walk(v) }
 walk(job)
+// Validate BEFORE destroying anything. A completed job with a changed or empty result shape would
+// otherwise delete the previous candidate set, recreate an empty directory and report "0 frames"
+// as success -- losing work to a service-side change rather than to anything local.
+if (!found.length) { console.error('job completed but returned no image payloads; leaving', outDir, 'untouched'); process.exit(1) }
+
 // Replace the previous set outright. Writing over it left any longer numbered tail from an earlier
 // run in place and still reported success, so a later inspection could mix two generations.
 // NOTE: found.length is NOT frames.length — measured, 8 input frames returned 16 payloads — so the

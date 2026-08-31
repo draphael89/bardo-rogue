@@ -86,13 +86,17 @@ function tileColorSpan(data: Buffer, tile: number, cols: number, cell: number, s
   return colors.size
 }
 
-async function materialSpan(): Promise<void> {
-  const { data, info } = await sharp('public/assets/sprites/bardo_room.png').ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+// Parameterised because the Bardo forked its tile sheet: `bardo_hub.png` is a SEPARATE 60-cell floor
+// ramp, and while sourceSheet() checked its dimensions, palette and alpha, this gate -- the one that
+// actually judges whether a floor cell still carries three material values -- only ever read
+// bardo_room.png. A promoted hub floor could collapse to two values with room:gate still green.
+async function materialSpan(file: string): Promise<void> {
+  const { data, info } = await sharp(file).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
   const spans = Array.from({ length: 60 }, (_, i) => tileColorSpan(data, i + 1, 8, 24, info.width))
   // Some low-key ramp cells intentionally collapse chip into lit (§2.2); three distinct material
   // values is the honest lower bound, not four invented merely to satisfy this counter.
   const weak = spans.filter(n => n < 3).length
-  add('room:floor-material-span', weak === 0,
+  add(`room:floor-material-span:${file.split('/').pop()!.replace('.png', '')}`, weak === 0,
     `${Math.min(...spans)}..${Math.max(...spans)} colours per floor cell; ${weak} below three material values`)
 }
 
@@ -442,7 +446,8 @@ await sourceSheet('public/assets/sprites/bardo_room.png', 8 * 24, 12 * 24)
 // additive pass and renders as raw starfield.
 await sourceSheet('public/assets/sprites/bardo_hub.png', 8 * 24, 12 * 24)
 await sourceSheet('public/assets/sprites/bardo_props.png', 4 * 48, 4 * 48)
-await materialSpan()
+await materialSpan('public/assets/sprites/bardo_room.png')
+await materialSpan('public/assets/sprites/bardo_hub.png')
 negativeSpace(buildArena(new Rng(1), 'bardo'))
 const url = flag('url')
 const rooms = url ? await runtime(url, flag('shot-dir')) : []

@@ -187,10 +187,18 @@ the model draws one. It draws one either way.
 
 So the incompatibility is structural, not a tuning miss: **these profiles were measured on
 outline-less Blender renders, and outlined pixel art — which is what this lane produces and what most
-pixel art looks like — cannot satisfy a 5% cap on its own keyline colour.** Two honest ways forward,
-and choosing between them is an art-direction call rather than a gate fix: give the profiles an
-explicit outline allowance, or strip/thin the keyline in the compile before the gates see it. Do not
-shrink the art to fit.
+pixel art looks like — cannot satisfy a 5% cap on its own keyline colour.** Two ways forward, and the second one is now
+BUILT AND MEASURED rather than hypothetical.
+
+**`pnpm deline` erodes the keyline, and it works.** Each outline pixel takes its nearest INTERIOR
+neighbour's colour, so the silhouette is preserved rather than eaten. On the stone Warden: `seal0`
+**11.4% -> 6.8% in one pass**, a second pass changes nothing (it converges), and at 9x the figure is
+indistinguishable except for the missing outline. That is the whole keyline gone for free.
+
+**It is not sufficient on its own, and the residual is informative.** The remaining 6.8% against a
+5.0% cap is the Warden's VEIL — his defining feature, the thing the design calls his refusal. So the
+last 1.8pp is a real art-direction question (a smaller veil, or a profile that admits the feature),
+not a processing gap. Do not shrink the art to fit, and do not let `deline` paper over it.
 
 ### 2.1 The prompt this lane has NOT been measured with
 

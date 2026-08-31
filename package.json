@@ -44,7 +44,8 @@
     "fx": "tsx tools/make-bardo-fx.ts",
     "hub:candidate": "tsx tools/hub-candidate.ts",
     "anim:pack": "tsx tools/anim-pack.ts",
-    "hero:candidate": "node tools/hero-candidate.mjs"
+    "hero:candidate": "node tools/hero-candidate.mjs",
+    "deline": "node tools/deline.mjs"
   },
   "dependencies": {
     "pixi.js": "^8.20.1"

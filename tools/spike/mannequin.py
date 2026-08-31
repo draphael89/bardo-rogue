@@ -196,6 +196,11 @@ MAT_SLIT = make_flat("slitFlat", canon_srgb("#0A0C12"))       # mortar: the face
 # body — measured, run6 south flipped to +1.00 the moment exposure moved the torso to its lit
 # step. seal0 is its own family, one step, and the gate skips single-step forms.
 MAT_VISOR = make_flat("visorFlat", canon_srgb("#12141C"))     # seal0: the dark face of the helm
+# THE EYE. A featureless dark visor is the one thing every generated challenger fixed and the rig did
+# not: at 1x the head reads as a blank block, and the sprite has no gaze. `purple3` is already in the
+# hero's ramp for the sash, so this costs no colour slot -- it re-uses the wine family as a lit slit
+# rather than adding an accent. Flat, so `familyLightScore` skips it the same way the visor is skipped.
+MAT_EYE = make_flat("eyeFlat", canon_srgb("#9E4658"))         # purple3: the lit slit in the visor
 MAT_WINE_DARK = make_flat("wineDarkFlat", canon_srgb("#2A0E1C"))  # purple0: the cape's material-dark hem
 
 # ---------------------------------------------------------------- armature: the Veteran recipe
@@ -390,7 +395,7 @@ box("crestL", V(-3.0, -2.6, HZ + 19.9), 1.0, 2.3, 1.15, "head", MAT_IRON,
 # exhibit's helm is a block, not a head.
 box("helmCrown", V(0, -3.4, HZ + 16.8), 3.6, 3.2, 1.9, "head", MAT_IRON)
 box("visorPlate", V(0, -6.4, HZ + 16.3), 2.9, 0.7, 2.3, "head", MAT_VISOR)
-box("faceSlit", V(0, -7.3, HZ + 17.0), 2.3, 0.5, 0.8, "head", MAT_SLIT)
+box("faceSlit", V(0, -7.3, HZ + 17.0), 2.3, 0.5, 0.8, "head", MAT_EYE)
 # The brow. `mortar` (slit) and `seal0` (visor) are neighbouring canon darks, so at 1x the slit is
 # invisible INSIDE the plate — the whole face reads as one black block and SS3.4's "the face slit
 # must remain readable" quietly fails while every gate stays green. What makes a slit read is the LIT
@@ -664,6 +669,11 @@ if WEAPON != "none":
         WEAPON_MID = 5.4
     else:
         sword_box("swordGrip", grip_c - sword_dir * 3.4, 0.55, 0.55, 3.4, MAT_BONE)
+        # NOT gold, and the attempt is worth recording. Every generated challenger draws a gold
+        # crossguard and it is what makes a held bar read as a sword -- but `gold` is budgeted as a
+        # static POINT (4.8% share in a 23.4x9.4% box) and a crossguard rides a weapon that sweeps the
+        # whole frame. Measured: bbox 39.1x37.5% south, 34.4x37.5% east. A swinging accent cannot be
+        # a point colour. The blade has to earn its read from value, which is what the section does.
         sword_box("swordGuard", h_tail + sword_dir * 0.3, 4.5, 0.8, 0.7, MAT_STEEL)
         # The blade's three values are three FACETS, ordered along the key. The sun sits at yaw -12
         # (screen-left, SS2.1 Law 2), so a lenticular section reads left-to-right as lit bevel ->

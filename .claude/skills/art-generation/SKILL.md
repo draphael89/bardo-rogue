@@ -85,6 +85,51 @@ pnpm art compile art/specs/<id>.json
 **6. Promotion is two compiles, not one** (§6). A candidate compile lands in `.art-cache/` and needs
 no approval. Production needs a human to approve the **master**, then a second spec compiles it.
 
+### 2.2 The Pro lane — MEASURED 2026-08-31, and it is a different tool
+
+§2 above is the **pixflux** recipe. The web Creator now files pixflux under "Legacy models" and
+offers **Pro** and **Pixen**; `POST /generate-image-v2` is Pro and it has no MCP tool. Driven through
+`tools/pl/generate-pro.mjs`. One call returns **16 candidates**, so this lane is pick-the-best, not
+one-shot.
+
+**The measured recipe, from four A/B variants on the hero at one seed:**
+
+1. **`style_image` = a shipped 64px cell of ours**, with `style_options`
+   `{color_palette: true, outline: true, shading: true, detail: false}`. Palette, outline and shading
+   copy our look; leaving `detail` FALSE is what lets it out-detail the source, which is the entire
+   point of using it over the rig.
+2. **NO `reference_images`.** This is the counter-intuitive one and it cost a round to find. Passing
+   the rig's own idle as a subject reference produced 16 heroes whose greatsword was a **detached
+   floating white bar** — because the rig's blade IS a featureless white bar, so the reference taught
+   exactly that. Dropping it and letting the description carry the weapon produced a properly gripped,
+   shouldered greatsword with a visible crossguard in nearly every candidate. **A reference teaches
+   its own defects.** Use one only when the thing being referenced is already good.
+3. **Generate AT the target cell**, not at 2×. §3's 2× rule exists to win the palette vote; here
+   `style_options.color_palette` wins it directly, and generating at 64 keeps the authored pixel
+   PLACEMENT that is the reason to use this lane at all. Downsampling averages exactly that away.
+4. Description carries the art direction literally: view, light direction ("lit from the upper left"),
+   feet-near-the-bottom margin, the ramp in words, "no pure black and no pure white", and explicit
+   negatives ("no skin tone, no green, no brown leather") — those negatives did real work.
+
+Quality at 64px is far beyond both the rig and the pixflux lane: layered pauldrons, cloth folds,
+cloaks, shield sigils, hooded robes with a lit staff ember. This is the first lane in the project
+that produced art good enough to judge on beauty rather than on gates.
+
+**`create-character-v3` then rotates a champion into 8 consistent directions** (`tools/pl/`), and
+identity holds across all eight — measured on three enemies at once.
+
+### 2.3 `transfer-outfit-v2` does NOT preserve pose — tested, and this is the caveat that matters
+
+§7.1 flagged it as the endpoint that targets the failure §7 struck. Tested on the rig's 8-frame run
+cycle with a champion as the reference: **the artwork is superb and the poses are gone.** The run
+cycle came back as a generic standing pose, and the greatsword is absent in several frames. It
+restyles by REDRAWING, so it cannot carry a sim-locked clip whose frames the renderer indexes by
+`stateTick`.
+
+It is still the right tool for a 2-16 frame sequence whose exact poses do not matter. It is the wrong
+tool for anything the rig registers. **The rig's value was never the pixels — it is the guarantee
+that frame N is the pose the hitbox expects.** Nothing generated has replaced that yet.
+
 ### 2.1 The prompt this lane has NOT been measured with
 
 `pnpm art generate <spec> --provider pixellab` dry-runs free (no key) and prints the prompt

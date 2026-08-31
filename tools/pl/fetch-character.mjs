@@ -17,7 +17,12 @@ if (!lookup.ok) { console.error(`character lookup failed: HTTP ${lookup.status} 
 const j = await lookup.json()
 const rot = j.rotation_urls ?? j.rotations ?? {}
 const keys = Object.keys(rot)
-if (!keys.length) { console.log(id, 'status:', j.status ?? JSON.stringify(j).slice(0,180)); process.exit(0) }
+// A pending character has no rotations yet. Exiting 0 here told automation the download succeeded
+// while leaving the output directory missing or stale, so this is a failure like any other.
+if (!keys.length) {
+  console.error(`${id}: no rotations available (status ${j.status ?? 'unknown'}) — nothing downloaded`)
+  process.exit(1)
+}
 // Stage the whole set first. Writing each rotation as it arrives meant a later signed URL failing
 // left the earlier directions overwritten and the unvisited ones stale from the previous run — a
 // mixed candidate set, on a command that exits non-zero and looks like it changed nothing.
@@ -27,7 +32,9 @@ mkdirSync(staging, { recursive: true })
 const fetched = []
 for (const k of keys) {
   const url = typeof rot[k] === 'string' ? rot[k] : rot[k]?.url
-  if (!url) continue
+  // A direction with neither a string nor a .url is an incomplete result, not one to skip: skipping
+  // promoted a short staging set over the previous rotations and still reported keys.length.
+  if (!url) { console.error(`rotation "${k}" has no download URL — incomplete result, leaving ${out} untouched`); process.exit(1) }
   // A rotation URL is time-signed and can expire. Without this check the error body was written
   // straight to a .png and counted as a downloaded direction — JSON masquerading as candidate art.
   const res = await fetch(url)
@@ -38,4 +45,4 @@ for (const k of keys) {
 }
 rmSync(out, { recursive: true, force: true })
 renameSync(staging, out)
-console.log(out, keys.length, 'directions')
+console.log(out, fetched.length, 'directions')

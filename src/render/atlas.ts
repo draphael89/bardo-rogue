@@ -143,27 +143,35 @@ export async function loadAtlas(manifest: Record<string, string[]>): Promise<Atl
     group('decals', manifest.decals),
     group('light', manifest.light),
     Promise.all(requested.map(async ([name, path, optional]) => {
-      try {
+      // Loads AND validates. Validation has to happen inside this guard, not in the bind loop below:
+      // a candidate whose files are both PRESENT but whose sidecar is stale, malformed or
+      // dimensionally inconsistent with its PNG would otherwise throw outside the try and stop the
+      // game booting — which is the exact failure the fallback exists to prevent. Missing files were
+      // only ever half the problem; a half-rebuilt candidate is the more likely one.
+      const loadValidated = async (png: string, json: string) => {
         const [tex, def] = await Promise.all([
-          Assets.load<Texture>(`${path}.png`),
-          fetch(`${path}.json`).then(r => {
+          Assets.load<Texture>(png),
+          fetch(json).then(r => {
             if (!r.ok) throw new Error(`sheet ${name}: sidecar request failed (${r.status})`)
             return r.json() as Promise<SheetDef>
           }),
         ])
+        validateSheetDef(def, name)
+        if (tex.width !== def.cols * def.cell || tex.height !== def.rows * def.cell) {
+          throw new Error(`sheet ${name}: image is ${tex.width}x${tex.height}, sidecar declares ${def.cols * def.cell}x${def.rows * def.cell}`)
+        }
         return { name, tex, def }
+      }
+      try {
+        return await loadValidated(`${path}.png`, `${path}.json`)
       } catch (error) {
         if (!optional) throw error
         // A missing hub sheet has no fallback and drops to the static prop cell. A missing hero
         // CANDIDATE does have one — the production sheet it stands in for — so load that instead,
         // or ?heroCandidate=1 would boot a hero with no south sheet at all.
         if (SHEETS.includes(name as ProductionSheetName)) {
-          console.warn(`atlas: candidate for "${name}" not built (${(error as Error).message}) — using the production sheet; run pnpm hero:candidate`)
-          const [tex, def] = await Promise.all([
-            Assets.load<Texture>(`${base}sprites/${name}.png`),
-            fetch(`${base}sprites/${name}.json`).then(r => r.json() as Promise<SheetDef>),
-          ])
-          return { name, tex, def }
+          console.warn(`atlas: candidate for "${name}" unusable (${(error as Error).message}) — using the production sheet; run pnpm hero:candidate`)
+          return await loadValidated(`${base}sprites/${name}.png`, `${base}sprites/${name}.json`)
         }
         console.warn(`atlas: optional sheet "${name}" not loaded (${(error as Error).message}) — keeping the static prop cell`)
         return null
@@ -209,12 +217,8 @@ export async function loadAtlas(manifest: Record<string, string[]>): Promise<Atl
   for (const entry of loadedSheets) {
     if (!entry) continue
     const { name, tex, def } = entry
-    // The contract is checked at load, not assumed: a sidecar and its PNG can drift apart, and a
-    // silent mismatch shows up as the wrong pose on the wrong tick rather than as an error.
-    validateSheetDef(def, name)
-    if (tex.width !== def.cols * def.cell || tex.height !== def.rows * def.cell) {
-      throw new Error(`sheet ${name}: image is ${tex.width}x${tex.height}, sidecar declares ${def.cols * def.cell}x${def.rows * def.cell}`)
-    }
+    // Already validated at load (see loadValidated above) — the contract is checked before an entry
+    // can reach here, so an unusable optional candidate has taken its fallback rather than throwing.
     sheets.set(name, bindSheet(def, tex, whiteSheet(tex)))
   }
 

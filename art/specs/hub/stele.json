@@ -1,0 +1,55 @@
+{
+  "id": "hub.stele.candidate",
+  "kind": "prop",
+  "input": ".art-cache/hub/masters/stele-96.png",
+  "output": ".art-cache/hub/compiled/hub_stele.png",
+  "sidecar": ".art-cache/hub/compiled/hub_stele.json",
+  "cell": 48,
+  "cols": 1,
+  "rows": 1,
+  "maxColors": 12,
+  "palette": [
+    "void",
+    "mortar",
+    "seal0",
+    "slate0",
+    "slate1",
+    "slate2",
+    "slate3",
+    "boneLo",
+    "boneDim",
+    "iron",
+    "ironHi",
+    "grout"
+  ],
+  "colourPlacement": "hub-stele",
+  "fit": "grid",
+  "chromaKey": false,
+  "coverage": 0.5,
+  "salience": {
+    "minShare": 0.2,
+    "minDelta": 0.16
+  },
+  "frames": [
+    {
+      "name": "stele",
+      "i": 0
+    }
+  ],
+  "provenance": {
+    "provider": "pixellab",
+    "model": "create_image_pixflux (MCP), 96x96, forced canon ramp",
+    "promptFile": "art/prompts/hub_stele_96.txt"
+  },
+  "registrationNote": "CANDIDATE ONLY. Bardo hub prop lane; output stays in .art-cache and never reaches art/approved or public/assets. The hub-* colourPlacement caps are PROVISIONAL: they were set from this candidate's own measurements because bardo_props.png carries no sidecar and no accepted prop has ever faced a placement profile. They are not a perceptual threshold and must be re-derived by a human before promotion.",
+  "waivers": [
+    {
+      "gate": "frame:stele:light-direction",
+      "reason": "HUMAN CALL PENDING. Correlation 0.91 reads as baked south key on an upright slab. Kept only so the candidate can be judged at 1x; this must be resolved by a ramp or regen before promotion, never waived into production."
+    },
+    {
+      "gate": "detail-density",
+      "reason": "prop cap 25% is measured-miscalibrated (art-generation SS3.1); 34.9% sits inside the 34-49% band every compiled prop occupies."
+    }
+  ]
+}

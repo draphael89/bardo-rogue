@@ -35,6 +35,11 @@ const CANDIDATE_SHEETS = {
 
 const HERO_CANDIDATE = '/.art-cache/pixellab/hero-light1/compiled/bardo_veteran_greatsword_south'
 
+// The Bardo hub's PixelLab prop candidates, assembled by `pnpm hub:candidate`. Bound only under
+// import.meta.env.DEV with ?hubCandidate=1, so unapproved art cannot reach a build: publicDir is off
+// for `command === 'build'` and .art-cache is gitignored besides.
+const HUB_PROPS_CANDIDATE = '/.art-cache/hub/compiled/bardo_props.png'
+
 type ProductionSheetName = (typeof SHEETS)[number]
 type CandidateSheetName = keyof typeof CANDIDATE_SHEETS
 export type SheetName = ProductionSheetName | CandidateSheetName
@@ -77,6 +82,7 @@ export async function loadAtlas(manifest: Record<string, string[]>): Promise<Atl
   const params = new URLSearchParams(location.search)
   const candidateMode = import.meta.env.DEV && params.get('actorCandidate') === '1'
   const heroCandidateMode = import.meta.env.DEV && params.get('heroCandidate') === '1'
+  const hubCandidateMode = import.meta.env.DEV && params.get('hubCandidate') === '1'
   const requested: Array<readonly [SheetName, string]> = [
     ...SHEETS.map(name => [name, heroCandidateMode && name === 'bardo_veteran_greatsword_south'
       ? HERO_CANDIDATE
@@ -97,7 +103,7 @@ export async function loadAtlas(manifest: Record<string, string[]>): Promise<Atl
     texture('sprites/tiny_dungeon.png'),
     texture('sprites/bardo_room.png'),
     texture('sprites/bardo_hub.png'),
-    texture('sprites/bardo_props.png'),
+    hubCandidateMode ? Assets.load<Texture>(HUB_PROPS_CANDIDATE) : texture('sprites/bardo_props.png'),
     group('particles', manifest.particles),
     group('decals', manifest.decals),
     group('light', manifest.light),

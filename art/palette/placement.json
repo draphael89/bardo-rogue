@@ -826,5 +826,253 @@
       "maxWidth": 0.95,
       "maxHeight": 0.95
     }
+  },
+  "hub-bell": {
+    "void": {
+      "maxShare": 0.3,
+      "maxWidth": 0.95,
+      "maxHeight": 0.95
+    },
+    "mortar": {
+      "maxShare": 0.2,
+      "maxWidth": 0.95,
+      "maxHeight": 0.95
+    },
+    "seal0": {
+      "maxShare": 0.25,
+      "maxWidth": 0.95,
+      "maxHeight": 0.95
+    },
+    "iron": {
+      "maxShare": 0.35,
+      "maxWidth": 0.95,
+      "maxHeight": 0.95
+    },
+    "ironHi": {
+      "maxShare": 0.1,
+      "maxWidth": 0.95,
+      "maxHeight": 0.95
+    },
+    "coinBrass": {
+      "maxShare": 0.45,
+      "maxWidth": 0.95,
+      "maxHeight": 0.95
+    },
+    "goldDim": {
+      "maxShare": 0.2,
+      "maxWidth": 0.95,
+      "maxHeight": 0.95
+    },
+    "gold": {
+      "maxShare": 0.32,
+      "maxWidth": 0.95,
+      "maxHeight": 0.95
+    },
+    "boneLo": {
+      "maxShare": 0.27,
+      "maxWidth": 0.95,
+      "maxHeight": 0.95
+    },
+    "slate0": {
+      "maxShare": 0.3,
+      "maxWidth": 0.95,
+      "maxHeight": 0.95
+    },
+    "slate1": {
+      "maxShare": 0.3,
+      "maxWidth": 0.95,
+      "maxHeight": 0.95
+    },
+    "woodLo": {
+      "maxShare": 0.15,
+      "maxWidth": 0.95,
+      "maxHeight": 0.95
+    }
+  },
+  "hub-ossuary": {
+    "void": {
+      "maxShare": 0.35,
+      "maxWidth": 0.95,
+      "maxHeight": 0.95
+    },
+    "mortar": {
+      "maxShare": 0.25,
+      "maxWidth": 0.95,
+      "maxHeight": 0.95
+    },
+    "seal0": {
+      "maxShare": 0.3,
+      "maxWidth": 0.95,
+      "maxHeight": 0.95
+    },
+    "slate0": {
+      "maxShare": 0.45,
+      "maxWidth": 0.95,
+      "maxHeight": 0.95
+    },
+    "slate1": {
+      "maxShare": 0.45,
+      "maxWidth": 0.95,
+      "maxHeight": 0.95
+    },
+    "slate2": {
+      "maxShare": 0.4,
+      "maxWidth": 0.95,
+      "maxHeight": 0.95
+    },
+    "boneLo": {
+      "maxShare": 0.25,
+      "maxWidth": 0.95,
+      "maxHeight": 0.95
+    },
+    "boneDim": {
+      "maxShare": 0.3,
+      "maxWidth": 0.95,
+      "maxHeight": 0.95
+    },
+    "iron": {
+      "maxShare": 0.4,
+      "maxWidth": 0.95,
+      "maxHeight": 0.95
+    },
+    "ironHi": {
+      "maxShare": 0.34,
+      "maxWidth": 0.95,
+      "maxHeight": 0.95
+    },
+    "woodLo": {
+      "maxShare": 0.15,
+      "maxWidth": 0.95,
+      "maxHeight": 0.95
+    },
+    "wood": {
+      "maxShare": 0.15,
+      "maxWidth": 0.95,
+      "maxHeight": 0.95
+    }
+  },
+  "hub-lamp": {
+    "void": {
+      "maxShare": 0.35,
+      "maxWidth": 0.95,
+      "maxHeight": 0.95
+    },
+    "mortar": {
+      "maxShare": 0.2,
+      "maxWidth": 0.95,
+      "maxHeight": 0.95
+    },
+    "seal0": {
+      "maxShare": 0.25,
+      "maxWidth": 0.95,
+      "maxHeight": 0.95
+    },
+    "iron": {
+      "maxShare": 0.78,
+      "maxWidth": 0.95,
+      "maxHeight": 0.95
+    },
+    "ironHi": {
+      "maxShare": 0.15,
+      "maxWidth": 0.95,
+      "maxHeight": 0.95
+    },
+    "boneLo": {
+      "maxShare": 0.15,
+      "maxWidth": 0.95,
+      "maxHeight": 0.95
+    },
+    "numenDim": {
+      "maxShare": 0.2,
+      "maxWidth": 0.95,
+      "maxHeight": 0.95
+    },
+    "numen": {
+      "maxShare": 0.2,
+      "maxWidth": 0.95,
+      "maxHeight": 0.95
+    },
+    "numenHi": {
+      "maxShare": 0.12,
+      "maxWidth": 0.95,
+      "maxHeight": 0.95
+    },
+    "goldDim": {
+      "maxShare": 0.1,
+      "maxWidth": 0.95,
+      "maxHeight": 0.95
+    },
+    "woodLo": {
+      "maxShare": 0.15,
+      "maxWidth": 0.95,
+      "maxHeight": 0.95
+    },
+    "wood": {
+      "maxShare": 0.15,
+      "maxWidth": 0.95,
+      "maxHeight": 0.95
+    }
+  },
+  "hub-stele": {
+    "void": {
+      "maxShare": 0.35,
+      "maxWidth": 0.95,
+      "maxHeight": 0.95
+    },
+    "mortar": {
+      "maxShare": 0.25,
+      "maxWidth": 0.95,
+      "maxHeight": 0.95
+    },
+    "seal0": {
+      "maxShare": 0.3,
+      "maxWidth": 0.95,
+      "maxHeight": 0.95
+    },
+    "slate0": {
+      "maxShare": 0.35,
+      "maxWidth": 0.95,
+      "maxHeight": 0.95
+    },
+    "slate1": {
+      "maxShare": 0.4,
+      "maxWidth": 0.95,
+      "maxHeight": 0.95
+    },
+    "slate2": {
+      "maxShare": 0.35,
+      "maxWidth": 0.95,
+      "maxHeight": 0.95
+    },
+    "slate3": {
+      "maxShare": 0.38,
+      "maxWidth": 0.95,
+      "maxHeight": 0.95
+    },
+    "boneLo": {
+      "maxShare": 0.15,
+      "maxWidth": 0.95,
+      "maxHeight": 0.95
+    },
+    "boneDim": {
+      "maxShare": 0.36,
+      "maxWidth": 0.95,
+      "maxHeight": 0.95
+    },
+    "iron": {
+      "maxShare": 0.2,
+      "maxWidth": 0.95,
+      "maxHeight": 0.95
+    },
+    "ironHi": {
+      "maxShare": 0.1,
+      "maxWidth": 0.95,
+      "maxHeight": 0.95
+    },
+    "grout": {
+      "maxShare": 0.2,
+      "maxWidth": 0.95,
+      "maxHeight": 0.95
+    }
   }
 }

@@ -1,0 +1,51 @@
+{
+  "id": "hub.ossuary.candidate",
+  "kind": "prop",
+  "input": ".art-cache/hub/masters/ossuary-96.png",
+  "output": ".art-cache/hub/compiled/hub_ossuary.png",
+  "sidecar": ".art-cache/hub/compiled/hub_ossuary.json",
+  "cell": 48,
+  "cols": 1,
+  "rows": 1,
+  "maxColors": 12,
+  "palette": [
+    "void",
+    "mortar",
+    "seal0",
+    "slate0",
+    "slate1",
+    "slate2",
+    "boneLo",
+    "boneDim",
+    "iron",
+    "ironHi",
+    "woodLo",
+    "wood"
+  ],
+  "colourPlacement": "hub-ossuary",
+  "fit": "grid",
+  "chromaKey": false,
+  "coverage": 0.5,
+  "salience": {
+    "minShare": 0.2,
+    "minDelta": 0.16
+  },
+  "frames": [
+    {
+      "name": "ossuary",
+      "i": 0
+    }
+  ],
+  "provenance": {
+    "provider": "pixellab",
+    "model": "create_image_pixflux (MCP), 96x96, forced canon ramp",
+    "promptFile": "art/prompts/hub_ossuary_96.txt"
+  },
+  "registrationNote": "CANDIDATE ONLY. Bardo hub prop lane; output stays in .art-cache and never reaches art/approved or public/assets.",
+  "waivers": [
+    {
+      "gate": "detail-density",
+      "reason": "prop cap 25% is measured-miscalibrated (art-generation SS3.1). NOTE 54.1% is ABOVE the 34-49% band the other compiled props occupy, so this is the noisiest candidate in the set: the iron banding is doing it. Judge at 1x before promotion; do not carry this waiver into production unmeasured."
+    }
+  ]
+}

@@ -41,7 +41,8 @@
     "site:build": "tsx tools/build-site.ts",
     "site:deploy": "tsx tools/deploy-site.ts",
     "palette": "tsx tools/art.ts palette",
-    "fx": "tsx tools/make-bardo-fx.ts"
+    "fx": "tsx tools/make-bardo-fx.ts",
+    "hub:candidate": "tsx tools/hub-candidate.ts"
   },
   "dependencies": {
     "pixi.js": "^8.20.1"

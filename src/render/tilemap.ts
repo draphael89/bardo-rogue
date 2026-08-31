@@ -1012,7 +1012,12 @@ function bakeBardoCauseway(g: Graphics, arena: Arena): void {
     if (d > 92) continue
     const keep = d < 34 ? (h & 7) < 6 : d < 62 ? (h & 7) < 3 : (h & 7) < 1
     if (!keep || levelAt(wx, wy) < 2) continue
-    const w = 4 + (h >>> 14) % 6, ht = 2 + (h >>> 18) % 2
+    // SIZE, not count. The count is load-bearing — these blocks are what `top-one-focality` finds
+    // near the player at the arrival capture — so it is untouched. But at 4-9 x 2-3 they were the
+    // same aspect as the floor's own value blocks, and read at 5x that made them bricks set INTO
+    // the paving rather than firelight lying ON it. 2-5 x 1-2 is a glint: same population, same
+    // colours, same places, less mass each.
+    const w = 2 + (h >>> 14) % 4, ht = 1 + (h >>> 18) % 2
     artPx(g, wx * S, wy * S, w, ht, (h >>> 20) % 3 === 0 ? C.nave0 : C.naveWarm)
   }
   // TWO glints, and they stay goldDim. They sit 96 world px from the spawn — outside the

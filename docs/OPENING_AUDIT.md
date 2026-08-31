@@ -1,8 +1,21 @@
-# Opening Town + Hero — art direction audit
+# Opening Town + Hero — art direction audit, v2
 
-**Date:** 2026-08-30 · **Branch:** `codex/bardo-first-sixty-seconds` · **Method:** two forensic
-investigations (pipeline archaeology, AI-generation forensics), the compiled candidate measurements
-from the approval package, and the orchestrator's own 1× judgement of every staged master.
+> **§8's stage 4 is no longer "untested", 2026-08-31.** `animate_character` has since been measured
+> and `.claude/skills/art-generation` §11 carries the result. Two of its claims did not survive:
+> "nothing emits keypoints in PixelLab's format" is now narrower — `/estimate-skeleton` returns
+> `{x, y, label, z_index}` against an 18-value enum whose `ARM`/`LEG` entries are the wrist and
+> ankle — and the missing prerequisite is not the rig's emitter but the fact that the **character ZIP
+> carries no keypoints at all**, so nothing round-trips. **Article IV held and then some:** a
+> rig-authored reference image carried the game's projection *and* its north key light through
+> generation unprompted. Everything else in this file stands as measured.
+
+**Date:** 2026-08-30 (evening) · **Branch:** `claude/bardo-rogue-art-phase-2` · **Baseline:** `4ffbab5`
+(PR #28 merged) · **Method:** the game played and photographed at 1× through `pnpm shot`, every
+number below measured off those PNGs or read out of the shipped sidecars; two forensic passes over
+the art pipeline and the hero's animation contract.
+
+v1 of this document graded the build **52/100** *before* PR #28. It is preserved in git history.
+This version re-grades what actually ships now and corrects two of v1's conclusions.
 
 Graded against excellent shipped indie games, not against the placeholder it replaced.
 
@@ -29,113 +42,176 @@ remain unchanged.
 
 ---
 
+## 0. What has landed since this audit was written
+
+**Done, on this branch, measured.**
+
+- **The light has a colour** (§13 item 1). An additive pass over the multiply, tinted per room; a
+  constant blue-violet floor under the crushed blacks. Bardo arrival: lit warmth **0.08 → 0.50**,
+  shadow mean blue **3.5 → 14.7**, bright-set lead **`slate2` @ 14.7% → `boneDim` @ 1.8%** — §3.2.5
+  satisfied. Cost 0.1 ms p50 under a dense fight. Nothing was drawn.
+- **Both missing gates exist** (§13 item 3). `room:gate` now reads the composited frame; a
+  source:target parity test guards #28's pixel grid, verified by breaking it (9 of 19 go red).
+
+**Open, and waiting on a human.**
+
+- **The hero's head** (§13 item 2) — a candidate sits unapproved in `.art-cache`; see §9, which is
+  rewritten because the framing in it was wrong.
+
+**Tested and rejected.**
+
+- **The PixelLab edit lane as a drawing pass over rig output** — §8's headline proposal. Two rounds,
+  ~40 generations. Registration survives cleanly, which was the real risk; but it redesigns rather
+  than shades, and does it **differently on every frame of a clip at the same seed**. That is
+  disqualifying for a character sheet. §8 carries the measurements and what the lane is still good
+  for.
+
+---
+
 ## 1. Executive verdict
 
-This project has a **world-class art system pointed at 10% of its screen, a genuinely good
-environment, and a protagonist who is a white blob.**
+**PR #28 was real. The hero is on the grid, crisp, and authored. The next gap is not darkness, not
+asset count, and not PixelLab prompting — it is that your light is the wrong colour, and that nothing
+in this project has ever measured the frame it actually ships.**
 
-The compile → gate → approve → ship pipeline is better than most shipped indie games have: measured
-thresholds with their failed predecessors recorded in comments, two-tier fail/judge severity, waivers
-that are rejected if they name a passing gate, hash-verified human approval, and a byte-level
-reproducibility test. It governs **two character sheets**. Everything else — every floor, wall, prop,
-particle, decal, three of five enemies, and the hero for the entire opening — reaches the screen
-through lanes that pipeline cannot see.
+*(An earlier draft of this line ended "and your hero has no face." That was wrong, and §9 records the
+correction: he has one, fully modelled, and it was losing a rank fight to his own shoulder rims. I am
+leaving the mistake visible because its shape is the lesson — the defect looked like missing art and
+was a value decision, which is the same trap this project fell into with the light.)*
 
-Two root causes explain nearly every symptom, and neither is "we need more assets."
+Three findings reframe the work, and two of them contradict things this project currently believes.
 
-**Root cause A — the hero is the only thing on screen not on the pixel grid.** The world renders at
-1.5× scale. Tiles and props compensate (`atlas.ts:58` passes a `logicalSize`, so 24 source px → 24
-target px, 1:1). `cut()` in `sheet.ts:200` sets no `orig`, so every authored character is resampled at
-a non-integer 1.5× — each source pixel becoming an alternating 1-or-2 target pixels — and because
-positions round in *world* space, the phase flips as he walks and **his outline crawls**. No gate can
-see it: the gates measure the sheet, never the rendered frame. This is why nine hours of art direction
-never made the hero sit in the room.
+**Finding 1 — PixelLab has never produced a single pixel in this game, and the thing that did cannot
+draw.** `tools/art/generate.ts` — 371 tested lines, a reference resolver, a palette encoder, a
+manifest writer — has never been executed. There are zero manifests, zero prompt files, and
+`.art-cache/candidates/` has never existed. Every one of the eight shipped hero masters says
+`"provider": "blender-mannequin-spike"`. The hero is a **Blender rig render**, quantised to canon.
 
-**Root cause B — generators add, and every art law in this game is subtractive.** ~58 recorded
-generations across three lanes have shipped **zero pixels**. Every recorded rejection is an *excess*,
-never a deficit. This is not a prompting problem and more generations will not fix it.
+That rig is excellent at what it does: it computes proportion, registration, pivots, sockets, planted
+feet and an 8-frame gait, and it re-renders the whole catalogue in 52 seconds. It solves every
+constraint a generator structurally could not. **What it cannot do is compose.** It renders exactly
+what it is told, correctly lit, and it has no opinion about which of those surfaces the eye should
+find first — so the hero's torso is a stack of axis-aligned rectangles, his mantle is a wine blob with
+no hem, his legs read as one column, and the brightest thing on him is a pauldron rim. Every one of
+those is a decision nobody made rather than a thing the tool got wrong.
 
-The good news: both are cheap. A is roughly one line. B is a lane-assignment decision plus one new
-gate. Neither requires redesigning anything already built.
+**Finding 2 — the game is not too dark. Measured, its blacks match the concept boards almost
+exactly.** I assumed otherwise from the first screenshot and the measurement corrected me:
+
+| | B0+B1 share | mean L | brightest 5% (rgb) | warmth of brightest 5% |
+|---|---|---|---|---|
+| concept-02 *Death is the Door* | — | — | (161, 115, 71) | **+0.78** |
+| concept-03 *The Trial* | — | — | (139, 107, 74) | **+0.61** |
+| concept-05 *Town Between Worlds* | 95.4 % | 0.124 | (112, 78, 49) | **+0.79** |
+| **the game, arrival** | **95.8 %** | **0.094** | **(76, 73, 73)** | **+0.04** |
+| **the game, Gate plaza** | 88.6 % | 0.128 | (80, 74, 74) | +0.08 |
+
+*(warmth = (r − b) ÷ mean channel. Bands are perceptual L, cbrt of relative luminance, six equal
+steps.)*
+
+The concepts and the game hold **the same amount of black**. The concepts' lit surfaces are deep
+amber; the game's are **neutral grey**. That is the whole visual gap between this build and the
+picture the project is chasing, and it is measurable, consistent across every board and every island,
+and fixable without drawing anything.
+
+The mechanism is architectural, not artistic. `light.ts` composes a lightmap and **multiplies** it
+over the world — its own comment says so: *"the lightmap only ever DARKENS."* A multiply cannot make
+cold stone warm. `#ffd9a0` over `slate2 #425066` is still blue. The Bardo's six braziers all declare
+correct warm tints (`0xffd9a0`, `0xff7a18`, `0xffc078`, `0xffab5c`); none of that warmth can reach a
+surface, by construction.
+
+**Finding 3 — the frame breaks the bible's own §3.2.5, and it is measurable.** §3.2.5: *"Static
+architecture is never in the top rank. If the wall cope is the brightest thing on screen, the frame is
+wrong."* In the arrival frame, of the 3.02 % of pixels above Y=70, the single most common colour is
+**`#3e495b` at 31.9 %** — that is `slate2`, cold blue-grey **stone**. Cold architecture is the
+brightest large mass in the opening shot of the game.
+
+The good news in all three: none of them needs a new asset, a new tool, or a new constitution. You
+already have the best art bible I have read in a hobby project. The gap is enforcement on the pixels
+that ship, not doctrine.
 
 ---
 
 ## 2. Scorecard (0–100)
 
-### Visual — 56
+### Visual — 57
 
-| Axis | Score | Why |
-|---|---|---|
-| Art direction | 55 | `ART_DIRECTION.md` is genuinely excellent — measured rules, recorded dead predecessors. But direction is only as good as its reach, and it reaches the compiled lane only. The *experience* shows three different hands. |
-| Character design | 35 | The hero is now designed (approved this session). Five of six actors are still Kenney puppets wrapped in runtime `Graphics` telegraphs. |
-| Environment design | 68 | Code-authored, 24px native, measured. Slabs cross tile boundaries, wear paths follow real traffic, occlusion at every joint. The best-executed part of the game. |
-| Composition | 70 | Islands hold 82.6–95.2% negative space; the pilgrimage axis gives the eye a destination; each island has a focal object and its own light pool. |
-| Colour & palette | 80 | The canon palette is the project's strongest identity artifact. Measured: 0 off-canon pixels across 18/18 generated candidates. Hue never drifts. |
-| Lighting | 72 | Recently earned: the Gate is the key at r140/s2.4, every other pool ranks under it, and the star rank was fixed (stars were the brightest pixels in the game). |
-| Asset consistency | 30 | The killer. Three visually distinct hands: isometric ~600-colour concept boards, near-elevation generated set pieces with per-block bevel, and the flat code-authored world. |
-| Readability | 40 | Hero clears ground-separation at Weber 1.01 against a 1.00 floor — by 0.01. The Kenney enemies measured **−0.34 to −0.55**: darker than the floor they stand on. |
-| Distinctiveness | 72 | "Every space floats in void with sparse stars" is a real, ownable identity, and it is consistently held. |
-| Visual polish | 35 | Crawling outlines, non-integer resampling, and a protagonist drawn in ASCII inside a view file. |
+| Axis | v1 | now | Why |
+|---|---|---|---|
+| Art direction | 55 | **58 → 64** | The bible is genuinely excellent and its reach grew (characters now compile through it). But the shipped frame violates §3.2.5 and §3.2.6 measurably, and nothing detects that. |
+| Character design | 35 | **38** | Now authored, on-grid, one hand, consistent across 8 sheets. Still: no interior modelling on torso or legs, a domino silhouette at 1×, an inverted value hierarchy (§9), and 4 of 6 actors are Kenney. |
+| Environment design | 68 | **60** | Marked **down** on measurement, not on regression. `buildBardo` is sophisticated — four islands, ranked pools, a worn spine, a fainter fork, staggered links, seals as teasers. At 1× it renders as **flat grey rectangles**: ~19 props over 465 paved cells, and nothing stands up. |
+| Composition | 70 | **66** | The plan is good; the frame does not sell it. Three of the four islands are visually identical, so there is no pull toward any of them. |
+| Colour & palette | 80 | **72** | Canon holds absolutely — 0 off-canon pixels. But the palette is *used* monochromatically: 55 colours, and the frame reads as grey with orange dots. |
+| Lighting | 72 | **48 → 68** | The largest correction in this document, and now largely acted on. Pools were always ranked, tuned and coupled to the bake — configured beautifully — but what rendered was a multiply that cannot warm anything, with cold stone in the top brightness rank. Since fixed (§0): warmth 0.08 → 0.50, shadow blue 3.5 → 14.7, architecture out of the top rank. Short of the concepts' 0.61–0.79 because their pools are small and hard and ours are the room's calibrated radii. |
+| Asset consistency | 30 | **45** | Hero and Brute are now one hand from one rig. Caster, charger, warden and dummy are still visibly from another game. |
+| Readability | 40 | **52** | The grid fix is real and the hero is crisp. Value hierarchy is inverted: the blade (B5) out-ranks the body (B0–B1), and the pauldron rims out-rank the face — measured, dome L 0.110 against pauldrons L 0.213. |
+| Distinctiveness | 72 | **74** | "Islands in a starfield void" is ownable and held everywhere. |
+| Visual polish | 35 | **55** | Crawling outlines are gone — the single biggest win in #28. Remaining: a bone-white ring at the hero's feet brighter than the hero, a raw staircase on the blade's diagonal, no cast shadow from anything onto stone. |
 
-### Animation — 40
+### Animation — 50
 
-| Axis | Score | Why |
-|---|---|---|
-| Hero animation | 25 | A **2-frame run**. Three-frame swings. The heavy holds one drawing for 400 ms of a 717 ms attack, and its recovery replays the wind-up pixels via alias. |
-| Environmental animation | 55 | Braziers gutter, motes drift, fog moves. Modest but correct. |
-| Movement feel | 70 | The sim is well tuned and measured — 100/100 seeds resolve, skilled bot wins 78%. Input responsiveness is not the problem. |
-| Animation transitions | 45 | `clipSelect.ts` is well-built and unit-tested against real damage windows. But its commit branch requires ≥2 startup frames and every shipped clip has exactly 1, so **the entire plant-pose mechanism is unreachable code**. |
-| Character personality | 20 | No idle variation, no secondary motion, no weight shift. The hero stands perfectly still and runs on two frames. |
-| Weapon interaction | 25 | The sword pickup is a state flip. No anticipation, no pose, no hitch, no camera acknowledgement. |
+| Axis | v1 | now | Why |
+|---|---|---|---|
+| Hero animation | 25 | **52** | v1's "2-frame run" is stale. Measured from the sidecars: an **8-frame run at 4 ticks each** (32-tick loop, 7.5 fps), and **5-pose chains** for light1 / light2 / heavy. That is a real animation set. |
+| Environmental animation | 55 | **55** | Braziers gutter, motes drift, fog moves, flame tongues take their source's colour. Modest and correct. |
+| Movement feel | 70 | **72** | 957 tests green, matrix measured, no seed strands a player. Input responsiveness is not a problem here. |
+| Animation transitions | 45 | **58** | `clipSelect` is well built and the plant-pose branch is now **reachable** — every swing clip ships `ci = 2`, and the heavy passes `commitTick = 3`. v1 called it dead code; it is live for the heavy. The light swings still take an even split because they pass no commit tick. |
+| Character personality | 20 | **25** | **Idle is one static cell.** No idle clip exists in any sidecar. No breathing, no weight shift, no cloak follow-through, no secondary motion, and a visor slit that cannot move. The dodge's middle frame holds 10 ticks on one drawing; the heavy's commit holds 9. |
+| Weapon interaction | 25 | **38** | More fires than v1 credited: `swordMetal` + a 329.63 Hz bell, the Gate's mark lights, the rack redraws without its blade. But the hero does not move, and a full-width gold HUD banner is the loudest thing in the frame. |
 
-### Production system — 62
+### Production system — 67
 
-| Axis | Score | Why |
-|---|---|---|
-| PixelLab workflow | 25 | 21 generations, 0 shipped. §12.6 ("each new generation is conditioned on the approved pool") has **never once been exercised** — three set-piece specs declare a `references` array the endpoint they used cannot accept. |
-| Style consistency | 40 | Palette is locked hard and holds. Projection, scale-in-frame, value structure, light logic and detail density are all uncontrolled — and those are what "one hand" actually means. |
-| Iteration speed | 85 | The Blender lane re-renders, re-registers, re-quantises and re-gates an entire catalogue in **52 seconds** after a proportion change. Genuinely excellent. |
-| Reproducibility | 90 | `tests/art/reproducibility.test.ts` sha256-compares recompiled output against the committed PNG and sidecar. A hand-edited sheet cannot ship undetected. Best-in-class. |
-| Asset organization | 80 | `.art-cache` → `art/approved` (receipted) → `public/assets` (gated) is a clean, enforced custody chain. |
-| Technical integration | 50 | The rig lane emits 5-pose frame names; the renderer requires different ones. A spike sheet was **not a drop-in** — the lane stopped one bridge short of shipping. |
-| Scalability | 65 | The rig scales beautifully. The tile lane hardcodes a *copy* of 55 canon colours instead of reading `canon.json`, and its `T`/`PROP` index tables are a 91-entry registration table living in sim code, protected only by a comment saying "append, never reorder." |
+| Axis | v1 | now | Why |
+|---|---|---|---|
+| PixelLab workflow | 25 | **20** | Marked **down**, because the honest finding is worse than "the workflow is weak": **there is no workflow.** The client has never run. Two set-piece candidates exist, made through the MCP by hand, never approved, and their inputs are gone from disk. |
+| Style consistency | 40 | **58** | The rig gives characters one hand, one light rig, one palette lane. Projection, scale-in-frame and detail density are still unmeasured for anything generated. |
+| Iteration speed | 85 | **88** | 52 seconds to re-render, re-register, re-quantise and re-gate the whole catalogue after a proportion change. Better than most studios. |
+| Reproducibility | 90 | **92** | `tests/art/reproducibility.test.ts` sha256-compares recompiled output against the committed PNG and sidecar. A hand-edited sheet cannot ship undetected. |
+| Asset organization | 80 | **84** | `.art-cache` → `art/approved` (hash-verified receipt) → `public/assets` (gated). Candidates cannot write into production *by construction* — the approval check keys on the output path. |
+| Technical integration | 50 | **62** | The rig → sidecar → renderer bridge now works end to end for the hero, including sockets in world px. The five actor specs exist and are complete, but every `input` points at `.art-cache/actors/…`, which is **not on disk** — the lane cannot be re-run without re-rendering. |
+| Scalability | 65 | **68** | The rig scales. The tile lane still hardcodes a *copy* of 55 canon colours instead of reading `canon.json`, and the `T`/`PROP` index tables remain a 91-entry registration table in sim code. |
 
-### Experience — 49
+### Experience — 55
 
-| Axis | Score | Why |
-|---|---|---|
-| First impression | 65 | The title over the live Gate plaza with the descent is genuinely good and distinctly *this game*. |
-| Emotional impact | 45 | The frame is atmospheric but not yet moving. Warmth without revelation. |
-| Sense of place | 70 | The strongest thing the game has. It reads as a real location with history. |
-| Player orientation | 60 | The pilgrimage axis works; the arrival still under-signals where to go. |
-| Hero readability | 20 | A white Kenney blob for the entire opening — the single loudest defect, and the reason this audit exists. |
-| Perceived craftsmanship | 45 | Care is visible in the stone and invisible in the character, which reads as "unfinished" rather than "stylised." |
-| Cohesion | 35 | Three hands plus a protagonist off the pixel grid. |
-| Would I keep playing | 55 | Yes — for the world. Not yet for the character. |
+| Axis | v1 | now | Why |
+|---|---|---|---|
+| First impression | 65 | **66** | The title card over the live Gate plaza is good and distinctly this game. |
+| Emotional impact | 45 | **45** | Atmospheric, not yet moving. There is no single object in the frame that makes you say "look at that." The concepts each have three. |
+| Sense of place | 70 | **70** | Still the strongest thing here. |
+| Player orientation | 60 | **52** | The spine works. But the Forge, Shrine and Pier measure 96.9 / 97.4 / 98.1 % in B0+B1 — three of the four islands you are invited to explore are, at 1×, dark grey rectangles. Nothing pulls. |
+| Hero readability | 20 | **48** | The largest single gain. He is crisp, on-grid, and the wine mantle gives him a colour identity. He is also a dark domino with a grey box for a head. |
+| Perceived craftsmanship | 45 | **52** | Care is visible in the stone logic and the rig. It is not visible in the frame, which is the only place it counts. |
+| Cohesion | 35 | **50** | One hand for the two authored characters; the other four actors are still foreign. |
+| Would I keep playing | 55 | **60** | Yes, for the world and now partly for the character. |
 
-### **Overall: 52 / 100**
+### **Overall: 52 → 57**
 
-An environment worth 70 carrying a character worth 25, judged by a production system worth 62 that is
-pointed at the wrong 10% of the screen.
+Five points for one PR, and honestly earned: the grid fix, the authored hero and the 8-frame run are
+all real. The score did not move further because I marked **Lighting down 24 points** on measurement.
+That is not a regression — it is v1 grading the *configuration* and v2 grading the *frame*.
 
 ---
 
 ## 3. What currently works — protect these
 
-1. **The bible itself.** `ART_DIRECTION.md` converts taste into citable, measurable rules. It ended an
-   eleven-round critic loop. Every recommendation below extends it rather than replacing it.
-2. **The compile pipeline's internals**, each with a recorded failed predecessor: value lift solved
-   once per sheet (per-cell would erase the difference between a coiled wind-up and a lit contact),
-   applied as a gamma on OKLab L only (preserves material identity), palette-mapping *before* voting,
-   salience rescue (without it thin blades vanish — measured), staging-then-promote.
-3. **The gate suite's honesty.** Two-tier fail/judge, the deleted `warn` tier, and waivers that are
-   *rejected* when they name a currently-passing gate.
-4. **The approval receipt mechanism.** Hash-verified, location-coupled, enforced at two call sites.
-5. **The code-authored environment.** The only lane that has ever beaten its reference games.
-6. **The Blender rig.** 52-second full-catalogue iteration, registration computed from bones, palette
-   lanes proven by sweep before a second of render time is spent.
-7. **The sim/art timing contract.** Timing lives in `tuning.ts`; a sheet may only *assert* its contact
+1. **`ART_DIRECTION.md`.** It converts taste into citable, measurable rules, and it already names both
+   of this build's biggest defects (§3.2.5 brightness rank, §3.2.6 warm key / cool ambient). **Do not
+   write another constitution.** Enforce this one.
+2. **The Blender rig.** 52-second catalogue iteration, registration computed from bones rather than
+   judged, lighting constants derived from gate sweeps, per-frame camera framing auto-solved, and a
+   two-pass compile that discovers its own waivers instead of hand-writing them. Genuinely excellent
+   engineering.
+3. **The custody chain.** `.art-cache` → receipted `art/approved` → gated `public/assets`, with the
+   approval boundary enforced *by output path* so a candidate lane physically cannot ship.
+4. **Reproducibility.** sha256 recompile comparison. Best-in-class.
+5. **The sim/art timing contract.** Timing lives in `tuning.ts`; a sheet may only *assert* its contact
    frame, machine-checked at compile. This is the only thing stopping art desyncing from a hitbox.
+6. **`buildBardo`'s composition logic.** Four islands under a footprint cap, ranked light pools with a
+   real gap between ranks, a worn pilgrimage spine plus a fainter fork, staggered side links so the
+   middle latitude never reads as a boulevard, seals as silhouette-only teasers. **The plan is better
+   than the render.** Fix the render; do not touch the plan.
+7. **The pixel grid, as of #28.** One source pixel is one target pixel. Protect it with a test.
 
 ---
 
@@ -143,275 +219,523 @@ pointed at the wrong 10% of the screen.
 
 | # | What | Evidence |
 |---|---|---|
-| 1 | **The unarmed hero** | Kenney stock tile 96 plus **237 lines of hand-typed ASCII pose art inside a view file**, drawn in five colours, **none of which exist in `canon.json`**. No gate, no receipt, no reproducibility test can reach it. |
-| 2 | **Caster, charger, warden, oath-bound, dummy** | Kenney tiles 84/122/109/54 under runtime `Graphics`. The ground-separation gate exists *because* these sprites measured darker than their floor — and they are still shipping, because with no sidecar the gate cannot reach them. |
-| 3 | **Generated set pieces** | Every candidate across all three targets came back with small brick coursing — item 1 on the forbidden list, forbidden in capitals in the prompt. `skiff-522` measures **52% edge density** against the code-authored prop sheet's 20.8%: 2.5× busier than the world it would sit in. |
-| 4 | **The concept boards, used as generation references** | 45° isometric, ~600 colours, a **gold-framed glowing gate** — precisely what §8.2.2 and §10.22 forbid. When reference and rule disagree, the reference wins. That is the mechanical explanation for twelve gold-framed gates. |
-| 5 | **Weapon sprites** | Kenney tiles 106/118/129. |
-| 6 | **Animation frame budget** | Two-frame run; 400 ms of the heavy attack on wind-up pixels; the side dodge holds one drawing for 167 ms. |
+| 1 | **The hero's head** | Not for want of a face — `visorPlate`, `faceSlit` and a lit `helmBrow` all render correctly (§9). The brow quantises to `brick` and the two pauldron rims to `brickHi`, so **the eye lands on his shoulders**: dome L 0.110 against pauldrons L 0.213, four face pixels against thirty shoulder ones. At 1× he is a domino with a bright bar across it. |
+| 2 | **Caster, charger, warden, dummy** | Kenney tiles 84 / 122 / 54 / 109 under runtime `Graphics`. In the pose sheet the caster is a magenta blob with a red laser and the charger is a white-red streak — visibly from another game. |
+| 3 | **The bone ring at the hero's feet** | `#d1c3ae` (canon `bone`), a bright ellipse ring under every actor, **brighter than the entire hero body**. It is the first thing the eye finds on the character. |
+| 4 | **The blade's diagonal** | A raw 2-1-2-1 staircase in near-white with a pure-black edge running its full length. The clearest "rendered, not drawn" tell on the sprite, and the highest-value object in most frames. |
+| 5 | **Three of the four islands** | Forge, Shrine and Pier at 96.9 / 97.4 / 98.1 % B0+B1. Each holds 1–3 props. The island named "the Forge" contains one brazier, one slag shard and an NPC — **there is no forge**. |
+| 6 | **`BOW_ART` in `views/bow.ts`** | 3 × 16×16 hand-typed ASCII frames in 6 off-canon colours. The same class of defect deleted from `player.ts` in #28. **Two of its three frames are unreachable** — `key` is assigned `'rest'` at init and the only reassignment is a ternary whose condition is always false, so `draw` and `loose` never render. |
+| 7 | **The idle** | One static cell, held forever, in every direction, armed and unarmed. |
+| 8 | **The pickup banner** | A full-width gold HUD bar is the loudest object in the frame at the game's first moment of agency. |
 
 ---
 
 ## 5. Root-cause diagnosis
 
-**A. The pixel grid (technical, ~1 line).** Detailed in §1. Characters resample at non-integer 1.5×
-while the room is 1:1. Fixing it costs the Brute a third of his on-screen size and makes every
-authored character crisp for the first time.
+Separated as requested. Note which bucket is *empty*: **"we need more assets" is not a root cause here.**
 
-**B. Additive tool, subtractive laws (process).** Generators add. Negative prompting does not remove a
-prior. The only mechanism in this project that has ever removed anything is **deleting the colour from
-the palette lock** — which is why removing two colours fixed in one generation what four rounds of
-prose could not.
+### Art direction — 1 problem, and it is not the doctrine
 
-The corollary is the actionable half:
+**The bible reaches the sheet and not the frame.** Every gate in `tools/art/gates.ts` measures a
+sprite sheet in isolation: dimensions, binary alpha, palette subset, colour budget, B5 mass, per-frame
+silhouette mass, connectivity, ground separation against a *constant* floor value of 0.1297, light
+direction, edge clearance, height, sockets, identity distance, clip centroids, loop closure, planted
+feet. **Not one of them looks at a rendered frame of the actual game.** That is why a §3.2.5 violation
+— cold architecture in the top brightness rank — has shipped in the opening shot for the project's
+whole life with 507/507 gates green.
 
-> **Generation succeeds when an asset is a positive, self-contained noun. It fails when the asset is
-> defined by a negative, or by a relation.**
+### Asset quality — 1 problem
 
-- Positive noun → `skiff-522`: reads as a boat in one second, five value bands, materials genuinely
-  value-separated.
-- Negative → the Seal arch (defined by refusing to be lit or detailed): 0 for 3, correctly moved to
-  code, where a loop of integer rects can *guarantee* the pattern never resolves into a glyph.
-- Relation → every hero constraint (≤40px **of 64**, ≥2 bands **from the floor**, one hook **no other
-  character has**, feet **at row 60**): **0 for 10**. A generator structurally cannot see a relation,
-  because it does not have the other term.
+**The rig cannot draw.** It gives you correct geometry, correct registration, correct motion and
+perfect consistency. It cannot give you a face, a fold, an artist's accent, an exaggeration, or a
+deliberate asymmetry — because none of those are computable from bones. The shipped hero has roughly
+8 readable shapes on a 37 px figure; a Hyper Light Drifter or Death's Door protagonist at that size
+carries 15–20. This is the *correct* division of labour to have discovered; the missing half is a
+drawing pass, and it does not exist in the pipeline today.
 
-**C. The palette lock is an alphabet, not a grammar (tooling).** A colour not in the lock cannot be
-drawn — real, and load-bearing. But a colour *in* the lock appears wherever the model wants it.
-Measured: `skiff-522`'s spec asked for `goldDim` as "a single bounce pixel"; it delivered **815 pixels,
-14.2% of the sprite, across the whole hull.** `seal-622` was asked for a flat black mass and returned
-12.3% teal moss. **The moment a colour is needed anywhere, expect it everywhere.**
+### Animation — 2 problems
 
-**D. The gates pass what the eye rejects, always in the same direction (process).** Every gate is a
-*structural* check. None is semantic. They passed two sheets a human rejected on sight, and pass
-507/507 on a hero whose crest reads as horns. `CHARACTER_HARD_CONSTRAINTS.md` §1 already says it
-correctly: *"A green gate says the candidate is structurally admissible, not aesthetically accepted."*
+1. **No idle.** Not a weak idle — **no idle clip exists in any sidecar.** A game's protagonist stands
+   still more than he does anything else, and yours is a photograph.
+2. **Long holds inside short clips.** The dodge's middle frame owns 10 of 20 ticks; the heavy's commit
+   owns 9 of 12 startup ticks. The frames exist; the *pacing* concentrates them badly.
 
-**E. Reference conditioning transfers costume, not construction.** The hero candidates matched the
-concept's red tabard and gold sigil precisely, and matched none of its camera, none of the spec's
-scale, and none of the silhouette rules.
+### Composition — 2 problems
+
+1. **Nothing stands up.** Every island is a flat paved slab inside a 1-tile wall ring. The concept
+   boards read as places because they have columns, arches, shelves, ladders, banners — vertical mass
+   that occludes and casts. The game has no occluding verticals at all outside the Gate.
+2. **Prop density is roughly one object per 24 paved tiles.** The concepts run 8–15 objects per
+   platform. This is the difference between "a location" and "a floor plan."
+
+### Technical — 2 problems
+
+1. **The lightmap multiplies.** Warm light physically cannot warm cold stone through a multiply. This
+   is the mechanism behind the +0.04 warmth measurement and it is the single highest-leverage fix in
+   this document.
+2. **A bone-coloured ring renders at every actor's foot**, out-ranking the actor.
+
+### Tooling — 1 problem
+
+**Nothing measures a rendered frame.** `pnpm room:gate` comes closest, and it gates room *sources* and
+Bardo negative space, not the composited frame's brightness rank or hue split. Both of my headline
+measurements took about thirty lines of `sharp` and could run in CI tomorrow.
+
+### PixelLab workflow — see §6. In one line: it does not exist.
+
+### Process — 1 problem, inherited from v1 and still true
+
+**Generation succeeds when an asset is a positive, self-contained noun. It fails when the asset is
+defined by a negative, or by a relation.** ~58 generations shipped zero pixels; every rejection was an
+excess, never a deficit. The corollary that matters for §8: a *third* mode exists that this framing
+missed — **transformation**. Editing an image that is already correct is neither a negative nor a
+relation, because the model has the other term in its hand. That is the opening for PixelLab.
 
 ---
 
 ## 6. Critique of the current PixelLab workflow
 
-1. **The client is dead code.** 21 PixelLab generations, **0** through `tools/art/generate.ts`. Its
-   371 carefully engineered lines — reference resolver, palette-PNG encoder, manifest, survivor-note
-   error path, tested against the provider OpenAPI — are unexercised. Every real generation went
-   through a side channel with weaker provenance than the design specifies.
-2. **Specs record conditioning that did not happen.** Three set-piece specs declare `references` that
-   `create_image_pixflux` cannot accept.
-3. **Prompt-of-record drift.** `gen-setpiece-skiff.json`'s subject is not the text that produced the
-   winner.
-4. **Two lanes, one word.** PixelLab (hard palette, native canvas, binary alpha) and codex-imagegen
-   (524–615 colours, `alpha: false`, 20× downsample, 9-of-12 baked checkerboards) both write to
-   `candidates/` and are both called "candidates." No policy distinguishes them.
-5. **Volume buys noise, not range.** 10 hero generations → 9 unique images → 1 design → 0 usable.
-   Cherry-picking assumes variance *across* candidates; here the variance is texture and the design is
-   the model's prior.
-6. **`kind: "prop"` is a gate hole.** It skips the three value gates. `gate-1002` passed **10/10** with
-   zero pixels above B2, zero gold (§8.2.2 unmarked), and would ship **darker than the plaza it stands
-   on** (Weber +0.14).
-7. **The judging canvas is not the shipping form.** Both set pieces were gated as 160px single cells;
-   in game they are multi-cell masses that `bakePropShadows` currently cannot place. Both 10/10s are
-   provisional.
-8. **Custody is asymmetric.** Every accept gets a hash-verified receipt. Every reject lives in prose.
-   **The rejection corpus is this project's most valuable art data** — it is the only place it has
-   learned anything — and it sits in a gitignored cache with no record.
+**There is no current PixelLab workflow. This is not a criticism of how you use it; it is the finding.**
+
+1. **The client has never been executed.** `tools/art/generate.ts` writes a prompt file *before* the
+   first paid request, writes a manifest on every exit path, and creates `.art-cache/candidates/`.
+   Repo-wide there are **zero** prompt files, **zero** manifests, and that directory has never
+   existed. All 21 recorded PixelLab generations went through the MCP by hand.
+2. **Provenance is therefore asymmetric.** Every shipped sidecar names `blender-mannequin-spike` or
+   `openai`. Nothing names `pixellab`. The two set-piece specs that do (`setpiece-gate`,
+   `setpiece-skiff`) are marked candidate-only, were never approved, and their input masters are gone
+   from disk — those 10/10 gate results are now unreproducible.
+3. **The subscription is lapsing unspent** (`VERTICAL_SLICE_PLAN.md`), which is the right call for the
+   role PixelLab was being asked to play and the wrong call for the role §8 proposes.
+4. **Specs record conditioning that could not happen.** Three `gen-setpiece-*.json` files name
+   references under `art/reference/concepts/`. That is not the approved pool, so §12.6's compounding
+   ("each new generation is conditioned on the approved pool") **has never once been exercised** —
+   there has never been a first term.
+5. **The concept boards were used as style references, and they contradict the bible.** They are 45°
+   isometric, ~79,000 colours, with a gold-framed glowing gate — precisely what §8.2.2 and §10.22
+   forbid. When a reference and a rule disagree, the reference wins. That is the mechanical
+   explanation for twelve gold-framed gates. **Use them to judge, never to condition.**
+6. **`kind: "prop"` is a live gate hole.** Ground separation, per-frame ground separation and height
+   are emitted **only** when `kind === 'character'`, and connectivity is downgraded from fail to judge.
+   A prop is never checked for whether it is darker than the floor it stands on.
+7. **The judging canvas is not the shipping form.** Both set pieces were gated as single 160 px cells;
+   in game they are multi-cell masses, and `bakePropShadows` excludes by index and cannot place them.
+   Solve the multi-cell footprint contract before approving any set piece.
+8. **Custody is one-sided.** Every accept gets a hash-verified receipt; every reject lives in prose in
+   a gitignored cache. The rejection corpus is the most valuable art data this project has generated,
+   and it is the only part with no record.
+
+**What PixelLab actually measured well at, in this project's own logs:** 8-direction rotation of a
+master *you* authored (identity held across all facings, one generation), and template locomotion (a
+real gait with extension, counter-swing and lean — the best animation in the corpus, one generation).
+Both take your identity and do labour on it. Neither asks it to invent under constraint. That is the
+shape of the answer in §8.
+
+**Do not use `create_image_pro`.** 20–40 credits, and it buys nothing pixflux's free palette lock
+already delivers. Its only case is multi-reference composition.
 
 ---
 
-## 7. Proposed visual constitution — the four articles that are missing
+## 7. The visual constitution
 
-You already have a constitution. Do not write another. It fixes palette, value bands, tile size,
-camera, outline, shadow, light direction and composition, and it is enforced where it reaches. These
-four gaps are what let inconsistency through anyway.
+**You have one. Do not write another.** `ART_DIRECTION.md` already fixes palette, value bands, tile
+size, camera, outline, shadow, light direction, silhouette and composition. Four articles are missing,
+and all four are *enforcement*, not doctrine.
 
 **Article I — One pixel grid.** Every authored sprite lands 1:1 on the render target. A sheet's cell
-size divided by `worldScale` is its logical size; anything else is a defect. *Enforcement: `cut()`
-sets `orig`; a test asserts source:target parity for every registered sheet.*
+size divided by `worldScale` is its logical size; anything else is a defect.
+*Enforcement:* `cut()` sets `orig` (done in #28). **A test asserting source:target parity per
+registered sheet does not exist and should be your first commit** — two dozen concurrent worktrees can
+regress it silently, and no gate can see it.
 
-**Article II — Colour placement, not just colour identity.** Each colour in an asset's ramp declares a
-maximum share and a maximum bounding box as a fraction of the sprite. *Enforcement: a new compile
-gate.* This converts the project's best art direction — currently prose in `paletteNote` fields — into
-something machine-checked, and would have caught the skiff's 815 gold pixels automatically.
+**Article II — The frame is gated, not only the sheet.** A composited 1× frame of the opening must
+satisfy: (a) the brightest 5 % of pixels have warmth ≥ +0.45; (b) no static architecture colour is the
+most common member of that set; (c) the darkest 50 % has a non-zero blue floor (b ≥ 10).
+*Enforcement:* a new `pnpm frame:gate` running the thirty lines of `sharp` used to produce §1's table,
+over three canonical shots. **This is the missing gate class, and it catches the defect that has
+shipped for a year.**
 
-**Article III — Detail density has a budget.** Edge density per asset class, measured, with the
-code-authored world as the reference (15.9% floor, 20.8% props). *Enforcement: a new compile gate.*
-Nothing today stops a 52%-churn asset landing beside a 21%-churn world.
+**Article III — Colour placement, not just colour identity.** Each colour in an asset's ramp declares
+a maximum share and a maximum bounding box as a fraction of the sprite.
+*Enforcement:* a new compile gate. This converts your best prose (`paletteNote`) into something
+machine-checked and would have caught the skiff's 815 gold pixels automatically.
 
 **Article IV — Projection is a reference image, never an adjective.** "high top-down" as a *word*
-produced 10 out of 10 elevation portraits. The camera must be supplied as a rendered image at the
-exact game projection. *The Blender lane can emit this for free*, which makes it the natural feeder
-for the generated lane rather than its competitor.
+produced 10 of 10 elevation portraits. The camera must be supplied as a rendered image at the exact
+game projection. **The rig emits this for free**, which makes it the natural feeder for any generated
+lane rather than its competitor.
 
 ---
 
-## 8. The ideal PixelLab pipeline
+## 8. The production pipeline — the real proposal
 
-The governing rule: **generate positive nouns, rig relations, code refusals.**
+**Invert PixelLab's role. It is not your generator. It is your finishing pass.**
+
+> **MEASURED, AND THE ANSWER IS NO — for animated characters.** This was the strongest idea in the
+> audit and it does not survive contact. Two `edit_image` rounds were run against three compiled hero
+> cells (idle, run0, run4), ~20 generations each:
+>
+> | | Result |
+> |---|---|
+> | Registration | **Survives.** bbox unchanged, foot pivot unchanged in all six outputs. This was the real risk and it is not one. |
+> | Five-part brief ("lit top edge, two folds, a hem, greave rims, separate the legs") | Redesigned the idle's diagonal sash into a full skirt, barely touched the run frames, delivered none of the leg gap / greave rims / hem — and **deleted the brow line the prompt explicitly said to keep**. |
+> | Single positive instruction ("shade the red cloth: two darker fold lines and a dark hem") | Still redesigned the garment, and **differently on each of the three frames, at the same seed**. Opaque pixel count grew 2.8–3.4 %. |
+>
+> The second result is the disqualifying one. Frame-to-frame consistency is not a nice-to-have on a
+> character sheet, it is the entire reason the rig exists — and the rig delivers it *by construction*,
+> six sheets and 1 823 gate assertions in 54 seconds. A tool that redraws the same garment three
+> different ways across one run cycle cannot touch a clip, however good any single frame looks.
+>
+> Two more frictions found in passing: `edit_image` has **no palette lock** (unlike pixflux's
+> `color_image`), so every output needs the compile pass before it can even be judged in canon; and
+> inline base64 **truncates above ~3 frames** in this MCP client, which the tool documents and which
+> caps a batch well below the 16 the pricing assumes.
+>
+> **Where the lane is still right:** single-frame assets with no consistency requirement — props, set
+> pieces, portraits, UI — and throwaway concepting to decide a design *before* the rig implements it.
+> Plus PixelLab's two separately measured strengths, which are different tools: 8-direction rotation
+> of an authored master, and template locomotion. Keep it off anything with a clip.
+
+
+The rig produces figures that are *correct and lifeless*. A generator asked to invent a hero under
+relational constraints fails 0-for-10. But a model handed a correct image and asked to **change one
+thing about it** is doing neither invention nor constraint satisfaction — it has the other term in
+front of it. That is `edit_image`, `inpaint_image` and `correct_pixelart`, and it is the one mode this
+project has never tried.
+
+### The prop recipe that works — and the error that hid it
+
+**Correction first, because it invalidates a number this document printed.** The "74 % edge density,
+2–3.5× the world" figure came from generating at the target size, 48 px, and measuring the raw output
+against *compiled* code-authored art. That is not like-for-like, and it skipped the entire reason the
+compiler exists: `reduce()` downsamples **by voting in palette space**, and voting is the density
+lever. Generating the same objects at 192 px against a 48 px cell:
+
+| | edge density | colours | gates |
+|---|---|---|---|
+| raw 48 px generation (the wrong test) | 74.2 % | 36 | — |
+| **192 px → compiled to 48** | **42.7–47.6 %** | **7–12** | **PASS, 0 blocking** |
+| code-authored props | 26.2–41.2 % | 9–10 | — |
+
+The gap is ~15 % busier, not 200 %. **The tool was never the problem; the methodology was.**
+
+**The recipe, in four steps.**
+
+1. **Generate at 4× the target cell**, canon palette locked (`color_image`). The lock is real: 0
+   off-canon colours and 0 partial-alpha pixels on every candidate, which passes two hard gates
+   outright.
+2. **Prompt it lit and complete.** Asking for an "empty, cold, unlit brazier" produced a formless
+   blue-grey bowl with no legs — the model needs the fire to know what the object *is*. It was
+   correctly blocked.
+3. **Remove what the runtime owns in the RAMP, not the prompt.** Recompiling that same lit master
+   against a ramp with no ember colours in it snapped the flame down into iron and ash: a proper
+   wrought-iron bowl on three legs, 7 colours, 42.7 % density, **PASS 0 blocking**. The game then
+   owns the flame (`particles.flame`), the light pool (`arena.braziers`) and the cast shadow
+   (`bakePropShadows`) — which is the division that lets a brazier gutter.
+4. **A ramp is per-asset. Never copy one.** Doing exactly that twice in this session mapped an
+   anvil's wooden stump into orange fire, then into snow.
+
+**And the guard rail already exists.** §5 of this document says the gates cannot see baked lighting.
+That is wrong at the sheet level: `frame:*:light-direction` fired on the prompted-unlit candidate at
+correlation **0.66 against a +0.35 cap** and refused to promote it. The one structural objection to
+generated props is already machine-checked.
+
+**Where it beats the code lane outright:** radially symmetric, silhouette-dominant objects — braziers,
+bowls, bells, jars, lanterns. The generated brazier is a better object than the hand-coded one, on
+palette, on budget, gate-green, and it sits correctly in a real 1× frame.
+
+**Where it still loses:** anything whose read depends on projection. The anvil came back isometric
+both times, which no ramp fixes. And `create_map_object` style-matching against a real room patch
+matched the palette and **lost the subject entirely** — it returned a barrel.
+
+### The lane, per asset class — measured
+
+One test per class, same palette, same room, same measurements. **The axis every row turns on is not
+"which tool draws better" — PixelLab often draws better — it is whether the asset must RECEIVE the
+room's light and the clip's timing, or may carry its own.**
+
+| Class | Lane | Evidence |
+|---|---|---|
+| **Hero, enemies — anything with a clip** | **Rig, decisively** | The rig gives frame consistency by construction: 6 sheets, 1 823 gate assertions, 54 s. `edit_image` redrew one garment three different ways across three frames at the same seed. Generation on hero identity is 0 for 10 historically, because every hero constraint is a *relation*. |
+| **Floors, walls, autotiles** | **Code, decisively** | 20.4 % edge density, slabs that cross tile boundaries, wear paths that follow real traffic, a bake coupled to the room's light pools. None of that is a static image — it is parametric behaviour a generated tile cannot have. **PixelLab's `create_topdown_tileset` is untested here**; say so rather than assume. |
+| **Props and set pieces** | **PixelLab, for the right shapes** — see the recipe above | Generated at 4× and compiled, a brazier comes out at 42.7 % density and 7 colours, gate-green, and is a **better object** than the hand-coded one. The code lane's `pew` and `shard` are ambiguous brown and grey masses by comparison. Loses on anything whose read depends on projection: the anvil came back isometric twice. |
+| **Particles, decals, impacts, swing arcs** | **Code, no contest** | They track `tuning.ts`. A sprite cannot. |
+| **Title screen and UI** | **Code — there is no asset to generate** | The title is `Graphics.rect()` and `Text` held over the *living hub*, which is the best composition decision in the project: the first frame a player sees is the room they are about to stand in. The only generable thing here is separate key art, and that is gpt-image's job, not PixelLab's. |
+| **Concept art, marketing, key art** | **gpt-image** | 79 000 colours, no alpha discipline, no grid — useless as an asset, excellent as a target. Judge against it; never condition on it. |
+
+**What the palette lock does and does not buy.** Locked, pixflux returned **0 off-canon colours and 0
+partial-alpha pixels** on all three props — two of the repo's hard gates passed outright, which is
+genuinely better than any other generated lane has managed. It still failed the colour budget and the
+density budget on the same images. The audit's own line, now measured twice: **the palette lock is an
+alphabet, not a grammar.** It fixes *which* colours appear and nothing about *how many, where, or how
+busy*.
+
+**The structural finding, and it is the one that generalises.** Composite those props into a real 1×
+frame and the mismatch is not density or palette — it is that **they carry their own baked lighting**.
+The column is lit from its left while the room's key is the brazier to its right. The game's props are
+drawn to *receive* a light pool; a generated sprite bakes one in. No prompt fixes that, because the
+generator does not have the room. It is the same shape as the failure that killed the edit lane and
+the same shape as the twelve gold-framed gates: **the generator cannot see the other term.**
+
+### Ownership
+
+| Medium | Owns | Why |
+|---|---|---|
+| **Blender rig** | proportion, registration, pivots, sockets, planted feet, gait, every combat clip's *geometry*, all directional consistency | every constraint a generator failed is *computed* from bones; 52-second catalogue iteration |
+| **PixelLab (edit lane)** | the **drawing pass** over rig output: face and visor, fabric folds, lit edges, foot separation, blade cleanup; 8-direction rotation of an authored master; skeleton-driven in-betweens | the one mode where the model has the other term; both its measured strengths live here |
+| **PixelLab (create lane)** | positive-noun props only: a brazier, a lantern, a bell, a boat, a crate | the one generation class that has ever passed |
+| **Code** | tiles, autotiles, materials, HUD, telegraphs, impacts, swing arcs, **anything defined by refusal**, and **every threshold mark and light pool on a generated mass** | a sprite cannot track `tuning.ts`, and code can *guarantee* a pattern never resolves into a glyph |
+| **Runtime** | lighting, grade, camera, post | must respond to sim state |
+| **gpt-image** | concepting and marketing only | 500–600 colours, `alpha: false`, baked checkerboards — never an asset source |
+
+### The stages
 
 | # | Stage | Input | Tool | Output | Acceptance | Failure mode | Verification |
 |---|---|---|---|---|---|---|---|
-| 0 | **Classify** | an asset need | judgement | one of noun / relation / refusal | the class is unambiguous | mis-class wastes a whole round (12 gates, 3 seals) | if the brief contains "not", "without", or a comparison to another asset, it is not a noun |
-| 1 | **Canonical reference** | approved master | Blender lane | one on-model 64px asset the project would defend | it passes gates *and* the eye | §12.6 has no first term today | the orchestrator's 1× judgement |
-| 2 | **Projection reference** | the rig | Blender headless | mannequin rendered on a floor tile at the game camera | matches the shipped frame exactly | an adjective instead of an image | diff against a real `pnpm shot` |
-| 3 | **Frame template** | canvas rules | tool | template image: cell, body cap, anchor row | the generator receives it as a reference | prose caps that nothing measures | a body-only bounds gate (the current height gate caps at 52px on a 64 cell, so the 40px rule is measured by nothing) |
-| 4 | **Generate** | spec + refs 1–3 | `generate.ts` (MCP routed through it) | candidates + manifest | palette lock holds; provenance recorded | side-channel calls with no manifest | 0 off-canon pixels, 0 partial alpha |
-| 5 | **Screen** | candidates | orchestrator at 1× | keep / reject **with a receipt** | every reject writes `.rejection.json` | rejects lost to prose | the rejection corpus grows |
-| 6 | **Compile + gate** | master | existing pipeline | sheet + sidecar | 0 blocking; waivers exact and explained | `kind:"prop"` skipping value gates | fix the hole |
-| 7 | **Bake the marks** | compiled mass | code | gold crossings, light pools, shadows | §8.2.2 satisfied | expecting the generator to place them | it never has, 12 for 12 |
-| 8 | **Place** | sheet | engine | in-game at 1× with hero for scale | reads at gameplay scale | judged on a canvas that will not ship | `pnpm shot`, read at 1× |
+| 0 | **Classify** | an asset need | judgement | noun / relation / refusal / **transformation** | the class is unambiguous | mis-class wastes a whole round (12 gates, 3 seals) | if the brief contains "not", "without", or a comparison, it is not a noun — route it to rig, code, or the edit lane |
+| 1 | **Pose** | pose data | rig | 512 px renders + `rig.json` bones | every marker projects inside the cell (`FIT WARNING` is a hard stop) | a pose that leaves the cell | the rig prints it |
+| 2 | **Compile** | renders | `pnpm art compile` | sheet + sidecar | 0 blocking gates; waivers exact, explained, and currently firing | `kind:"prop"` skipping the value gates | the existing suite |
+| 3 | ~~**Draw**~~ | — | — | **Stage removed.** The acceptance criterion below was the right one and the lane passes it; it fails a criterion this table did not think to write down — *the same edit on every frame of a clip* | — | — | — |
+| 4 | **Propagate** ← *untested* | an authored master | PixelLab `animate_character` with rig keypoints | the master carried across frames and facings | identity gate ≤ 0.45 across the clip | — | the existing `identity:*` gates. Note this is a DIFFERENT tool from `edit_image` and one of PixelLab's two measured strengths, so the stage-3 result does not condemn it — but it is unproven here and the rig already produces consistent frames for free |
+| 5 | **Screen** | candidates | you, at 1×, on the room's floor value | keep / reject **with a receipt** | every reject writes `.rejection.json` with a reason | rejects lost to prose | the rejection corpus grows |
+| 6 | **Approve** | master | `pnpm art approve` (human only) | hash-verified receipt | sha256 matches at compile | an edited master shipping silently | the reproducibility test |
+| 7 | **Bake the marks** | compiled mass | code | gold crossings, light pools, cast shadows | §8.2.2 satisfied | expecting the generator to place them | it never has, 12 for 12 |
+| 8 | **Gate the frame** ← *new* | the shipped build | `pnpm frame:gate` | brightness rank, warmth, hue floor | Article II | judging a sheet and shipping a frame | the §1 measurements, in CI |
 
-**Do not use `create_image_pro`** — 20–40 generations, and it buys nothing pixflux's free palette lock
-already delivers. Its only case is multi-reference composition.
-
-**PixelLab's two demonstrated strengths, both worth using:** 8-direction rotation of a master *we*
-authored (identity held across all facings, 1 generation), and template locomotion (a real gait with
-extension, counter-swing and lean — the best animation in the corpus, 1 generation). Both take our
-identity and do labour. Neither asks it to invent under constraint.
-
-**Missing prerequisite for the accelerator role:** `animate-with-skeleton` takes exact keypoints and
-the rig can emit them; nothing in the repo emits keypoints today. That is the highest-leverage missing
-piece, and it converts PixelLab's one hard failure (free-text combat) into its strength.
+**The missing prerequisite is small and specific:** `animate_character` takes exact keypoints and the
+rig already computes every marker's projected pixel position into `rig.json`. Nothing emits them in
+PixelLab's format today. That one adapter converts PixelLab's single hard failure (free-text combat
+poses) into its strongest mode.
 
 ---
 
-## 9. Hero plan
+## 9. Hero plan — **rewritten; the first draft of this section was wrong**
 
-**Done this session:** eight masters approved with hash-verified receipts — unarmed ×3 facings, roll
-×2, greatsword ×3 — with the crest reshaped from horns and the mantle given fold geometry. The ASCII
-placeholder and the Kenney fallback are being deleted as this document is written.
+The first draft said "the hero has no face" and routed the fix to the PixelLab edit lane. Both halves
+were wrong, and the correction is worth more than the recommendation was.
 
-**Next, in order:**
+**He has a face, and it is properly built.** `mannequin.py` models a `visorPlate` in `seal0`, a
+`faceSlit` in `mortar`, and — added in an earlier pass for exactly this reason — a `helmBrow` in
+steel, under a comment that already gets the principle right: *"What makes a slit read is the LIT
+edge above it, not a darker dark."* All three render correctly. Read the compiled south idle back as
+hex and the face is there: a lit brow over a two-row black slit inside a dark visor plate.
 
-1. **Frames, not fidelity.** The selectors are already built and tested; nothing has ever bought
-   frames for them. An 8-frame run and a 5-pose swing chain make the hero feel alive far more than any
-   redraw. Note `clipSelect.ts:70` requires ≥2 startup frames — buying that frame *activates* the
-   plant-pose mechanism that is currently unreachable code.
-2. **Idle variation and secondary motion.** A breathing idle and cloak follow-through. Personality is
-   currently 20/100 and this is most of it.
-3. **Grounding.** Contact shadow scaled to the pose, foot planting checked against the (currently
-   vacuous) planted-feet gate.
-4. **Do not add an outline or a rim.** Ground separation is already carried by value (Weber 1.01) and
-   the wine field. An outline would fight the code-authored world's flat-mass language.
+**What was wrong was the rank, not the drawing.** The brow quantised to `brick`; the two pauldron
+rims quantised a step higher to `brickHi`, the top of the ramp — over thirty pixels of it, on the
+widest part of the figure, against four on his face. The brightest thing on the hero was his shoulder
+line. Measured on the shipped south idle: **helm dome L 0.110, pauldrons L 0.213** — a 1.9× inversion.
+
+**Two things were tried, and one of them failed usefully.** Lifting the *dome* (MAT_IRON → `#5C6070`)
+moved dome L **0.1100 → 0.1114** and the head:shoulder ratio not at all — because `helmCrown` and the
+visor own nearly every visible head pixel and the ball is behind them. That value was never the
+dome's to spend. Reverted. What worked was giving the top of the ramp to the **brow** and stepping the
+**rims** down one: the brow becomes `brickHi` directly above a `mortar` slit, which is the largest
+value step this palette has, four pixels wide, at eye level.
+
+**And it is an improvement, not a transformation. Say so.** At 14× the face clearly reads. At 1×, full
+figure, the difference is subtle. What makes the hero a domino at gameplay scale is not one material:
+his head is ~13 px of a 37 px figure and mostly occluded by crest and visor, his torso and legs carry
+no interior modelling, and the whole body is near-monochrome with two bright accents. Fixing *that* is
+a proportion-and-value redesign of the mannequin — it changes who the character is, so it is a
+decision, not a defect.
+
+**Note also what this says about §8.** The stage-3 "PixelLab draws the face" proposal was written
+before this investigation and it is now over-scoped: the face is *geometry and material*, which the
+rig computes, and the rig was already right. Keep the edit lane on its proper ground — folds, worn
+edges, hand-placed accents, the things not derivable from bones — and stop assuming a generator is
+needed for anything the eye is missing.
+
+**Still open, in order:**
+
+1. **Decide the body's value structure.** Does the shoulder line keep the top of the ramp, or does the
+   head? A candidate for the second answer is compiled and gate-green in `.art-cache/spike/hero-final`
+   (169 gates unarmed, 404 armed, 0 blocking). **Approval is a human's; no agent may award it.**
+2. **Give the body interior modelling.** Two separated legs with a gap, a hem on the mantle, a lit top
+   edge on the greave. ~8 readable shapes today; a shipped indie protagonist at this size carries 15–20.
+3. **Author an idle clip.** Two or three frames, 20–30 ticks each. There is no idle clip in any
+   sidecar; personality is 25/100 and this is most of it.
+4. **Re-pace the long holds.** The dodge's 10-tick middle and the heavy's 9-tick commit.
+5. **Kill the bone ring at his feet**, and pull the blade's value down one band so the character
+   out-ranks his weapon.
+6. **Do not add an outline or a rim.** Ground separation is already carried by value and the wine
+   mantle. (The white rim on a perfect dodge is a *reward*, one tick, and should stay.)
 
 ---
 
 ## 10. Opening-town plan
 
-The environment is the strongest thing here; treat this as protection, not overhaul.
+Protection and addition, not overhaul. The composition logic is good.
 
-1. **Bake the Gate's threshold mark.** The generated Gate has zero gold. `bakeBardoGate` already draws
-   `goldDim` courses as integer-aligned rects — the exact §8.2.2 mark twelve generations could not
-   produce. **Generated stone, baked light. Generation owns mass and material; code owns anything the
-   eye is meant to be led to.**
-2. **Finish the arrival's drench.** The Gate got revelation; the causeway got a lamp.
-3. **Recast the actors from the rig, not the generator.** Every constraint the generator failed is
-   computed in a rig. This is the last Kenney.
-4. **Solve prop placement before approving any set piece.** `bakePropShadows` excludes by index and
-   neither compiled set piece can currently be placed. Until a multi-cell footprint contract exists,
-   a 10/10 is provisional.
+1. **Make light additive and amber.** The one change that moves this build closest to its own concept
+   boards, and it draws nothing. Add a warm additive pass over the existing multiply so a lit surface
+   can actually exceed its unlit colour. Target: brightest-5 % warmth ≥ +0.45 (concepts run +0.61 to
+   +0.79; you are at +0.04).
+2. **Lift the shadow floor off pure black.** The darkest 50 % of your arrival frame is `rgb(0, 0, 4)`;
+   the concepts run `rgb(3–9, 3–9, 13–26)` — a blue-violet, not a void. `postfx` already has
+   `uShadowTint` and `uShadowLift`; this is a number.
+3. **Stand three to five things up on every island.** Columns, a ladder, a shelf, a hanging banner, a
+   broken arch. Code-authored props on the existing sheet grammar. This is what separates the concept
+   boards from a floor plan, and every island currently has 1–3 objects.
+4. **Give the Forge a forge, the Shrine an altar, the Pier a boat.** Each island is named for
+   something it does not contain. One strong focal object each is worth more than twenty small props.
+5. **Bake the Gate's threshold mark.** `bakeBardoGate` already draws `goldDim` courses as
+   integer-aligned rects — the exact §8.2.2 mark that twelve generations could not produce.
+   **Generated stone, baked light: generation owns mass and material; code owns anything the eye is
+   meant to be led to.**
+6. **Do not lift the ambient.** I tested it: `ambientDarkness` 0.44 → 0.24 and `vignette` 0.40 → 0.22
+   moved mean L only 0.094 → 0.104 and made the frame flatter. The darkness is not the defect. *(One
+   worthwhile exception measured: `arena.ts`'s `edge` term at `1 - dEdge / 3` puts 71.8 % of paved
+   cells at the darkest level; the file's own comment records `1 - dEdge / 2` as the revert. I tried
+   it — B2 share 3.7 % → 7.0 %, and the stone visibly regains material. Worth taking on its own
+   merits, but it is a texture fix, not the light fix.)*
 
 ---
 
 ## 11. The sword moment
 
-Currently a state flip: `p.armed` changes and the sprite swaps. It is the first act of agency in the
-game and it has no beat.
+More of it works than v1 credited. `swordMetal` plays with a 329.63 Hz bell, the Gate's mark lights on
+the same tick, the doors open, and the rack redraws without its blade. The beats exist; the **staging**
+does not.
 
-The whole moment, restrained, in the order that buys the most per unit of work:
+In order of value per unit of work:
 
-1. **Proximity** — the blade's specular catches as the player enters the rack radius. Code, one light.
+1. **Cut the banner.** A full-width gold HUD bar is currently the loudest object in the frame at the
+   game's first moment of agency, and it is UI. Let the room say it.
 2. **A pickup pose** — anticipation → grasp → rise, three authored frames. The rig has the poses.
-3. **Hit-stop** — 4–6 ticks at the grasp. The mechanism already exists in `tuning.hitstop`.
-4. **The room answers** — the sealed north Gate's mark lights on the same tick. Already wired to
-   `rackTaken`; it just needs to feel simultaneous.
-5. **One sound.** One good one.
+3. **Hit-stop, 4–6 ticks at the grasp.** `tuning.hitstop` already exists.
+4. **Proximity specular** — the blade's edge catches as you enter the rack radius. Code, one light.
+   This also solves a real problem: **the rack is currently not visually distinguishable** in the
+   frame, and it is the one object the first minute is about.
+5. **Keep the sound.** It is already good.
 
-Explicitly **not**: particles, camera shake, a UI flourish, or a weapon glow. The bible forbids baked
-glow, and one excellent animation with one excellent sound beats twelve effects.
+Explicitly **not**: particles, camera shake, a UI flourish, or a weapon glow. One excellent animation
+with one excellent sound beats twelve effects.
 
 ---
 
 ## 12. Art vs code
 
-| Medium | Owns | Why |
-|---|---|---|
-| **Blender rig** | every character, every equipment state, every combat clip | every constraint a generator failed is *computed* from bones; 52-second catalogue iteration |
-| **PixelLab** | 8-direction rotation of our masters; template locomotion; positive-noun props (boats, braziers, bells, lanterns) | its two demonstrated strengths; the one class that has ever passed |
-| **Code** | tiles, materials, autotiles, HUD chrome, telegraphs, impacts, swing arcs, **anything defined by refusal**, **all threshold marks and light on generated masses** | a sprite cannot track `tuning.ts`; and code can *guarantee* a pattern never resolves into a glyph — which is why the Seal arch works now and 3 generations did not |
-| **Runtime** | lighting, grade, camera, post | must respond to sim state |
+Covered in §8's ownership table. The one line worth repeating, because it is the rule this project
+learned the hard way and keeps re-deriving:
+
+> **Generation owns mass and material. Code owns anything the eye is meant to be led to.**
+
+And the new corollary this audit adds:
+
+> **The rig owns geometry. Only a drawing pass owns character.**
 
 ---
 
 ## 13. Ranked highest-leverage changes
 
+Ranked by perceived quality × readability ÷ cost, with dependency order respected.
+
 | # | Change | Impact | Cost | Reuse | Risk |
 |---|---|---|---|---|---|
-| 1 | **The pixel-grid fix** (`cut()` sets `orig`) | Every authored character becomes crisp and stops crawling. Fixes "pasted on" globally. | ~1 line | every sprite, forever | Brute shrinks by ⅓ — verify |
-| 2 | **Ship the approved hero; delete the ASCII placeholder and the Kenney fallback** | Removes the loudest defect in the game | 1 session | — | frame-name bridge must be exact |
-| 3 | **Adopt the noun/relation/refusal lane law** | Stops burning generations on classes that structurally cannot succeed | a decision | all future art | none |
-| 4 | **Colour-placement gate** (share + bbox per colour) | Converts the best art direction from prose into enforcement | ~half a day | every generated asset | none |
-| 5 | **On-model + projection references** | Starts the §12.6 compounding that has never begun | rig emits both free | every generation | none |
-| 6 | **Buy the hero frames** (8-frame run, 5-pose chains, breathing idle) | Personality 20 → 60 | rig time | all actors | none |
-| 7 | **Recast the five actors from the rig** | Kills the last Kenney; fixes enemies darker than their floor | 1–2 sessions | — | needs identity rounds |
-| 8 | **Rejection receipts** (`pnpm art reject --reason`) | Preserves the most valuable corpus this project has | ~1 hour | forever | none |
+| 1 | **Additive warm light + a non-black shadow floor** | Closes the single largest measured gap to the concept boards (+0.04 → +0.6 warmth). Changes every frame in the game. | ~1 day | every room, every realm | must not break the room-gate's value budgets — measure |
+| 2 | **Give the hero a face** (visor, jaw, brow) via the PixelLab edit lane | The eye finally lands on the character. Character design 38 → 60+. | ~20 px × 3 facings + the lane | every actor after him | the edit must not move the silhouette — diff the alpha |
+| 3 | **`pnpm frame:gate`** (Article II) + the source:target parity test (Article I) | Converts the two defects that shipped for a year into build failures. ~60 lines total. | half a day | forever | none |
+| 4 | **An idle clip** (2–3 frames) + re-pace the dodge and heavy holds | Personality 25 → 50. The protagonist stops being a photograph. | rig time | all actors | none |
+| 5 | **Stand things up + one focal object per island** | Turns a floor plan into a place. Sense of place 70 → 85, orientation 52 → 70. | 1–2 sessions, code-authored | every realm's rooms | prop footprint contract needed for multi-cell |
+| 6 | **The sword moment's staging** (cut banner, 3-frame pose, hit-stop, proximity specular) | The first act of agency gets a beat. | ~half a session | every pickup after it | none |
+| 7 | **Recast caster / charger / warden / dummy from the rig** | Kills the last Kenney; fixes enemies measured darker than their floor. Note the five specs already exist and are complete — but their `.art-cache` inputs are gone, so the lane must be re-run. | 1–2 sessions | — | needs identity rounds |
+| 8 | **Rejection receipts** (`pnpm art reject --reason`) | Preserves the most valuable corpus this project has. | ~1 hour | forever | none |
+| 9 | **Delete `BOW_ART`** and the `SPRITE.player` / dead `restoreSword` entries | Removes the last view-file-authored pixels; two of three bow frames are already unreachable. | ~1 hour | — | none |
+
+**What is deliberately *not* on this list:** more generations, more props, particles, camera shake, a
+new palette, a new constitution, and a hero redesign. The hero's construction is correct. He needs a
+face, not a rebuild.
 
 ---
 
 ## 14. Phased plan
 
 **Phase 0 — Stop / preserve / remove.**
-*Stop:* generating anything defined by a negative or a relation; passing the concept boards to
-generators as style references (they contradict the bible and win); `create_image_pro`.
-*Preserve:* the bible, the gate suite, the receipt mechanism, the reproducibility test, the code-tile
-lane, the rig, the sim/art timing contract.
-*Remove:* the ASCII pose art and its off-palette colour table; the Kenney player fallback; eventually
-`tiny_dungeon.png` and the `SPRITE`/`WEAPON` index tables.
-**Done when:** no Kenney texture binds to the player and no view file contains authored pixels.
+*Stop:* passing the concept boards to any generator as a style reference; `create_image_pro`;
+generating anything defined by a negative or a relation; grading the *configuration* instead of the
+frame.
+*Preserve:* the bible, the gate suite, the receipt mechanism, the reproducibility test, the rig, the
+code-tile lane, `buildBardo`'s composition, the sim/art timing contract, the pixel grid.
+*Remove:* `BOW_ART`, `SPRITE.player`, `restoreSword`, and eventually `tiny_dungeon.png`.
+**Done when** `grep -rn "SPRITE.player\|BOW_ART" src/` is empty.
 
-**Phase 1 — Art-direction lock.** The four missing articles (§7). Colour-placement and detail-density
-gates written; the on-model and projection references emitted from the rig; the frame template plus a
-body-only bounds gate. **Done when** a generation can be rejected *automatically* for putting the
-right colour in the wrong place.
+**Phase 1 — Enforcement lock.** Article I's parity test and Article II's `frame:gate`, both in CI.
+Article III's colour-placement gate. The rig emits projection and on-model references.
+**Done when** a build fails because cold architecture is the brightest mass in the opening frame.
 
-**Phase 2 — Hero.** Ship the approved masters behind the pixel-grid fix; then buy frames (8-frame run,
-5-pose chains, breathing idle, cloak follow-through). **Done when** the hero reads as a character at
-1× in motion, on the grid, in every state, with no fallback path alive.
+**Phase 2 — Light.** Additive warm pass; shadow floor lifted off black; the `edge` term revert
+measured on its own merits; the bone ring at the feet removed; the blade dropped one value band.
+**Done when** the arrival frame measures brightest-5 % warmth ≥ +0.45 and no static architecture
+colour leads that set.
 
-**Phase 3 — Opening town.** Bake the Gate's threshold mark; finish the arrival drench; solve the
-multi-cell prop footprint contract. **Done when** the arrival measures a full band of centre lift *and*
-wins its blind compare against concept-02 on composition, not just on structure.
+**Phase 3 — Hero.** The edit lane stood up (stage 3 of §8) and proven on one cell. Face, folds, foot
+separation propagated across 3 facings × 2 families. An idle clip. The long holds re-paced.
+**Done when** the hero reads as a character at 1×, in motion, standing still, in every state — and a
+stranger can tell which way he is facing without seeing him move.
 
-**Phase 4 — Animation + interaction.** The sword moment's five beats (§11); ambient environmental
-motion. **Done when** the pickup has anticipation, contact and consequence, and a first-time player
-pauses on it.
+**Phase 4 — Town.** Verticals and one focal object per island. The Gate's threshold mark baked. The
+multi-cell prop footprint contract solved.
+**Done when** each island is identifiable at a glance from any other, and the arrival wins a blind
+compare against concept-05 on composition.
 
-**Phase 5 — Integration + polish.** Actor recasts from the rig; delete `tiny_dungeon.png`; weapon
-sprites folded into body sheets. **Done when** `grep -r tiny_dungeon src/` is empty.
+**Phase 5 — Interaction.** The sword moment's five beats. Ambient environmental motion.
+**Done when** the pickup has anticipation, contact and consequence, and the room answers on the same
+tick without a HUD banner carrying it.
 
-**Phase 6 — Production pipeline.** Route every generation through one client; add rejection receipts;
-emit rig keypoints for `animate-with-skeleton`. **Done when** a new actor goes identity → gated
-candidate → approval package without a human writing a prompt by hand.
+**Phase 6 — Pipeline.** Rig keypoints emitted for `animate_character`. Rejection receipts. Actor
+recasts. Every generation routed through one client with a manifest.
+**Done when** a new actor goes identity → gated candidate → approval package without a human writing
+a prompt by hand.
 
 ---
 
 ## 15. Definition of done — the opening-town vertical slice
 
-The slice is complete when **all** of these hold:
-
 1. No Kenney texture and no view-file-authored pixel reaches the screen in the first sixty seconds.
-2. Every authored sprite renders 1:1 on the pixel grid; a test asserts source:target parity per sheet.
-3. The hero reads as a character at 1×, in motion, in every state, armed and unarmed — with an
-   8-frame run, a breathing idle, and no fallback path alive in the code.
-4. The sword pickup has anticipation, contact and consequence, and the room answers on the same tick.
-5. The arrival, the axis and the Gate plaza each pass §11.1 **and** win a blind compare against their
+2. Every authored sprite renders 1:1 on the pixel grid, **and a test asserts source:target parity per
+   sheet.** *(The fix shipped in #28; the test still does not exist.)*
+3. `pnpm frame:gate` is green on the arrival, the axis and the Gate plaza: brightest-5 % warmth
+   ≥ +0.45, no static architecture colour leading that set, shadow floor blue and non-zero.
+4. The hero reads as a character at 1×, in motion **and standing still**, armed and unarmed — with a
+   face, an idle clip, an 8-frame run, and no fallback path alive in the code.
+5. The sword pickup has anticipation, contact and consequence; the room answers on the same tick; and
+   no HUD banner is carrying the moment.
+6. Each of the four islands is identifiable at a glance from any other, and each contains the thing it
+   is named for.
+7. The arrival, the axis and the Gate plaza each pass §11.1 **and** win a blind compare against their
    named concept exhibit on composition.
-6. Every shipped asset has a receipt; every rejected candidate has a rejection receipt with a reason.
-7. Colour-placement and detail-density gates exist and are green on every shipped asset.
-8. A new asset can go from identity decision to gated candidate without a hand-written prompt.
-9. `pnpm typecheck`, `pnpm test`, `pnpm matrix -- --seeds 1-100`, the pinned replays and
-   `pnpm room:gate` are all green.
-10. **The user plays the first minute and does not want to change anything.** This gate is theirs
-    alone, and no agent may award it.
+8. Every shipped asset has a receipt; every rejected candidate has a rejection receipt with a reason.
+9. Colour-placement and detail-density gates exist and are green on every shipped asset.
+10. `pnpm typecheck`, `pnpm test`, `pnpm matrix -- --seeds 1-100`, the pinned replays and
+    `pnpm room:gate` are all green.
+11. **The user plays the first minute and does not want to change anything.** This gate is theirs
+    alone, and **no agent may award it.**
+
+---
+
+## Appendix — how every number here was produced
+
+All measurements are off PNGs written by `pnpm shot -- --oneX 1` against a private dev server, so one
+PNG pixel is one target pixel. Bands are perceptual L (cbrt of relative luminance) in six equal steps.
+Warmth is `(r − b) ÷ mean(r,g,b)` over a luminance-sorted percentile band.
+
+| Shot | mean L | B0 | B0+B1 | unique colours |
+|---|---|---|---|---|
+| title over the plaza | 0.108 | 74.3 % | 90.8 % | 1009 |
+| arrival (the first frame of play) | 0.094 | 75.3 % | 95.8 % | 1265 |
+| Gate plaza | 0.128 | 64.4 % | 88.6 % | 1010 |
+| the rack, before pickup | 0.115 | 67.1 % | 90.4 % | 622 |
+| the Forge | 0.084 | 83.4 % | **96.9 %** | 1106 |
+| the Shrine | 0.076 | 83.3 % | **97.4 %** | 1047 |
+| the Pier | 0.083 | 79.4 % | **98.1 %** | 1117 |
+| a combat room (`wave1`), for contrast | 0.143 | 65.2 % | 90.7 % | 1332 |
+| concept-05 *Town Between Worlds* | 0.124 | 78.0 % | 95.4 % | 79 024 |
+
+Two experiments were run against the live source and **reverted**; `git status` was clean afterward:
+
+- `HUB.ambientDarkness` 0.44 → 0.24 and `vignette` 0.40 → 0.22: mean L 0.094 → 0.104, B0 75.3 → 71.4 %.
+  **Marginal — the ambient is not the lever.**
+- `arena.ts` `edge` term `1 - dEdge / 3` → `1 - dEdge / 2` (the revert its own comment records): mean L
+  0.094 → 0.104, **B2 3.7 → 7.0 %**, and the stone visibly regains material read at 1×.
+
+Baseline at the time of writing: `pnpm typecheck` green, `pnpm test` **957 passed / 81 files**.

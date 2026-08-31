@@ -1,0 +1,77 @@
+{
+  "id": "pilot.hero.rotations.candidate",
+  "kind": "character",
+  "input": ".art-cache/pilot-hero/rot-master-n.png",
+  "output": ".art-cache/pilot-hero/compiled/pilot_hero_rotations.png",
+  "sidecar": ".art-cache/pilot-hero/compiled/pilot_hero_rotations.json",
+  "cell": 64,
+  "cols": 4,
+  "rows": 2,
+  "maxColors": 16,
+  "palette": [
+    "mortar",
+    "seal0",
+    "iron",
+    "ironHi",
+    "purple0",
+    "purple2",
+    "purple3",
+    "boneLo",
+    "boneDim",
+    "bone",
+    "brickLo",
+    "brick",
+    "brickHi",
+    "cope",
+    "gold"
+  ],
+  "colourPlacement": "veteran",
+  "fit": "grid",
+  "chromaKey": false,
+  "coverage": 0.5,
+  "salience": {
+    "minShare": 0.22,
+    "minDelta": 0.16
+  },
+  "valueLift": false,
+  "frames": [
+    {
+      "name": "south",
+      "i": 0
+    },
+    {
+      "name": "southEast",
+      "i": 1
+    },
+    {
+      "name": "east",
+      "i": 2
+    },
+    {
+      "name": "northEast",
+      "i": 3
+    },
+    {
+      "name": "north",
+      "i": 4
+    },
+    {
+      "name": "northWest",
+      "i": 5
+    },
+    {
+      "name": "west",
+      "i": 6
+    },
+    {
+      "name": "southWest",
+      "i": 7
+    }
+  ],
+  "provenance": {
+    "provider": "pixellab",
+    "model": "create-character-v3 (MCP, 2 gen) from a rig-authored reference + animate_character template running-8-frames, ai_freedom 0, 128px, low top-down",
+    "promptFile": "art/prompts/pilot_hero_run.txt"
+  },
+  "registrationNote": "CANDIDATE ONLY. The eight v3 rotations compiled as one sheet so identity:sheet:* (leave-one-out histogram distance vs the rest) measures whether the eight are one character, and frame:*:light-direction measures the baked key on each. Not a shippable sheet: rotations are not a clip."
+}

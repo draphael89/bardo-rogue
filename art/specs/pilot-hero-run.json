@@ -1,0 +1,103 @@
+{
+  "id": "pilot.hero.run.candidate",
+  "kind": "character",
+  "input": ".art-cache/pilot-hero/run-south-master-n.png",
+  "output": ".art-cache/pilot-hero/compiled/pilot_hero_run_south.png",
+  "sidecar": ".art-cache/pilot-hero/compiled/pilot_hero_run_south.json",
+  "cell": 64,
+  "cols": 4,
+  "rows": 2,
+  "maxColors": 16,
+  "palette": [
+    "mortar",
+    "seal0",
+    "iron",
+    "ironHi",
+    "purple0",
+    "purple2",
+    "purple3",
+    "boneLo",
+    "boneDim",
+    "bone",
+    "brickLo",
+    "brick",
+    "brickHi",
+    "cope",
+    "gold"
+  ],
+  "colourPlacement": "veteran",
+  "fit": "grid",
+  "chromaKey": false,
+  "coverage": 0.5,
+  "salience": {
+    "minShare": 0.22,
+    "minDelta": 0.16
+  },
+  "valueLift": false,
+  "frames": [
+    {
+      "name": "run0",
+      "i": 0
+    },
+    {
+      "name": "run1",
+      "i": 1
+    },
+    {
+      "name": "run2",
+      "i": 2
+    },
+    {
+      "name": "run3",
+      "i": 3
+    },
+    {
+      "name": "run4",
+      "i": 4
+    },
+    {
+      "name": "run5",
+      "i": 5
+    },
+    {
+      "name": "run6",
+      "i": 6
+    },
+    {
+      "name": "run7",
+      "i": 7
+    }
+  ],
+  "clips": {
+    "run": {
+      "frames": [
+        "run0",
+        "run1",
+        "run2",
+        "run3",
+        "run4",
+        "run5",
+        "run6",
+        "run7"
+      ],
+      "timing": "ticks",
+      "ticks": [
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4
+      ],
+      "loop": true
+    }
+  },
+  "provenance": {
+    "provider": "pixellab",
+    "model": "create-character-v3 (MCP, 2 gen) from a rig-authored reference + animate_character template running-8-frames, ai_freedom 0, 128px, low top-down",
+    "promptFile": "art/prompts/pilot_hero_run.txt"
+  },
+  "registrationNote": "CANDIDATE ONLY, .art-cache. The pilot measures ONE thing: does animate_character hold identity across a clip, which is what edit_image failed (identity gate, cosine <= 0.45). NO PIVOTS OR SOCKETS ARE DECLARED, deliberately. The rig projects them from rig.json (assemble.mjs:187-200) and an external generator cannot; declaring invented ones would either pass the ink-proximity gate trivially or fail for reasons unrelated to the lane. Letting the compiler detect the pivot also makes clip:run:planted-feet a real measurement of whether the generated gait keeps a stable foot line. Reference was the SHIPPED hero idle cell (public/assets/sprites/bardo_veteran_greatsword_south.png cell 0) so the projection is the game's own 20deg ortho, per OPENING_AUDIT Article IV: projection is a reference image, never an adjective."
+}

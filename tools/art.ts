@@ -18,6 +18,7 @@ import { isProductionPath, verifyApproval, writeReceipt } from './art/approve'
 import { validateSheetDef, type SheetDef } from '../src/render/sheet'
 import { buildPrompt, generate, parseProvider, promptHash, requests, resolveReferences, tokenFor, type GenerateSpec } from './art/generate'
 import { writeRejection } from './art/reject'
+import { importCharacter, assembleAnimation } from './art/pixellab'
 
 const argv = process.argv.slice(2)
 const cmd = argv[0]
@@ -34,8 +35,50 @@ const usage = (): never => {
   pnpm art approve <art/approved/master.png> --id <identity.vN> --by <who> [--note <why>]
   pnpm art reject <candidate.png> --reason <why> [--by <who>] [--manifest <run.manifest.json>]
   pnpm art preview <sheet.png> [--scale 6] [--out <png>]
-  pnpm art generate <gen-spec.json> [--provider retrodiffusion|pixellab] [--live]`)
+  pnpm art generate <gen-spec.json> [--provider retrodiffusion|pixellab] [--live]
+  pnpm art pixellab import <characterId>          download + hash an EXISTING family; spends nothing
+  pnpm art pixellab assemble <manifest.json> --state <s> --animation <a> --direction <d> --clip <name>`)
   process.exit(1)
+}
+
+// --- pixellab -----------------------------------------------------------------------------------
+// Custody for what the account already holds. Both subcommands are GETs of paid-for state, so
+// neither can spend; there is no --live here because there is nothing to opt into yet.
+async function cmdPixellab(): Promise<void> {
+  const sub = argv[1]
+  if (sub === 'import') {
+    const id = argv[2]
+    if (!id) usage()
+    const { manifest, manifestPath } = await importCharacter(id)
+    console.log(`imported ${manifest.characterId} (export ${manifest.exportVersion}, group ${manifest.groupId ?? '-'})`)
+    console.log(`  zip ${manifest.zip.bytes} bytes, ${manifest.zip.files} files, sha256 ${manifest.zip.sha256.slice(0, 16)}…`)
+    for (const s of manifest.states) {
+      const clips = Object.entries(s.animations)
+      console.log(`  state ${s.folder}: ${s.rotations.length} rotations, ${clips.length} animation group(s)${s.size ? `, ${s.size.width}x${s.size.height}` : ''}${s.view ? `, ${s.view}` : ''}`)
+      for (const [name, dirs] of clips) console.log(`    ${name}: ${Object.keys(dirs).length} dir(s) x ${Object.values(dirs)[0]} frames`)
+    }
+    if (manifest.errors.length) console.log(`  ${manifest.errors.length} ERROR(S): ${manifest.errors.slice(0, 3).join('; ')}`)
+    console.log(`manifest: ${manifestPath}`)
+    return
+  }
+  if (sub === 'assemble') {
+    const manifestPath = argv[2]
+    if (!manifestPath) usage()
+    const r = await assembleAnimation({
+      manifestPath,
+      state: flag('state') ?? 'Idle',
+      animation: flag('animation') ?? usage(),
+      direction: flag('direction') ?? 'south',
+      clip: flag('clip') ?? 'clip',
+      ...(flag('cols') ? { cols: Number(flag('cols')) } : {}),
+    })
+    console.log(`${r.master}  ${r.width}x${r.height}, source cell ${r.cell}`)
+    console.log(`  frames: ${r.frames.join(' ')}`)
+    console.log(`\nNext: write a compile spec whose "input" is that master, with "cell" set to the`)
+    console.log(`TARGET cell (64 for a character) — the compiler votes ${r.cell} down to it in palette space.`)
+    return
+  }
+  usage()
 }
 
 // --- palette ----------------------------------------------------------------------------------------
@@ -267,6 +310,7 @@ async function cmdGenerate(): Promise<void> {
 switch (cmd) {
   case 'palette': await cmdPalette(); break
   case 'generate': await cmdGenerate(); break
+  case 'pixellab': await cmdPixellab(); break
   case 'compile': await cmdCompile(); break
   case 'approve': cmdApprove(); break
   case 'reject': cmdReject(); break

@@ -2,9 +2,27 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "game",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "exec",
+        "vite",
+        "--port",
+        "5199",
+        "--strictPort"
+      ],
+      "port": 5199
+    },
+    {
       "name": "site",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "8899", "-d", "site/dist"],
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8899",
+        "-d",
+        "site/dist"
+      ],
       "port": 8899
     }
   ]

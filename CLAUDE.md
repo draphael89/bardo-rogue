@@ -44,8 +44,19 @@ The art pipeline (`docs/ART_PIPELINE_AUDIT.md` for why, `ART_DIRECTION.md` §12 
 | `pnpm fx` | code-authored particles and ground decals. |
 | `pnpm assets` | the shrinking Kenney subset (needs `KENNEY_DIR` + `unzip`). |
 
-Asset lifecycle: `art/specs/` (versioned specs) -> `.art-cache/` (disposable candidates, gitignored)
--> `art/approved/` (human-approved masters, the style reference pool) -> `public/assets/` (compiled).
+Which lane makes an asset, and how to drive the generated one end to end:
+**`.claude/skills/art-generation` — the single operating authority for the PixelLab lane.** When docs
+disagree, precedence is: `ART_DIRECTION.md` §12 (constitution: palette, silhouette, light, canvas) >
+`art-generation` (operating manual: routing, recipe, costs, gates, measured numbers) > everything
+else. `docs/ART_PIPELINE_*.md` and `docs/OPENING_AUDIT.md` are **design records, not instructions** —
+each carries a supersede banner naming what has since been disproved. `.claude/skills/pixel-art-sprites`
+covers frame craft only and defers here for tooling. The global `pixellab` skill is vendor-general and
+loses to this one on anything Bardo-specific.
+
+Asset lifecycle: `art/specs/` (versioned specs) + `art/prompts/` (the prompt of record, hashed into
+every sidecar) -> `.art-cache/` (disposable candidates, gitignored) -> `art/approved/` (human-approved
+masters, the style reference pool) -> `public/assets/` (compiled). A spec whose `promptFile` points
+into `.art-cache/` is broken on a clean checkout — the prompt is tracked or it does not exist.
 A master enters `art/approved/` only with a receipt beside it (`<name>.approval.json`, written by
 `pnpm art approve`) whose sha256 still matches the file; compiling into `public/assets/` verifies
 that receipt and stops when the master is missing, unreceipted, or edited since approval. Gate

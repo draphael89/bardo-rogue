@@ -1,0 +1,43 @@
+{
+  "id": "probe.brazierDeflamed.candidate",
+  "kind": "prop",
+  "input": ".art-cache/props-test/masters/brazier-192.png",
+  "output": ".art-cache/props-test/compiled/probe_brazier_deflamed.png",
+  "sidecar": ".art-cache/props-test/compiled/probe_brazier_deflamed.json",
+  "cell": 48,
+  "cols": 1,
+  "rows": 1,
+  "maxColors": 10,
+  "palette": [
+    "void",
+    "mortar",
+    "seal0",
+    "iron",
+    "ironHi",
+    "slate1",
+    "boneLo",
+    "woodLo",
+    "wood",
+    "ashField"
+  ],
+  "colourPlacement": "probe-brazier-deflamed",
+  "fit": "grid",
+  "chromaKey": false,
+  "coverage": 0.5,
+  "salience": {
+    "minShare": 0.2,
+    "minDelta": 0.16
+  },
+  "frames": [
+    {
+      "name": "brazier",
+      "i": 0
+    }
+  ],
+  "provenance": {
+    "provider": "pixellab",
+    "model": "create_image_pixflux (MCP), seed 3, 192x192, forced canon ramp",
+    "promptFile": "art/prompts/probe_brazier_192.txt"
+  },
+  "registrationNote": "CANDIDATE ONLY, .art-cache. Same LIT master as probe.brazier, compiled against a ramp with NO ember colours in it. Asking the model for an 'unlit, empty' brazier produced a formless bowl -- it needs the fire to know what the object is. So generate it lit, and let the RAMP remove the emission: with nowhere for orange to map, the compiler snaps the flame into the nearest admitted value. The game then owns the flame (particles.flame), the light pool (arena.braziers) and the shadow (bakePropShadows), which is the division that keeps a prop able to gutter."
+}

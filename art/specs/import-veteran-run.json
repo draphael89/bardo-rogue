@@ -1,0 +1,109 @@
+{
+  "id": "import.veteran.run.candidate",
+  "kind": "character",
+  "input": ".art-cache/pixellab/3c541446-069a-4cc1-8a9b-ab4c12a492b2/assembled/Idle-pilot_run_v3_rigstart-south.png",
+  "output": ".art-cache/pixellab/compiled/import_veteran_run.png",
+  "sidecar": ".art-cache/pixellab/compiled/import_veteran_run.json",
+  "cell": 64,
+  "cols": 3,
+  "rows": 3,
+  "maxColors": 16,
+  "palette": [
+    "mortar",
+    "seal0",
+    "iron",
+    "ironHi",
+    "purple0",
+    "purple2",
+    "purple3",
+    "boneLo",
+    "boneDim",
+    "bone",
+    "brickLo",
+    "brick",
+    "brickHi",
+    "cope",
+    "gold"
+  ],
+  "colourPlacement": "veteran",
+  "fit": "grid",
+  "chromaKey": false,
+  "coverage": 0.5,
+  "salience": {
+    "minShare": 0.22,
+    "minDelta": 0.16
+  },
+  "valueLift": false,
+  "frames": [
+    {
+      "name": "run0",
+      "i": 0
+    },
+    {
+      "name": "run1",
+      "i": 1
+    },
+    {
+      "name": "run2",
+      "i": 2
+    },
+    {
+      "name": "run3",
+      "i": 3
+    },
+    {
+      "name": "run4",
+      "i": 4
+    },
+    {
+      "name": "run5",
+      "i": 5
+    },
+    {
+      "name": "run6",
+      "i": 6
+    },
+    {
+      "name": "run7",
+      "i": 7
+    },
+    {
+      "name": "run8",
+      "i": 8
+    }
+  ],
+  "clips": {
+    "run": {
+      "frames": [
+        "run0",
+        "run1",
+        "run2",
+        "run3",
+        "run4",
+        "run5",
+        "run6",
+        "run7",
+        "run8"
+      ],
+      "timing": "ticks",
+      "ticks": [
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4
+      ],
+      "loop": true
+    }
+  },
+  "provenance": {
+    "provider": "pixellab",
+    "model": "imported via `pnpm art pixellab import` from character 3c541446 (export 3.1); animation pilot_run_v3_rigstart, direction south",
+    "promptFile": "art/prompts/pilot_hero_run.txt"
+  },
+  "registrationNote": "CANDIDATE ONLY. Proves the Stage 1 chain end to end: provider export -> hashed manifest -> tracked assembler -> compile -> gates, with no hand-run script anywhere in it."
+}

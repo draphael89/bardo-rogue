@@ -96,6 +96,20 @@ describe('computed provenance', () => {
     expect(a.def.source?.promptHash).toMatch(/^[0-9a-f]{64}$/)
     expect(b.def.source?.promptHash).not.toBe(a.def.source?.promptHash)
   })
+  it('holds a spec that lives on disk to a tracked prompt, and leaves inline compiles alone', async () => {
+    // The bug this closes: four specs were committed naming a promptFile inside the gitignored
+    // .art-cache/. They compiled on the machine that made them and threw on every clean checkout —
+    // which is where `setpiece-gate` and `setpiece-skiff` still are, with their prompts gone for good.
+    // The seam is "did this spec come off disk", not "is the output production": a candidate spec gets
+    // committed too, and the unit tests above legitimately point a fixture at a tmp dir.
+    const pf = join(dir, 'prompt.txt')
+    writeFileSync(pf, 'a prompt in a scratch directory')
+    await expect(compileSheet(spec({ provenance: { provider: 'x', promptFile: pf } }), 'art/specs/on-disk.json'))
+      .rejects.toThrow(/must live under art\/prompts\//)
+    // ...and the same spec compiled programmatically is fine.
+    const inline = await compileSheet(spec({ provenance: { provider: 'x', promptFile: pf } }))
+    expect(inline.def.source?.promptHash).toMatch(/^[0-9a-f]{64}$/)
+  })
   it('rejects a typed promptHash and a typed referenceHashes', async () => {
     await expect(compileSheet(spec({ provenance: { provider: 'x', promptHash: 'see some doc' } })))
       .rejects.toThrow(/computed from provenance.promptFile/)

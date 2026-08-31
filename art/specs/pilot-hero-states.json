@@ -1,0 +1,109 @@
+{
+  "id": "pilot.hero.states.candidate",
+  "kind": "character",
+  "input": ".art-cache/pilot-hero/states-master-n.png",
+  "output": ".art-cache/pilot-hero/compiled/pilot_hero_states.png",
+  "sidecar": ".art-cache/pilot-hero/compiled/pilot_hero_states.json",
+  "cell": 64,
+  "cols": 4,
+  "rows": 4,
+  "maxColors": 16,
+  "palette": [
+    "mortar",
+    "seal0",
+    "iron",
+    "ironHi",
+    "purple0",
+    "purple2",
+    "purple3",
+    "boneLo",
+    "boneDim",
+    "bone",
+    "brickLo",
+    "brick",
+    "brickHi",
+    "cope",
+    "gold"
+  ],
+  "colourPlacement": "veteran",
+  "fit": "grid",
+  "chromaKey": false,
+  "coverage": 0.5,
+  "salience": {
+    "minShare": 0.22,
+    "minDelta": 0.16
+  },
+  "valueLift": false,
+  "frames": [
+    {
+      "name": "armed_south",
+      "i": 0
+    },
+    {
+      "name": "unarmed_south",
+      "i": 1
+    },
+    {
+      "name": "armed_southEast",
+      "i": 2
+    },
+    {
+      "name": "unarmed_southEast",
+      "i": 3
+    },
+    {
+      "name": "armed_east",
+      "i": 4
+    },
+    {
+      "name": "unarmed_east",
+      "i": 5
+    },
+    {
+      "name": "armed_northEast",
+      "i": 6
+    },
+    {
+      "name": "unarmed_northEast",
+      "i": 7
+    },
+    {
+      "name": "armed_north",
+      "i": 8
+    },
+    {
+      "name": "unarmed_north",
+      "i": 9
+    },
+    {
+      "name": "armed_northWest",
+      "i": 10
+    },
+    {
+      "name": "unarmed_northWest",
+      "i": 11
+    },
+    {
+      "name": "armed_west",
+      "i": 12
+    },
+    {
+      "name": "unarmed_west",
+      "i": 13
+    },
+    {
+      "name": "armed_southWest",
+      "i": 14
+    },
+    {
+      "name": "unarmed_southWest",
+      "i": 15
+    }
+  ],
+  "provenance": {
+    "provider": "pixellab",
+    "model": "create-character-v3 (MCP, 2 gen) from a rig-authored reference + animate_character template running-8-frames, ai_freedom 0, 128px, low top-down",
+    "promptFile": "art/prompts/pilot_hero_run.txt"
+  },
+  "registrationNote": "CANDIDATE ONLY. Two create_character_state states of ONE character (Idle=greatsword, Unarmed) interleaved by direction in a single sheet, so identity:sheet:* judges whether a weapon state stays the same person. The game switches exactly these two families on bladeEquipped (player.ts:201)."
+}

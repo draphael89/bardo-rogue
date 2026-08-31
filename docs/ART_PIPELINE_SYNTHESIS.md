@@ -1,5 +1,20 @@
 # Art Pipeline Synthesis
 
+> **SUPERSEDED IN PART, 2026-08-31. `.claude/skills/art-generation` is the operating authority for
+> the PixelLab lane; this file remains the design record.** Four things below were measured and did
+> not hold:
+> 1. **"skeleton hand keypoints → sockets"** — `SkeletonLabel` has no `HAND` or `FOOT`. `RIGHT/LEFT
+>    ARM` is the wrist and `RIGHT/LEFT LEG` the ankle, so `handR`/`handL`/`head` and the pivot are
+>    recoverable as *candidates*; `bladeTip`/`bladeMid` are not recoverable at all.
+> 2. **The character ZIP does not carry keypoints.** `export_version` 3.1 has exactly four top-level
+>    keys and no keypoint field, across a v3 character, a template animation, a v3 animation and a
+>    state. Only `/estimate-skeleton` returns them, and it is a separate paid call.
+> 3. **Retro Diffusion is not the identity source.** The rig is: a rig-authored reference image
+>    carries the game's own 20° projection *and its north key light*, which no adjective does.
+> 4. **"32 px generated animation"** is stale — characters are a 64 px cell (ADR 0002).
+>
+> The pilot this document called for has since run. `animate_character` is no longer untested.
+
 Date: 2026-08-28. This document reconciles two independent audits of the same question — "what
 is Bardo Rogue's AI-first art pipeline?" — and converges on one best-of-breed plan.
 

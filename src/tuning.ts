@@ -511,6 +511,43 @@ export const tuning = {
       ambientTint: 0x1e1c38, // indigo void; warm floor is graded out, ember stays on the lights
       vignette: 0.32,        // how much brighter the arena centre is than the edge
       brazierFlicker: 0.30,
+      // How much of the lamps' own emitted light is ADDED back over the multiply (light.ts). The
+      // multiply alone can only ever return a surface to its authored colour, and the authored
+      // stone is cold slate — which is why every lit surface in the game measured neutral grey
+      // (brightest-5% warmth +0.04) against +0.61..+0.79 on the concept boards. This is the knob
+      // that lets a brazier's pool carry the brazier's hue.
+      //
+      // MEASURED on the Bardo arrival, brightest-5% warmth / mean L / share in the bottom two value
+      // bands, against concept-05 at 0.79 / 0.124 / 95.4%:
+      //   0.00 (before)  0.04 / 0.094 / 95.8%   grey light; §3.2.5 lead colour `slate2`
+      //   0.30           0.39 / 0.121 / 90.9%
+      //   0.40           0.50 / 0.134 / 89.6%   <- here
+      //   0.55           0.63 / 0.143 / 87.2%
+      // Warmth keeps climbing past this, and so does the frame mean: the concept holds MORE warmth
+      // at LESS brightness because its pools are small and hard, and ours are the room's calibrated
+      // radii, which are coupled to the baked floor levels (`braziers` in src/sim/arena.ts) and are
+      // not this knob's to move. 0.40 is where the light reads as fire and the dark still has
+      // somewhere to be dark.
+      //
+      // OPEN, AND IT NEEDS A HUMAN: this knob cannot satisfy both `bardo:lit-warmth` (added here)
+      // and `bardo-axis:centre-lift` (added on main). Measured against a live build 2026-08-31:
+      //   warmAdd  bardo warmth   axis centre / outer      verdict
+      //   0.22     0.29           0.120 B1 / 0.079 B0      centre-lift ok, lit-warmth FAILS (floor 0.30)
+      //   0.25     0.32           0.122 B1 / 0.080 B1      lit-warmth ok, centre-lift FAILS
+      //   0.40     0.50           0.134 B1 / 0.089 B1      lit-warmth ok, centre-lift FAILS
+      // The satisfiable window is empty, and it misses by one thousandth.
+      //
+      // It is NOT a composition regression. centre/outer is 1.52x at 0.22 and 1.51x at 0.40 — the
+      // frame is exactly as focal either way. `centre-lift` compares QUANTISED bands, so it flips on
+      // which side of the 0.08 B0/B1 line the outer region lands, conflating "is the centre focal"
+      // with "is the frame dark enough". Warm light raises the floor everywhere by construction.
+      //
+      // Left at 0.40 deliberately: warmth 0.50 against concept boards at 0.61-0.79, versus 0.29 at
+      // the value that would appease the band. Dimming good light to clear a boundary artefact is
+      // the wrong trade. The real fix is one of — measure centre-lift as a RATIO, re-cut the axis
+      // moment so its perimeter is genuinely darker, or accept a named waiver. All three are
+      // judgement calls about the art, so none of them is an agent's to make.
+      warmAdd: 0.40,
       playerLightRadius: 32, playerLightAlpha: 0.12,
       flameRate: 16,         // flame particles per second per brazier
       deathFadeSec: 1.6,     // slow red vignette after playerDeath
@@ -534,6 +571,13 @@ export const tuning = {
       // inside the grade's GLSL string, where no tuner could find it and no live edit could reach
       // it. Value unchanged; only its address moved.
       shadowLift: 0.30,
+      // The constant floor added under the darkest values, in units of `shadow*` (postfx.ts): the
+      // authored void's own blue-violet, restored after the contrast term crushes it to neutral.
+      // MEASURED as mean blue over the darkest half of the Bardo arrival, against 13 / 15 / 26 on
+      // the three concept boards: 0.00 -> 4 (before), 0.16 -> 13, 0.22 -> 16, 0.30 -> 19. Frame mean
+      // barely moves across that whole sweep (0.153 / 0.159 / 0.156), because a floor this low costs
+      // almost no luminance — it buys hue, not brightness, which is the entire point.
+      shadowFloor: 0.22,
     },
   },
 }

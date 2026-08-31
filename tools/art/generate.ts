@@ -67,7 +67,11 @@ const BIBLE_RULES = [
   'metal is a value range with its extremes touching, not one flat value',
   'cloth has no specular',
   'no pure black and no pure white pixels',
-  'a uniform #00ff00 background, no shadow, no scenery, no text, no labels, no grid, no watermark',
+  // NOT a #00ff00 matte. Both providers are already asked for transparency — `remove_bg` for Retro
+  // Diffusion and `no_background` for PixelLab — so demanding a green background contradicted the
+  // request in the same breath, and worse, handed the model a colour to paint INTO the sprite. It
+  // survived unnoticed because this client has never been run live.
+  'a transparent background, no shadow, no scenery, no text, no labels, no grid, no watermark',
 ]
 
 const FORBIDDEN = [
@@ -228,7 +232,9 @@ export async function requests(provider: ProviderName, spec: GenerateSpec, token
       description: prompt,
       image_size: { width: spec.size, height: spec.size },
       view: spec.view ?? 'high top-down',
-      outline: 'single color black outline',
+      // NOT 'single color black outline': BIBLE_RULES above sends "never pure black" in the same
+      // request's prompt, and ART_DIRECTION.md:289 says a full black outline flattens at this scale.
+      outline: 'single color outline',
       shading: 'basic shading',
       detail: 'medium detail',
       no_background: true,

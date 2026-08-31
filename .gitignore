@@ -20,3 +20,8 @@ tools/.*.mjs
 
 # Generated art candidates and compile reports. Only compiled, approved assets live in public/assets.
 .art-cache/
+
+# Local secrets. Never committed: this repo pushes to a GitHub remote.
+.env
+.env.*
+!.env.example

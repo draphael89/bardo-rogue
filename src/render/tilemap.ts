@@ -596,16 +596,16 @@ function bakeWallCope(g: Graphics, arena: Arena): void {
     if (arena.base[r * arena.cols + c] !== T.capNorth) continue
     const h = wearHash(c, r, 137)
     const ox = c * ROOM_ART_TILE, oy = r * ROOM_ART_TILE
-    // The authored segments, in native cell px. Rows 21-22 are the cope's own two rows.
-    const seg = [2, 12, 23]
-    for (let i = 0; i < seg.length; i++) {
-      // Erase two of three on average. Painted in cope value, so the cope line stays unbroken.
-      if (((h >>> (i * 3)) & 3) === 0) continue
-      artPx(g, ox + seg[i], oy + 21, 3, 2, C.boneDim)
+    // Erase the authored segments back to cope value, then lay the SAME NUMBER back at offsets this
+    // cell picked for itself. Count is what matters: an earlier cut erased two of three and added
+    // one, which measured 40 segments down to 20 across the plaza — that is not de-stamping a
+    // highlight, it is deleting half of it, and the wall read dimmer rather than less regular.
+    // Three in, three out, each jittered inside its own third so two never collide.
+    for (const x of [2, 12, 23]) artPx(g, ox + x, oy + 21, 3, 2, C.boneDim)
+    for (let i = 0; i < 3; i++) {
+      const nx = 1 + i * 7 + (h >>> (i * 5)) % 6
+      artPx(g, ox + nx, oy + 21, 3, 1, C.brick)
     }
-    // …and put one back somewhere this cell chose for itself.
-    const nx = 1 + (h >>> 11) % (ROOM_ART_TILE - 4)
-    artPx(g, ox + nx, oy + 21, 3, 1, C.brick)
   }
 }
 

@@ -356,6 +356,37 @@ canvas than the rig's does: median bbox **53.5px against the shipped hero's 43**
 `frame:*:height` on 5 of 8 frames until you rescale. Rescale with ONE scale and ONE offset for the
 whole clip; per-frame normalisation flattens a run cycle's bob into a treadmill.
 
+### 11.1 Weapon variants are `create_character_state`, and it works
+
+The game switches exactly two hero families on `bladeEquipped` (`player.ts:201`): `unarmed` and
+`greatsword`, eight sheets between them. `create_character_state` maps onto that 1:1 — it edits one
+state with a text description and applies the SAME edit across all 8 directions, keeping the
+character's identity, body and proportions.
+
+Measured 2026-08-31. Source state "Idle" (greatsword) -> new state "Unarmed", description *"unarmed
+with empty hands, no sword, no weapon of any kind, same armour and dark red cloak"*, with
+**`use_color_palette_from_reference: true`** so the variant is snapped back to the original's colours.
+Both states' 8 rotations compiled into ONE sheet so `identity:sheet:*` had to judge them against each
+other:
+
+**All 16 frames passed. Max distance 0.063 against a 0.45 cap** — the two weapon states are
+unambiguously one person. 14 colours across both.
+
+**Cost: 48 generations**, not the 20-40 the tool documents. Budget a state at ~50 and check
+`get_balance` first.
+
+Two knobs that exist for exactly this and are easy to miss:
+
+- **`override_width` / `override_height`.** A state that ADDS a big weapon needs canvas room to grow
+  into, and without it the blade is cropped or shrunk to fit. Removing a prop (as above) does not.
+- **`use_color_palette_from_reference`.** On for a weapon or armour swap, so canon holds.
+  Off when the edit is *supposed* to introduce a new colour.
+
+So the shape for a full hero is: **one `create_character_state` per weapon family, then per-state
+animations by §11's v3-with-a-rig-start-frame recipe.** Do not make a second character for a weapon
+variant — a fresh `create_character` is a different person, and nothing in the gate suite would
+forgive that.
+
 **What is still unsolved.** Sockets. The rig projects them from `rig.json`
 (`assemble.mjs:187-200`) and an external generator cannot; `CHARACTER_HARD_CONSTRAINTS.md:9` requires
 they be projected. `/estimate-skeleton` is the candidate and is untested here. Say where your sockets

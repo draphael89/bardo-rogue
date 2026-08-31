@@ -59,10 +59,12 @@ async function boot() {
   const viewOverride = +(q.get('view') ?? 0)
   tuning.view.width = fitViewWidth(viewOverride)
 
-  const manifest = await (await fetch(`${ASSET_BASE}manifest.json`)).json() as Record<string, string[]>
-  await loadFonts()
-  const ra = await createRenderApp(document.getElementById('app')!, viewOverride)
-  const atlas = await loadAtlas(manifest)
+  // Started together: the atlas's need for the manifest is the only real ordering here.
+  const manifestLoad = fetch(`${ASSET_BASE}manifest.json`).then(r => r.json() as Promise<Record<string, string[]>>)
+  const fontsLoad = loadFonts()
+  const appLoad = createRenderApp(document.getElementById('app')!, viewOverride)
+  const atlasLoad = manifestLoad.then(loadAtlas)
+  const [manifest, ra, atlas] = await Promise.all([manifestLoad, appLoad, atlasLoad, fontsLoad])
   const audio = new AudioSystem()
   audio.muted = mute
   audio.load(manifest.audio) // not awaited: the game starts silent-then-sound rather than waiting

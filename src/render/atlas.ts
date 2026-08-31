@@ -61,17 +61,51 @@ export async function loadAtlas(manifest: Record<string, string[]>): Promise<Atl
   // own root is a no-op on http(s) and correct on any scheme.
   Assets.resolver.rootPath = new URL('/', location.href).href
   const base = ASSET_BASE
-  const tiny = await Assets.load<Texture>(base + 'sprites/tiny_dungeon.png')
-  const room = await Assets.load<Texture>(base + 'sprites/bardo_room.png')
-  const props = await Assets.load<Texture>(base + 'sprites/bardo_props.png')
-  const particles = new Map<string, Texture>()
-  const decals = new Map<string, Texture>()
-  const lights = new Map<string, Texture>()
-  await Promise.all([
-    ...manifest.particles.map(async f => particles.set(f.replace('.png', ''), await Assets.load<Texture>(base + 'particles/' + f))),
-    ...manifest.decals.map(async f => decals.set(f.replace('.png', ''), await Assets.load<Texture>(base + 'decals/' + f))),
-    ...manifest.light.map(async f => lights.set(f.replace('.png', ''), await Assets.load<Texture>(base + 'light/' + f))),
+  // Pixi configures its texture-format preferences inside a lazy `Assets.init()` that flips its own
+  // `_initialized` flag BEFORE it awaits format detection, so a second load starting in that window
+  // would skip init and resolve against a resolver that has not been told its preferences yet.
+  // Initialising up front is what makes the wave below safe, and costs no round trip: the detections
+  // are data: URLs.
+  await Assets.init()
+
+  const candidateMode = import.meta.env.DEV && new URLSearchParams(location.search).get('actorCandidate') === '1'
+  const requested: Array<readonly [SheetName, string]> = [
+    ...SHEETS.map(name => [name, `${base}sprites/${name}`] as const),
+    ...(candidateMode
+      ? Object.entries(CANDIDATE_SHEETS).map(([name, path]) => [name as CandidateSheetName, path] as const)
+      : []),
+  ]
+
+  // Nothing here depends on anything else here, so every file goes out in ONE wave. Loading them in
+  // groups cost a round trip per group before the first frame -- the three base sheets, then the
+  // particle/decal/light group, then the authored sheets -- for no ordering the atlas actually needs.
+  const texture = (path: string): Promise<Texture> => Assets.load<Texture>(base + path)
+  const group = (dir: string, files: string[]): Promise<Array<[string, Texture]>> =>
+    Promise.all(files.map(async f => [f.replace('.png', ''), await texture(`${dir}/${f}`)] as [string, Texture]))
+
+  const [tiny, room, props, particleTex, decalTex, lightTex, loadedSheets] = await Promise.all([
+    texture('sprites/tiny_dungeon.png'),
+    texture('sprites/bardo_room.png'),
+    texture('sprites/bardo_props.png'),
+    group('particles', manifest.particles),
+    group('decals', manifest.decals),
+    group('light', manifest.light),
+    Promise.all(requested.map(async ([name, path]) => {
+      const [tex, def] = await Promise.all([
+        Assets.load<Texture>(`${path}.png`),
+        fetch(`${path}.json`).then(r => {
+          if (!r.ok) throw new Error(`sheet ${name}: sidecar request failed (${r.status})`)
+          return r.json() as Promise<SheetDef>
+        }),
+      ])
+      return { name, tex, def }
+    })),
   ])
+
+  // Filled in manifest order rather than completion order: same contents, no longer race-dependent.
+  const particles = new Map<string, Texture>(particleTex)
+  const decals = new Map<string, Texture>(decalTex)
+  const lights = new Map<string, Texture>(lightTex)
 
   const tiles = new Map<number, Texture>()
   const rooms = new Map<number, Texture>()
@@ -101,21 +135,7 @@ export async function loadAtlas(manifest: Record<string, string[]>): Promise<Atl
   }
   const tinyWhite = whiteSheet(tiny)
   const sheets = new Map<string, Sheet>()
-  const candidateMode = import.meta.env.DEV && new URLSearchParams(location.search).get('actorCandidate') === '1'
-  const requested: Array<readonly [SheetName, string]> = [
-    ...SHEETS.map(name => [name, `${base}sprites/${name}`] as const),
-    ...(candidateMode
-      ? Object.entries(CANDIDATE_SHEETS).map(([name, path]) => [name as CandidateSheetName, path] as const)
-      : []),
-  ]
-  await Promise.all(requested.map(async ([name, path]) => {
-    const [tex, def] = await Promise.all([
-      Assets.load<Texture>(`${path}.png`),
-      fetch(`${path}.json`).then(r => {
-        if (!r.ok) throw new Error(`sheet ${name}: sidecar request failed (${r.status})`)
-        return r.json() as Promise<SheetDef>
-      }),
-    ])
+  for (const { name, tex, def } of loadedSheets) {
     // The contract is checked at load, not assumed: a sidecar and its PNG can drift apart, and a
     // silent mismatch shows up as the wrong pose on the wrong tick rather than as an error.
     validateSheetDef(def, name)
@@ -123,7 +143,7 @@ export async function loadAtlas(manifest: Record<string, string[]>): Promise<Atl
       throw new Error(`sheet ${name}: image is ${tex.width}x${tex.height}, sidecar declares ${def.cols * def.cell}x${def.rows * def.cell}`)
     }
     sheets.set(name, bindSheet(def, tex, whiteSheet(tex)))
-  }))
+  }
 
   return {
     tile: i => tiles.get(i) ?? (tiles.set(i, sub(tiny, i, 12, 16)), tiles.get(i)!),

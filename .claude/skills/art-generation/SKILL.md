@@ -412,8 +412,11 @@ unambiguously one person. 14 colours across both.
 
 Two knobs that exist for exactly this and are easy to miss:
 
-- **`override_width` / `override_height`.** A state that ADDS a big weapon needs canvas room to grow
-  into, and without it the blade is cropped or shrunk to fit. Removing a prop (as above) does not.
+- **The canvas override, and its name depends on the layer you are calling.** A state that ADDS a big
+  weapon needs canvas room to grow into, and without it the blade is cropped or shrunk to fit.
+  Removing a prop (as above) does not. **REST `CreateCharacterStateRequest` takes a single
+  `override_frame_size`; the MCP wrapper takes `override_width` + `override_height`.** Both are real;
+  name the layer or the next reader sends the wrong field.
 - **`use_color_palette_from_reference`.** On for a weapon or armour swap, so canon holds.
   Off when the edit is *supposed* to introduce a new colour.
 
@@ -444,9 +447,37 @@ come back from the provider.
   animation, a v3 animation and a state** — three of the four lanes. **Pro is untested**; if a Pro
   ZIP does carry keypoints, this section is what to update.
 
-**So sockets remain unsolved.** The rig projects them from `rig.json` (`assemble.mjs:187-200`);
-`CHARACTER_HARD_CONSTRAINTS.md:9` requires they be projected, and nothing in a 3.1 export can supply
-them. `/estimate-skeleton` is the remaining candidate and is untested here — and its labels are
-reported not to name hand or foot explicitly, so treat anything it returns as a **candidate**, not as
-a projection. Say where your sockets came from; never imply the rig.
+**Verify that by dumping the schema, not by grepping.** A substring search for `bone` over the whole
+JSON returns TRUE on an export that has no skeleton data at all — it matches `"cream bone-white cloth
+sash"` inside the prompt. The 3.1 export object has exactly four keys (`group_id`, `states`,
+`export_version`, `export_date`) and each state's `frames` has exactly two (`rotations`,
+`animations`). There is nowhere for a keypoint to be.
+
+### 11.3 Sockets: three of five are recoverable, and the API says which
+
+`/estimate-skeleton` is a real path, and `SkeletonLabel` in the live OpenAPI is an 18-value enum:
+
+```
+NOSE NECK  RIGHT/LEFT SHOULDER  RIGHT/LEFT ELBOW  RIGHT/LEFT ARM
+RIGHT/LEFT HIP  RIGHT/LEFT KNEE  RIGHT/LEFT LEG  RIGHT/LEFT EYE  RIGHT/LEFT EAR
+```
+
+There is no `HAND` or `FOOT`, which is why it gets reported as "does not label hands or feet" — but
+`RIGHT ARM` / `LEFT ARM` are the **arm terminus** (wrist) and `RIGHT LEG` / `LEFT LEG` the ankle, so
+the mapping to our sidecar exists:
+
+| our socket | from | confidence |
+|---|---|---|
+| `handR` / `handL` | `RIGHT ARM` / `LEFT ARM` | candidate — the wrist, not the grip |
+| `head` | `NECK`, or `NOSE` for the face | candidate |
+| pivot (`feetCenter`) | midpoint of `LEFT LEG` + `RIGHT LEG` | candidate; the spritesheet's centred pivot is the cheaper source |
+| `bladeTip` / `bladeMid` | **nothing** | a skeleton has no weapon. Rig-only, or derive in code. |
+
+`Keypoint` is `{x, y, label, z_index}` — it even carries the depth the rig throws away
+(`mannequin.py:1258` discards `co.z`). Cost: the schema's own example is `usd 0.02` per call.
+
+**So the honest status is three of five sockets plus the pivot are recoverable as CANDIDATES, and the
+two weapon sockets are not.** `CHARACTER_HARD_CONSTRAINTS.md:9` requires sockets be *projected*;
+estimated is not projected. Validate against the `frame:*:socket:*` gate before trusting any of it,
+and always say where a socket came from. Never imply the rig.
 

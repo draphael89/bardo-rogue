@@ -12,6 +12,22 @@ export interface AtmospherePreset {
   /** Undressed brazier/window fallback. Dress tint still wins. Never ember on iron or wine. */
   keyTint: number
   /**
+   * The hue of the light the room's lamps ADD back over the multiply (`warmAdd`, src/render/light.ts).
+   *
+   * Separate from `keyTint` on purpose, and the two are not interchangeable. `keyTint` is what an
+   * UNDRESSED source is, and in the hub that is deliberately the cold star-pane blue, because the
+   * sources it actually falls back for are the Bardo's star panes. The additive pass asks a
+   * different question — what colour is the light once it lands — and the answer there is the fire,
+   * not the window.
+   *
+   * It must also be considerably warmer than a lamp's own sprite tint. Measured: the Bardo's
+   * braziers carry `0xffd9a0`, a pale cream at warmth +0.45, and an additive pass in that colour
+   * saturates toward WHITE before it reads as fire — brightest-5% (192,172,142), warmth 0.30, when
+   * the concept boards sit at (112,78,49) and 0.79. Cutting blue here is what buys saturated amber
+   * instead of a bright grey. Omit for a room whose light should land neutral.
+   */
+  addTint?: number
+  /**
    * The stone itself, as a multiply on the baked floor (src/render/tilemap.ts).
    *
    * The header above used to say "dress already changes the floor". It does not, and never did:
@@ -146,6 +162,8 @@ const HUB: AtmospherePreset = {
   // leaves the light alone, and it moves frame-mean in the safe direction.
   ambientDarkness: 0.44,
   vignette: 0.40,
+  // Between canon `sill #FFBA60` and `ember #FF7A18`: the colour a kept fire actually puts on stone.
+  addTint: 0xff8c30,
 }
 
 const ATMOSPHERE: Record<LayoutId, AtmospherePreset> = {

@@ -61,6 +61,7 @@ uniform vec3 uHighlightTint;
 uniform float uContrast;
 uniform float uSat;
 uniform float uShadowLift;
+uniform float uShadowFloor;
 
 void main(void)
 {
@@ -76,6 +77,14 @@ void main(void)
     c = mix(c, c * uHighlightTint, hi * 0.38);
     c = (c - 0.5) * uContrast + 0.5;
     c = mix(vec3(luma), c, uSat);
+    // The shadow floor. The lift above targets uShadowTint * luma, which is zero at zero, so the
+    // darkest pixels had nothing to be lifted TOWARD -- and then the contrast term, pivoting on 0.5,
+    // crushed what little was left: the authored void (#08070E, already a blue-violet) rendered at
+    // rgb(1,1,4). Measured over the darkest half of the opening frame: mean blue 4, against 13-26
+    // on the concept boards. This adds the floor back as a constant, after contrast and saturation
+    // so neither can take it away again, and only under the darkest values so it cannot wash the
+    // room. It is a FLOOR, not a lift: the dark stays dark, it just stops being neutral black.
+    c += uShadowTint * uShadowFloor * (1.0 - smoothstep(0.0, 0.22, luma));
     // Clamped to the palette's ends here once. That was wrong and two blind critics caught it
     // independently: it left impact nowhere to go ("no pixel in ANY of our rendered frames exceeds
     // (236,240,246)"). ART_DIRECTION.md 1.3.4 governs AUTHORED ART -- its acceptance test in 5 says
@@ -121,6 +130,7 @@ export class PostFx {
       uContrast: { value: G.contrast, type: 'f32' },
       uSat: { value: G.sat, type: 'f32' },
       uShadowLift: { value: G.shadowLift, type: 'f32' },
+      uShadowFloor: { value: G.shadowFloor, type: 'f32' },
     })
     this.gradeUniforms = gradeUniforms
     this.grade = new Filter({
@@ -178,6 +188,7 @@ export class PostFx {
     ;(u.uContrast as number) = G.contrast
     ;(u.uSat as number) = G.sat
     ;(u.uShadowLift as number) = G.shadowLift
+    ;(u.uShadowFloor as number) = G.shadowFloor
     this.gradeUniforms.update()
   }
 

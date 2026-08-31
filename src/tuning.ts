@@ -511,6 +511,24 @@ export const tuning = {
       ambientTint: 0x1e1c38, // indigo void; warm floor is graded out, ember stays on the lights
       vignette: 0.32,        // how much brighter the arena centre is than the edge
       brazierFlicker: 0.30,
+      // How much of the lamps' own emitted light is ADDED back over the multiply (light.ts). The
+      // multiply alone can only ever return a surface to its authored colour, and the authored
+      // stone is cold slate — which is why every lit surface in the game measured neutral grey
+      // (brightest-5% warmth +0.04) against +0.61..+0.79 on the concept boards. This is the knob
+      // that lets a brazier's pool carry the brazier's hue.
+      //
+      // MEASURED on the Bardo arrival, brightest-5% warmth / mean L / share in the bottom two value
+      // bands, against concept-05 at 0.79 / 0.124 / 95.4%:
+      //   0.00 (before)  0.04 / 0.094 / 95.8%   grey light; §3.2.5 lead colour `slate2`
+      //   0.30           0.39 / 0.121 / 90.9%
+      //   0.40           0.50 / 0.134 / 89.6%   <- here
+      //   0.55           0.63 / 0.143 / 87.2%
+      // Warmth keeps climbing past this, and so does the frame mean: the concept holds MORE warmth
+      // at LESS brightness because its pools are small and hard, and ours are the room's calibrated
+      // radii, which are coupled to the baked floor levels (`braziers` in src/sim/arena.ts) and are
+      // not this knob's to move. 0.40 is where the light reads as fire and the dark still has
+      // somewhere to be dark.
+      warmAdd: 0.40,
       playerLightRadius: 32, playerLightAlpha: 0.12,
       flameRate: 16,         // flame particles per second per brazier
       deathFadeSec: 1.6,     // slow red vignette after playerDeath
@@ -534,6 +552,13 @@ export const tuning = {
       // inside the grade's GLSL string, where no tuner could find it and no live edit could reach
       // it. Value unchanged; only its address moved.
       shadowLift: 0.30,
+      // The constant floor added under the darkest values, in units of `shadow*` (postfx.ts): the
+      // authored void's own blue-violet, restored after the contrast term crushes it to neutral.
+      // MEASURED as mean blue over the darkest half of the Bardo arrival, against 13 / 15 / 26 on
+      // the three concept boards: 0.00 -> 4 (before), 0.16 -> 13, 0.22 -> 16, 0.30 -> 19. Frame mean
+      // barely moves across that whole sweep (0.153 / 0.159 / 0.156), because a floor this low costs
+      // almost no luminance — it buys hue, not brightness, which is the entire point.
+      shadowFloor: 0.22,
     },
   },
 }

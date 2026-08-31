@@ -43,6 +43,11 @@ interface RuntimeRoom {
     outerMean: number
     centreBand: number
     outerBand: number
+    litWarmth: number
+    shadowBlue: number
+    leadColour: string
+    leadShare: number
+    leadIsStone: boolean
   }
 }
 
@@ -133,14 +138,26 @@ function valueBand(value: number): number {
   return 5
 }
 
+// The palette's cold structural stone. §3.2.5 forbids static architecture from leading the frame's
+// brightness rank, and these are the names it leads with when it does. Flames, gold, bone and the
+// warm woods are deliberately absent: those ARE allowed to be the brightest thing in a room.
+const STONE = new Set(['slate0', 'slate1', 'slate2', 'slate3', 'slateHi', 'nave0', 'nave1', 'nave2',
+  'brickLo', 'brick', 'brickHi', 'cope', 'copeHi', 'seal0', 'mortar', 'grout'])
+
+/** How warm a colour is, on the axis the concept boards separate on: (r - b) over the mean channel. */
+function warmth(r: number, g: number, b: number): number {
+  return (r - b) / Math.max(1, (r + g + b) / 3)
+}
+
 async function frameMetrics(png: Buffer, points: Array<{ x: number; y: number }>): Promise<NonNullable<RuntimeRoom['frame']>> {
   const { data, info } = await sharp(png).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
-  const samples: Array<{ x: number; y: number; l: number }> = []
+  const samples: Array<{ x: number; y: number; l: number; r: number; g: number; b: number }> = []
   // HUD and footer are intentionally excluded; this gate asks whether the room spends its values
   // near a playable/focal read, not whether the life pips are bright enough.
   for (let y = 28; y < info.height - 22; y++) for (let x = 0; x < info.width; x++) {
     const i = (y * info.width + x) * 4
-    samples.push({ x, y, l: luminance([data[i], data[i + 1], data[i + 2]] as RGB) })
+    const r = data[i], g = data[i + 1], b = data[i + 2]
+    samples.push({ x, y, r, g, b, l: luminance([r, g, b] as RGB) })
   }
   const values = samples.map(s => s.l).sort((a, b) => a - b)
   const mean = values.reduce((a, b) => a + b, 0) / Math.max(1, values.length)
@@ -163,6 +180,33 @@ async function frameMetrics(png: Buffer, points: Array<{ x: number; y: number }>
   })
   const centreMean = centre.reduce((sum, sample) => sum + sample.l, 0) / Math.max(1, centre.length)
   const outerMean = outer.reduce((sum, sample) => sum + sample.l, 0) / Math.max(1, outer.length)
+
+  // The frame's own light, measured the way the concept boards were measured. Sheet gates cannot
+  // see any of this: a sprite is admissible in isolation and the composited frame is still wrong.
+  const byLuma = [...samples].sort((a, b) => a.l - b.l)
+  const lit = byLuma.slice(Math.floor(byLuma.length * 0.95))
+  const dark = byLuma.slice(0, Math.floor(byLuma.length * 0.5))
+  const sum = (rows: typeof samples) => rows.reduce((a, s) => ({ r: a.r + s.r, g: a.g + s.g, b: a.b + s.b }), { r: 0, g: 0, b: 0 })
+  const litSum = sum(lit)
+  const n = Math.max(1, lit.length)
+  const litWarmth = warmth(litSum.r / n, litSum.g / n, litSum.b / n)
+  const shadowBlue = sum(dark).b / Math.max(1, dark.length)
+
+  // Which single colour LEADS the bright set. The grade shifts every canon hex a little, so the
+  // lead is matched back to its nearest canon name rather than compared as a literal.
+  const tally = new Map<string, number>()
+  for (const s of lit) {
+    const key = `${s.r},${s.g},${s.b}`
+    tally.set(key, (tally.get(key) ?? 0) + 1)
+  }
+  const [leadKey, leadCount] = [...tally].sort((a, b) => b[1] - a[1])[0] ?? ['0,0,0', 0]
+  const [lr, lg, lb] = leadKey.split(',').map(Number)
+  let leadColour = 'unknown', best = Infinity
+  for (const [name, c] of Object.entries(canon().colors)) {
+    const [cr, cg, cb] = [1, 3, 5].map(i => parseInt(c.hex.slice(i, i + 2), 16))
+    const d2 = (cr - lr) ** 2 + (cg - lg) ** 2 + (cb - lb) ** 2
+    if (d2 < best) { best = d2; leadColour = name }
+  }
   return {
     mean,
     readableShare,
@@ -173,6 +217,11 @@ async function frameMetrics(png: Buffer, points: Array<{ x: number; y: number }>
     outerMean,
     centreBand: valueBand(centreMean),
     outerBand: valueBand(outerMean),
+    litWarmth,
+    shadowBlue,
+    leadColour,
+    leadShare: leadCount / n,
+    leadIsStone: STONE.has(leadColour),
   }
 }
 
@@ -216,6 +265,35 @@ async function runtime(url: string, shotDir?: string): Promise<RuntimeRoom[]> {
         `${(frame.highlightShare * 100).toFixed(2)}%; ceiling 3.50% (${source})`)
       add(`${label}:top-one-focality`, frame.topOneNearest <= 64 && frame.topOneNearShare >= 0.04,
         `${(frame.topOneNearShare * 100).toFixed(1)}% of full top-1% set within 64px of player/focal; nearest ${frame.topOneNearest.toFixed(1)}px (${source})`)
+      // §3.2.6 "Warm key, cool ambient." The three below are the first in this suite that read the
+      // COMPOSITED FRAME's colour rather than a sheet's, and they exist because the opening shipped
+      // for a year with grey light and crushed blacks while every sheet gate was green. Reference
+      // numbers, measured off the concept boards this project judges against: lit warmth
+      // +0.61 / +0.78 / +0.79, shadow blue 13-26.
+      //
+      // ARMED ON THE BARDO ONLY, and the reason is not timidity. §3.2.6 says every realm keeps the
+      // warm/cool split and "only the hues change" — but Cocytus is ice and the crossings are water,
+      // so their keys are COLD by direction, and a global warm floor would be a rule that says the
+      // ice room is broken for being ice. Measured at the time of writing: bardo 0.08, threshold
+      // -0.21, lethe -0.46, asphodel 0.16, landing 0.30, cocytus -0.23, antechamber 0.27, minos
+      // 0.27, crossing -0.44, oath-court -0.10; brightness-rank fails in all ten. Widening this
+      // correctly means comparing each room against ITS OWN declared key tint, not raising a global
+      // number — until then every layout still reports, so the next pass has the measurement and does
+      // not have to rediscover it.
+      //
+      // The armed floors are a ratchet against regression, NOT the artistic target. A green here
+      // means "the light has not gone backwards", never "the light is finished".
+      const armed = label === 'bardo'
+      const report = (name: string, pass: boolean, detail: string): void => {
+        if (armed) add(name, pass, detail)
+        else add(`${name}-report`, true, `${detail} [reported, not armed]`)
+      }
+      report(`${label}:lit-warmth`, frame.litWarmth >= 0.30,
+        `brightest 5% warmth ${frame.litWarmth.toFixed(2)}; floor 0.30, concept boards 0.61-0.79 (${source})`)
+      report(`${label}:shadow-floor`, frame.shadowBlue >= 8,
+        `darkest 50% mean blue ${frame.shadowBlue.toFixed(1)}; floor 8, concept boards 13-26 (${source})`)
+      report(`${label}:brightness-rank`, !frame.leadIsStone,
+        `brightest 5% led by ${frame.leadColour} at ${(frame.leadShare * 100).toFixed(1)}%; §3.2.5 forbids static architecture in the top rank (${source})`)
     }
     const capture = async (target: Target, enter: boolean): Promise<void> => {
       if (seenLayouts.has(target.layout)) return

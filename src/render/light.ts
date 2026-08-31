@@ -17,8 +17,24 @@ import { fxRng } from './fxRng'
 // map re-rendered the whole 64×36 district every frame), and the multiply covers every visible
 // pixel. The baked room alpha masks that multiply so the screen-space void stays identical to the
 // letterbox instead of acquiring a target-sized lightmap seam.
+// A multiply cannot make cold stone warm.
+//
+// The lightmap below is composed as `ambient + additive sources` and MULTIPLIED over the world, so a
+// fully lit pixel is at best its own authored colour and an unlit one is that colour darkened. The
+// authored stone is cold slate, so every lit surface in the game measured neutral grey: brightest-5%
+// warmth +0.04 against +0.61..+0.79 on the concept boards this project judges against, and the
+// brightest large mass in the opening frame was `slate2` — the exact failure ART_DIRECTION §3.2.5
+// names ("static architecture is never in the top rank") and §3.2.6 asks for ("warm key, cool
+// ambient"). No amount of tint on the sources could fix it: the multiply is the ceiling.
+//
+// So the same scene is rendered a SECOND time with the ambient base blacked out and the vignette
+// hidden, which leaves only the light the room's own lamps emit, and that is composited with `add`.
+// Black adds nothing, so unlit ground is untouched and the dark keeps its depth; a brazier's pool
+// gains its own hue. The pass costs one extra render of ~15 sprites into a view-sized target.
 export class Lighting {
   private rt: RenderTexture
+  /** The same scene minus ambient and vignette: what the lamps EMIT, for the additive pass. */
+  private rtAdd: RenderTexture
   private scene = new Container()
   private base: Sprite
   private vignette: Sprite
@@ -29,8 +45,10 @@ export class Lighting {
   private extraDoors: Array<{ s: Sprite; d: ArenaDoor }> = []
   private player: Sprite
   private out: Sprite
+  private outAdd: Sprite
   private roomMask: Sprite
   private mask: MaskFilter
+  private maskAdd: MaskFilter
   private t = 0
   private flameAcc = 0
   private deathT = 0
@@ -41,6 +59,7 @@ export class Lighting {
   constructor(ra: RenderApp, private atlas: Atlas, private particles: Particles, private renderer: Renderer, arena: World['arena'], room: Sprite) {
     const { w, h } = this.rtSize()
     this.rt = RenderTexture.create({ width: w, height: h, scaleMode: 'nearest' })
+    this.rtAdd = RenderTexture.create({ width: w, height: h, scaleMode: 'nearest' })
 
     this.base = new Sprite(Texture.WHITE); this.base.width = w; this.base.height = h
     this.vignette = new Sprite(atlas.light('circle')); this.vignette.anchor.set(0.5); this.vignette.blendMode = 'add'
@@ -58,12 +77,19 @@ export class Lighting {
     this.mask = new MaskFilter({ sprite: this.roomMask, channel: 'alpha', blendMode: 'multiply', resolution: 'inherit' })
     this.out.filters = [this.mask]
     this.out.position.set(-this.pad, -this.pad)
-    ra.layers.light.addChild(this.roomMask, this.out)
+    // Same geometry, same room mask, `add` instead of `multiply`. Masked for the same reason the
+    // multiply is: without it a brazier near an island's edge would light the starfield void.
+    this.outAdd = new Sprite(this.rtAdd)
+    this.maskAdd = new MaskFilter({ sprite: this.roomMask, channel: 'alpha', blendMode: 'add', resolution: 'inherit' })
+    this.outAdd.filters = [this.maskAdd]
+    this.outAdd.position.set(-this.pad, -this.pad)
+    ra.layers.light.addChild(this.roomMask, this.out, this.outAdd)
   }
 
   releaseRoomMask(): void {
     this.roomMask.texture = Texture.EMPTY
     this.mask.setSprite(this.roomMask)
+    this.maskAdd.setSprite(this.roomMask)
   }
 
   // The visible world window plus pad, in world px. tuning.view.width is adaptive (app.ts), so
@@ -80,12 +106,14 @@ export class Lighting {
     const { w, h } = this.rtSize()
     if (this.rt.width !== w || this.rt.height !== h) {
       this.rt.resize(w, h)
+      this.rtAdd.resize(w, h)
       this.base.width = w; this.base.height = h
     }
     this.roomMask.texture = room.texture
     this.roomMask.scale.set(room.scale.x, room.scale.y)
     this.roomMask.position.set(room.position.x, room.position.y)
     this.mask.setSprite(this.roomMask)
+    this.maskAdd.setSprite(this.roomMask)
     for (const s of this.braziers) s.destroy()
     for (const c of this.cores) c.s.destroy()
     for (const s of this.windows) s.destroy()
@@ -267,7 +295,28 @@ export class Lighting {
     this.scene.position.set(-ox, -oy)
     this.base.position.set(ox, oy)
     this.out.position.set(ox, oy)
+    this.outAdd.position.set(ox, oy)
     this.renderer.render({ container: this.scene, target: this.rt, clear: true })
+
+    // Pass two: the same sources with the ambient blacked out and the vignette hidden. What is left
+    // is only what the lamps EMIT, so the composite below adds a lamp's own hue to the stone it
+    // falls on and adds literally nothing anywhere else. The base stays in the scene as an opaque
+    // black rather than being hidden, so the target is black-not-transparent and the `add` blend
+    // has no premultiplied-alpha edge to argue with.
+    //
+    // Death owns the frame's colour; a warm lift fighting the closing red vignette reads as a bug.
+    const addAlpha = L.warmAdd * (1 - d)
+    this.outAdd.visible = addAlpha > 0.001
+    if (this.outAdd.visible) {
+      this.outAdd.alpha = addAlpha
+      this.outAdd.tint = air.addTint ?? 0xffffff
+      const ambientTint = this.base.tint
+      this.base.tint = 0x000000
+      this.vignette.visible = false
+      this.renderer.render({ container: this.scene, target: this.rtAdd, clear: true })
+      this.base.tint = ambientTint
+      this.vignette.visible = true
+    }
   }
 }
 

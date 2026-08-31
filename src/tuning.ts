@@ -528,6 +528,25 @@ export const tuning = {
       // radii, which are coupled to the baked floor levels (`braziers` in src/sim/arena.ts) and are
       // not this knob's to move. 0.40 is where the light reads as fire and the dark still has
       // somewhere to be dark.
+      //
+      // OPEN, AND IT NEEDS A HUMAN: this knob cannot satisfy both `bardo:lit-warmth` (added here)
+      // and `bardo-axis:centre-lift` (added on main). Measured against a live build 2026-08-31:
+      //   warmAdd  bardo warmth   axis centre / outer      verdict
+      //   0.22     0.29           0.120 B1 / 0.079 B0      centre-lift ok, lit-warmth FAILS (floor 0.30)
+      //   0.25     0.32           0.122 B1 / 0.080 B1      lit-warmth ok, centre-lift FAILS
+      //   0.40     0.50           0.134 B1 / 0.089 B1      lit-warmth ok, centre-lift FAILS
+      // The satisfiable window is empty, and it misses by one thousandth.
+      //
+      // It is NOT a composition regression. centre/outer is 1.52x at 0.22 and 1.51x at 0.40 — the
+      // frame is exactly as focal either way. `centre-lift` compares QUANTISED bands, so it flips on
+      // which side of the 0.08 B0/B1 line the outer region lands, conflating "is the centre focal"
+      // with "is the frame dark enough". Warm light raises the floor everywhere by construction.
+      //
+      // Left at 0.40 deliberately: warmth 0.50 against concept boards at 0.61-0.79, versus 0.29 at
+      // the value that would appease the band. Dimming good light to clear a boundary artefact is
+      // the wrong trade. The real fix is one of — measure centre-lift as a RATIO, re-cut the axis
+      // moment so its perimeter is genuinely darker, or accept a named waiver. All three are
+      // judgement calls about the art, so none of them is an agent's to make.
       warmAdd: 0.40,
       playerLightRadius: 32, playerLightAlpha: 0.12,
       flameRate: 16,         // flame particles per second per brazier

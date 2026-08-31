@@ -12,7 +12,7 @@ import type { PlayerPoseOverride } from './views/player'
 import { snapToTarget } from './views/shared'
 import { promiseFrame } from './clipSelect'
 import { ARM, armOf } from '@/sim/weapons'
-import { buildTilemap, rackProximityAmount, roomSheetFor, SHRINE_INK, type TilemapView } from './tilemap'
+import { buildTilemap, rackProximityAmount, roomSheetFor, propSheetFor, SHRINE_INK, type TilemapView } from './tilemap'
 import { Camera, clampFocus } from './camera'
 import { drawVoidUnderlay } from './starfield'
 import { TILE, PROP } from '@/sim/arena'
@@ -170,8 +170,9 @@ export class Presenter {
     this.tilemap = buildTilemap(ra.app.renderer, atlas, world.arena, floorTintFor(world), this.tileBakeRoot)
     L.floor.addChild(this.tilemap.sprite, this.tilemap.door)
     const propRoom = roomSheetFor(atlas, world.arena)
+    const propProps = propSheetFor(atlas, world.arena)
     for (const p of world.arena.props) {
-      const s = makePropSprite(atlas, propRoom, p)
+      const s = makePropSprite(propRoom, propProps, p)
       this.propSprites.push(s)
       this.bindAnimatedProp(s, p)
       L.entities.addChild(s)
@@ -1167,8 +1168,9 @@ export class Presenter {
     this.tilemap = buildTilemap(this.ra.app.renderer, this.atlas, this.world.arena, floorTintFor(this.world), this.tileBakeRoot)
     L.floor.addChild(this.tilemap.sprite, this.tilemap.door)
     const propRoom = roomSheetFor(this.atlas, this.world.arena)
+    const propProps = propSheetFor(this.atlas, this.world.arena)
     for (const p of this.world.arena.props) {
-      const s = makePropSprite(this.atlas, propRoom, p)
+      const s = makePropSprite(propRoom, propProps, p)
       this.propSprites.push(s)
       this.bindAnimatedProp(s, p)
       L.entities.addChild(s)
@@ -1218,6 +1220,10 @@ export class Presenter {
    */
   private bindAnimatedProp(s: Sprite, p: { tile: number; sheet: 'room' | 'prop'; x: number; y: number }): void {
     if (p.sheet !== 'prop') return
+    // Hub art, hub only — the same scoping propSheetFor() applies to the still cells. Without it a
+    // threshold's brazier would pick up the hub candidate's burn clip while its static cell stayed
+    // production, which is worse than either sheet on its own.
+    if (this.world.arena.kind !== 'bardo') return
     const bind = ANIMATED_PROPS[p.tile]
     if (!bind || !this.atlas.hasSheet(bind.sheet)) return
     const sheet = this.atlas.sheet(bind.sheet)

@@ -58,11 +58,15 @@ export type SheetName = ProductionSheetName | CandidateSheetName
 /** A room-sheet accessor. `atlas.room` for the shared sheet, `atlas.hub` for the Bardo's fork. */
 export type RoomSheet = (i: number) => Texture
 
+/** A prop-sheet accessor. `atlas.prop` for the shared sheet, `atlas.hubProp` for the Bardo's fork. */
+export type PropSheet = (i: number) => Texture
+
 export interface Atlas {
   tile(i: number): Texture          // Tiny Dungeon 16x16 by index (12 columns) — legacy actors, weapons
   room(i: number): Texture          // Bardo room source 24x24, logical 16x16 (8 columns)
   hub(i: number): Texture           // the Bardo hub's own copy of the room sheet, same indices
   prop(i: number): Texture          // Bardo furniture source 48x48, logical 32x32 (4 columns)
+  hubProp(i: number): Texture       // the Bardo hub's own copy of the prop sheet, same indices
   white(i: number): Texture         // same tile as a white silhouette (hit flash)
   /**
    * An authored sheet, addressed by semantic frame name rather than cell index.
@@ -121,10 +125,16 @@ export async function loadAtlas(manifest: Record<string, string[]>): Promise<Atl
   const group = (dir: string, files: string[]): Promise<Array<[string, Texture]>> =>
     Promise.all(files.map(async f => [f.replace('.png', ''), await texture(`${dir}/${f}`)] as [string, Texture]))
 
-  const [tiny, room, hub, props, particleTex, decalTex, lightTex, loadedSheets] = await Promise.all([
+  const [tiny, room, hub, props, hubProps, particleTex, decalTex, lightTex, loadedSheets] = await Promise.all([
     texture('sprites/tiny_dungeon.png'),
     texture('sprites/bardo_room.png'),
     texture('sprites/bardo_hub.png'),
+    texture('sprites/bardo_props.png'),
+    // The Bardo's own copy of the prop sheet, exactly as bardo_hub.png forks the tile sheet. Loading
+    // the candidate INSTEAD of production put hub art on every prop in all fourteen layouts, because
+    // `makePropSprite` resolves every `sheet: 'prop'` object through one accessor whatever room it is
+    // standing in — so a threshold's bells and braziers rendered the hub candidates too, and a
+    // non-hub art comparison was silently contaminated by a switch documented as a hub preview.
     hubCandidateMode ? Assets.load<Texture>(HUB_PROPS_CANDIDATE) : texture('sprites/bardo_props.png'),
     group('particles', manifest.particles),
     group('decals', manifest.decals),
@@ -156,6 +166,7 @@ export async function loadAtlas(manifest: Record<string, string[]>): Promise<Atl
   const rooms = new Map<number, Texture>()
   const hubs = new Map<number, Texture>()
   const propTiles = new Map<number, Texture>()
+  const hubPropTiles = new Map<number, Texture>()
   const whites = new Map<number, Texture>()
   const sub = (src: Texture, i: number, cols: number, sourceSize: number, logicalSize = sourceSize) =>
     new Texture({
@@ -198,6 +209,7 @@ export async function loadAtlas(manifest: Record<string, string[]>): Promise<Atl
     room: i => rooms.get(i) ?? (rooms.set(i, sub(room, i, 8, 24, 16)), rooms.get(i)!),
     hub: i => hubs.get(i) ?? (hubs.set(i, sub(hub, i, 8, 24, 16)), hubs.get(i)!),
     prop: i => propTiles.get(i) ?? (propTiles.set(i, sub(props, i, 4, 48, 32)), propTiles.get(i)!),
+    hubProp: i => hubPropTiles.get(i) ?? (hubPropTiles.set(i, sub(hubProps, i, 4, 48, 32)), hubPropTiles.get(i)!),
     white: i => whites.get(i) ?? (whites.set(i, sub(tinyWhite, i, 12, 16)), whites.get(i)!),
     sheet: name => {
       const s = sheets.get(name)

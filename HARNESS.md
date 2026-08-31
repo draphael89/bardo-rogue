@@ -69,7 +69,7 @@ A stock combat scenario stops 2 s after clear or death; the production `loop` st
   `pnpm strip` by passing `--actorCandidate 1` after `--`. Production builds ignore this switch.
 - `hubCandidate=1` also binds the ANIMATED brazier sheet (`bardo_brazier`), an 8-frame `burn` clip
   with `timing: 'ticks'` played by `tickClipFrame`. Build it with
-  `pnpm anim:pack -- --frames <dir of fN.png> --out <strip.png>` (packs a provider's loose frames
+  `pnpm anim:pack -- --frames <dir of fN.png> --out <strip.png> --cols <spec cols>` (packs a provider's loose frames
   into one row-major strip, dropping the trailing byte-identical loop wrap) and then
   `pnpm art compile art/specs/hub/brazier-burn.json`. While that sheet is bound `src/render/light.ts`
   emits NO particle tongue on a brazier — the sprite owns the fire, the runtime still owns the light.

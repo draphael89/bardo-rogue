@@ -1,6 +1,6 @@
 // Pack a provider's loose animation frames into one row-major strip, ready for `pnpm art compile`.
 //
-// usage: pnpm anim:pack -- --frames .art-cache/hub/anim2 --out .art-cache/hub/masters/brazier-burn.png
+// usage: pnpm anim:pack -- --frames .art-cache/hub/anim2 --out .art-cache/hub/masters/brazier-burn.png --cols 8
 //
 // This is the step between "PixelLab returned N PNGs" and the compile spec. Two rules here are easy
 // to get wrong by hand and silently wrong in the result:
@@ -12,6 +12,12 @@
 //    byte-identical, so an unpinned animation keeps every frame it generated.
 //  - The compiler's contract is a square cell in a row-major grid, and the strip is measured
 //    afterwards rather than assumed.
+//  - `--cols` is REQUIRED and is checked against what was actually packed, because the compiler
+//    cannot catch a mismatch. `srcCell` slices by `meta.width / spec.cols` PROPORTIONALLY — it never
+//    looks at the native cell width — so a nine-frame 432px strip compiled against the eight-column
+//    brazier-burn spec is silently cut into eight 54px regions, each mixing two adjacent poses. That
+//    produces a plausible sheet, passes the gates, and animates as mush. The unpinned-wrap rule above
+//    is exactly what makes the count vary, so the two have to be checked together.
 //
 // ASEPRITE WAS TRIED HERE AND IS NOT USED. `aseprite --batch <frames> --sheet` auto-detects numbered
 // sequences: passing f0..f7 explicitly made it load the whole f0..f8 run it found on disk, report 9
@@ -30,7 +36,10 @@ const args = Object.fromEntries(process.argv.slice(2)
   .map((a, i, arr) => a.startsWith('--') ? [a.slice(2), arr[i + 1] ?? '1'] : []).filter(x => x.length))
 const framesDir = args.frames
 const out = args.out
-if (!framesDir || !out) throw new Error('usage: --frames <dir of fN.png> --out <sheet.png>')
+const cols = Number(args.cols)
+if (!framesDir || !out || !Number.isInteger(cols) || cols < 1) {
+  throw new Error('usage: --frames <dir of fN.png> --out <sheet.png> --cols <the compile spec\'s column count>')
+}
 
 // Numeric order, not lexicographic: f10 must not sort between f1 and f2.
 const files = readdirSync(framesDir).filter(f => /^f\d+\.png$/.test(f))
@@ -40,6 +49,12 @@ if (files.length < 2) throw new Error(`anim-pack: ${framesDir} holds ${files.len
 
 const kept = readFileSync(files[0]).equals(readFileSync(files[files.length - 1])) ? files.slice(0, -1) : files
 if (kept.length !== files.length) console.log(`  dropped ${files[files.length - 1].split('/').pop()} — byte-identical wrap of frame 0`)
+
+if (kept.length !== cols) {
+  throw new Error(`anim-pack: packed ${kept.length} frames but --cols is ${cols}. The compile spec's grid and the strip must agree — `
+    + `the compiler divides the strip's width by cols proportionally, so a mismatch slices frames apart instead of failing. `
+    + `Either fix the frame directory or point this at a spec whose cols is ${kept.length}.`)
+}
 
 const first = await sharp(kept[0]).metadata()
 const cell = first.width!

@@ -1,6 +1,6 @@
 import { Container, Sprite, RenderTexture, Graphics, type DestroyOptions, type Renderer } from 'pixi.js'
 import { TILE, T, PROP, interior, type Arena, type ArenaDoor, type ArenaShrine, type DoorMark, type ArenaOffering, type ArenaRack, doorOpens } from '@/sim/arena'
-import type { Atlas, RoomSheet } from './atlas'
+import type { Atlas, RoomSheet, PropSheet } from './atlas'
 import { OATH } from './oathMetal'
 import { tuning } from '@/tuning'
 
@@ -12,6 +12,14 @@ import { tuning } from '@/tuning'
  */
 export const roomSheetFor = (atlas: Atlas, arena: Arena): RoomSheet =>
   arena.kind === 'bardo' ? atlas.hub : atlas.room
+
+/**
+ * The same fork for FURNITURE. Props are placed by index out of one sheet, so binding the hub's
+ * candidates globally put them on every bell, brazier, lamp and ossuary in all fourteen layouts —
+ * a switch documented as a hub preview quietly restyling the rooms you were comparing it against.
+ */
+export const propSheetFor = (atlas: Atlas, arena: Arena): PropSheet =>
+  arena.kind === 'bardo' ? atlas.hubProp : atlas.prop
 
 // Static floor/walls baked into one texture; door clusters (sprites + marks) change with open state.
 // `door` is a Container so every exit rides with presenter addChild / destroy. destroy() always

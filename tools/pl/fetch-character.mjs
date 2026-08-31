@@ -9,7 +9,12 @@ if (TOKEN_MISSING) { console.error('PIXELLAB_SECRET is not set: put it in .env.l
 
 const H = { Authorization: `Bearer ${process.env.PIXELLAB_SECRET}` }
 const [id, out] = process.argv.slice(2)
-const j = await (await fetch(`https://api.pixellab.ai/v2/characters/${id}`, { headers: H })).json()
+// The lookup itself needs the same check the rotation downloads got. An expired token, unknown id
+// or server error returns a JSON error body; parsing it blind left `rot` empty, which fell through
+// to the status branch and exited 0 — reporting success having downloaded nothing.
+const lookup = await fetch(`https://api.pixellab.ai/v2/characters/${id}`, { headers: H })
+if (!lookup.ok) { console.error(`character lookup failed: HTTP ${lookup.status} ${(await lookup.text()).slice(0, 200)}`); process.exit(1) }
+const j = await lookup.json()
 const rot = j.rotation_urls ?? j.rotations ?? {}
 const keys = Object.keys(rot)
 if (!keys.length) { console.log(id, 'status:', j.status ?? JSON.stringify(j).slice(0,180)); process.exit(0) }

@@ -40,7 +40,10 @@ const CANDIDATE_SHEETS = {
 } as const
 
 // The live hill-climb slot for the hero's south sheet, bound by ?heroCandidate=1 in dev only.
-// Currently the lofted-blade rig candidate: `bash .art-cache/hero/build.sh` rebuilds it.
+// Built by `pnpm hero:candidate` (tools/hero-candidate.mjs, tracked — a producer inside the
+// gitignored .art-cache could not exist on a clean checkout). OPTIONAL for the same reason the hub
+// sheets are: a developer who has not run that command should get the production hero, not a
+// rejected Promise.all and a game that will not boot.
 const HERO_CANDIDATE = '/.art-cache/hero/candidate/bardo_veteran_greatsword_south'
 
 // The Bardo hub's PixelLab prop candidates, assembled by `pnpm hub:candidate`. Bound only under
@@ -100,9 +103,9 @@ export async function loadAtlas(manifest: Record<string, string[]>): Promise<Atl
   const hubCandidateMode = import.meta.env.DEV && params.get('hubCandidate') === '1'
   // The third element is OPTIONAL: a sheet whose absence is a legitimate state rather than an error.
   const requested: Array<readonly [SheetName, string, boolean]> = [
-    ...SHEETS.map(name => [name, heroCandidateMode && name === 'bardo_veteran_greatsword_south'
-      ? HERO_CANDIDATE
-      : `${base}sprites/${name}`, false] as const),
+    ...SHEETS.map(name => heroCandidateMode && name === 'bardo_veteran_greatsword_south'
+      ? [name, HERO_CANDIDATE, true] as const
+      : [name, `${base}sprites/${name}`, false] as const),
     ...(candidateMode
       ? Object.entries(CANDIDATE_SHEETS).filter(([n]) => !(HUB_SHEETS as readonly string[]).includes(n))
         .map(([name, path]) => [name as CandidateSheetName, path, false] as const)
@@ -151,6 +154,17 @@ export async function loadAtlas(manifest: Record<string, string[]>): Promise<Atl
         return { name, tex, def }
       } catch (error) {
         if (!optional) throw error
+        // A missing hub sheet has no fallback and drops to the static prop cell. A missing hero
+        // CANDIDATE does have one — the production sheet it stands in for — so load that instead,
+        // or ?heroCandidate=1 would boot a hero with no south sheet at all.
+        if (SHEETS.includes(name as ProductionSheetName)) {
+          console.warn(`atlas: candidate for "${name}" not built (${(error as Error).message}) — using the production sheet; run pnpm hero:candidate`)
+          const [tex, def] = await Promise.all([
+            Assets.load<Texture>(`${base}sprites/${name}.png`),
+            fetch(`${base}sprites/${name}.json`).then(r => r.json() as Promise<SheetDef>),
+          ])
+          return { name, tex, def }
+        }
         console.warn(`atlas: optional sheet "${name}" not loaded (${(error as Error).message}) — keeping the static prop cell`)
         return null
       }

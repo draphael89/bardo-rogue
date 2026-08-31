@@ -47,6 +47,17 @@ const files = readdirSync(framesDir).filter(f => /^f\d+\.png$/.test(f))
   .map(f => join(framesDir, f))
 if (files.length < 2) throw new Error(`anim-pack: ${framesDir} holds ${files.length} frames`)
 
+// The sequence must be CONTIGUOUS from f0, not merely the right length. A directory holding
+// f0..f6 plus a stale f8 has the expected eight files and passes the --cols check below, and the
+// numeric sort then packs seven live poses and one leftover into a sheet that looks perfectly
+// valid. Counting is not enough when a re-generation can leave a higher index behind.
+const nums = files.map(f => parseInt(f.split('/').pop()!.slice(1), 10))
+const gap = nums.findIndex((n, i) => n !== i)
+if (gap !== -1) {
+  throw new Error(`anim-pack: frame numbering is not contiguous from f0 — found ${nums.join(',')}; `
+    + `expected f0..f${files.length - 1}. A stale higher-numbered frame from an earlier run is the usual cause.`)
+}
+
 const kept = readFileSync(files[0]).equals(readFileSync(files[files.length - 1])) ? files.slice(0, -1) : files
 if (kept.length !== files.length) console.log(`  dropped ${files[files.length - 1].split('/').pop()} — byte-identical wrap of frame 0`)
 

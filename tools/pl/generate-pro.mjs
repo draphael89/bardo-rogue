@@ -2,6 +2,14 @@
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import sharp from 'sharp'
+
+// Node does not read .env.local on its own, and only `pnpm art` passes --env-file-if-exists.
+// Load it here so the documented `node tools/pl/*.mjs` invocations actually carry the token instead
+// of sending `Authorization: Bearer undefined`.
+try { process.loadEnvFile('.env.local') } catch { /* absent or already in the environment */ }
+const TOKEN_MISSING = !process.env.PIXELLAB_SECRET
+if (TOKEN_MISSING) { console.error('PIXELLAB_SECRET is not set: put it in .env.local or the environment'); process.exit(1) }
+
 const TOKEN = process.env.PIXELLAB_SECRET
 const cfg = JSON.parse(readFileSync(process.argv[2], 'utf8'))
 const H = { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' }

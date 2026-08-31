@@ -23,10 +23,7 @@ const SINGLES: Array<[string, number]> = [
   ['.art-cache/hub/compiled/hub_brazier.png', 4],   // PROP.brazier
   ['.art-cache/hub/compiled/hub_ossuary.png', 5],   // PROP.ossuary
   ['.art-cache/hub/compiled/hub_lamp.png', 12],     // PROP.keeperLamp
-  // PROP.brazierCold (13) keeps production art. The cold master is a recorded NEGATIVE result:
-  // prompting for "unlit" returned a formless bowl (art-generation §4) and it still fails
-  // light-direction at 0.66 and slate1 at 54% against a checked-in 10% cap. The lit/cold read is
-  // carried by the runtime light and by bakeBardoCauseway's soot wedges, not by two sprites.
+  ['.art-cache/hub/compiled/hub_brazier_cold.png', 13], // PROP.brazierCold — same master, ember colours dropped from the ramp
   // PROP.verdictStele (15) is DELIBERATELY absent: the candidate lost production's legible carved
   // cross and read as a plain standing rock. art/specs/hub/stele.json is kept as the record.
 ]
@@ -50,10 +47,30 @@ for (let i = 0; i < 4; i++) {
   layers.push({ input: cut, ...at(i) })
 }
 
+/** Bottom-most opaque row of a cell, or -1 when the cell is empty. The prop's ground line. */
+async function groundLine(buf: Buffer): Promise<number> {
+  const { data, info } = await sharp(buf).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+  for (let y = info.height - 1; y >= 0; y--) {
+    for (let x = 0; x < info.width; x++) if (data[(y * info.width + x) * 4 + 3] !== 0) return y
+  }
+  return -1
+}
+
 for (const [file, index] of SINGLES) {
   const m = await sharp(file).metadata()
   if (m.width !== CELL || m.height !== CELL) throw new Error(`hub-candidate: ${file} is ${m.width}x${m.height}, expected ${CELL} square`)
-  layers.push({ input: await sharp(file).png().toBuffer(), ...at(index) })
+  // Align the candidate's FEET to the cell it replaces. A generated prop is centred in its canvas by
+  // the generator, but the prop grid's contract is a ground line: production's brazier stands at
+  // y=46 and the candidate at y=37, so dropped in unshifted it hovers 9 source px above the floor
+  // with its baked shadow stranded under empty air. Measured per prop rather than tabulated, so a
+  // regenerated candidate re-aligns itself instead of inheriting a stale constant.
+  const prodCell = await sharp(SRC).extract({ ...at(index), width: CELL, height: CELL }).png().toBuffer()
+  const dy = (await groundLine(prodCell)) - (await groundLine(await sharp(file).png().toBuffer()))
+  const shifted = dy === 0 ? await sharp(file).png().toBuffer() : await sharp({
+    create: { width: CELL, height: CELL, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+  }).composite([{ input: file, top: dy, left: 0 }]).png().toBuffer()
+  if (dy !== 0) console.log(`  ${file.split('/').pop()} -> cell ${index}, dropped ${dy}px onto the ground line`)
+  layers.push({ input: shifted, ...at(index) })
 }
 
 // The replaced cells are cleared first: compositing a candidate OVER production art leaves the old

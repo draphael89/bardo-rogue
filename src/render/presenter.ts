@@ -26,13 +26,14 @@ import type { SheetName } from './atlas'
  * not loaded, stays the static cell it has always been, so this is inert in production.
  */
 /**
- * The prop grid's registration contract: 48px source cells drawn at 32 logical px, standing on
- * row 46. `tools/hub-candidate.ts` measures the same line off production's own art when it drops a
- * static candidate cell in; these must agree.
+ * The prop grid's registration contract: 48px source cells drawn at 32 logical px.
+ *
+ * The ground row is PER PROP and is measured off production's own art, exactly as
+ * `tools/hub-candidate.ts` measures it for the static cells: brazier and cold brazier stand on row
+ * 46, ossuary and keeper's lamp on 47. One shared constant was wrong for the lamp by a pixel.
  */
 const PROP_CELL = 48
 const PROP_LOGICAL = 32
-const PROP_GROUND_ROW = 46
 
 /**
  * A position -> phase hash for ambient prop clips. Mixes the bits rather than adding two scaled
@@ -47,9 +48,9 @@ const propPhaseHash = (x: number, y: number): number => {
   return h >>> 0
 }
 
-const ANIMATED_PROPS: Record<number, { sheet: SheetName; clip: string }> = {
-  [PROP.brazier]: { sheet: 'bardo_brazier', clip: 'burn' },
-  [PROP.keeperLamp]: { sheet: 'bardo_lamp', clip: 'glow' },
+const ANIMATED_PROPS: Record<number, { sheet: SheetName; clip: string; groundRow: number }> = {
+  [PROP.brazier]: { sheet: 'bardo_brazier', clip: 'burn', groundRow: 46 },
+  [PROP.keeperLamp]: { sheet: 'bardo_lamp', clip: 'glow', groundRow: 47 },
 }
 import { Hud } from './hud'
 import { Particles } from './particles'
@@ -1235,8 +1236,13 @@ export class Presenter {
     // sprite already positioned for the static cell — so the burn clip hung ~6 world px above its own
     // floor and its baked shadow. Re-registering here uses the sheet's declared foot pivot, which is
     // the same contract `atlas.ts` gives every authored sheet, rather than a per-prop table.
+    // TWO CONVENTIONS MEET HERE, and mixing them cost a pixel. `compile.ts` returns a frame's foot
+    // pivot as `footY + 1` (compile.ts:513) — a BOUNDARY, one past the last opaque row — while
+    // `groundLine()` in tools/hub-candidate.ts returns the row INDEX of that last opaque row. So the
+    // target is the ground-row boundary, `groundRow + 1`, and the shift is that minus the pivot.
+    // Measured: brazier 47 - 38 = 9 source px, which is the same 9 the static assembler reports.
     const foot = sheet.frame(clip.frames[0]).anchorY * sheet.def.cell
-    s.y += (PROP_GROUND_ROW - foot) * (PROP_LOGICAL / PROP_CELL)
+    s.y += (bind.groundRow + 1 - foot) * (PROP_LOGICAL / PROP_CELL)
     // Every cresset in the room shares one clip, so without a phase offset they all flicker in
     // lockstep and read as one animation stamped twice rather than as two fires. Derived from the
     // prop's own position: deterministic, no RNG, and stable across a room rebuild.

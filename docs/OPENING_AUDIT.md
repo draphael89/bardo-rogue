@@ -49,6 +49,14 @@ remain unchanged.
 - **The hero's head** (§13 item 2) — a candidate sits unapproved in `.art-cache`; see §9, which is
   rewritten because the framing in it was wrong.
 
+**Tested and rejected.**
+
+- **The PixelLab edit lane as a drawing pass over rig output** — §8's headline proposal. Two rounds,
+  ~40 generations. Registration survives cleanly, which was the real risk; but it redesigns rather
+  than shades, and does it **differently on every frame of a clip at the same seed**. That is
+  disqualifying for a character sheet. §8 carries the measurements and what the lane is still good
+  for.
+
 ---
 
 ## 1. Executive verdict
@@ -354,6 +362,32 @@ lane rather than its competitor.
 
 **Invert PixelLab's role. It is not your generator. It is your finishing pass.**
 
+> **MEASURED, AND THE ANSWER IS NO — for animated characters.** This was the strongest idea in the
+> audit and it does not survive contact. Two `edit_image` rounds were run against three compiled hero
+> cells (idle, run0, run4), ~20 generations each:
+>
+> | | Result |
+> |---|---|
+> | Registration | **Survives.** bbox unchanged, foot pivot unchanged in all six outputs. This was the real risk and it is not one. |
+> | Five-part brief ("lit top edge, two folds, a hem, greave rims, separate the legs") | Redesigned the idle's diagonal sash into a full skirt, barely touched the run frames, delivered none of the leg gap / greave rims / hem — and **deleted the brow line the prompt explicitly said to keep**. |
+> | Single positive instruction ("shade the red cloth: two darker fold lines and a dark hem") | Still redesigned the garment, and **differently on each of the three frames, at the same seed**. Opaque pixel count grew 2.8–3.4 %. |
+>
+> The second result is the disqualifying one. Frame-to-frame consistency is not a nice-to-have on a
+> character sheet, it is the entire reason the rig exists — and the rig delivers it *by construction*,
+> six sheets and 1 823 gate assertions in 54 seconds. A tool that redraws the same garment three
+> different ways across one run cycle cannot touch a clip, however good any single frame looks.
+>
+> Two more frictions found in passing: `edit_image` has **no palette lock** (unlike pixflux's
+> `color_image`), so every output needs the compile pass before it can even be judged in canon; and
+> inline base64 **truncates above ~3 frames** in this MCP client, which the tool documents and which
+> caps a batch well below the 16 the pricing assumes.
+>
+> **Where the lane is still right:** single-frame assets with no consistency requirement — props, set
+> pieces, portraits, UI — and throwaway concepting to decide a design *before* the rig implements it.
+> Plus PixelLab's two separately measured strengths, which are different tools: 8-direction rotation
+> of an authored master, and template locomotion. Keep it off anything with a clip.
+
+
 The rig produces figures that are *correct and lifeless*. A generator asked to invent a hero under
 relational constraints fails 0-for-10. But a model handed a correct image and asked to **change one
 thing about it** is doing neither invention nor constraint satisfaction — it has the other term in
@@ -378,8 +412,8 @@ project has never tried.
 | 0 | **Classify** | an asset need | judgement | noun / relation / refusal / **transformation** | the class is unambiguous | mis-class wastes a whole round (12 gates, 3 seals) | if the brief contains "not", "without", or a comparison, it is not a noun — route it to rig, code, or the edit lane |
 | 1 | **Pose** | pose data | rig | 512 px renders + `rig.json` bones | every marker projects inside the cell (`FIT WARNING` is a hard stop) | a pose that leaves the cell | the rig prints it |
 | 2 | **Compile** | renders | `pnpm art compile` | sheet + sidecar | 0 blocking gates; waivers exact, explained, and currently firing | `kind:"prop"` skipping the value gates | the existing suite |
-| 3 | **Draw** ← *new* | one compiled cell | PixelLab `edit_image` / `inpaint_image`, palette-locked | the same cell with a face, folds, a lit edge | silhouette and pivot **unchanged**; palette still canon; ≤ 16 colours | the edit moves the silhouette, breaking every pivot and socket downstream | diff the alpha mask against the input — it must be identical |
-| 4 | **Propagate** ← *new* | the drawn cell + the rig's other cells | PixelLab `create_character_state` / `animate_character` with rig keypoints | the drawing carried across all frames and facings | identity gate ≤ 0.45 across the clip | hand-drawing 137 cells | the existing `identity:*` gates |
+| 3 | ~~**Draw**~~ | — | — | **Stage removed.** The acceptance criterion below was the right one and the lane passes it; it fails a criterion this table did not think to write down — *the same edit on every frame of a clip* | — | — | — |
+| 4 | **Propagate** ← *untested* | an authored master | PixelLab `animate_character` with rig keypoints | the master carried across frames and facings | identity gate ≤ 0.45 across the clip | — | the existing `identity:*` gates. Note this is a DIFFERENT tool from `edit_image` and one of PixelLab's two measured strengths, so the stage-3 result does not condemn it — but it is unproven here and the rig already produces consistent frames for free |
 | 5 | **Screen** | candidates | you, at 1×, on the room's floor value | keep / reject **with a receipt** | every reject writes `.rejection.json` with a reason | rejects lost to prose | the rejection corpus grows |
 | 6 | **Approve** | master | `pnpm art approve` (human only) | hash-verified receipt | sha256 matches at compile | an edited master shipping silently | the reproducibility test |
 | 7 | **Bake the marks** | compiled mass | code | gold crossings, light pools, cast shadows | §8.2.2 satisfied | expecting the generator to place them | it never has, 12 for 12 |

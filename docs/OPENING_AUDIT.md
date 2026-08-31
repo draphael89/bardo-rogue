@@ -1,5 +1,14 @@
 # Opening Town + Hero — art direction audit, v2
 
+> **§8's stage 4 is no longer "untested", 2026-08-31.** `animate_character` has since been measured
+> and `.claude/skills/art-generation` §11 carries the result. Two of its claims did not survive:
+> "nothing emits keypoints in PixelLab's format" is now narrower — `/estimate-skeleton` returns
+> `{x, y, label, z_index}` against an 18-value enum whose `ARM`/`LEG` entries are the wrist and
+> ankle — and the missing prerequisite is not the rig's emitter but the fact that the **character ZIP
+> carries no keypoints at all**, so nothing round-trips. **Article IV held and then some:** a
+> rig-authored reference image carried the game's projection *and* its north key light through
+> generation unprompted. Everything else in this file stands as measured.
+
 **Date:** 2026-08-30 (evening) · **Branch:** `claude/bardo-rogue-art-phase-2` · **Baseline:** `4ffbab5`
 (PR #28 merged) · **Method:** the game played and photographed at 1× through `pnpm shot`, every
 number below measured off those PNGs or read out of the shipped sidecars; two forensic passes over

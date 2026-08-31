@@ -3,7 +3,7 @@ name: art-generation
 description: >-
   Which lane makes a Bardo Rogue art asset — the Blender rig, PixelLab, code, or the runtime — and how
   to drive the generated lane end to end: gen spec, the free dry run that assembles the prompt from
-  the art bible, the 4x canvas rule, subtracting the runtime's own light in the compile ramp, the
+  the art bible, the 2x canvas rule, subtracting the runtime's own light in the compile ramp, the
   gates that judge it, and the human checkpoint. Every number here was measured; the ones that were
   disproved are struck rather than deleted. Use it when asked to make or replace a prop, set piece,
   tile, actor or character, when choosing between PixelLab and the rig, when writing a gen spec or a
@@ -50,9 +50,11 @@ it to the rig or to code. ~58 generations shipped zero pixels on that mistake.
 
 Measured on `probe.brazier`, this repo, 2026-08-30. **Read §2.1 before substituting anything.**
 
-**1. Gen canvas** = **4 × the compile spec's `cell`** (see §3), capped — pixflux takes 16–400 px per
-side, so 4× is only available to a **cell ≤ 100**. Above that, drop to 3× or 2×; the colour win
-arrives at 2× anyway.
+**1. Gen canvas** = **2 × the compile spec's `cell`** (see §3). Not 4× — an earlier version of this
+file said 4× on the strength of a density curve that turned out to be a measurement artifact, and §3
+withdraws it. 2× buys the entire colour win (41 → 12) and costs a quarter of what 4× costs on the v3
+animation lane (`ceil(w·h·frames/65536)` per direction: 128px = 2/dir, 256px = 8/dir). Go above 2×
+only for a specific measured reason, and pixflux caps a side at 400 px regardless.
 
 **2. Prompt: a short subject line plus the palette lock.** What was measured is 61–94 bytes:
 
@@ -213,7 +215,7 @@ for orange to map, the compiler snaps the flame into iron and ash. Same master, 
 
 ```
 prop-brazier.json          ramp includes emberLo/ember/emberHi  ->  10 colours, flame present
-prop-brazier-deflamed.json ramp omits them                      ->   7 colours, 42.7%, PASS 0 blocking
+prop-brazier-deflamed.json ramp omits them                      ->   7 colours, 41.8%, 0 blocking at the time (see §9 — detail-density now rejects it)
 ```
 
 **A ramp is per-asset. Copying one is a bug.** Copying the brazier's onto an anvil mapped its wooden
@@ -228,14 +230,14 @@ mechanism: *"the compiler only uses the ramp a spec names."*
 | Gate | Catches | Measured / caveat |
 |---|---|---|
 | `palette-subset`, `binary-alpha` | off-canon colour, soft edges | The canon lock passes both **outright**: 0 off-canon, 0 partial-alpha on every candidate. |
-| `colour-budget` | ramp sprawl | Native-size generation blew it at 36; the 4× path lands 7–12. Prop budget is 12 (`canon.json`). Judged on the compile, never the raw candidate. |
+| `colour-budget` | ramp sprawl | Native-size generation blew it at 36; compiling an oversized master down lands 7–12. Prop budget is 12 (`canon.json`). Judged on the compile, never the raw candidate. |
 | `frame:*:edge-clearance` | art touching the cell edge | `fit:"grid"` samples the whole cell, so a candidate that fills its canvas fails. **This is why the prompt asks for a margin.** |
 | `frame:*:silhouette-mass` | a wisp or a solid block | bbox fill must be 22–82 %. |
 | `frame:*:light-direction` | **baked lighting** | Fired at **0.66 against a +0.35 cap** on the prompted-unlit brazier and blocked it. **But it only computes when `bbox.h >= 9` and `familyLightScore` returns non-null** (`gates.ts:326-332`) — a single-material object can score null and the gate silently never runs. "It fired once" is not "it always fires". |
 | `frame:*:connectivity` | scattered islands | `fail` for characters, **downgraded to `judge` for props** — i.e. waivable. Do not waive it. |
 | `b5-mass` | blown highlights | ≤ 25 % above 0.72 luminance. A lantern or any glow prop is the one to watch. |
 | `ground-separation`, `frame:*:height` | darker than its floor, too tall | **Emitted only for `kind: "character"`.** A `prop` is never checked for either — a known hole, not a pass. |
-| `identity:<clip>:a->b` | the character changing mid-clip | Cosine <= 0.45 on a colour histogram. Caught `edit_image`. **Blind to a lost prop** — it scored a clip whose greatsword vanished from 6 of 8 frames at 0.001-0.036. Never read it as "the drawing survived". |
+| `identity:<clip>:a->b` | the character changing mid-clip | Cosine <= 0.45 on a colour histogram. Caught `edit_image`. **Blind to a lost prop** — it scored 0.001-0.036 on a south run clip that had lost most of its greatsword (§11's per-direction table). Never read it as "the drawing survived". |
 | `detail-density` | surface churn | Class caps **character 0.70 / prop 0.25 / tile 0.18 / effect 0.45**. `judge`, not `fail` — and the prop cap is miscalibrated: an approved shipped actor runs at 65.6% while the props it rejects are 34-49%. Read §3.1 before acting on it. |
 | `colour-placement:<colour>` | a colour spreading where the class never puts it | Needs a `colourPlacement` profile naming every ramp colour (`art/palette/placement.json`); a spec without one fails `tests/art/spec-validate.test.ts`. The generated hero on the `veteran` profile fails **`boneLo`: bbox 29.7x28.1% against a 4.7x4.7% cap** — it distributes a rig-tiny accent colour far more widely. |
 | `clip:*:prop-mass:<frame>` <- **new** | **a held prop dropping out of a clip** | Bright-band (>0.62 luma) share of each clip frame against the sheet's own bare frames; >= 0.45x. Measured: all seven shipped sheets sit at **0.51-0.93x**, a template-animated clip at **0.19-0.39x**. `judge`, because deliberately sheathing a weapon is a legitimate waiver. |
@@ -248,7 +250,7 @@ floor value, in motion, before believing it: `pnpm art preview`, or composite in
 
 `isChroma` (`compile.ts:292`) deletes any pixel where `g > r+48 && g > b+48`, and it runs on **raw
 source pixels before palette mapping**. No canon colour trips it (closest is `numenHi`, margin 16), but
-a bright teal in a 4× master — a numen lantern, the Ferryman's glass — is destroyed before the palette
+a bright teal in an oversized master — a numen lantern, the Ferryman's glass — is destroyed before the palette
 ever sees it. MCP output arrives with real alpha via `no_background: true`, so the chroma path buys
 nothing and can only cost you. The one spec that sets `chromaKey: true` is `brute.json`, whose source
 is a genuine gpt-image green plate.
@@ -261,7 +263,7 @@ compiles (`compile.ts:548`), with `approvedSource` byte-identical to `spec.input
 
 1. **Candidate compile.** `output` under `.art-cache/` → the approval check is skipped by
    construction, because it keys on the output path. Gate it, `pnpm art preview` it, judge at 1×.
-2. **A human moves the 4× MASTER** — not the compiled 48 px output — into `art/approved/`, and runs
+2. **A human moves the OVERSIZED MASTER** — the generated source, not the compiled cell — into `art/approved/`, and runs
    `pnpm art approve` for a hash-verified receipt. **Never an agent's call.**
 3. **Production compile.** A second spec whose `input` is that approved master and whose `output` is
    `public/assets/`. It re-verifies the receipt.
@@ -334,6 +336,11 @@ truncation at ~4 and ~6 frames, which is exactly the failure the global skill do
 approval checkpoint keys on the output path (`tools/art/approve.ts`), so a candidate lane physically
 cannot ship. Result, re-run from this file alone: **7 colours, 41.8 % density, PASS 9 gates 0 blocking.**
 
+**That PASS predates `detail-density`.** Re-compiled against current `main` the same candidate is
+**BUILD REJECTED** at 41.8 % against a 25 % prop cap. Read §3.1 before you conclude anything from
+this example: the recipe is sound and the cap is the thing under dispute, but do not quote "0
+blocking" as if it still holds.
+
 ## 10. What needs a human
 
 The approval in §6, always. And the aesthetic call — a gate cannot tell you the anvil came back
@@ -388,7 +395,7 @@ budget and 256 is four times the price for it.
 pose needs the room (128x160 for a raised greatsword) — the same geometry that denies the armed hero
 a roll sheet (`CHARACTER_HARD_CONSTRAINTS.md:184-188`). And the generated figure fills more of its
 canvas than the rig's does: median bbox **53.5px against the shipped hero's 43**, which trips
-`frame:*:height` on 5 of 8 frames until you rescale. Rescale with ONE scale and ONE offset for the
+`frame:*:height` on 5 of the 8 ROTATIONS until you rescale. Rescale with ONE scale and ONE offset for the
 whole clip; per-frame normalisation flattens a run cycle's bob into a treadmill.
 
 ### 11.1 Weapon variants are `create_character_state`, and it works

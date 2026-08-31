@@ -381,8 +381,14 @@ describe('authored effect sprites', () => {
 // this pipeline, so the lane that produces most of the screen cannot be the one lane exempt from it.
 describe('code-generated sheets', () => {
   it('keeps the room and prop detail density inside their measured class budgets', async () => {
+    // The baseline moved DOWN, 0.159 -> 0.153, and the pin is re-taken rather than loosened because
+    // that is the change working. Three sheet edits took energy out of the room sheet on purpose:
+    // the wine runner lost its 3px checker and then two of its three folds per cell (38.1% -> 20.6%
+    // on that tile alone), and wallFace's bond period went 15 -> 12 so the courses stop breaking at
+    // every seam. Quieter is the direction this sheet is supposed to move; the cap at 0.18 is what
+    // guards the other direction and it is untouched.
     const cases = [
-      ['bardo_room.png', 0.18, 0.159],
+      ['bardo_room.png', 0.18, 0.153],
       ['bardo_props.png', 0.25, 0.208],
     ] as const
     for (const [name, cap, baseline] of cases) {

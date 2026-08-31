@@ -1,0 +1,51 @@
+{
+  "id": "hub.brazier.candidate",
+  "kind": "prop",
+  "input": ".art-cache/props-test/masters/brazier-192.png",
+  "output": ".art-cache/hub/compiled/hub_brazier.png",
+  "sidecar": ".art-cache/hub/compiled/hub_brazier.json",
+  "cell": 48,
+  "cols": 1,
+  "rows": 1,
+  "maxColors": 12,
+  "palette": [
+    "void",
+    "mortar",
+    "seal0",
+    "iron",
+    "ironHi",
+    "woodLo",
+    "wood",
+    "woodHi",
+    "emberLo",
+    "ember",
+    "emberHi",
+    "boneLo"
+  ],
+  "colourPlacement": "probe-brazier",
+  "fit": "grid",
+  "chromaKey": false,
+  "coverage": 0.5,
+  "salience": {
+    "minShare": 0.2,
+    "minDelta": 0.16
+  },
+  "frames": [
+    {
+      "name": "brazier",
+      "i": 0
+    }
+  ],
+  "provenance": {
+    "provider": "pixellab",
+    "model": "create_image_pixflux (MCP), seed 3, 192x192, forced canon ramp",
+    "promptFile": "art/prompts/probe_brazier_192.txt"
+  },
+  "registrationNote": "CANDIDATE ONLY, for the Bardo hub preview (?hubCandidate=1). Reuses the probe's already-paid 192px lit master and its tracked prompt unchanged \u2014 zero generations. MEASURED DECISION, and it goes against the general rule. art-generation SS4 says the runtime owns fire, so the deflamed ramp (embers removed) is normally correct \u2014 it is what made the keeper's lamp's missing flame right. It was tried here first and is a REGRESSION for this room: the flame anchors in arena.braziers are the LIGHT POOLS, not the prop positions. forgeFire (18, 21.2) sits on the brazier at (18, 21), but focal (33.5, 4.6) sits BETWEEN the two Gate-flanking braziers at (31, 4) and (36, 5), ~40px from each, so both read as dead iron bowls and the Gate plaza loses its only two warm marks. Captured A/B at 1x before deciding. There is one PROP.brazier cell, so this cannot be mixed per placement; the cost is that the forge brazier double-draws its flame. Two dead cressets at the room's focal beat one doubled flame at the forge. PROP.brazierCold keeps production art \u2014 prop-brazier-cold.json is a recorded NEGATIVE result.",
+  "waivers": [
+    {
+      "gate": "detail-density",
+      "reason": "prop cap 25% is measured-miscalibrated (art-generation SS3.1): the approved shipped bardo_brute runs 65.6% while every compiled prop lands 34-49%. 48.6% here is at the top of that band \u2014 the ember ramp is what costs the extra churn over the deflamed variant's 41.8%."
+    }
+  ]
+}

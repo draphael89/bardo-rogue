@@ -687,11 +687,20 @@ console.log('wrote', out, COLS * ROOM_CELL, 'x', ROWS * ROOM_CELL, '(' + tiles.l
 
 // The Bardo hub paves from its OWN copy of this sheet, at identical indices. bardo_room.png serves
 // the other thirteen layouts, so replacing a hub tile cannot reach Cocytus or Asphodel — which is
-// exactly how the brass level-4 ramp escaped once before (see LV[4]). The two files start
-// byte-identical and diverge only as hub art is promoted into bardo_hub.png.
+// exactly how the brass level-4 ramp escaped once before (see LV[4]).
+//
+// SEEDED ONCE, then never touched. Divergence from bardo_room.png is the POINT of the fork, so an
+// unconditional write here would silently destroy every promoted hub tile on the next `pnpm tiles`
+// — and this tool runs for reasons that have nothing to do with the hub (a prop edit, an fx tweak).
+// `--reseed-hub` is the deliberate re-fork, and it says what it is discarding.
 const hubOut = 'public/assets/sprites/bardo_hub.png'
-await sharp(sheet, { raw: { width: COLS * ROOM_CELL, height: ROWS * ROOM_CELL, channels: 4 } }).png().toFile(hubOut)
-console.log('wrote', hubOut, COLS * ROOM_CELL, 'x', ROWS * ROOM_CELL, '(hub fork)')
+const reseedHub = process.argv.includes('--reseed-hub')
+if (!existsSync(hubOut) || reseedHub) {
+  await sharp(sheet, { raw: { width: COLS * ROOM_CELL, height: ROWS * ROOM_CELL, channels: 4 } }).png().toFile(hubOut)
+  console.log('wrote', hubOut, COLS * ROOM_CELL, 'x', ROWS * ROOM_CELL, reseedHub ? '(hub fork RESEEDED — any promoted hub art is gone)' : '(hub fork seeded)')
+} else {
+  console.log('kept', hubOut, '— the hub fork owns its own art; pass --reseed-hub to re-fork from bardo_room')
+}
 
 const preview = 'public/progress/shots/tiles-r4.png'
 await sharp(sheet, { raw: { width: COLS * ROOM_CELL, height: ROWS * ROOM_CELL, channels: 4 } })

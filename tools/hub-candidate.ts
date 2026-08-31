@@ -20,8 +20,13 @@ const at = (i: number) => ({ left: (i % COLS) * CELL, top: Math.floor(i / COLS) 
 
 /** Single-cell candidates, by the PROP index each one stands in for. */
 const SINGLES: Array<[string, number]> = [
+  ['.art-cache/hub/compiled/hub_brazier.png', 4],   // PROP.brazier
   ['.art-cache/hub/compiled/hub_ossuary.png', 5],   // PROP.ossuary
   ['.art-cache/hub/compiled/hub_lamp.png', 12],     // PROP.keeperLamp
+  // PROP.brazierCold (13) keeps production art. The cold master is a recorded NEGATIVE result:
+  // prompting for "unlit" returned a formless bowl (art-generation §4) and it still fails
+  // light-direction at 0.66 and slate1 at 54% against a checked-in 10% cap. The lit/cold read is
+  // carried by the runtime light and by bakeBardoCauseway's soot wedges, not by two sprites.
   // PROP.verdictStele (15) is DELIBERATELY absent: the candidate lost production's legible carved
   // cross and read as a plain standing rock. art/specs/hub/stele.json is kept as the record.
 ]

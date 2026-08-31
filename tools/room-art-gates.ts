@@ -435,6 +435,12 @@ async function runtime(url: string, shotDir?: string): Promise<RuntimeRoom[]> {
 }
 
 await sourceSheet('public/assets/sprites/bardo_room.png', 8 * 24, 12 * 24)
+// The Bardo hub's fork is gated on the same terms as the sheet it forked from. It is not a copy any
+// more once hub art lands, and an ungated sheet is where off-canon colour or partial alpha gets in.
+// Alpha matters twice over here: src/render/light.ts:72-86 masks the whole lightmap on the baked
+// room texture's alpha, so a hub tile carrying alpha-0 pixels drops out of BOTH the multiply and the
+// additive pass and renders as raw starfield.
+await sourceSheet('public/assets/sprites/bardo_hub.png', 8 * 24, 12 * 24)
 await sourceSheet('public/assets/sprites/bardo_props.png', 4 * 48, 4 * 48)
 await materialSpan()
 negativeSpace(buildArena(new Rng(1), 'bardo'))

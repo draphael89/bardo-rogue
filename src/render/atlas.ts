@@ -17,7 +17,25 @@ const SHEETS = [
   'bardo_veteran_greatsword_south',
   'bardo_brute',
 ] as const
-export type SheetName = (typeof SHEETS)[number]
+
+// The hill-climb lane has to be inspectable in-engine before a generated identity crosses the
+// repository's human approval boundary. Vite serves the ignored .art-cache in development, so the
+// opt-in query below can bind gated candidates without copying them into public/assets or making a
+// production build contain unapproved art. The map is deliberately explicit: no directory scan,
+// no newest-file wins, and no production fallback that could ship a candidate by accident.
+const CANDIDATE_SHEETS = {
+  bardo_caster_east: '/.art-cache/actors/caster/compiled/bardo_caster_east',
+  bardo_charger_east: '/.art-cache/actors/charger/compiled/bardo_charger_east',
+  bardo_oathbound_east: '/.art-cache/actors/oathbound/compiled/bardo_oathbound_east',
+  bardo_oathbound_north: '/.art-cache/actors/oathbound/compiled/bardo_oathbound_north',
+  bardo_oathbound_south: '/.art-cache/actors/oathbound/compiled/bardo_oathbound_south',
+  bardo_warden_north: '/.art-cache/actors/warden/compiled/bardo_warden_north',
+  bardo_warden_south: '/.art-cache/actors/warden/compiled/bardo_warden_south',
+} as const
+
+type ProductionSheetName = (typeof SHEETS)[number]
+type CandidateSheetName = keyof typeof CANDIDATE_SHEETS
+export type SheetName = ProductionSheetName | CandidateSheetName
 
 export interface Atlas {
   tile(i: number): Texture          // Tiny Dungeon 16x16 by index (12 columns) — legacy actors, weapons
@@ -29,6 +47,7 @@ export interface Atlas {
    * Pivots and sockets travel in the sidecar, so a view never hard-codes a registration table.
    */
   sheet(name: SheetName): Sheet
+  hasSheet(name: SheetName): boolean
   particle(name: string): Texture
   decal(name: string): Texture
   light(name: string): Texture
@@ -82,10 +101,20 @@ export async function loadAtlas(manifest: Record<string, string[]>): Promise<Atl
   }
   const tinyWhite = whiteSheet(tiny)
   const sheets = new Map<string, Sheet>()
-  await Promise.all(SHEETS.map(async name => {
+  const candidateMode = import.meta.env.DEV && new URLSearchParams(location.search).get('actorCandidate') === '1'
+  const requested: Array<readonly [SheetName, string]> = [
+    ...SHEETS.map(name => [name, `${base}sprites/${name}`] as const),
+    ...(candidateMode
+      ? Object.entries(CANDIDATE_SHEETS).map(([name, path]) => [name as CandidateSheetName, path] as const)
+      : []),
+  ]
+  await Promise.all(requested.map(async ([name, path]) => {
     const [tex, def] = await Promise.all([
-      Assets.load<Texture>(`${base}sprites/${name}.png`),
-      fetch(`${base}sprites/${name}.json`).then(r => r.json() as Promise<SheetDef>),
+      Assets.load<Texture>(`${path}.png`),
+      fetch(`${path}.json`).then(r => {
+        if (!r.ok) throw new Error(`sheet ${name}: sidecar request failed (${r.status})`)
+        return r.json() as Promise<SheetDef>
+      }),
     ])
     // The contract is checked at load, not assumed: a sidecar and its PNG can drift apart, and a
     // silent mismatch shows up as the wrong pose on the wrong tick rather than as an error.
@@ -106,6 +135,7 @@ export async function loadAtlas(manifest: Record<string, string[]>): Promise<Atl
       if (!s) throw new Error(`atlas: no sheet "${name}"`)
       return s
     },
+    hasSheet: name => sheets.has(name),
     particle: n => particles.get(n) ?? Texture.WHITE,
     decal: n => decals.get(n) ?? Texture.WHITE,
     light: n => lights.get(n) ?? Texture.WHITE,

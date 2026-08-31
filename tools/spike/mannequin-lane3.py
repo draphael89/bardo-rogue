@@ -232,21 +232,20 @@ def build_bones_humanoid(leg_scale):
 
 
 if ACTOR == "warden":
-    # NOT a humanoid: a building. The piers hang off ROOT, not off the pelvis, so the upper mass can
-    # rise and fall — the void IS the charge meter — while the plinths stay planted on the floor.
-    # The piers overstand the resting hem underside by 6 units, so even the biggest lift never opens
-    # a gap: connectivity stays 1 component against the hard cap of 3.
+    # A judicial effigy built around a doorway, not a loose room prop. The two planted legs hang off
+    # ROOT while the wine-dark upper sentence rises from the pelvis: the opening between them remains
+    # the slam meter, but the head, shoulders and arms now make the mass read as an actor at 1x.
     bone("root", V(0, 2, 0), V(0, 5, 0))
     bone("feetCenter", V(0, 0, 0), V(0, -3, 0), "root")
-    bone("pelvis", V(0, 0, 20), V(0, 0, 24), "root")
-    bone("chest", V(0, 0, 24), V(0, 0, 36), "pelvis")
+    bone("pelvis", V(0, 0, 18), V(0, 0, 22), "root")
+    bone("chest", V(0, 0, 22), V(0, 0, 36), "pelvis")
     bone("shoulder", V(0, 0, 36), V(0, 0, 43), "chest")
-    bone("lintelB", V(0, 0, 43), V(0, 0, 50), "shoulder")
-    bone("head", V(0, -1, 38), V(0, -1, 46), "chest")
+    bone("lintelB", V(0, 0, 43), V(0, 0, 49), "shoulder")
+    bone("head", V(0, -1, 38), V(0, -1, 52), "chest")
     for side, sx in (("R", 1), ("L", -1)):
-        bone("pier" + side, V(16.0 * sx, 0, 20), V(16.0 * sx, 0, 0), "root")
-        bone("upperArm" + side, V(15.0 * sx, 0, 41), V(17.0 * sx, 0, 34), "shoulder")
-        bone("foreArm" + side, V(17.0 * sx, 0, 34), V(19.0 * sx, 0, 28), "upperArm" + side)
+        bone("pier" + side, V(10.0 * sx, 0, 18), V(10.0 * sx, 0, 0), "root")
+        bone("upperArm" + side, V(12.0 * sx, 0, 40), V(14.0 * sx, 0, 32), "shoulder")
+        bone("foreArm" + side, V(14.0 * sx, 0, 32), V(15.0 * sx, 0, 25), "upperArm" + side)
 elif ACTOR == "oathbound":
     # `--leg-scale 1.10` baked in: HIP_Z 14.85. With the split crest deleted the helm crown tops out
     # at HZ + 19.0 plus a 2.0 sealed ridge, so the standing body lands ~3px under §4.1's 40px body
@@ -300,6 +299,25 @@ def box(name, center, hx, hy, hz, bone_name, mat, rot=None):
     return o
 
 
+def tapered_box(name, cx, cy, z0, z1, bottom_hx, top_hx, hy, bone_name, mat):
+    """A hard-sided vestment/stele mass with a deliberately drawn taper."""
+    verts = [
+        V(cx - bottom_hx, cy - hy, z0), V(cx + bottom_hx, cy - hy, z0),
+        V(cx + top_hx, cy - hy, z1), V(cx - top_hx, cy - hy, z1),
+        V(cx - bottom_hx, cy + hy, z0), V(cx + bottom_hx, cy + hy, z0),
+        V(cx + top_hx, cy + hy, z1), V(cx - top_hx, cy + hy, z1),
+    ]
+    faces = [(0, 1, 2, 3), (4, 7, 6, 5), (0, 4, 5, 1), (3, 2, 6, 7),
+             (0, 3, 7, 4), (1, 5, 6, 2)]
+    mesh = bpy.data.meshes.new(name + "Mesh")
+    mesh.from_pydata(verts, [], faces)
+    mesh.materials.append(mat)
+    o = bpy.data.objects.new(name, mesh)
+    bpy.context.collection.objects.link(o)
+    attach(o, bone_name)
+    return o
+
+
 def limb_cyl(name, bone_name, r, mat, fat=1.15):
     b = arm_data.bones[bone_name]
     head = arm.matrix_world @ b.head_local
@@ -327,83 +345,81 @@ def marker(name, world_pos, bone_name):
     MARKERS[name] = e
 
 
-# ================================================================= WARDEN — the gate that walks
+# ================================================================= WARDEN — the sentence that walks
 if ACTOR == "warden":
-    # THE ARCH IS TRANSPARENT AND THAT IS THE ONE THING NOT TO GET WRONG. Alpha 0 between the piers:
-    # no inner face, no soffit, no back wall, no MAT_SLIT fill. §4.2 fills the sprite with solid
-    # black, so an opaque dark interior turns black too and the hook dies in the exact test it exists
-    # to win. NOTHING BELOW SPANS x in (-6, +6) UNDER z 20.
-    # The plinths are the DARK step, and that is measured rather than chosen. As lit MAT_WSTONE
-    # their big horizontal top faces put ~130px of the family's BRIGHTEST step at floor level, which
-    # is half of why light-direction measured +0.68..+0.95 against the +0.35 cap on all 13 frames.
-    # Dark stone at the contact line is also the correct drawing.
-    box("plinthR", V(17.0, 0, 1.0), 11.0, 5.2, 1.0, "root", MAT_WSTONE_DARK)
-    box("plinthL", V(-17.0, 0, 1.0), 11.0, 5.2, 1.0, "root", MAT_WSTONE_DARK)
+    # Alpha stays open between the legs. It is the silhouette hook and the slam meter; the new
+    # proportions make it a stride beneath a body rather than a hole in a squat wall.
+    box("plinthR", V(10.0, 0, 1.0), 7.0, 5.0, 1.0, "root", MAT_WSTONE_DARK)
+    box("plinthL", V(-10.0, 0, 1.0), 7.0, 5.0, 1.0, "root", MAT_WSTONE_DARK)
     for _s, _sx in (("R", 1), ("L", -1)):
-        # Pier: x 6..26, z 0..20. Inner face at |x| = 6 -> a 12px void. It overstands the resting hem
-        # underside (z 14) by 6 so the biggest pelvis lift still leaves the mass ONE component.
-        box("pier" + _s, V(16.0 * _sx, 0, 10.0), 10.0, 4.5, 10.0, "pier" + _s, MAT_WSTONE)
-        # Material-dark backing — the capeShadow mechanism from the hero rig. It GUARANTEES §4.3.3's
-        # 1px outline round the pier instead of hoping shading produces one.
-        #
-        # TWO RULES EVERY BACKING PLATE ON THIS BODY OBEYS, both bought with a failed compile.
-        #  (1) CENTRED IN Y, never offset behind. Offset +y made the plates the first surface the
-        #      NORTH camera sees: the whole north sheet came back mortar at Weber -0.55 on all 14
-        #      frames while south passed 137/137.
-        #  (2) NEVER PROUD IN +Z. A plate taller than its body shows its own TOP FACE under a 20 deg
-        #      top-down camera — 1137px of mortar, half the north drawing. §4.3.3 puts the outline on
-        #      the contour AWAY from the key anyway, so each plate matches its body's z-top exactly
-        #      and is proud only at the sides and the bottom.
-        box("pierEdge" + _s, V(16.0 * _sx, 0, 9.6), 10.8, 4.0, 10.0, "pier" + _s, MAT_SLIT)
-    # Hem: 56px wide, z 14..20, overhanging each pier by 2px. That 2px step, faced dark underneath,
-    # is the shadow line that says lintel-over-piers.
-    box("hem", V(0, 0, 17.0), 28.0, 6.0, 3.0, "pelvis", MAT_WSTONE)
-    box("hemUnder", V(0, -0.4, 14.4), 28.1, 5.7, 0.5, "pelvis", MAT_WSTONE_DARK)
-    # The chest's own cast shadow on the hem top, drawn as geometry rather than left to the renderer.
-    # MEASURED: from the north the hem's lit top face is 690px of nave2 — the family's BRIGHTEST step
-    # — at meanY 51, low on the sheet, which is the whole of why north measured light-direction
-    # +0.71..+0.88 while south passed 137/137 at -0.x. In south this band sits on the far side and is
-    # mostly hidden behind the chest, so it costs that facing almost nothing.
-    box("hemShadow", V(0, 3.6, 20.05), 28.0, 2.4, 0.2, "pelvis", MAT_WSTONE_DARK)
-    box("shoulderShadow", V(0, 2.6, 43.05), 18.0, 2.0, 0.2, "shoulder", MAT_WSTONE_DARK)
-    box("hemEdge", V(0, 0, 16.6), 28.5, 5.4, 3.0, "pelvis", MAT_SLIT)
-    box("chest", V(0, 0, 28.0), 12.0, 5.0, 8.0, "chest", MAT_WSTONE)
-    box("chestEdge", V(0, 0, 27.6), 12.6, 4.4, 8.0, "chest", MAT_SLIT)
-    box("shoulderBlock", V(0, 0, 39.5), 18.0, 4.6, 3.5, "shoulder", MAT_WSTONE)
-    box("shoulderEdge", V(0, 0, 39.1), 18.5, 4.0, 3.5, "shoulder", MAT_SLIT)
-    # The lintel IS the shoulder line: a 36px bar, top at z 50 = standing height, dead level and
-    # UNBROKEN. The exact inverse of the hero's split crest, which is the shape he is known by.
-    box("lintel", V(0, -0.6, 46.5), 18.0, 4.0, 3.5, "lintelB", MAT_WSTONE)
-    box("lintelEdge", V(0, -0.6, 46.1), 18.5, 3.4, 3.5, "lintelB", MAT_SLIT)
-    # NO DARK BAND UNDER THE LINTEL. MEASURED on the staged reject: it put 36px of nave0 — the
-    # family's darkest step — at meanY 22 while nave1 sat at 44 and nave2 at 43.5, and a dark step
-    # NORTH of the bright ones is exactly what familyLightScore reads as bright-south. Dropping it
-    # leaves nave0 as the hem underside alone, low on the sheet, where a shadow belongs.
-    # The head is SUNK 3.5px below the lintel top, so the top contour stays one unbroken bar.
-    # Contour and value are different channels: it is invisible in silhouette and still the
-    # brightest thing on the body. That fixes the inversion measured on the hero's north sheet,
-    # where his brightest pixels were his boots.
-    box("head", V(0, -1.0, 42.0), 4.5, 3.4, 4.5, "head", MAT_WSTONE)
-    box("recess", V(0, -3.4, 42.0), 5.2, 0.3, 5.0, "head", MAT_VISOR)
-    box("maskPlate", V(0, -4.2, 42.6), 4.0, 0.4, 2.8, "head", MAT_MASK)
-    box("maskLo", V(0, -4.3, 40.0), 4.0, 0.4, 0.9, "head", MAT_MASK_LO)
-    # Pure `bone` is the lit upper-left rim ONLY: ~10px, well under the sprite b5-mass cap of 25%.
-    # Three steps, because an 8x6 mark that is the eye's stop cannot jump boneLo->bone across two
-    # bands with no midtone.
-    box("maskHi", V(-1.7, -4.5, 44.7), 2.2, 0.35, 0.6, "head", MAT_MASK_HI)
-    # THE JUDGMENT COURSE. §8.2.2 makes gold the threshold mark and §9.0 puts it on crossings only —
-    # door frames, Charon's pole, Minos' beam. This actor IS the crossing. Segmented, because a
-    # continuous highlight along a full edge reads as plastic (§2.4) and §8.2.4 wants it unfinished.
-    for _i, _gx in enumerate((-7.0, 0.0, 7.0)):
-        box(f"gold{_i}", V(_gx, -4.7, 47.4), 2.5, 0.4, 0.7, "lintelB", MAT_GOLD)
-    # The nape block: the ONE place in the whole set where anything rises above the bar, and it is
-    # the back of the head. North is therefore never a mirror of south.
-    box("napeBlock", V(0, 2.8, 48.4), 4.5, 1.5, 1.3, "head", MAT_WSTONE)
+        # Human-readable legs rather than room piers: broad at the planted foot, narrower where they
+        # enter the girdle. The open stride stays intact and still meters the slam lift.
+        tapered_box("pierEdge" + _s, 10.0 * _sx, 0, -0.2, 18.0, 7.1, 5.4, 4.0,
+                    "pier" + _s, MAT_SLIT)
+        tapered_box("pier" + _s, 10.0 * _sx, -0.2, 0.0, 18.1, 6.5, 4.8, 4.3,
+                    "pier" + _s, MAT_WSTONE)
+    # A tapered stone girdle connects the planted lower body to the vestment. Deleting the old 41px
+    # horizontal platform is the structural change that stops Minos reading as an altar.
+    tapered_box("hemEdge", 0, 0, 14.0, 20.0, 13.8, 15.8, 5.0, "pelvis", MAT_SLIT)
+    tapered_box("hem", 0, -0.3, 14.5, 20.1, 13.0, 15.0, 5.3, "pelvis", MAT_WSTONE)
+    box("hemUnder", V(0, -0.5, 14.5), 13.0, 5.1, 0.45, "pelvis", MAT_WSTONE_DARK)
+    # A split, tapered vestment instead of a blank heraldic rectangle. The flat central folds are
+    # material-dark wine and are authored on both faces, so neither facing becomes the weak side.
+    tapered_box("chest", 0, 0, 19.0, 36.0, 7.5, 9.5, 5.0, "chest", MAT_WINE)
+    box("sentenceFold", V(0, 0, 27.0), 0.8, 5.2, 6.2, "chest", MAT_WINE_DARK)
+    box("sentenceStoleR", V(3.2, 0, 28.0), 0.65, 5.2, 6.6, "chest", MAT_WINE_DARK,
+        rot=(0, radians(-18), 0))
+    box("sentenceStoleL", V(-3.2, 0, 28.0), 0.65, 5.2, 6.6, "chest", MAT_WINE_DARK,
+        rot=(0, radians(18), 0))
+    for _s, _sx in (("R", 1), ("L", -1)):
+        box("shoulderBlock" + _s, V(8.0 * _sx, 0, 39.5), 7.0, 4.6, 3.5, "shoulder", MAT_WSTONE)
+        box("shoulderShadow" + _s, V(8.0 * _sx, 2.6, 43.05), 7.0, 2.0, 0.2,
+            "shoulder", MAT_WSTONE_DARK)
+        box("shoulderEdge" + _s, V(8.0 * _sx, 0, 39.1), 7.5, 4.0, 3.5,
+            "shoulder", MAT_SLIT)
+    # THE JUDGMENT SCALE. The old crossing beam was only a thin horizontal behind a generic block
+    # head: readable as construction, not authority. Preserve the First Gate's crossing, but give
+    # it a judicial noun that survives a black test: a central fulcrum, unequal hanging verdicts,
+    # and a face clearly above the shoulders. The weights hang from the lintel bone, so the fan's
+    # torso turn moves the whole scale instead of leaving decorative UI behind the actor.
+    box("lintelEdge", V(0, 0.4, 44.2), 20.0, 2.7, 1.7, "lintelB", MAT_SLIT)
+    box("lintel", V(0, -0.6, 44.7), 19.0, 3.0, 1.35, "lintelB", MAT_WSTONE)
+    tapered_box("scaleFulcrum", 0, -1.0, 44.5, 50.2, 3.3, 1.1, 2.5,
+                "lintelB", MAT_WSTONE_DARK)
+    # Unequal verdict blocks turn the crossing beam into a scale without adding hairline chains that
+    # vanish at 1x. Their dark stems and bone faces make two closed, offset punctuation marks in the
+    # silhouette. They sit outside the shoulder mass so they cannot become pauldrons.
+    box("scaleStemR", V(18.0, 0, 39.7), 0.8, 2.0, 4.0, "lintelB", MAT_WSTONE_DARK)
+    box("scaleStemL", V(-18.0, 0, 37.8), 0.8, 2.0, 5.9, "lintelB", MAT_WSTONE_DARK)
+    tapered_box("verdictR", 18.0, -0.7, 33.8, 37.8, 3.6, 2.4, 2.8,
+                "lintelB", MAT_MASK_LO)
+    tapered_box("verdictL", -18.0, -0.7, 30.0, 34.0, 3.6, 2.4, 2.8,
+                "lintelB", MAT_MASK_LO)
+
+    # A long funerary judge-mask replaces the old warm horizontal strip. The tapered jaw, paired eye
+    # sockets and central nose remain a face at native scale, while the stepped stone crown breaks
+    # the automaton/block-head read. Bone highlight stays above the eyes; gold is kept off the face.
+    sphere("head", V(0, -1.0, 46.3), 5.5, 3.6, 5.7, "head", MAT_WSTONE)
+    box("recess", V(0, -3.5, 46.0), 5.8, 0.3, 5.9, "head", MAT_VISOR)
+    tapered_box("maskPlate", 0, -4.2, 41.8, 50.0, 2.7, 4.7, 0.4,
+                "head", MAT_MASK)
+    box("maskLo", V(0, -4.3, 42.1), 2.7, 0.4, 1.0, "head", MAT_MASK_LO)
+    box("eyeR", V(2.1, -4.7, 47.4), 1.35, 0.2, 0.6, "head", MAT_VISOR)
+    box("eyeL", V(-2.1, -4.7, 47.4), 1.35, 0.2, 0.6, "head", MAT_VISOR)
+    box("maskNose", V(0, -4.55, 45.7), 0.65, 0.3, 2.5, "head", MAT_MASK_HI)
+    box("maskBrow", V(-1.8, -4.5, 49.6), 2.5, 0.35, 0.6, "head", MAT_MASK_HI)
+    box("crown", V(0, -0.7, 50.7), 4.2, 2.7, 0.9, "head", MAT_WSTONE_DARK)
+    box("crownPeak", V(0, -0.9, 51.8), 1.8, 2.4, 0.7, "head", MAT_WSTONE)
+    # §8.2.2 keeps gold on crossings: two end hinges and one fulcrum pin, never a face stripe.
+    for _i, _gx in enumerate((-18.0, 0.0, 18.0)):
+        box(f"gold{_i}", V(_gx, -3.8, 45.2 if _gx else 49.0),
+            1.5 if _gx else 1.2, 0.35, 0.8 if _gx else 1.2, "lintelB", MAT_GOLD)
+    box("napeBlock", V(0, 2.8, 49.7), 4.8, 1.5, 1.0, "head", MAT_WSTONE)
     for _s, _sx in (("R", 1), ("L", -1)):
         limb_cyl("upperArmM" + _s, "upperArm" + _s, 2.5, MAT_WSTONE)
         limb_cyl("foreArmM" + _s, "foreArm" + _s, 2.2, MAT_WSTONE)
     marker("feetCenter", Vector((0, 0, 0)), "feetCenter")
-    marker("mask", arm.matrix_world @ V(0, -4.6, 42.6), "head")
+    marker("mask", arm.matrix_world @ V(0, -4.6, 46.4), "head")
 
 # ================================================================= OATH-BOUND — the gate, worn
 elif ACTOR == "oathbound":
@@ -682,13 +698,21 @@ if ACTOR == "warden":
         ops += arms if arms else []
         return ops
 
-    # Arms OUT LEVEL at lintel height: contour widens, VOID UNCHANGED. This is the discrimination the
-    # whole fight depends on — the void rising means the circle is coming, the contour widening means
-    # the veil is. Two different channels, so a player reading one is never reading the other.
-    RING_ARMS = [("A", "upperArmR", (1, 0, 0.12)), ("A", "foreArmR", (1, 0, 0.05)),
-                 ("A", "upperArmL", (-1, 0, 0.12)), ("A", "foreArmL", (-1, 0, 0.05))]
+    # The slam begins with both arms hauling the scale upward. This uses the apparatus as body acting:
+    # a tall, gathered silhouette commits to becoming the crushed, down-braced contact pose below.
+    GATHER_ARMS = [("A", "upperArmR", (0.62, 0, 0.78)), ("A", "foreArmR", (-0.18, 0, 0.98)),
+                   ("A", "upperArmL", (-0.62, 0, 0.78)), ("A", "foreArmL", (0.18, 0, 0.98))]
+    COMMIT_ARMS = [("A", "upperArmR", (0.78, 0, 0.42)), ("A", "foreArmR", (-0.56, 0, 0.55)),
+                   ("A", "upperArmL", (-0.78, 0, 0.42)), ("A", "foreArmL", (0.56, 0, 0.55))]
+    # Ring arms sit BELOW the permanent yoke. The former level T-pose fused with that beam and spent
+    # two limbs for almost no new silhouette; this down/out diamond widens at the red core, where the
+    # radial effect leaves enough contrast to see it. VOID UNCHANGED: widening still means veil.
+    RING_ARMS = [("A", "upperArmR", (0.92, 0, -0.38)), ("A", "foreArmR", (0.98, 0, 0.20)),
+                 ("A", "upperArmL", (-0.92, 0, -0.38)), ("A", "foreArmL", (-0.98, 0, 0.20))]
     FLUSH_ARMS = [("A", "upperArmR", (0.30, 0, -1)), ("A", "foreArmR", (0.15, 0, -1)),
                   ("A", "upperArmL", (-0.30, 0, -1)), ("A", "foreArmL", (-0.15, 0, -1))]
+    BRACE_ARMS = [("A", "upperArmR", (0.50, 0, -1)), ("A", "foreArmR", (0.60, 0, -1)),
+                  ("A", "upperArmL", (-0.50, 0, -1)), ("A", "foreArmL", (-0.60, 0, -1))]
     POSES = {
         # ZERO VERTICAL BOB, and the renderer must honour it (pose.hop = 0, sx = sy = 1, rot = 0).
         # Every other actor bobs. An actor that does not bob reads as inevitable.
@@ -701,20 +725,20 @@ if ACTOR == "warden":
         "chaseB": W(pier_dy=(2.2, -2.2)),
         # The first 20 of the 36-tick windup (clipSelect splits at ceil(windup*0.55) = 20; take the
         # boundary from tuning.warden, never from the sheet). Piers rake 10 -> 6, pelvis +3.
-        "windSlamGather": W(lift=3.0),
+        "windSlamGather": W(lift=2.5, arms=GATHER_ARMS),
         # The last 16 ticks. Piers at 3 deg, pelvis +5, the void at its widest. Nothing else in the
         # frame moves. windup2 is 24 in phase two: the tell does not get shorter in the DRAWING —
         # the opening stays the same size and only the hold shortens.
-        "windSlamCommit": W(lift=5.0),
+        "windSlamCommit": W(lift=2.8, arms=COMMIT_ARMS),
         # slamTicks is 4, so this single frame IS the whole active window and it must read at a
         # glance. Pelvis -5, void crushed, the hem driven down over the pier tops.
-        "slamContact": W(lift=-5.0),
+        "slamContact": W(lift=-5.0, arms=BRACE_ARMS),
         # recover 48 ticks — the longest punish window he owns, AND the shared recovery drawing for
         # ring (42) and fan (40). One strong pose beats three weak ones.
         "slamRecover": W(lift=-2.5, tilt=2.5),
-        "windRing": W(arms=RING_ARMS),
+        "windRing": W(lift=-1.5, arms=RING_ARMS),
         # The 8 bolts leave from the hem line, not from a hand: a building does not throw.
-        "ringRelease": W(arms=FLUSH_ARMS),
+        "ringRelease": W(lift=1.5, arms=FLUSH_ARMS),
         # The ONLY frame in the set where the gold course is not parallel to the floor: a third tell
         # made of nothing but torso twist, over a base that does not move.
         "windFan": W(twist=-18.0),
@@ -743,7 +767,8 @@ if ACTOR == "warden":
     # with no facing logic at all, so two authored facings is strictly more than it has.
     FACINGS = ["south", "north"]
     SHEET = dict(cell=72, cols=4, rows=4, mirror=False,
-                 palette=["mortar", "seal0", "nave0", "nave1", "nave2", "boneLo", "boneDim", "bone", "gold"],
+                 palette=["mortar", "seal0", "nave0", "nave1", "nave2", "purple0", "purple2", "purple3",
+                          "boneLo", "boneDim", "bone", "gold"],
                  sockets={f: ["mask"] for f in FRAME_ORDER},
                  clips={
                      # VERIFIED against compile.ts: `ref: warden` resolves and carries `windup`,
@@ -849,7 +874,7 @@ elif ACTOR == "oathbound":
     # ninth cell. Frames named `guard`, `bash`, `open` or `guardDown` would compile and then never be
     # selected. These eight names, in this order.
     FRAME_ORDER = ["idle", "chase", "windupEarly", "windupCommit", "release", "contact", "recover", "hurt"]
-    FACINGS = ["east"]
+    FACINGS = ["east", "south", "north"]
     SHEET = dict(cell=64, cols=4, rows=2, mirror=True,
                  palette=["mortar", "seal0", "iron", "ironHi", "brickLo", "brick", "brickHi", "gold"],
                  sockets={f: (["maulHead"] if f in ("windupEarly", "windupCommit", "release", "contact") else [])
@@ -909,9 +934,11 @@ for facing in FACINGS:
         if only and fname not in only:
             continue
         hidden = set(HIDE.get(fname, []))
+        if ACTOR == "oathbound" and facing == "south":
+            hidden.add("leafEdge")
         for o in all_meshes:
             o.hide_render = o.name in hidden
-        place_camera(FEET_ROW, CANVAS / 2)
+        place_camera(FEET_ROW - (2 if ACTOR == "oathbound" and facing == "south" else 0), CANVAS / 2)
         reset_pose()
         apply_ops(POSES[fname])
         bones = {}

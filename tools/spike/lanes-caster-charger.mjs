@@ -23,7 +23,7 @@ export const ACTORS = {
   // The iron base is LIFTED off the hero's #393942, which this ramp captures whole as ashFieldLit.
   caster: {
     ramp: ['mortar', 'grout', 'woodLo', 'sky', 'iron', 'ironHi', 'slateHi',
-      'ashField', 'ashFieldLit', 'boneLo', 'boneDim', 'bone'],
+      'ashField', 'ashFieldLit', 'boneLo', 'boneDim', 'bone', 'ember', 'emberHi'],
     lanes: [
       { name: 'MAT_IRON', hex: '#4C4C56', family: 'iron', shaded: true, expect: ['ironHi'] },
       { name: 'MAT_IRON_CREV', hex: '#26262E', family: 'iron', shaded: false, expect: ['iron'] },
@@ -33,6 +33,8 @@ export const ACTORS = {
       { name: 'MAT_WAX_LO', hex: '#5A4E42', family: 'wax', shaded: false, expect: ['boneLo'] },
       { name: 'MAT_SHROUD', hex: '#33302A', family: 'cloth', shaded: true, expect: ['ashField', 'ashFieldLit'] },
       { name: 'MAT_GLASS', hex: '#0E122C', family: 'glass', shaded: false, expect: ['sky'] },
+      { name: 'MAT_FLAME', hex: '#FF7A18', family: 'flame', shaded: false, expect: ['ember'] },
+      { name: 'MAT_FLAME_HI', hex: '#FFCC56', family: 'flame', shaded: false, expect: ['emberHi'] },
       { name: 'MAT_OUT_IRON', hex: '#0A0C12', family: 'outline', shaded: false, expect: ['mortar'] },
       { name: 'MAT_OUT_CLTH', hex: '#0C0E16', family: 'outline', shaded: false, expect: ['grout'] },
       { name: 'MAT_OUT_WAX', hex: '#261A16', family: 'outline', shaded: false, expect: ['woodLo'] },
@@ -48,6 +50,7 @@ export const ACTORS = {
     lanes: [
       { name: 'MAT_BRASS', hex: '#7A5E30', family: 'brass', shaded: true, expect: ['naveWarm', 'coinBrass'] },
       { name: 'MAT_IRON', hex: '#393942', family: 'iron', shaded: true, expect: ['iron', 'ironHi'] },
+      { name: 'MAT_BONELO', hex: '#5A4E42', family: 'bone', shaded: false, expect: ['boneLo'] },
       { name: 'MAT_BONE', hex: '#90806C', family: 'bone', shaded: false, expect: ['boneDim'] },
       { name: 'MAT_BONEHI', hex: '#D0C0A8', family: 'bone', shaded: false, expect: ['bone'] },
       { name: 'MAT_SLIT', hex: '#0A0C12', family: 'outline', shaded: false, expect: ['mortar'] },

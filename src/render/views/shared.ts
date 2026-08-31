@@ -32,6 +32,12 @@ export class EntityView {
   hitClass: ContactClass = 'body'
   hitKind: EnemyKind = 'dummy'
   hitHeavy = false
+  /** Candidate and shipped sheets can own a drawn hurt pose even when the enemy kind historically
+   *  used a transformed legacy tile. This is per view, not a global kind switch, so the dev-only
+   *  candidate lane cannot change the production renderer when it is off. */
+  authoredReaction = false
+  /** An authored Oath-Bound sheet carries the raised/lowered shield in its own poses. */
+  authoredGuard = false
   private owned: Sprite[] = []
   private normalTex; private whiteTex
   /** `tile` null means the body is authored and `bindBody` supplies it: nothing legacy is bound at
@@ -68,6 +74,8 @@ export class EntityView {
     this.whiteTex = whiteTex
     this.body.texture = tex
   }
+  markAuthoredReaction() { this.authoredReaction = true }
+  markAuthoredGuard() { this.authoredGuard = true }
   own(sprite: Sprite): Sprite { this.owned.push(sprite); return sprite }
   // The contact shadow is the authored 16px hard disc (tools/make-bardo-fx.ts), not a soft 64px
   // Kenney blob: §3.2.8 wants cast shadows "hard-edged... never a blur".

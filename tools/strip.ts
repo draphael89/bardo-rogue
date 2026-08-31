@@ -29,6 +29,7 @@ const mute = args.mute ?? '1'
 const banner = args.banner === '1'
 const cols = Math.max(1, +(args.cols ?? 4))
 const url = args.url ?? 'http://localhost:5173'
+const actorCandidate = args.actorCandidate === '1'
 const evalJs = args.eval ?? ''            // posing JS, run after --from and before frame 0 (prelude helpers below)
 const holdJs = args.hold ?? ''            // input partial re-applied before every step, e.g. '{"attack":true,"aimX":1}'. Beats --bot: an input override wins over the bot.
 const seedRng = args.rng !== '0'
@@ -41,13 +42,18 @@ function parseHold(s: string): Record<string, unknown> {
   catch { throw new Error(`--hold must be JSON, e.g. --hold '{"attack":true,"aimX":1}' (got: ${s})`) }
 }
 
-// crop in internal-resolution coords (tuning.view): "x,y,w,h", or "player" / "player,w,h" (a FIXED box on the player at frame 0)
+// crop in internal-resolution coords (tuning.view): "x,y,w,h", "player" / "player,w,h", or
+// "enemy" / "enemy,w,h" (a FIXED box on the selected actor at frame 0).
 const VIEW_W = tuning.view.width, VIEW_H = tuning.view.height
 const cropArg = args.crop ?? ''
-let cropMode: 'fixed' | 'player' = 'fixed'
+let cropMode: 'fixed' | 'player' | 'enemy' = 'fixed'
 let crop = { x: 0, y: 0, w: VIEW_W, h: VIEW_H }
 if (cropArg.startsWith('player')) {
   cropMode = 'player'
+  const p = cropArg.split(',').slice(1).map(Number)
+  crop = { x: 0, y: 0, w: p[0] || 160, h: p[1] || 120 }
+} else if (cropArg.startsWith('enemy')) {
+  cropMode = 'enemy'
   const p = cropArg.split(',').slice(1).map(Number)
   crop = { x: 0, y: 0, w: p[0] || 160, h: p[1] || 120 }
 } else if (cropArg) {
@@ -98,7 +104,7 @@ if (seedRng) await page.addInitScript({
   })()`,
 })
 
-await page.goto(`${url}/?scenario=${scenario}&seed=${seed}&debug=${debug}&mute=${mute}${god ? '&god=1' : ''}${bot ? `&bot=${bot}` : ''}`)
+await page.goto(`${url}/?scenario=${scenario}&seed=${seed}&debug=${debug}&mute=${mute}${god ? '&god=1' : ''}${bot ? `&bot=${bot}` : ''}${actorCandidate ? '&actorCandidate=1' : ''}`)
 await page.waitForFunction(() => !!(window as unknown as { __game?: unknown }).__game, null, { timeout: 20000, polling: 50 })  // polling, not rAF: rAF is swallowed
 
 // take over: kill rAF, reset to a clean tick 0, drive tick+render by hand from here on
@@ -135,9 +141,13 @@ const clip = await page.evaluate(({ crop, cropMode, VIEW_W, VIEW_H }) => {
   const ra = g.presenter.ra
   const s = ra.scale
   let { x, y, w, h } = crop
-  if (cropMode === 'player') {
-    // The camera owns the world transform; ask the container where the player landed (target px).
-    const pt = ra.world.toGlobal({ x: g.world.player.x, y: g.world.player.y })
+  if (cropMode === 'player' || cropMode === 'enemy') {
+    // The camera owns the world transform; ask the container where the chosen actor landed.
+    const busy = ['windup', 'attack', 'recover', 'stagger', 'aim', 'freeze', 'dash']
+    const actor = cropMode === 'enemy'
+      ? g.world.enemies.find((e: any) => e.active && busy.includes(e.state)) ?? g.world.enemies.find((e: any) => e.active)
+      : g.world.player
+    const pt = ra.world.toGlobal({ x: actor?.x ?? g.world.player.x, y: actor?.y ?? g.world.player.y })
     x = pt.x - w / 2
     y = pt.y - h / 2
   }

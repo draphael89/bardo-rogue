@@ -1,4 +1,6 @@
 import { Graphics, Texture, type Container } from 'pixi.js'
+import type { Atlas } from '../atlas'
+import type { Sheet, SheetFrameView } from '../sheet'
 import type { Enemy } from '@/sim/world'
 import type { Arena } from '@/sim/arena'
 import { tuning } from '@/tuning'
@@ -11,6 +13,7 @@ import { clamp01, lerp } from '../anim'
 import { isDangerPointVisible } from '../terrain'
 import { EntityView, type EnemyFrame, type Pose } from './shared'
 import { MINOS } from '../minosInk'
+import { tickClipFrame } from '../clipSelect'
 
 // Authored 24×28 judge. Not a tinted grunt: a hooded robe, a gold circlet, a veil.
 // Four poses. The sentence of the fight lives in exact floor geometry — circle, spokes, or fan —
@@ -171,6 +174,36 @@ const SCORCH_TICKS = 20
 const tells = new WeakMap<EntityView, Graphics>()
 const tellHis = new WeakMap<EntityView, Graphics>()
 const eyes = new WeakMap<EntityView, Graphics>()
+const wardenArt = new WeakMap<EntityView, { north: Sheet; south: Sheet }>()
+
+export function bindWardenArt(v: EntityView, atlas: Atlas): void {
+  wardenArt.set(v, {
+    north: atlas.sheet('bardo_warden_north'),
+    south: atlas.sheet('bardo_warden_south'),
+  })
+  v.markAuthoredReaction()
+}
+
+export function wardenFrameName(sheet: Sheet, e: Enemy, time: number, speed: number): string {
+  if (e.flash > 0) return 'hurt'
+  if (e.state === 'stagger') return 'stagger'
+  if (e.state === 'phase') return 'phase'
+  if (e.state === 'chase' && speed > 4) return tickClipFrame(sheet.def.clips!.chase, time)
+  if (e.state === 'windup') {
+    if (e.pattern === WARDEN_PATTERN.slam) {
+      return e.stateTick < wardenWindup(e) - tuning.warden.commitLead
+        ? 'windSlamGather'
+        : 'windSlamCommit'
+    }
+    return e.pattern === WARDEN_PATTERN.ring ? 'windRing' : 'windFan'
+  }
+  if (e.state === 'attack') {
+    if (e.pattern === WARDEN_PATTERN.slam) return 'slamContact'
+    return e.pattern === WARDEN_PATTERN.ring ? 'ringRelease' : 'fanRelease'
+  }
+  if (e.state === 'recover') return 'slamRecover'
+  return 'idle'
+}
 
 function attach(v: EntityView, map: WeakMap<EntityView, Graphics>, parent: Container | null | undefined): Graphics | null {
   const existing = map.get(v)
@@ -305,25 +338,38 @@ export function updateWardenView(v: EntityView, e: Enemy, f: EnemyFrame, out: Po
     rot = -e.facing * 0.18; sx = MASS * 0.94; sy = MASS * 1.06; key = 'recover'
   }
 
-  v.bindBody(wardenTexture(key))
-  v.body.anchor.set(0.5, 1)
+  const art = wardenArt.get(v)
+  let authored: SheetFrameView | null = null
+  if (art) {
+    const sheet = Math.sin(e.aimAngle) < -0.2 ? art.north : art.south
+    authored = sheet.frame(wardenFrameName(sheet, e, f.time, speed))
+    v.bindBody(authored.texture, authored.white)
+    v.body.anchor.set(authored.anchorX, authored.anchorY)
+    sx = 1; sy = 1; rot = 0; hop = 0
+  } else {
+    v.bindBody(wardenTexture(key))
+    v.body.anchor.set(0.5, 1)
+  }
 
-  if (e.flash > 0) out.tint = MINOS.wash
+  if (art) out.tint = 0xffffff
+  else if (e.flash > 0) out.tint = MINOS.wash
   else if (e.phase) out.tint = MINOS.wash
   else out.tint = 0xffffff
 
   updateWardenTell(v, e, f.x, f.y, tk, arena)
-  updateWardenEyes(v, e, f.x, f.y, hop)
+  updateWardenEyes(v, e, f.x, f.y, hop, authored?.sockets.mask)
   out.sx = sx; out.sy = sy; out.rot = rot; out.hop = hop
 }
 
-function updateWardenEyes(v: EntityView, e: Enemy, x: number, y: number, hop: number): void {
+function updateWardenEyes(v: EntityView, e: Enemy, x: number, y: number, hop: number,
+                           mask?: readonly [number, number]): void {
   const g = eyesFor(v)
   if (!g) return
   g.clear()
   if (!e.phase || e.state === 'dead') { g.visible = false; return }
   g.visible = true
-  const ex = Math.round(x), ey = Math.round(y - 18 - hop)
+  const ex = Math.round(x + (mask?.[0] ?? 0) * e.facing)
+  const ey = Math.round(mask ? y + e.radius + 1 + mask[1] : y - 18 - hop)
   g.rect(ex - 3, ey, 1, 1).fill(MINOS.eye)
   g.rect(ex + 2, ey, 1, 1).fill(MINOS.eye)
   g.rect(ex - 3, ey - 1, 1, 1).fill(MINOS.eyeHot)

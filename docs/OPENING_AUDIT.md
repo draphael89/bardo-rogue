@@ -6,6 +6,27 @@ from the approval package, and the orchestrator's own 1× judgement of every sta
 
 Graded against excellent shipped indie games, not against the placeholder it replaced.
 
+**Execution note, 2026-08-30:** source/target parity, colour-placement, detail-density and rejection
+receipts are now implemented. A rig-emitted breathing idle plus reach/contact/settle pickup candidate
+clears all 2,154 applicable gates with six measured weapon-apex waivers. Contact now plants for four
+stopped ticks, while held movement cancels settle into the armed run instead of skating a static pose
+through the rack. The candidate remains in `.art-cache` pending human Look and approval, so the
+scorecard below is intentionally not regraded yet.
+
+**Composition note, 2026-08-30:** the rendered-frame blind spot is now covered for three named Bardo
+moments. Arrival, central axis and Gate plaza each pass a full-band centre-lift check at 640×360/1×
+(0.089 vs 0.033, 0.093 vs 0.055, and 0.149 vs 0.049 respectively), plus the existing value,
+highlight and top-one focality gates. A source-backed north threshold now breaks the axis's former
+four-way equality without changing collision. The named concept exhibits still win all three blind
+composition pairs, so §15 item 5 and the scorecard remain open rather than being awarded by metric.
+
+**Actor-candidate note, 2026-08-30:** the Lampad now has a rig-only east candidate whose walking
+funeral-lamp silhouette clears 109/109 gates with zero waivers, stays at or below the caster's locked
+0.5 width/height ceiling in every pose, and maintains Weber +1.54 to +1.64 across all nine frames.
+The chest-height lantern carries a steady flame. The two failed carrier/placard iterations have
+rejection receipts. It is not approved or integrated, so the Kenney inventory and scorecard below
+remain unchanged.
+
 ---
 
 ## 1. Executive verdict

@@ -1,4 +1,5 @@
 import { setDoorWalkable } from './arena'
+import { addFreeze } from './combat'
 import { prepareWeapon } from './session'
 import type { World } from './world'
 import { tuning } from '@/tuning'
@@ -15,6 +16,12 @@ export function tryPrepareWeapon(world: World): void {
   if (dx * dx + dy * dy > tuning.run.rackRadius * tuning.run.rackRadius) return
   world.arena.rackTaken = true
   prepareWeapon(world, rack.arm)
+  // The first weapon is a contact, not a state flip while the body keeps skating. Plant at the
+  // authoritative overlap and spend four stopped ticks on it; a held direction answers on the next
+  // movement tick, when the renderer cancels settle directly into the armed run.
+  p.vx = p.vy = 0
+  p.px = p.x; p.py = p.y
+  addFreeze(world, tuning.hitstop.pickup)
   world.doorOpen = world.hasNextRoom()
   setDoorWalkable(world.arena, world.doorOpen)
   world.emit({ type: 'weaponPrepared', weapon: rack.arm, x: rack.x, y: rack.y })

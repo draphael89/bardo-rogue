@@ -241,7 +241,12 @@ def marker(name, world_pos, bone_name):
 # thing that reads as furniture until it moves, which is the correct read for a nymph who is a lamp.
 # It also helps the black test rather than costing it: there is no thin arm left to mud at 1x.
 if ACTOR == "caster":
-    HIP = 22.0            # legs 22px of a 36px standing body = 61% (the Veteran's are ~46%)
+    # A walking funeral lamp, not a stick under a bracket. The first 1x candidate spent 61% of its
+    # height on bare legs, gave the pale column a face, and hung the lantern near its knees on a
+    # 17px chain. Together those relations drew a thin person carrying a rectangular placard. Lower
+    # hips, one broad wax bell, no face cue, and a chest-height lantern make the noun complete;
+    # the crook and sim-aligned socket remain the identity and timing contract.
+    HIP = 17.0
 
     MAT_WAX = make_mat("wax", canon_srgb("#90806C"))              # -> boneDim, SHADED. The body mid,
     #   ~38% of opaque at Weber +2.93: the ground-separation solution AND the identity, because she is
@@ -275,34 +280,29 @@ if ACTOR == "caster":
     bone("head", V(0, -0.6, HIP + 10), V(0, -1.8, HIP + 13.5), "chest")
     # The crook is BODY, not a weapon. That is what puts its rise inside the height gate's own bbox
     # measurement and still clears the 52px cap on a 64 cell — so the sheet ships waiver-free.
-    bone("crook", V(0, 3.5, HIP + 8), V(0, 3.5, HIP + 24), "chest")
-    bone("lampArm", V(0, 3.5, HIP + 24), V(0, -9.5, HIP + 24), "crook")
-    bone("lamp", V(0, -9.5, HIP + 17), V(0, -9.5, HIP - 5), "lampArm")
+    bone("crook", V(0, 3.5, HIP + 8), V(0, 3.5, HIP + 30), "chest")
+    bone("lampArm", V(0, 3.5, HIP + 30), V(0, -9.5, HIP + 30), "crook")
+    bone("lamp", V(0, -9.5, HIP + 17), V(0, -9.5, HIP + 1), "lampArm")
     for side, sx in (("R", 1), ("L", -1)):
         bone("thigh" + side, V(2.2 * sx, 0, HIP), V(2.2 * sx, 0, HIP - 11), "pelvis")
         bone("shin" + side, V(2.2 * sx, 0, HIP - 11), V(2.2 * sx, 0, 1.6), "thigh" + side)
         bone("foot" + side, V(2.2 * sx, 0, 1.6), V(2.2 * sx, -2.6, 0.6), "shin" + side)
     bpy.ops.object.mode_set(mode="OBJECT")
 
-    # --- the wax column. 8.8px of body DEPTH, which is what east reads as WIDTH: 0.25 of the standing
-    # height against the hero's measured 0.50 (18x36). That 2:1 is the primary hero separator, and the
-    # two standing heights are identical on purpose — the separator is aspect, which survives
-    # downscale, not size, which does not.
-    sphere("torso", V(0, 0, HIP + 5), 3.0, 4.4, 6.0, "spine", MAT_WAX)
-    sphere("chestCap", V(0, 0, HIP + 9), 2.8, 3.8, 2.6, "chest", MAT_WAX)
-    sphere("skull", V(0, -1.0, HIP + 11.5), 2.6, 3.4, 3.2, "head", MAT_WAX)
-    box("pelvisBlock", V(0, 0, HIP - 1), 2.6, 3.4, 2.2, "pelvis", MAT_WAX)
+    # --- the wax body. East reads local depth as width, so these `ry` values are the silhouette,
+    # not hidden volume. One uninterrupted bell replaces the humanoid head / chest / waist stack.
+    sphere("torso", V(0, 0, HIP + 4), 4.0, 7.5, 7.0, "spine", MAT_WAX)
+    sphere("chestCap", V(0, 0, HIP + 9), 3.7, 6.8, 3.2, "chest", MAT_WAX)
+    box("wick", V(0, 0, HIP + 12.0), 1.6, 2.4, 2.2, "head", MAT_WAX)
+    box("pelvisBlock", V(0, 0, HIP - 1), 3.5, 6.6, 2.4, "pelvis", MAT_WAX)
     # The material-dark contour on the side away from the north-15-left key (§4.3.3), got the proven
     # way: a dark box that OVERHANGS the lit body, the capeShadow mechanism from mannequin.py, rather
     # than shading that hopes a rim appears. Never behind the crook — a backing plate there would
     # fill the closed hole, which is the one thing on this sheet no gate can see.
-    box("napeShadow", V(0, 3.9, HIP + 4), 3.1, 1.1, 6.6, "spine", MAT_OUT_WAX)
-    # A 1px notch where a face would be. Deliberately NOT a boneLo eye socket: on a 7px head that is
-    # 3px of ornament that muds at 1x, and a dark BONE step high on the body is exactly what flips
-    # familyLightScore's sign test. woodLo is its own single-step family, so the gate skips it.
-    box("faceNotch", V(0, -4.0, HIP + 11.4), 1.6, 0.5, 0.5, "head", MAT_OUT_WAX)
-    # The sheet's only B5 pixels: the crown cap and the wick tip, ~3% of opaque against a 25% cap.
-    box("crownCap", V(0, -1.0, HIP + 14.2), 2.2, 2.8, 0.5, "head", MAT_WAX_HI)
+    box("napeShadow", V(0, 7.1, HIP + 3), 4.0, 1.1, 7.2, "spine", MAT_OUT_WAX)
+    # The sheet's only B5 pixels: one unlit wick cap and the lantern wick, ~3% of opaque against a
+    # 25% cap. It is centred, never projected as a nose or eye.
+    box("crownCap", V(0, 0, HIP + 14.2), 1.4, 1.8, 0.5, "head", MAT_WAX_HI)
 
     for side, sx in (("R", 1), ("L", -1)):
         limb("thighM" + side, "thigh" + side, 1.5, MAT_WAX)
@@ -313,10 +313,11 @@ if ACTOR == "caster":
         box("kneeHollow" + side, V(2.2 * sx, 1.3, HIP - 10.6), 1.2, 0.45, 1.0, "shin" + side, MAT_WAX_LO)
         box("shinCuff" + side, V(2.2 * sx, 0, 5.6), 1.45, 1.45, 1.1, "shin" + side, MAT_IRON)
 
-    # --- the shroud, waist to knee: the dark band that stops a pale column reading as one undivided
-    # bar. No specular, two bands, and it never touches B5 (§2.5).
-    box("shroud", V(0, 0, HIP - 6.0), 2.9, 4.3, 5.0, "pelvis", MAT_SHROUD)
-    box("shroudHem", V(0, 0, HIP - 11.4), 2.95, 4.35, 0.7, "pelvis", MAT_OUT_CLTH)
+    # --- a two-step bell shroud. The upper mass carries the wax body; the narrower lower mass
+    # exposes both feet and makes the taper readable in solid black rather than through colour.
+    box("shroudUpper", V(0, 0, HIP - 5.0), 3.8, 8.0, 4.0, "pelvis", MAT_SHROUD)
+    box("shroudLower", V(0, 0.3, HIP - 10.2), 3.4, 6.5, 2.6, "pelvis", MAT_SHROUD)
+    box("shroudHem", V(0, 0.3, HIP - 13.1), 3.45, 6.55, 0.7, "pelvis", MAT_OUT_CLTH)
 
     # --- THE CROOK: an iron shepherd's crook fused to the spine. A closed RING above the crown —
     # stem up the nape, a top bar reaching forward, a front bar descending to the hook tip, and a
@@ -327,34 +328,33 @@ if ACTOR == "caster":
     # NO GATE CAN SEE IT: `components` in tools/art/gates.ts counts opaque ISLANDS, and a hole is not
     # an island. It is verified by reading the 1x black test, nine frames, and that is the first thing
     # to check. If the hole has closed, thicken the bars and reopen it before judging anything else.
-    box("crookStem", V(0, 3.5, HIP + 16.0), 0.9, 1.0, 8.0, "crook", MAT_IRON)
-    box("crookTop", V(0, -3.0, HIP + 23.0), 0.9, 7.5, 1.0, "lampArm", MAT_IRON)
-    box("crookFront", V(0, -9.5, HIP + 20.5), 0.9, 1.0, 3.5, "lampArm", MAT_IRON)
+    box("crookStem", V(0, 3.5, HIP + 19.0), 0.9, 1.0, 11.0, "crook", MAT_IRON)
+    box("crookTop", V(0, -3.0, HIP + 29.0), 0.9, 7.5, 1.0, "lampArm", MAT_IRON)
+    box("crookFront", V(0, -9.5, HIP + 26.5), 0.9, 1.0, 3.5, "lampArm", MAT_IRON)
     # The eye. A FIRST pass built this as one 11x4px slot spanning the whole arm, and the 1x black
     # test read it as a placard held overhead rather than as a hook: the hole was right, the
     # proportion was not. Kept small and set back against the stem, the arm reads as a lamp bracket
     # and the void still measures 6.5 x 3 px against the >= 3x3 minimum.
-    box("crookEyeFloor", V(0, -0.75, HIP + 17.0), 0.85, 3.25, 1.0, "lampArm", MAT_IRON_CREV)
-    box("crookEyeFront", V(0, -4.5, HIP + 20.0), 0.85, 0.5, 2.0, "lampArm", MAT_IRON)
-    box("crookSpec", V(0, -3.0, HIP + 24.1), 0.6, 3.0, 0.35, "lampArm", MAT_IRON_SP)
+    box("crookEyeFloor", V(0, -0.75, HIP + 23.0), 0.85, 3.25, 1.0, "lampArm", MAT_IRON_CREV)
+    box("crookEyeFront", V(0, -4.5, HIP + 26.0), 0.85, 0.5, 2.0, "lampArm", MAT_IRON)
+    box("crookSpec", V(0, -3.0, HIP + 30.1), 0.6, 3.0, 0.35, "lampArm", MAT_IRON_SP)
 
-    # --- the lamp: a 6x5px cage on 3px of chain, hung at the PROJECTED position of the sim's own bolt
-    # origin — e.radius + 4 = 9 world px along the aim (src/sim/enemies/caster.ts:116) — so the drawn
-    # charge and the fired bolt leave the same pixel and the aim maths needs no change. The rig
-    # projects the socket per frame; there is no pivot table.
-    box("lampChain", V(0, -9.5, HIP + 8.5), 0.5, 0.5, 8.5, "lamp", MAT_IRON)
-    box("lampCage", V(0, -9.5, HIP - 1.5), 1.4, 3.0, 2.5, "lamp", MAT_IRON)
-    box("lampBack", V(0, -6.4, HIP - 1.5), 1.2, 0.4, 2.2, "lamp", MAT_IRON_CREV)
-    box("lampRim", V(0, -9.5, HIP + 0.8), 0.9, 2.4, 0.3, "lamp", MAT_IRON_SP)
-    box("lampPane", V(0, -12.4, HIP - 1.6), 1.0, 0.35, 1.5, "lamp", MAT_GLASS)
-    # This steady flame makes the hanging mass read as a lamp before its first attack. The hostile
+    # --- the lamp: a 6x6px cage on a short chain, at the PROJECTED position of the sim's own
+    # bolt origin — e.radius + 4 = 9 world px along the aim (src/sim/enemies/caster.ts:116). Keeping
+    # the cage beside the chest makes the crook a hanger, not a second body-height rectangle.
+    box("lampChain", V(0, -9.5, HIP + 13.0), 0.5, 0.5, 4.0, "lamp", MAT_IRON)
+    box("lampCage", V(0, -9.5, HIP + 6.0), 1.5, 3.2, 3.0, "lamp", MAT_IRON)
+    box("lampBack", V(0, -6.2, HIP + 6.0), 1.3, 0.4, 2.6, "lamp", MAT_IRON_CREV)
+    box("lampRim", V(0, -9.5, HIP + 8.8), 1.0, 2.6, 0.3, "lamp", MAT_IRON_SP)
+    box("lampPane", V(0, -12.6, HIP + 5.9), 1.1, 0.35, 1.8, "lamp", MAT_GLASS)
+    # The steady flame makes the hanging mass read as a lamp before its first attack. The hostile
     # wine ray still owns state; this only fixes the actor's idle noun at native scale.
-    box("lampFlame", V(-1.7, -11.0, HIP - 1.0), 0.4, 1.5, 1.5, "lamp", MAT_FLAME)
-    box("lampWick", V(-1.8, -11.5, HIP - 0.1), 0.3, 0.6, 0.7, "lamp", MAT_FLAME_HI)
-    box("lampFoot", V(0, -9.5, HIP - 4.2), 1.3, 2.6, 0.4, "lamp", MAT_OUT_IRON)
+    box("lampFlame", V(-1.7, -11.2, HIP + 6.4), 0.4, 1.5, 1.5, "lamp", MAT_FLAME)
+    box("lampWick", V(-1.8, -11.7, HIP + 7.3), 0.3, 0.6, 0.7, "lamp", MAT_FLAME_HI)
+    box("lampFoot", V(0, -9.5, HIP + 2.8), 1.4, 2.8, 0.4, "lamp", MAT_OUT_IRON)
 
     marker("feetCenter", V(0, 0, -2.2), "feetCenter")
-    marker("lamp", arm.matrix_world @ V(0, -9.5, HIP - 1.5), "lamp")
+    marker("lamp", arm.matrix_world @ V(0, -9.5, HIP + 6.0), "lamp")
 
     # ---- poses. Sim states are idle / position / aim / recover / stagger / dead. The light key is
     # unchanged from the rig — do not re-aim the sun.
@@ -377,8 +377,8 @@ if ACTOR == "caster":
         "strafeA": BASE + legs(-24, 16, 20, 6) + [
             ("R", "crook", "X", -3), ("R", "lamp", "X", 10), ("T", "pelvis", (0, 0, -0.9)),
         ],
-        "strafeB": BASE + legs(18, -22, 8, 22) + [
-            ("R", "crook", "X", 3), ("R", "lamp", "X", -9), ("T", "pelvis", (0, 0, -1.1)),
+        "strafeB": BASE + legs(16, -18, 8, 18) + [
+            ("R", "crook", "X", 2), ("R", "lamp", "X", -5), ("T", "pelvis", (0, 0, -1.1)),
         ],
         # MOTION STOPS. Both heels down for the only time on the sheet, lamp dead still and plumb,
         # head lifts. Read this frame TEMPORALLY: two heels dropping is 2px and would not survive
@@ -387,22 +387,22 @@ if ACTOR == "caster":
         # §6.7's ANNOUNCE, 24 ticks before contact against a 12-tick minimum. The ENTIRE column
         # changes shape, so the windup reads in solid black across the room.
         "aimRise": BASE + legs(-12, 9, 12, 5) + [
-            ("R", "crook", "X", 18), ("R", "spine", "X", -6), ("R", "lamp", "X", -7),
+            ("R", "crook", "X", 8), ("R", "spine", "X", -6), ("R", "lamp", "X", -5),
             ("T", "pelvis", (0, 0, -1.1)),
         ],
         # From casterLockTick() = round(24 * 0.66) = tick 16: the tick the angle stops tracking you.
         # Crook at full forward, trailing leg straight and locked, head UP for the only time here.
         # The pose says committed because the sim IS committed; the last third is yours to cross.
         "aimLock": BASE + legs(-16, 13, 4, 0) + [
-            ("R", "crook", "X", 30), ("R", "spine", "X", -7), ("R", "head", "X", -26),
+            ("R", "crook", "X", 10), ("R", "spine", "X", -7), ("R", "head", "X", -20),
             ("R", "lamp", "X", -2), ("T", "pelvis", (0, 0, -1.2)),
         ],
         # A RECOVER frame, not an aim frame: the sim fires at stateTick >= aimTicks and switches to
         # 'recover' in the same tick, so an aim-state release pose would never be displayed for a
         # single tick. The only backward recoil in the roster — the shot knocks her off her own line.
         "release": BASE + legs(-9, 16, 10, 2) + [
-            ("R", "crook", "X", -6), ("R", "spine", "X", -12), ("R", "pelvis", "X", -5),
-            ("R", "lamp", "X", 8), ("T", "pelvis", (0, 0.9, -0.6)),
+            ("R", "crook", "X", 5), ("R", "spine", "X", -7), ("R", "pelvis", "X", -3),
+            ("R", "lamp", "X", 4), ("T", "pelvis", (0, 0.5, -0.6)),
         ],
         # The pendulum keeps moving after she has stopped, which is what makes a top-heavy vertical
         # mass read as heavy rather than as a stick.
@@ -410,17 +410,16 @@ if ACTOR == "caster":
             ("R", "crook", "X", 7), ("R", "head", "X", 8), ("R", "lamp", "X", -8),
             ("T", "pelvis", (0, 0, -0.8)),
         ],
-        # The column TOPPLES toward the cut: legs trail behind the hips, the crook swings past
-        # vertical, the lamp overshoots outside the body contour. No other actor can topple, because
-        # none of them is a pole — the 0.60 centre of gravity and the punish mechanic are one idea.
+        # The column buckles toward the cut without surrendering the caster's narrow class read:
+        # the base compresses, the head folds, and the lamp overshoots inside the crook's envelope.
         # There is no death frame: presenter.ts shatters whatever texture is on screen on 'kill', so
         # `hurt` IS the frame that shatters, and it is drawn to shatter well.
         "hurt": BASE + [
-            ("R", "pelvis", "X", -16), ("R", "spine", "X", -14), ("R", "head", "X", -18),
-            ("R", "crook", "X", -22), ("R", "lamp", "X", 18),
-            ("R", "thighR", "X", 26), ("R", "shinR", "X", 30),
-            ("R", "thighL", "X", 34), ("R", "shinL", "X", 22),
-            ("T", "pelvis", (0, 2.2, -1.6)),
+            ("R", "pelvis", "X", -4), ("R", "spine", "X", -4), ("R", "head", "X", -8),
+            ("R", "crook", "X", 8), ("R", "lamp", "X", 4),
+            ("R", "thighR", "X", 16), ("R", "shinR", "X", 20),
+            ("R", "thighL", "X", 18), ("R", "shinL", "X", 16),
+            ("T", "pelvis", (0, 0.6, -0.5)),
         ],
     }
     FRAME_ORDER = ["idle", "strafeA", "strafeB", "settle", "aimRise",
@@ -430,6 +429,8 @@ if ACTOR == "caster":
         "cell": 64, "cols": 3, "rows": 3, "mirror": True,
         "palette": ["mortar", "grout", "woodLo", "sky", "iron", "ironHi", "slateHi",
                     "ashField", "ashFieldLit", "boneLo", "boneDim", "bone", "ember", "emberHi"],
+        "colourPlacement": "caster",
+        "maxWidthToHeight": 0.5,
         "sockets": SOCKETS,
         "clips": {
             "strafe": {"frames": ["strafeA", "strafeB"], "timing": "ticks",
@@ -574,6 +575,7 @@ if ACTOR == "charger":
     SHEET = {
         "cell": 36, "cols": 4, "rows": 2, "mirror": True,
         "palette": ["mortar", "iron", "ironHi", "naveWarm", "coinBrass", "boneLo", "boneDim", "bone"],
+        "colourPlacement": "charger",
         "sockets": SOCKETS,
         "clips": {
             # NO contact key: tuning.charger has no `active` phase and compile.ts rejects a contact

@@ -7,11 +7,12 @@ import type { World, Enemy, Projectile } from '@/sim/world'
 import type { EnemyKind, HitSource, SimEvent } from '@/sim/events'
 import { tuning } from '@/tuning'
 import { EntityView, createPlayerView, createEnemyView, updatePlayerView, updateEnemyView, makePropSprite, BoltView, ArrowView, EchoView, MirrorBoltView, drawAimLine, drawSwingArc, drawSwingTip, drawBowAim } from './views'
-import { updatePlayerRim } from './views/player'
+import { pickupPhaseFrame, updatePlayerRim } from './views/player'
+import type { PlayerPoseOverride } from './views/player'
 import { snapToTarget } from './views/shared'
 import { promiseFrame } from './clipSelect'
 import { ARM, armOf } from '@/sim/weapons'
-import { buildTilemap, SHRINE_INK, type TilemapView } from './tilemap'
+import { buildTilemap, rackProximityAmount, SHRINE_INK, type TilemapView } from './tilemap'
 import { Camera, clampFocus } from './camera'
 import { drawVoidUnderlay } from './starfield'
 import { TILE } from '@/sim/arena'
@@ -110,6 +111,10 @@ export class Presenter {
   private hardLock = new HardLockFeedback()
   // Last valid floor-space pose lets target loss release outward instead of popping with no cause.
   private hardLockLast = { x: 0, y: 0, radius: 0 }
+  // Presentation-only custody for the rack's three authored beats. `world.tick` supplies the clock,
+  // but no value is written back to the deterministic world.
+  private pickupTick = -1
+  private pickupAngle = 0
 
   // The starfield void, screen space behind the world (starfield.ts). Presenter owns it because
   // only the presenter knows the current room's resting rect.
@@ -206,6 +211,7 @@ export class Presenter {
     this.reversalActions.clear()
     this.heavyPlantedSwing = -1
     this.hardLock.reset()
+    this.pickupTick = -1
   }
 
   handleEvents(events: readonly SimEvent[]) {
@@ -498,6 +504,7 @@ export class Presenter {
           this.heavyPlantedSwing = -1
           this.impacts.length = 0
           this.dodgedT = this.grazeT = this.reversalT = -1
+          this.pickupTick = -1
           this.rebuildRoom()
           this.camera.snapFollow()         // the hub is a different arena: framed, never scrolled into
           this.particles.clear()
@@ -543,9 +550,11 @@ export class Presenter {
           break
         case 'weaponPrepared':
           this.tilemap.setDoorOpen(this.world.doorOpen)
-          this.flash(0.32, 0xffd080)
-          this.particles.ring(ev.x, ev.y, 0xff9a30)
-          this.hud.showBanner('THE BLADE REMEMBERS', 'the threshold wakes', 1.5)
+          this.pickupTick = this.world.tick
+          {
+            const dx = ev.x - this.world.player.x, dy = ev.y - this.world.player.y
+            this.pickupAngle = Math.hypot(dx, dy) > 0.5 ? Math.atan2(dy, dx) : this.world.player.aimAngle
+          }
           break
         case 'runStarted':
           const start = runStartBanner(this.world.scenario)
@@ -918,6 +927,25 @@ export class Presenter {
     }
   }
 
+  private pickupPose(w: World): PlayerPoseOverride | undefined {
+    const p = w.player
+    if (p.state !== 'free') return undefined
+    const timing = tuning.view.pickup
+    if (this.pickupTick >= 0) {
+      const age = w.tick - this.pickupTick
+      const frame = pickupPhaseFrame(age, Math.hypot(p.vx, p.vy))
+      if (frame) return { frame, angle: this.pickupAngle }
+      this.pickupTick = -1
+    }
+    const rack = w.arena.rack
+    if (!rack || w.arena.rackTaken || p.armed) return undefined
+    const dx = rack.x - p.x, dy = rack.y - p.y
+    const distance = Math.hypot(dx, dy)
+    if (distance > timing.anticipateRadius) return undefined
+    this.pickupAngle = distance > 0.5 ? Math.atan2(dy, dx) : p.aimAngle
+    return { frame: 'pickupAnticipate', angle: this.pickupAngle }
+  }
+
   private addRecoil(angle: number, strength: number) {
     this.recoilX -= Math.cos(angle) * strength
     this.recoilY -= Math.sin(angle) * strength * 0.7
@@ -1213,7 +1241,10 @@ export class Presenter {
       v.update(lerp(b.px, b.x, slowAlpha), lerp(b.py, b.y, slowAlpha), b.angle, this.time)
       this.stampTrail(v, b, dtSec, tuning.juice.trail.arrowPx, (x, y) => this.particles.echoTrail(x, y))
     }
-    updatePlayerView(this.playerView, p, w, alpha, this.time)
+    const rack = w.arena.rack
+    const rackDistance = rack ? Math.hypot(rack.x - p.x, rack.y - p.y) : Infinity
+    this.tilemap.setRackProximity(rackProximityAmount(rackDistance, tuning.view.pickup.specularRadius, tuning.run.rackRadius))
+    updatePlayerView(this.playerView, p, w, alpha, this.time, this.pickupPose(w))
     if (!p.armed && this.playerView.weapon) this.playerView.weapon.visible = false
     this.contactReaction(dtSec)
     this.rollMotion(p)

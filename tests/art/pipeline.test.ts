@@ -3,28 +3,20 @@ import { readFileSync, existsSync, mkdtempSync, readdirSync, writeFileSync, utim
 import { createHash } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { Texture } from 'pixi.js'
 import sharp from 'sharp'
-import { validateSheetDef, type SheetDef } from '../../src/render/sheet'
+import { bindSheet, validateSheetDef, type SheetDef } from '../../src/render/sheet'
 import { compileSheet, validateClipRefs, type CompileReport, type CompileSpec } from '../../tools/art/compile'
-import { makeContext, runGates, summarise } from '../../tools/art/gates'
+import { makeContext, measureDetailDensity, runGates, summarise } from '../../tools/art/gates'
 import { canon, rgbToHex, type RGB } from '../../tools/art/palette'
 import { verifyApproval } from '../../tools/art/approve'
 import { authoredFxFrame, quantizeFxAlpha, quantizeFxRotation } from '../../src/render/fxUnits'
-import { heroFrameName } from '../../src/render/views/player'
+import { heroFrameName, heroMirrorScale, pickupPhaseFrame } from '../../src/render/views/player'
+import { rackProximityAmount, rackSpecularRect } from '../../src/render/tilemap'
 import { createWorld } from '../../src/sim/scenarios'
 import { ARM } from '../../src/sim/weapons'
-
-const SHEETS = [
-  'bardo_veteran_unarmed_east',
-  'bardo_veteran_unarmed_north',
-  'bardo_veteran_unarmed_south',
-  'bardo_veteran_unarmed_north_roll',
-  'bardo_veteran_unarmed_south_roll',
-  'bardo_veteran_greatsword_east',
-  'bardo_veteran_greatsword_north',
-  'bardo_veteran_greatsword_south',
-  'bardo_brute',
-] as const
+import { tuning } from '../../src/tuning'
+import { SHEETS } from '../../src/render/atlas'
 const sheetPath = (n: string) => `public/assets/sprites/${n}.png`
 const sidecarPath = (n: string) => `public/assets/sprites/${n}.json`
 
@@ -44,6 +36,20 @@ describe('asset contract', () => {
       const meta = await sharp(sheetPath(n)).metadata()
       expect(meta.width, n).toBe(def.cols * def.cell)
       expect(meta.height, n).toBe(def.rows * def.cell)
+    }
+  })
+
+  it('renders every shipped sheet at one source pixel per target pixel', () => {
+    for (const n of SHEETS) {
+      const def = JSON.parse(readFileSync(sidecarPath(n), 'utf8')) as SheetDef
+      const sheet = bindSheet(def, Texture.EMPTY, Texture.EMPTY)
+      for (const name of sheet.names()) {
+        const texture = sheet.frame(name).texture
+        expect(texture.frame.width, `${n}/${name} source width`).toBe(def.cell)
+        expect(texture.frame.height, `${n}/${name} source height`).toBe(def.cell)
+        expect(texture.orig.width * tuning.view.worldScale, `${n}/${name} target width`).toBe(texture.frame.width)
+        expect(texture.orig.height * tuning.view.worldScale, `${n}/${name} target height`).toBe(texture.frame.height)
+      }
     }
   })
 
@@ -374,6 +380,18 @@ describe('authored effect sprites', () => {
 // only contract-checks the two authored character sheets. Palette discipline is the whole thesis of
 // this pipeline, so the lane that produces most of the screen cannot be the one lane exempt from it.
 describe('code-generated sheets', () => {
+  it('keeps the room and prop detail density inside their measured class budgets', async () => {
+    const cases = [
+      ['bardo_room.png', 0.18, 0.159],
+      ['bardo_props.png', 0.25, 0.208],
+    ] as const
+    for (const [name, cap, baseline] of cases) {
+      const { data, info } = await sharp(`public/assets/sprites/${name}`).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+      const density = measureDetailDensity(new Uint8Array(data.buffer, data.byteOffset, data.length), info.width, info.height)
+      expect(density, name).toBeLessThanOrEqual(cap)
+      expect(density, `${name} measured baseline moved`).toBeCloseTo(baseline, 2)
+    }
+  })
   it('locks the native 24px room and 48px prop source contracts', async () => {
     const room = await sharp('public/assets/sprites/bardo_room.png').metadata()
     const props = await sharp('public/assets/sprites/bardo_props.png').metadata()
@@ -488,6 +506,60 @@ describe('review findings', () => {
     const runtimeKey = heroFrameName(southSheet, world.player, world, 0)
     expect(runtimeKey).toBe(south.clips!.light2.sim!.contact)
     expect(south.frames[runtimeKey].i).toBe(21)
+  })
+
+  it('plays an authored breathing idle and lets an available pickup pose own its beat', () => {
+    const world = createWorld(1, 'empty')
+    world.player.state = 'free'
+    world.player.vx = world.player.vy = 0
+    const def = {
+      clips: {
+        idle: { frames: ['idle', 'idleBreath'], timing: 'ticks', ticks: [68, 14], loop: true },
+        run: { frames: ['run0'], timing: 'ticks', ticks: [4], loop: true },
+      },
+    }
+    const sheet = {
+      def,
+      has: (name: string) => ['idle', 'idleBreath', 'pickupAnticipate'].includes(name),
+    } as unknown as Parameters<typeof heroFrameName>[0]
+    expect(heroFrameName(sheet, world.player, world, 0)).toBe('idle')
+    expect(heroFrameName(sheet, world.player, world, 68 / 60)).toBe('idleBreath')
+    expect(heroFrameName(sheet, world.player, world, 0, 'pickupAnticipate')).toBe('pickupAnticipate')
+    // Candidate wiring is inert until the named frame exists in a human-approved sheet.
+    expect(heroFrameName(sheet, world.player, world, 0, 'pickupContact')).toBe('idle')
+  })
+
+  it('turns a side pickup pose toward the rack instead of the current aim', () => {
+    expect(heroMirrorScale('side', 1, Math.PI)).toBe(-1)
+    expect(heroMirrorScale('side', -1, 0)).toBe(1)
+    expect(heroMirrorScale('side', -1)).toBe(-1)
+    expect(heroMirrorScale('north', -1, Math.PI)).toBe(1)
+  })
+
+  it('draws the rack specular as exactly one target pixel on target-grid edges', () => {
+    const rack = { x: 28.5 * 16, y: 8.3 * 16 }
+    const r = rackSpecularRect(rack)
+    const scale = tuning.view.worldScale
+    for (const edge of [rack.x + r.x, rack.y + r.y, rack.x + r.x + r.width, rack.y + r.y + r.height]) {
+      expect(edge * scale).toBeCloseTo(Math.round(edge * scale), 10)
+    }
+    expect(r.width).toBe(4) // the whole steel blade and no air beside it
+    expect(r.height * scale).toBe(1)
+  })
+
+  it('keeps rack proximity finite when live tuning collapses the fade band', () => {
+    expect(rackProximityAmount(18, 18, 18)).toBe(0)
+    expect(rackProximityAmount(17, 18, 18)).toBe(1)
+  })
+
+  it('holds pickup contact for the plant, then cancels settle into held movement', () => {
+    expect(tuning.view.pickup.contactTicks).toBe(tuning.hitstop.pickup + 1)
+    expect(pickupPhaseFrame(0, 95)).toBe('pickupContact')
+    expect(pickupPhaseFrame(4, 95)).toBe('pickupContact')
+    expect(pickupPhaseFrame(5, 24)).toBeUndefined()
+    expect(pickupPhaseFrame(5, 0)).toBe('pickupSettle')
+    expect(pickupPhaseFrame(13, 0)).toBe('pickupSettle')
+    expect(pickupPhaseFrame(14, 0)).toBeUndefined()
   })
 
   it('pose fit preserves aspect instead of stretching a cropped silhouette', async () => {

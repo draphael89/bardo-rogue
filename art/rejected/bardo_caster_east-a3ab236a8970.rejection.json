@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "file": "bardo_caster_east-a3ab236a8970.png",
+  "sha256": "a3ab236a8970dc594500c65db31dd331fb61e352009a8c0710f3bcf909c3ded9",
+  "originalFile": ".art-cache/staging/actor.caster.east-7d101dfb/bardo_caster_east.png",
+  "rejectedAt": "2026-08-31T01:17:40.836Z",
+  "recordedBy": "codex",
+  "reason": "Shortening the lantern chain removed the body-height frame, but at 1x the pale mass remained too narrow and humanoid; the closed crook eye still dominated the identity."
+}

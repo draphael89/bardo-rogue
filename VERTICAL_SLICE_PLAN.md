@@ -18,6 +18,41 @@ smoke through both endings, and 100/100 seeds for both policies (kite 80% wins, 
 attended human fun/readability gate remains deliberately open; do not expand this into the larger
 map, economy, encounter-director, or environmental-rule proposals before that evidence exists.
 
+**Revision 5 — opening-art foundation, phase 2.** The authored-sheet contract now has a direct
+source-to-target parity regression, every shipped art spec names a colour-placement profile, and
+detail-density is a blocking class-relative gate. Rejected candidates can be preserved with a hash,
+reason and optional generation manifest. The Veteran rig now emits a two-frame breathing idle and a
+three-beat acquisition across the unarmed and greatsword families; all eight candidate sheets clear
+2,154 gates with zero blocking findings and six measured weapon-apex waivers. The live pickup has
+already shed its flash, particle ring, banner and second bell in favour of one hard blade specular,
+the authored reach/contact/settle selector, a four-tick planted contact that cancels settle into held
+movement, and the Gate opening on the existing event tick. The new
+masters remain in `.art-cache`: human Look and `pnpm art approve` are still required before the
+frames can replace the eight receipted production masters. Current proof is typecheck, **972 tests in
+82 files**, `pnpm room:gate`, all nine shipped authored sheets at zero blocking art findings, and a
+100-seed matrix at 80% kite / 0% naive with no stranded seed. The intended pickup pause was re-recorded
+through `pnpm record-bots` (`slice-kite-loop-s7` hash `2495559391`; the other three hashes unchanged),
+and all fixtures are green.
+
+**Revision 6 — Bardo moment coverage.** `pnpm room:gate -- --url ...` now captures the arrival,
+central axis and Gate plaza as distinct 640×360 target frames instead of allowing one spawn frame to
+stand in for the whole oversized district. All three pass the live value, highlight, top-one and
+centre-lift checks: arrival 0.089/B1 vs 0.033/B0, axis 0.093/B1 vs 0.055/B0, plaza 0.149/B1 vs
+0.049/B0. The axis gained one source-backed processional threshold and unequal pylons without
+changing a solid cell; the Shrine's existing votive now visibly terminates the east branch. The
+named concept exhibits still won all three blind composition pairs. That failure remains open and
+the score is not inflated: the latest critic still asks for a more luminous architectural terminus,
+which is a deeper projection/material gap than another small ornament can honestly close.
+
+**Revision 7 — first enemy identity candidate.** The Lampad rig no longer draws a thin humanoid
+inside a body-height crook. A lower wax bell, centred wick, tall enclosed crook and chest-height
+steady lantern make the 1× silhouette read as one walking funeral lamp while every pose stays at or
+below the caster's locked 0.5 width/height ceiling. The east candidate clears **109/109** art gates
+with zero waivers; all nine frames sit at Weber **+1.54 to +1.64** over the rendered floor, and every
+pose keeps an enclosed crook eye. Two weaker iterations are preserved with rejection
+receipts. This is candidate evidence only: no master is approved, no production asset is replaced,
+and the Kenney caster remains until human Look and approval.
+
 ---
 
 # Bardo Vertical Slice Plan (historical header)
@@ -31,6 +66,26 @@ map, economy, encounter-director, or environmental-rule proposals before that ev
 ---
 
 ## STATUS — what has since been built
+
+**Bardo composition gate (2026-08-30).** The live room gate now samples the first-minute arrival,
+axis and plaza separately at 1× and blocks unless each playable centre is at least one canonical
+value band over its outer frame. The three frames are green, and all 11 production layouts remain
+covered. The central crossing no longer presents four equal exits: a lit north-south course, unequal
+solid pylons and one kept waylight establish the next threshold, while the moved Shrine votive gives
+the east branch a visible subordinate endpoint. Repeated blind comparisons still prefer the named
+concepts on all three compositions. Structural acceptance is green; comparative Look is not.
+
+**Opening-art phase 2 (2026-08-30).** The technical blind spots named by the opening audit are now
+executable contracts: authored sheets assert 1:1 source/target texels after `worldScale`, palette
+grammar constrains each colour's worst-frame share and footprint, floor/prop/character surface churn
+has class caps, and rejection receipts preserve why a candidate failed. The first visible candidate
+purchase is equally narrow: one extra idle drawing and three pickup drawings, all rig-authored with
+computed pivots and sockets. The sword moment has anticipation before sim contact, five ticks of
+contact, nine ticks of settle, one physical sound, and the already-authoritative Gate response.
+Pose selection is presentation-only; contact plants the hero through four deterministic frozen sim
+ticks. Evidence lives under `.art-cache/spike/hero-final/`. The candidate
+is gated, not approved or shipped, so the audit's animation and experience scores are deliberately
+unchanged pending human Look and an in-engine pass on promoted assets.
 
 **The hero the renderer can load (2026-08-30, late).** The staged hero candidate was immaculate and
 uninstallable: `src/render/views/player.ts` demands clips `run, dodge, light1, light2, heavy`, frames

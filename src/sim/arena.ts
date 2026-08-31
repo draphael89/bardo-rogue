@@ -533,6 +533,9 @@ function buildBardo(rng: Rng): Arena {
   const bell = { x: 51 * TILE, y: 20 * TILE }                   // the reliquary, upright on the Shrine
   // The fire on the Keeper's column (§8.4.4): the causeway's key, kept burning for whoever lands.
   const keeperFire = { x: 39.5 * TILE, y: 28.9 * TILE }
+  // A kept waylight at the north threshold. From the junction the Gate itself is still beyond
+  // the camera, so this is the next visible stop on the pilgrimage rather than a rival key.
+  const axisLight = { x: 35.5 * TILE, y: 17.5 * TILE }
   // Battle scar across the arrival ground (§5.3.2): the causeway's one non-axis-aligned form.
   const furrow = { x0: 28 * TILE, y0: 30.8 * TILE, x1: 39 * TILE, y1: 28.6 * TILE }
 
@@ -558,6 +561,9 @@ function buildBardo(rng: Rng): Arena {
     // the level-2 ring 2.4, which is a pool a body stands inside. Its gold chips are also what
     // carry `top-one-focality` at arrival.
     { x: 33.5 * TILE, y: 30.5 * TILE, r: 78, s: 1.18 },
+    // The waylight's own small baked pool. Direction comes from the north-south paving below;
+    // making this pool broad lights the side arms equally and recreates the four-way defect.
+    { x: axisLight.x, y: axisLight.y, r: 72, s: 0.90 },
   ]
   // The pilgrimage wear line (§8.4.1): a level-2 ridge worn along the spine, slightly off-axis.
   // It runs all the way into the landing, because that is where every walk has started (§2.2).
@@ -610,6 +616,23 @@ function buildBardo(rng: Rng): Arena {
     { c0: 20, r0: 29, c1: 26, r1: 30 },   // the Ferryman's pier, a dead end at the south-west void
   ]
   for (const R of walks) paveRect(s, R, levelFor(R))
+
+  // The junction is a pilgrimage line with side visits, not four equivalent exits. Re-pave only
+  // its central north-south course as continuous slabs: the threshold under the visible waylight
+  // is warmest, the crossing is one rank lower, and both side arms retain their dark base.
+  paveRect(s, { c0: 31, r0: 16, c1: 34, r1: 19 }, () => 4)
+  paveRect(s, { c0: 31, r0: 20, c1: 34, r1: 23 }, () => 2)
+
+  // Unequal solid pylons turn the lit course into an actual threshold without narrowing the
+  // four-cell walk. They occupy cells that were already void-solid, so the navigation map and
+  // replay hash do not change; the taller east pylon owns the kept light, the west one is broken.
+  const wayPylon = (c0: number, r0: number, rows: number) => {
+    for (let r = r0; r < r0 + rows; r++) for (let c = c0; c <= c0 + 1; c++) {
+      base[idx(c, r)] = r === r0 ? T.capNorth : r === r0 + rows - 1 ? T.capSouth : r === r0 + 1 ? T.wallFace : T.wallFaceB
+    }
+  }
+  wayPylon(29, 17, 3)
+  wayPylon(35, 15, 5)
 
   // A worn runner carries the line's last steps to the Gate (no UI arrow, §8.4.1).
   for (let r = 5; r <= 11; r++) for (let c = 32; c <= 34; c++) {
@@ -666,6 +689,10 @@ function buildBardo(rng: Rng): Arena {
   // tiles from the lamp already at (39, 30), was a mirrored pair on a shared Y — the same §5.2
   // rule the plaza braziers two blocks up are staggered to obey.
   furniture(35, 29, PROP.keeperLamp, false)
+  // The same kept-fire vocabulary as the arrival, now marking the next threshold. It stands on
+  // the taller east pylon, off the centre line; that cell was already solid void, so the prop
+  // remains decorative without changing the route.
+  furniture(35, 17, PROP.keeperLamp, false)
   // FORGE: the Smith's ground; the forge fire has a body, and quenched slag sits by the west wall.
   furniture(18, 21, PROP.brazier)
   furniture(11, 24, PROP.shard)
@@ -675,7 +702,9 @@ function buildBardo(rng: Rng): Arena {
     [0, 0, PROP.bellNW], [32, 0, PROP.bellNE], [0, 32, PROP.bellSW], [32, 32, PROP.bellSE],
   ] as const) props.push({ x: bellX + dx, y: bellY + dy, tile, sortY: bellSort, sheet: 'prop' })
   for (let r = 20; r <= 21; r++) for (let c = 50; c <= 52; c++) solid[idx(c, r)] = 1
-  furniture(46, 22, PROP.pan, false)
+  // The low votive terminates the east branch in a visible object; the bell remains the Shrine's
+  // deeper destination. Its light below tracks this exact pan instead of floating beyond view.
+  furniture(44, 20, PROP.pan, false)
   // PIER: the Ferryman's mooring (§8.4.4) — a pole on the boards, the skiff's prow in the void.
   furniture(20, 29, PROP.pole)
   furniture(18, 31, PROP.prow, false)
@@ -709,7 +738,7 @@ function buildBardo(rng: Rng): Arena {
       { x: 31 * TILE + 8, y: 4.8 * TILE, radius: 140, strength: 2.4, tint: 0xffd9a0 },
       { x: 36 * TILE + 8, y: 5.2 * TILE, radius: 72, strength: 0.80, tint: 0xffd9a0 },
       { x: forgeFire.x, y: forgeFire.y, radius: 72, strength: 0.95, tint: 0xff7a18 },
-      { x: 46 * TILE, y: 21.8 * TILE, radius: 40, strength: 0.45, tint: 0xd4b060 },
+      { x: 44.5 * TILE, y: 20.8 * TILE, radius: 40, strength: 0.45, tint: 0xd4b060 },
       // The causeway's own key (§8.4.6): the cresset on the Keeper's column. It was r128, which
       // is what flooded the causeway wall to wall; at r92 it lights its own column and the
       // ground around it and stops, and the landing gets its own lamp instead.
@@ -717,6 +746,9 @@ function buildBardo(rng: Rng): Arena {
       // The landing lamp: arrival is IN light (§3.2.3), and now the light has an object in frame.
       // Tracks the prop at (35, 29), half a tile below its foot.
       { x: 35.5 * TILE, y: 29.5 * TILE, radius: 84, strength: 1.20, tint: 0xffab5c },
+      // The axis waylight is a rank below the Keeper and far below the Gate. Its job is only to
+      // make north the dominant exit from the junction while that destination is off-camera.
+      { x: axisLight.x, y: axisLight.y, radius: 150, strength: 1.00, tint: 0xffab5c },
     ],
     windows: [
       { x: 37.5 * TILE, y: 3.5 * TILE, radius: 52, strength: 0.42 },

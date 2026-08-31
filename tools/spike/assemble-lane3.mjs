@@ -101,6 +101,7 @@ for (const facing of Object.keys(rig.facings)) {
     cell: CELL, cols: COLS, rows: ROWS,
     maxColors: 16,
     palette: sheet.palette,
+    ...(sheet.colourPlacement ? { colourPlacement: sheet.colourPlacement } : {}),
     facing,
     ...(facing === 'east' && sheet.mirror ? { mirror: true } : {}),
     fit: 'grid',

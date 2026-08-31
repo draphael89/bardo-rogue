@@ -18,6 +18,7 @@
     "boneDim",
     "bone"
   ],
+  "colourPlacement": "charger",
   "facing": "east",
   "mirror": true,
   "fit": "grid",

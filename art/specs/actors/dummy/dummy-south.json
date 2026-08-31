@@ -25,6 +25,7 @@
     "cope",
     "gold"
   ],
+  "colourPlacement": "dummy",
   "facing": "south",
   "fit": "grid",
   "chromaKey": false,

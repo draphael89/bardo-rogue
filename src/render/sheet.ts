@@ -68,6 +68,14 @@ export interface SheetProvenance {
   sourceHash?: string
 }
 
+export interface ColourPlacementRule {
+  /** Maximum share of this frame's opaque pixels occupied by the colour. */
+  maxShare: number
+  /** Maximum width/height of the colour's bbox as fractions of the authored cell. */
+  maxWidth: number
+  maxHeight: number
+}
+
 export interface SheetDef {
   id: string
   version: number
@@ -83,6 +91,10 @@ export interface SheetDef {
    * is palette drift even when every colour is individually canonical.
    */
   ramp?: string[]
+  /** Named per-colour grammar shared by every facing of one identity. */
+  colourPlacement?: string
+  /** Optional class silhouette ceiling, measured from each frame's opaque bbox. */
+  maxWidthToHeight?: number
   maxColors: number
   /** The direction the art is drawn facing. `mirror` says the opposite side is served by flipping. */
   facing?: 'east' | 'south' | 'north' | 'none'
@@ -158,6 +170,13 @@ export function validateSheetDef(def: SheetDef, where: string): void {
   if (def.ramp !== undefined) {
     if (!Array.isArray(def.ramp) || def.ramp.length === 0) fail('ramp must be a non-empty array of canon colour names')
     for (const n of def.ramp) if (typeof n !== 'string' || !n) fail('ramp contains a non-string entry')
+  }
+  if (def.colourPlacement !== undefined) {
+    if (!def.ramp) fail('colourPlacement requires a declared ramp')
+    if (typeof def.colourPlacement !== 'string' || !def.colourPlacement) fail('colourPlacement must name a profile')
+  }
+  if (def.maxWidthToHeight !== undefined && (!Number.isFinite(def.maxWidthToHeight) || def.maxWidthToHeight <= 0)) {
+    fail('maxWidthToHeight must be greater than 0')
   }
   if (!def.frames || Object.keys(def.frames).length === 0) fail('frames is empty')
   const cells = def.cols * def.rows

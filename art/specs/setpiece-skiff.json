@@ -8,6 +8,7 @@
   "cols": 1,
   "rows": 1,
   "maxColors": 12,
+  "colourPlacement": "skiff-setpiece",
   "palette": [
     "void",
     "mortar",

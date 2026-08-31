@@ -58,6 +58,20 @@ const gate = (rs: GateResult[], id: string): GateResult => {
 }
 
 describe('objective gates', () => {
+  it('fails the colour-placement contract when a sheet omits its ramp', async () => {
+    expect(gate(runGates(await ctx([body()])), 'colour-placement-contract').ok).toBe(false)
+  })
+
+  it('enforces a declared width-to-height ceiling', async () => {
+    const wide = await ctx([body()])
+    ;(wide.def as SheetDef & { maxWidthToHeight: number }).maxWidthToHeight = 0.5
+    expect(gate(runGates(wide), 'class-proportion').ok).toBe(false)
+
+    const narrow = await ctx([body(10, 4, 21, 29)])
+    ;(narrow.def as SheetDef & { maxWidthToHeight: number }).maxWidthToHeight = 0.5
+    expect(gate(runGates(narrow), 'class-proportion').ok).toBe(true)
+  })
+
   it('edge-clearance fails when content touches a cell edge', async () => {
     const rs = runGates(await ctx([body(0, 6, 27, 29)]))       // west edge contact
     expect(gate(rs, 'frame:f0:edge-clearance').ok).toBe(false)
@@ -69,6 +83,20 @@ describe('objective gates', () => {
     const dup = gate(rs, 'duplicate-frames')
     expect(dup.ok).toBe(false)
     expect(dup.severity).toBe('fail')
+  })
+  it('detail-density rejects surface churn above the asset-class budget', async () => {
+    const noisy = await ctx([body()], { kind: 'prop' })
+    expect(gate(runGates(noisy), 'detail-density').ok).toBe(false)
+    const quiet = await ctx([(x, y) => x >= 6 && x <= 25 && y >= 8 && y <= 27 ? 'slateHi' : null], { kind: 'prop' })
+    expect(gate(runGates(quiet), 'detail-density').ok).toBe(true)
+  })
+  it('colour placement rejects a legal colour used too widely or too often', async () => {
+    const veteranBody = (x: number, y: number): string | null => body()(x, y) === 'slateHi' ? 'ironHi' : body()(x, y)
+    const c = await ctx([veteranBody], {
+      ramp: ['mortar', 'seal0', 'iron', 'ironHi', 'purple0', 'purple2', 'purple3', 'boneLo', 'boneDim', 'bone', 'brickLo', 'brick', 'brickHi', 'cope', 'gold'],
+      colourPlacement: 'veteran',
+    })
+    expect(gate(runGates(c), 'colour-placement:ironHi').ok).toBe(false)
   })
   it('a socket off the drawing hard-fails, including one inside the bbox but on empty pixels', async () => {
     const c = await ctx([body()])

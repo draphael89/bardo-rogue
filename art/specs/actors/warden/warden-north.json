@@ -22,6 +22,7 @@
     "bone",
     "gold"
   ],
+  "colourPlacement": "warden",
   "facing": "north",
   "fit": "grid",
   "chromaKey": false,

@@ -6,7 +6,7 @@ import { ASSET_BASE } from '@/assetBase'
 TextureSource.defaultOptions.scaleMode = 'nearest'
 
 /** Authored sheets, each a PNG plus the JSON sidecar that names its frames. */
-const SHEETS = [
+export const SHEETS = [
   'bardo_veteran_unarmed_east',
   'bardo_veteran_unarmed_north',
   'bardo_veteran_unarmed_south',

@@ -59,12 +59,16 @@ const GS_ARCS = ['light1', 'light2', 'heavy'].flatMap(c => ARC.map(s => c + s))
 // folding it into the body sheet would push the unarmed family from 14 cells to 18 and re-grid it
 // from 4x4 to 6x3, invalidating every gate number already measured on those sheets.
 const ROLL = ['dive', 'tuck', 'apex', 'extend']
-const ACTIONS = rig.weapon === 'none' ? GRAMMAR
+const IDLE = ['idle', 'idleBreath']
+const RUN = ['run0', 'run1', 'run2', 'run3', 'run4', 'run5', 'run6', 'run7']
+const PICKUP = rig.weapon === 'none' ? ['pickupAnticipate']
+  : rig.weapon === 'greatsword' ? ['pickupContact', 'pickupSettle'] : []
+const ACTIONS = rig.weapon === 'none' ? [...PICKUP, ...GRAMMAR]
   : rig.weapon === 'dagger' ? DAGGER_ARC
-    : [...GRAMMAR, ...GS_ARCS]
-const FRAMES = ['idle', 'run0', 'run1', 'run2', 'run3', 'run4', 'run5', 'run6', 'run7', ...ACTIONS]
-// The grid follows the frame count instead of being pinned at 4x4: 14 cells fit 4x4, the
-// greatsword's 29 need 6x5. Cell size and registration are unchanged either way.
+    : [...PICKUP, ...GRAMMAR, ...GS_ARCS]
+const FRAMES = [...IDLE, ...RUN, ...ACTIONS]
+// The grid follows the frame count instead of being pinned at 4x4: the unarmed family's 16 cells
+// fit 4x4 and the greatsword family's 32 use 6x6. Cell size and registration stay unchanged.
 const COLS = FRAMES.length <= 16 ? 4 : 6
 const ROWS = Math.ceil(FRAMES.length / COLS)
 
@@ -89,7 +93,8 @@ const PALETTE = ['mortar', 'seal0', 'iron', 'ironHi', 'purple0', 'purple2', 'pur
 const HEIGHT_CAP = Math.round(CELL * 26 / 32)
 
 const CLIPS = {
-  run: { frames: FRAMES.slice(1, 9), timing: 'ticks', ticks: Array(8).fill(4), loop: true },
+  idle: { frames: IDLE, timing: 'ticks', ticks: [68, 14], loop: true },
+  run: { frames: RUN, timing: 'ticks', ticks: Array(8).fill(4), loop: true },
   // Every family with the shared grammar binds the dodge, which resolves to `player.dodge`
   // (total 20, travel 13 — both real timing windows) and asserts NO contact, which is legal
   // precisely because that window has no `active` phase. `grounded: false` is what exempts the
@@ -211,6 +216,7 @@ for (const facing of Object.keys(rig.facings)) {
     cell: CELL, cols: COLS, rows: ROWS,
     maxColors: 16,
     palette: PALETTE,
+    colourPlacement: 'veteran',
     facing,
     ...(facing === 'east' ? { mirror: true } : {}),
     fit: shared ? 'shared' : 'grid',
@@ -278,6 +284,7 @@ for (const facing of Object.keys(rig.facings)) {
     cell: CELL, cols: 2, rows: 2,
     maxColors: 16,
     palette: PALETTE,
+    colourPlacement: 'veteran',
     facing,
     fit: 'grid',
     chromaKey: false,

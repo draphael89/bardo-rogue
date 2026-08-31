@@ -2,6 +2,7 @@
 // `--url` adds exact live-composite and 1x target-frame checks against the running game.
 //
 //   pnpm room:gate -- --url http://localhost:5201 --shot-dir shots/room-gates
+//   pnpm room:gate -- --url http://localhost:5201 --bardo-only  # faster composition iteration
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { chromium } from '@playwright/test'
@@ -11,6 +12,7 @@ import { buildArena, interior, PROP, T, TILE, type Arena } from '../src/sim/aren
 import { Rng } from '../src/sim/rng'
 
 const argv = process.argv.slice(2)
+const bardoOnly = argv.includes('--bardo-only')
 const flag = (name: string): string | undefined => {
   const i = argv.indexOf('--' + name)
   if (i < 0) return undefined
@@ -31,7 +33,17 @@ interface RuntimeRoom {
   display: { width: number; height: number }
   player: { x: number; y: number }
   focal: { x: number; y: number }
-  frame?: { mean: number; readableShare: number; highlightShare: number; topOneNearShare: number; topOneNearest: number }
+  frame?: {
+    mean: number
+    readableShare: number
+    highlightShare: number
+    topOneNearShare: number
+    topOneNearest: number
+    centreMean: number
+    outerMean: number
+    centreBand: number
+    outerBand: number
+  }
 }
 
 const checks: Check[] = []
@@ -112,6 +124,15 @@ function percentile(sorted: number[], p: number): number {
   return sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * p))] ?? 0
 }
 
+function valueBand(value: number): number {
+  if (value < 0.08) return 0
+  if (value < 0.20) return 1
+  if (value < 0.35) return 2
+  if (value < 0.52) return 3
+  if (value < 0.72) return 4
+  return 5
+}
+
 async function frameMetrics(png: Buffer, points: Array<{ x: number; y: number }>): Promise<NonNullable<RuntimeRoom['frame']>> {
   const { data, info } = await sharp(png).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
   const samples: Array<{ x: number; y: number; l: number }> = []
@@ -131,12 +152,27 @@ async function frameMetrics(png: Buffer, points: Array<{ x: number; y: number }>
   const top = samples.filter(s => s.l >= cut)
   const distances = top.map(s => Math.min(...points.map(p => Math.hypot(s.x - p.x, s.y - p.y))))
   const topOneNearShare = distances.filter(d => d <= 64).length / Math.max(1, distances.length)
+  const playTop = 28, playHeight = info.height - 22 - playTop
+  const centre = samples.filter(s => {
+    const nx = s.x / info.width, ny = (s.y - playTop) / playHeight
+    return nx >= 0.20 && nx < 0.80 && ny >= 0.20 && ny < 0.80
+  })
+  const outer = samples.filter(s => {
+    const nx = s.x / info.width, ny = (s.y - playTop) / playHeight
+    return nx < 0.20 || nx >= 0.80 || ny < 0.20 || ny >= 0.80
+  })
+  const centreMean = centre.reduce((sum, sample) => sum + sample.l, 0) / Math.max(1, centre.length)
+  const outerMean = outer.reduce((sum, sample) => sum + sample.l, 0) / Math.max(1, outer.length)
   return {
     mean,
     readableShare,
     highlightShare,
     topOneNearShare,
     topOneNearest: Math.min(...distances),
+    centreMean,
+    outerMean,
+    centreBand: valueBand(centreMean),
+    outerBand: valueBand(outerMean),
   }
 }
 
@@ -147,7 +183,7 @@ async function runtime(url: string, shotDir?: string): Promise<RuntimeRoom[]> {
   const errors: string[] = []
   // These seeds cover every layout pool used by the production First Gate. Layout de-duplication
   // leaves one frame per live layout.
-  for (const seed of [1, 31]) {
+  for (const seed of bardoOnly ? [1] : [1, 31]) {
     const page = await browser.newPage({ viewport: { width: 640, height: 360 }, deviceScaleFactor: 1 })
     page.on('pageerror', error => errors.push(`seed ${seed} pageerror: ${error.message}`))
     page.on('console', message => { if (message.type() === 'error') errors.push(`seed ${seed} console: ${message.text()}`) })
@@ -172,6 +208,15 @@ async function runtime(url: string, shotDir?: string): Promise<RuntimeRoom[]> {
     })
 
     type Target = { id: string; layout: string; template: string }
+    const addFrameChecks = (label: string, source: string, frame: NonNullable<RuntimeRoom['frame']>): void => {
+      add(`${label}:frame-mean`, frame.mean <= 0.30, `${frame.mean.toFixed(3)}; ceiling 0.300 (${source})`)
+      add(`${label}:readable-content`, frame.readableShare >= 0.15,
+        `${(frame.readableShare * 100).toFixed(1)}% at B1 or brighter; floor 15.0% (${source})`)
+      add(`${label}:highlight-budget`, frame.highlightShare <= 0.035,
+        `${(frame.highlightShare * 100).toFixed(2)}%; ceiling 3.50% (${source})`)
+      add(`${label}:top-one-focality`, frame.topOneNearest <= 64 && frame.topOneNearShare >= 0.04,
+        `${(frame.topOneNearShare * 100).toFixed(1)}% of full top-1% set within 64px of player/focal; nearest ${frame.topOneNearest.toFixed(1)}px (${source})`)
+    }
     const capture = async (target: Target, enter: boolean): Promise<void> => {
       if (seenLayouts.has(target.layout)) return
       const actual = await page.evaluate(({ id, enter }) => {
@@ -218,20 +263,64 @@ async function runtime(url: string, shotDir?: string): Promise<RuntimeRoom[]> {
         `${room.texture.width}x${room.texture.height}; required ${room.cols * 24}x${room.rows * 24} (${source})`)
       add(`${label}:logical-display`, Math.round(room.display.width) === room.cols * 16 && Math.round(room.display.height) === room.rows * 16,
         `${room.display.width.toFixed(1)}x${room.display.height.toFixed(1)}; required ${room.cols * 16}x${room.rows * 16} (${source})`)
-      add(`${label}:frame-mean`, frame.mean <= 0.30, `${frame.mean.toFixed(3)}; ceiling 0.300 (${source})`)
-      add(`${label}:readable-content`, frame.readableShare >= 0.15,
-        `${(frame.readableShare * 100).toFixed(1)}% at B1 or brighter; floor 15.0% (${source})`)
-      add(`${label}:highlight-budget`, frame.highlightShare <= 0.035,
-        `${(frame.highlightShare * 100).toFixed(2)}%; ceiling 3.50% (${source})`)
-      add(`${label}:top-one-focality`, frame.topOneNearest <= 64 && frame.topOneNearShare >= 0.04,
-        `${(frame.topOneNearShare * 100).toFixed(1)}% of full top-1% set within 64px of player/focal; nearest ${frame.topOneNearest.toFixed(1)}px (${source})`)
+      addFrameChecks(label, source, frame)
       rooms.push(room)
       seenLayouts.add(target.layout)
     }
 
+    const captureBardoMoment = async (
+      name: string,
+      x: number,
+      y: number,
+      focalX: number,
+      focalY: number,
+    ): Promise<void> => {
+      const room = await page.evaluate(({ name, x, y, focalX, focalY, seed }) => {
+        const g = (window as unknown as { __game: any }).__game
+        const p = g.world.player
+        p.x = p.px = x
+        p.y = p.py = y
+        p.vx = p.vy = p.moveX = p.moveY = 0
+        g.presenter.camera.rest()
+        g.presenter.camera.snapFollow()
+        for (let i = 0; i < 3; i++) (window as any).__roomGateRender()
+        const ra = g.presenter.ra
+        const a = g.world.arena
+        const player = ra.world.toGlobal({ x: p.x, y: p.y })
+        const focal = ra.world.toGlobal({ x: focalX, y: focalY })
+        return {
+          id: 'bardo', layout: `bardo-${name}`, template: 'town', seed,
+          cols: a.cols,
+          rows: a.rows,
+          texture: { width: g.presenter.tilemap.sprite.texture.width, height: g.presenter.tilemap.sprite.texture.height },
+          display: { width: g.presenter.tilemap.sprite.width, height: g.presenter.tilemap.sprite.height },
+          player: { x: player.x, y: player.y },
+          focal: { x: focal.x, y: focal.y },
+        }
+      }, { name, x, y, focalX, focalY, seed }) as RuntimeRoom
+      const png = await page.screenshot()
+      if (shotDir) {
+        mkdirSync(shotDir, { recursive: true })
+        await sharp(png).png().toFile(join(shotDir, `${room.layout}.png`))
+      }
+      const frame = await frameMetrics(png, [room.player, room.focal])
+      room.frame = frame
+      const source = `bardo ${name}, seed ${seed}, 640x360 @1x`
+      addFrameChecks(room.layout, source, frame)
+      add(`${room.layout}:centre-lift`, frame.centreBand >= frame.outerBand + 1,
+        `centre ${frame.centreMean.toFixed(3)} B${frame.centreBand}; outer ${frame.outerMean.toFixed(3)} B${frame.outerBand}; required >=1 band (${source})`)
+      rooms.push(room)
+    }
+
     // The fresh Bardo must be measured before `gotoRoom` installs an active run. Capturing it after
     // that boundary produces the right masonry under the wrong first-minute HUD state.
-    if (seed === 1) await capture({ id: 'bardo', layout: 'bardo', template: 'town' }, false)
+    if (seed === 1) {
+      await capture({ id: 'bardo', layout: 'bardo', template: 'town' }, false)
+      await captureBardoMoment('arrival', 33.5 * 16, 30.5 * 16, 35.5 * 16, 29.5 * 16)
+      await captureBardoMoment('axis', 33 * 16, 21.5 * 16, 35.5 * 16, 17.5 * 16)
+      await captureBardoMoment('plaza', 33.5 * 16, 8.5 * 16, 33.5 * 16, 4.6 * 16)
+    }
+    if (bardoOnly) { await page.close(); continue }
     const targets = await page.evaluate(() => {
       const g = (window as unknown as { __game: any }).__game
       // This call installs the real seeded route; enumerate it only after this boundary.
@@ -252,9 +341,11 @@ async function runtime(url: string, shotDir?: string): Promise<RuntimeRoom[]> {
     'bardo', 'threshold', 'crossing', 'lethe', 'asphodel', 'landing', 'minos',
     'minos-east', 'cocytus', 'antechamber', 'oath-court',
   ]
-  const missing = productionLayouts.filter(layout => !seenLayouts.has(layout))
-  add('runtime:production-layout-coverage', missing.length === 0,
-    missing.length ? `missing ${missing.join(', ')}` : `${productionLayouts.length}/${productionLayouts.length} production-loop layouts sampled`)
+  if (!bardoOnly) {
+    const missing = productionLayouts.filter(layout => !seenLayouts.has(layout))
+    add('runtime:production-layout-coverage', missing.length === 0,
+      missing.length ? `missing ${missing.join(', ')}` : `${productionLayouts.length}/${productionLayouts.length} production-loop layouts sampled`)
+  }
   await browser.close()
   if (errors.length) throw new Error(errors.join('\n'))
   return rooms

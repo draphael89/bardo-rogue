@@ -8,6 +8,7 @@
   "cols": 4,
   "rows": 2,
   "maxColors": 16,
+  "colourPlacement": "brute",
   "palette": [
     "mortar",
     "slate0",

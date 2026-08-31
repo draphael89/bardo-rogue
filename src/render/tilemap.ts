@@ -13,6 +13,7 @@ export interface TilemapView {
   sprite: Sprite
   door: Container
   setDoorOpen(open: boolean): void
+  setRackProximity(amount: number): void
   /**
    * The cleared room's payout, which does not exist when the room is built — `shrine.ts` lights it
    * on the clear. Reads `arena.shrine` off the same arena object this view was built from, so the
@@ -245,15 +246,25 @@ function inStamp(x: number, y: number): boolean {
   return sy >= 0 && sy < STAMP_H && sx >= 0 && sx < STAMP_W && LIFE_STAMP[sy][sx] === 'X'
 }
 
-function makeRackCluster(rack: ArenaRack): { root: Container; sync(taken: boolean): void } {
+export function rackSpecularRect(rack: Pick<ArenaRack, 'x' | 'y'>): { x: number; y: number; width: number; height: number } {
+  const scale = tuning.view.worldScale
+  const targetX = Math.round((rack.x - 2) * scale) / scale
+  const targetY = Math.round((rack.y - 10) * scale) / scale
+  return { x: targetX - rack.x, y: targetY - rack.y, width: 4, height: 1 / scale }
+}
+
+export function rackProximityAmount(distance: number, specularRadius: number, rackRadius: number): number {
+  const span = Math.max(1, specularRadius - rackRadius)
+  return Math.max(0, Math.min(1, (specularRadius - distance) / span))
+}
+
+function makeRackCluster(rack: ArenaRack): { root: Container; sync(taken: boolean): void; proximity(amount: number): void } {
   const root = new Container()
   root.position.set(rack.x, rack.y)
-  const glow = new Graphics()
   const rackG = new Graphics()
-  root.addChild(glow, rackG)
+  const specular = new Graphics()
+  root.addChild(rackG, specular)
   const paint = (taken: boolean) => {
-    glow.clear()
-    glow.circle(0, 0, taken ? 14 : 22).fill({ color: taken ? 0x58402c : 0xff9a38, alpha: taken ? 0.06 : 0.16 })
     rackG.clear()
     // Three stone rests establish future weapon slots; only the centre carries steel.
     markPx(rackG, -25, 10, 50, 4, 0x09080d)
@@ -269,7 +280,21 @@ function makeRackCluster(rack: ArenaRack): { root: Container; sync(taken: boolea
     }
   }
   paint(false)
-  return { root, sync: paint }
+  return {
+    root,
+    sync(taken) {
+      paint(taken)
+      if (taken) specular.clear()
+    },
+    proximity(amount) {
+      specular.clear()
+      if (amount <= 0) return
+      // One hard-edged reflected line, on the steel itself. This is proximity feedback without a
+      // glow field, particle, or icon: the nearby hero supplies the light and the blade answers.
+      const r = rackSpecularRect(rack)
+      specular.rect(r.x, r.y, r.width, r.height).fill({ color: C.slateHi, alpha: Math.min(0.9, 0.18 + amount * 0.72) })
+    },
+  }
 }
 
 /**
@@ -478,6 +503,7 @@ const C = {
   slate1: 0x2e3a4e,
   slate2: 0x425066,
   slate3: 0x58667c,
+  slateHi: 0x76849a,
   nave0: 0x343c4c,
   naveWarm: 0x5c503a,
   emberLo: 0xb03010,
@@ -627,6 +653,17 @@ function bakeBardoProcession(g: Graphics, arena: Arena): void {
     px(g, x - reach - 3, y, 1, 1, C.coinBrass)
     px(g, x + reach + 3, y, 1, 1, C.coinBrass)
   }
+
+  // The Gate is still beyond the camera at the central junction, so the ordinary broken setts
+  // cannot terminate the visible route. One larger floor threshold sits under the kept waylight:
+  // a dark bed, two unequal B3 courses, and only two B4 catches on the inner arris. It is a next
+  // step rather than a second Gate — no frame, glyph, B5 pixel, glow, or mirrored full-width bar.
+  const tx = 33.2 * TILE, ty = 17.35 * TILE
+  px(g, tx - 29, ty - 1, 58, 4, C.iron)
+  px(g, tx - 27, ty, 19, 2, C.goldDim)
+  px(g, tx + 5, ty, 22, 2, C.goldDim)
+  px(g, tx - 8, ty, 5, 1, C.gold)
+  px(g, tx + 5, ty, 4, 1, C.gold)
 }
 
 // §2.1 Law 3. Wherever two surfaces meet, darken the joint. The wall tiles carry their own
@@ -1130,6 +1167,9 @@ export function buildTilemap(renderer: Renderer, atlas: Atlas, arena: Arena, flo
       gift?.sync(!!arena.offeringTaken)
       rack?.sync(!!arena.rackTaken)
       shrine?.sync(!!arena.shrineTaken)
+    },
+    setRackProximity(amount) {
+      rack?.proximity(arena.rackTaken ? 0 : Math.max(0, Math.min(1, amount)))
     },
     lightShrine() {
       if (shrine || !arena.shrine) return

@@ -39,8 +39,8 @@ export class Lighting {
   private base: Sprite
   private vignette: Sprite
   private braziers: Sprite[] = []
-  /** Flame-tongue emission points, parallel to `arena.braziers`. See flamePoints(). */
-  private flames: Array<{ x: number; y: number }> = []
+  /** Flame-tongue emission points, parallel to `arena.braziers`; null where a sprite owns the fire. */
+  private flames: Array<{ x: number; y: number } | null> = []
   private cores: Array<{ s: Sprite; src: { radius: number; strength: number; tint?: number } }> = []
   private windows: Sprite[] = []
   private door: Sprite
@@ -143,7 +143,13 @@ export class Lighting {
    * Only PROP.brazier counts. The keeper's lamp is numen glass, not fire — snapping an orange tongue
    * onto it would light a cold lantern.
    */
-  private flamePoints(arena: World['arena']): Array<{ x: number; y: number }> {
+  private flamePoints(arena: World['arena']): Array<{ x: number; y: number } | null> {
+    // A brazier whose sheet carries its own `burn` clip draws its own fire, frame by frame, in the
+    // same palette and on the same pixel grid as the bowl. Emitting a particle tongue there too is
+    // the double-flame that started all this: two fires on two clocks that can never agree. So the
+    // sprite wins and the tongue stands down — the LIGHT it casts is untouched, because light is
+    // still the runtime's job (§12.1) and only the drawn flame moved.
+    const spriteOwnsFire = this.atlas.hasSheet('bardo_brazier')
     // Measured, not assumed: the warm-pixel centroid of the shipped brazier cell is logical
     // (17.2, 15.5) in its 32px prop cell, and `pnpm hub:candidate` aligns every candidate to the
     // same ground line, so one constant serves the authored and the generated bowl alike.
@@ -157,7 +163,8 @@ export class Lighting {
         const d = Math.hypot(b.x - q.x, b.y - q.y)
         if (d < bestD) { bestD = d; best = q }
       }
-      return best ?? { x: b.x, y: b.y - 6 }
+      if (best) return spriteOwnsFire ? null : best
+      return { x: b.x, y: b.y - 6 }
     })
   }
 
@@ -324,8 +331,9 @@ export class Lighting {
       // flame cools to as it rises.
       const tongue = bz.tint === undefined ? brazierFlame(air) : { tint: bz.tint, tint1: 0xff7a18 }
       // The tongue burns in the bowl, not at the light's authored centre. See flamePoints().
-      const at = this.flames[bi] ?? { x: bz.x, y: bz.y - 6 }
-      this.particles.flame(at.x, at.y, tongue.tint, tongue.tint1)
+      // null means an animated sprite already draws this fire; adding a tongue would double it.
+      const at = this.flames[bi]
+      if (at) this.particles.flame(at.x, at.y, tongue.tint, tongue.tint1)
     }
 
     // Follow the camera: anchor the RT's world origin at the padded view window (rounded to whole

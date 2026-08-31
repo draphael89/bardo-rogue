@@ -15,7 +15,9 @@ import { ARM, armOf } from '@/sim/weapons'
 import { buildTilemap, rackProximityAmount, roomSheetFor, SHRINE_INK, type TilemapView } from './tilemap'
 import { Camera, clampFocus } from './camera'
 import { drawVoidUnderlay } from './starfield'
-import { TILE } from '@/sim/arena'
+import { TILE, PROP } from '@/sim/arena'
+import { tickClipFrame } from './clipSelect'
+import type { Sheet, SheetClip } from './sheet'
 import { Hud } from './hud'
 import { Particles } from './particles'
 import { lerp } from './anim'
@@ -104,6 +106,13 @@ export class Presenter {
   // The one you left. The kind is still a Hoplite; this set is how the room knows which body waded in.
   private huntIds = new Set<number>()
   private propSprites: Sprite[] = []
+  /**
+   * Props that carry their own looping animation. `arena.props` is otherwise static — a sprite is
+   * built once and never touched again — so ambient motion had nowhere to live and ended up as a
+   * particle system on a clock the art could not see. An animated prop is a normal authored sheet
+   * with a `timing: 'ticks'` clip, played by the same tickClipFrame() the hero's run uses.
+   */
+  private animProps: Array<{ s: Sprite; sheet: Sheet; clip: SheetClip; phase: number }> = []
   // Pixi caches a batcher per render-root InstructionSet and never evicts that cache. Reusing one
   // offscreen root keeps room bakes bounded while its children are rebuilt for each arena.
   private tileBakeRoot = new Container()
@@ -131,6 +140,7 @@ export class Presenter {
     for (const p of world.arena.props) {
       const s = makePropSprite(atlas, propRoom, p)
       this.propSprites.push(s)
+      this.bindAnimatedProp(s, p)
       L.entities.addChild(s)
     }
     this.playerView = createPlayerView(atlas, L)
@@ -1119,6 +1129,7 @@ export class Presenter {
     this.tilemap.door.destroy()
     for (const s of this.propSprites) s.destroy()
     this.propSprites = []
+    this.animProps = []
     this.rebuildVoid()
     this.tilemap = buildTilemap(this.ra.app.renderer, this.atlas, this.world.arena, floorTintFor(this.world), this.tileBakeRoot)
     L.floor.addChild(this.tilemap.sprite, this.tilemap.door)
@@ -1126,6 +1137,7 @@ export class Presenter {
     for (const p of this.world.arena.props) {
       const s = makePropSprite(this.atlas, propRoom, p)
       this.propSprites.push(s)
+      this.bindAnimatedProp(s, p)
       L.entities.addChild(s)
     }
     this.particles.bindArena(this.world.arena)
@@ -1167,9 +1179,29 @@ export class Presenter {
     if (n >= 8) v.trailAcc = 0   // a long hitch must not dump a frame's worth of pool in one go
   }
 
+  /**
+   * Bind a prop to its animated sheet when one is loaded. Absent, the prop stays the static cell it
+   * already was, so this is inert in production and in every room without candidate art.
+   */
+  private bindAnimatedProp(s: Sprite, p: { tile: number; sheet: 'room' | 'prop'; x: number; y: number }): void {
+    if (p.sheet !== 'prop' || p.tile !== PROP.brazier) return
+    if (!this.atlas.hasSheet('bardo_brazier')) return
+    const sheet = this.atlas.sheet('bardo_brazier')
+    const clip = sheet.def.clips?.burn
+    if (!clip) return
+    // Every cresset in the room shares one clip, so without a phase offset they all flicker in
+    // lockstep and read as one animation stamped twice rather than as two fires. Derived from the
+    // prop's own position: deterministic, no RNG, and stable across a room rebuild.
+    const total = (clip.ticks ?? []).reduce((a, b) => a + b, 0)
+    const phase = total ? ((p.x * 7 + p.y * 13) % total) / 60 : 0
+    this.animProps.push({ s, sheet, clip, phase })
+  }
+
   render(alpha: number, dtSec: number) {
     const w = this.world
     this.time += dtSec
+    // Ambient loops advance on the presentation clock; nothing in the sim depends on their phase.
+    for (const a of this.animProps) a.s.texture = a.sheet.frame(tickClipFrame(a.clip, this.time + a.phase)).texture
     // Everything on the far side of the slow-motion gate advances on a stretched clock, so it needs a
     // stretched alpha or it holds still for three frames and jumps on the fourth. slowAcc is where the
     // gate's accumulator stands after this tick, so this sweeps 0..1 across the whole stretched

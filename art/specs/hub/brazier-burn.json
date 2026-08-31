@@ -1,0 +1,109 @@
+{
+  "id": "hub.brazierBurn.candidate",
+  "kind": "prop",
+  "input": ".art-cache/hub/masters/brazier-burn.png",
+  "output": ".art-cache/hub/compiled/bardo_brazier.png",
+  "sidecar": ".art-cache/hub/compiled/bardo_brazier.json",
+  "cell": 48,
+  "cols": 8,
+  "rows": 1,
+  "maxColors": 12,
+  "palette": [
+    "void",
+    "mortar",
+    "seal0",
+    "iron",
+    "ironHi",
+    "woodLo",
+    "wood",
+    "woodHi",
+    "emberLo",
+    "ember",
+    "emberHi",
+    "boneLo"
+  ],
+  "colourPlacement": "probe-brazier",
+  "fit": "grid",
+  "chromaKey": false,
+  "coverage": 0.5,
+  "salience": {
+    "minShare": 0.2,
+    "minDelta": 0.16
+  },
+  "frames": [
+    {
+      "name": "burn0",
+      "i": 0
+    },
+    {
+      "name": "burn1",
+      "i": 1
+    },
+    {
+      "name": "burn2",
+      "i": 2
+    },
+    {
+      "name": "burn3",
+      "i": 3
+    },
+    {
+      "name": "burn4",
+      "i": 4
+    },
+    {
+      "name": "burn5",
+      "i": 5
+    },
+    {
+      "name": "burn6",
+      "i": 6
+    },
+    {
+      "name": "burn7",
+      "i": 7
+    }
+  ],
+  "clips": {
+    "burn": {
+      "frames": [
+        "burn0",
+        "burn1",
+        "burn2",
+        "burn3",
+        "burn4",
+        "burn5",
+        "burn6",
+        "burn7"
+      ],
+      "timing": "ticks",
+      "ticks": [
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6,
+        6
+      ],
+      "loop": true
+    }
+  },
+  "waivers": [
+    {
+      "gate": "detail-density",
+      "reason": "prop cap 25% is measured-miscalibrated (art-generation SS3.1): the approved shipped bardo_brute runs 65.6% while every compiled prop lands 34-49%. 48.6% here is the top of that band; the ember ramp costs the extra churn over the deflamed variant's 41.8%."
+    },
+    {
+      "gate": "frame:burn7:light-direction",
+      "reason": "HUMAN CALL PENDING, same class as the keeper lantern. 0.79 is the FLAME emitting, not a baked scene key: the fire is the brightest thing in its own cell by construction, and it is the frame where the tongue is tallest. Judge at 1x against the runtime light pool before promotion; do not carry into production unexamined."
+    }
+  ],
+  "provenance": {
+    "provider": "pixellab",
+    "model": "animate_image (MCP), seed 3, 48x48 x8, last_frame pinned to first for a seamless loop",
+    "promptFile": "art/prompts/hub_brazier_burn.txt"
+  },
+  "registrationNote": "CANDIDATE ONLY (?hubCandidate=1). The lit brazier as ONE animated object instead of a static sprite plus a particle system on a different clock. Source is our own already-compiled 48px brazier cell animated in place, so the bowl, legs and rubble are byte-identical to the still and only the fire moves. 1 generation. TRANSPORT MATTERS: the first attempt passed the image as inline base64 and the provider echoed frame 0 back with ZERO opaque pixels against our 614 \u2014 it animated from nothing and invented a generic cauldron. art-generation SS8 says pass a URL, never inline base64; a data: URL fixed it and frame 0 came back at exactly 614."
+}

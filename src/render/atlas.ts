@@ -31,6 +31,11 @@ const CANDIDATE_SHEETS = {
   bardo_oathbound_south: '/.art-cache/actors/oathbound/compiled/bardo_oathbound_south',
   bardo_warden_north: '/.art-cache/actors/warden/compiled/bardo_warden_north',
   bardo_warden_south: '/.art-cache/actors/warden/compiled/bardo_warden_south',
+  // The lit brazier as ONE animated object: an 8-frame `burn` clip with timing 'ticks', which is
+  // what src/render/sheet.ts reserves for ambient motion the sim has no opinion about. When this
+  // sheet is bound, src/render/light.ts stops emitting a particle tongue on that bowl — the whole
+  // point is one fire drawn by one tool, not a sprite and a particle system on different clocks.
+  bardo_brazier: '/.art-cache/hub/compiled/bardo_brazier',
 } as const
 
 const HERO_CANDIDATE = '/.art-cache/pixellab/hero-light1/compiled/bardo_veteran_greatsword_south'
@@ -88,8 +93,12 @@ export async function loadAtlas(manifest: Record<string, string[]>): Promise<Atl
       ? HERO_CANDIDATE
       : `${base}sprites/${name}`] as const),
     ...(candidateMode
-      ? Object.entries(CANDIDATE_SHEETS).map(([name, path]) => [name as CandidateSheetName, path] as const)
+      ? Object.entries(CANDIDATE_SHEETS).filter(([n]) => n !== 'bardo_brazier')
+        .map(([name, path]) => [name as CandidateSheetName, path] as const)
       : []),
+    // The animated brazier rides the hub lane, not the actor lane: it is hub art and it is what
+    // `pnpm hub:candidate` and ?hubCandidate=1 are for.
+    ...(hubCandidateMode ? [['bardo_brazier' as CandidateSheetName, CANDIDATE_SHEETS.bardo_brazier] as const] : []),
   ]
 
   // Nothing here depends on anything else here, so every file goes out in ONE wave. Loading them in

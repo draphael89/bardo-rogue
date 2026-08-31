@@ -1,0 +1,106 @@
+{
+  "id": "pilot.hero.sheet.candidate",
+  "kind": "character",
+  "input": ".art-cache/pilot-hero/sheet-master-n.png",
+  "output": ".art-cache/pilot-hero/compiled/pilot_hero_sheet.png",
+  "sidecar": ".art-cache/pilot-hero/compiled/pilot_hero_sheet.json",
+  "cell": 64,
+  "cols": 3,
+  "rows": 3,
+  "maxColors": 16,
+  "palette": [
+    "mortar",
+    "seal0",
+    "iron",
+    "ironHi",
+    "purple0",
+    "purple2",
+    "purple3",
+    "boneLo",
+    "boneDim",
+    "bone",
+    "brickLo",
+    "brick",
+    "brickHi",
+    "cope",
+    "gold"
+  ],
+  "fit": "grid",
+  "chromaKey": false,
+  "coverage": 0.5,
+  "salience": {
+    "minShare": 0.22,
+    "minDelta": 0.16
+  },
+  "valueLift": false,
+  "frames": [
+    {
+      "name": "idle",
+      "i": 0
+    },
+    {
+      "name": "run0",
+      "i": 1
+    },
+    {
+      "name": "run1",
+      "i": 2
+    },
+    {
+      "name": "run2",
+      "i": 3
+    },
+    {
+      "name": "run3",
+      "i": 4
+    },
+    {
+      "name": "run4",
+      "i": 5
+    },
+    {
+      "name": "run5",
+      "i": 6
+    },
+    {
+      "name": "run6",
+      "i": 7
+    },
+    {
+      "name": "run7",
+      "i": 8
+    }
+  ],
+  "clips": {
+    "run": {
+      "frames": [
+        "run0",
+        "run1",
+        "run2",
+        "run3",
+        "run4",
+        "run5",
+        "run6",
+        "run7"
+      ],
+      "timing": "ticks",
+      "ticks": [
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4
+      ],
+      "loop": true
+    }
+  },
+  "provenance": {
+    "provider": "pixellab",
+    "model": "create-character-v3 (MCP, 2 gen) from a rig-authored reference + animate_character template running-8-frames, ai_freedom 0, 128px, low top-down",
+    "promptFile": "art/prompts/pilot_hero_run.txt"
+  },
+  "registrationNote": "CANDIDATE ONLY. idle (a v3 rotation) + the 8 template-generated run frames, the shape a real hero sheet has. Exists to demonstrate clip:*:prop-mass: the greatsword is present in idle and absent from most of the run clip, which every other gate passes."
+}

@@ -232,7 +232,9 @@ export async function requests(provider: ProviderName, spec: GenerateSpec, token
       description: prompt,
       image_size: { width: spec.size, height: spec.size },
       view: spec.view ?? 'high top-down',
-      outline: 'single color black outline',
+      // NOT 'single color black outline': BIBLE_RULES above sends "never pure black" in the same
+      // request's prompt, and ART_DIRECTION.md:289 says a full black outline flattens at this scale.
+      outline: 'single color outline',
       shading: 'basic shading',
       detail: 'medium detail',
       no_background: true,

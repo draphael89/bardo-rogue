@@ -10,7 +10,8 @@ description: >-
   compile ramp, or when a generated candidate fails a gate.
   Triggers: "PixelLab", "generate a sprite", "make a prop", "new asset", "art lane", "pnpm art
   generate", "pnpm art compile", "gen spec", "compile spec", "palette ramp", "candidate", "gate
-  failed", "light-direction", "edge density", "which tool should draw this".
+  failed", "light-direction", "edge density", "which tool should draw this", "animate_character",
+  "create_character", "8 directions", "run cycle", "the hero animation".
 ---
 
 # Art generation
@@ -26,7 +27,7 @@ that.
 
 | The asset | Lane | Why, measured |
 |---|---|---|
-| Anything with a **clip** (hero, enemies, any animation) | **Blender rig** (`tools/spike/`) | The rig gives frame consistency by construction: 6 sheets, 1 823 gate assertions, 54 s. `edit_image` redrew one garment three different ways across three frames **at one seed**. |
+| Anything with a **clip** (hero, enemies, any animation) | **Blender rig** for the keyframes — then §11 if you want PixelLab to draw them | The rig gives frame consistency by construction: 6 sheets, 1 823 gate assertions, ~52 s per family. `edit_image` redrew one garment three different ways across three frames **at one seed**. `animate_character` is a different tool and §11 measures it. |
 | **Radially symmetric / silhouette-dominant** props — brazier, bowl, bell, jar, lantern, cauldron | **PixelLab** | The recipe in §2 produced a brazier that reads better than the hand-coded one, on palette, gate-green, correct in a real 1× frame. |
 | Props whose read depends on **projection** — anvil, bench, cart, table | **Code** (`pnpm tiles`, the `props32` array beside `brazier32()` in `tools/make-bardo-tiles.ts`) | PixelLab returned an isometric anvil twice, at two canvases. No ramp fixes projection. |
 | Floors, walls, autotiles | **Code** (`pnpm tiles`) | 20.4 % edge density, slabs crossing tile boundaries, wear paths following real traffic, a bake coupled to the light pools. Parametric behaviour, not an image. `create_topdown_tileset` is **untested here** — say so rather than assume. |
@@ -201,6 +202,8 @@ mechanism: *"the compiler only uses the ramp a spec names."*
 | `frame:*:connectivity` | scattered islands | `fail` for characters, **downgraded to `judge` for props** — i.e. waivable. Do not waive it. |
 | `b5-mass` | blown highlights | ≤ 25 % above 0.72 luminance. A lantern or any glow prop is the one to watch. |
 | `ground-separation`, `frame:*:height` | darker than its floor, too tall | **Emitted only for `kind: "character"`.** A `prop` is never checked for either — a known hole, not a pass. |
+| `identity:<clip>:a->b` | the character changing mid-clip | Cosine <= 0.45 on a colour histogram. Caught `edit_image`. **Blind to a lost prop** — it scored a clip whose greatsword vanished from 6 of 8 frames at 0.001-0.036. Never read it as "the drawing survived". |
+| `clip:*:prop-mass:<frame>` <- **new** | **a held prop dropping out of a clip** | Bright-band (>0.62 luma) share of each clip frame against the sheet's own bare frames; >= 0.45x. Measured: all seven shipped sheets sit at **0.51-0.93x**, a template-animated clip at **0.19-0.39x**. `judge`, because deliberately sheathing a weapon is a legitimate waiver. |
 
 A green gate says **structurally admissible, not aesthetically accepted**. Judge at 1× on the room's
 floor value, in motion, before believing it: `pnpm art preview`, or composite into a real
@@ -245,6 +248,14 @@ so a new master can silently change what a future generation is conditioned on.
 - ~~"`create_map_object` style-matches against a screenshot of the room."~~ **Disproved.** Given a
   real 64 px patch of lit causeway it matched the palette and **lost the subject** — it returned a
   barrel for an anvil.
+- ~~"`animate_character`'s named templates are the cheap way to get a clip."~~ **Unreliable for an
+  armed character, 2026-08-31, and the unreliability is per-DIRECTION.** `running-8-frames` at
+  `ai_freedom: 0` on an approved hero kept the greatsword on 3 of 8 directions and lost it on 5;
+  south was the worst at 0.22x its idle blade mass, south-west the best at 0.71x. **Measure every
+  direction — one is not a sample.** Every existing gate passed the bad ones: `identity:run:*` scored
+  0.001-0.036 against a 0.45 cap, because a thin blade is a rounding error in a colour histogram.
+  Templates are humanoid skeleton animations; they do not know the character is holding anything.
+  This is what `clip:*:prop-mass` now catches (§5).
 - ~~"Generate at the target size."~~ See §3.
 - ~~"The anvil is worth one more PixelLab try with the bible prompt."~~ **Not struck — untested, and
   the two are in tension.** The anvil verdict is n=2 under the short subject line, and the bible
@@ -296,3 +307,57 @@ it replaces and look at it.
 
 Measurements here come from `docs/OPENING_AUDIT.md` §8; that document keeps the evidence, this one
 keeps the instructions. Change them together or they drift.
+
+## 11. The character lane — measured, and it is the rig that makes it work
+
+Run 2026-08-31, 12 generations total, character `3c541446` ("Bardo Veteran (rig-fed pilot)").
+`OPENING_AUDIT.md:333-337` Article IV said it first: **projection is a reference image, never an
+adjective.** Every number below follows from obeying that.
+
+**Step 1 — the identity, from the rig.** `create_character` mode `v3` with `reference_image_base64`
+= the SHIPPED hero cell (`public/assets/sprites/bardo_veteran_greatsword_south.png` cell 0). **2
+generations, 8 rotations.** The reference carries the game's own 20 deg ortho projection, so no
+`view` adjective has to. Compiled: **14 colours** (budget 16), `identity:sheet:*` **0.004-0.056**
+(cap 0.45), `light-direction` **-1.00 to +0.38** (cap +0.35) — the reference carried our north key
+too, unprompted. Pin `view: "low top-down"` anyway: it is ~20 deg and the repo's own gen specs say
+`high top-down` (~35 deg), which is wrong for this game.
+
+**Step 2 — the clip. Two ways, and only one works.**
+
+| | blade mass vs idle | gates (south) |
+|---|---|---|
+| `running-8-frames` **template**, `ai_freedom: 0` | **0.22x-0.71x, direction-dependent** | 94 gates, **19 blocking** |
+| **`mode: "v3"` + `custom_start_frame_base64` = a rig-authored run0** | **0.73-1.01x** | 94 gates, **1 blocking** |
+
+The shipped hero's own clips sit at 0.51-0.93x, so v3 lands inside real approved art. The one v3
+blocker was `clip:run:planted-feet`, 3px of foot spread against a 2px cap.
+
+**The template's per-direction spread is the point**, and it is why one direction is never a sample:
+
+| dir | S | SW | SE | N | NW | E | NE | W |
+|---|---|---|---|---|---|---|---|---|
+| min blade mass vs idle | **0.22x** | 0.71x | 0.45x | 0.47x | 0.68x | 0.43x | 0.31x | 0.30x |
+
+Five of eight fall under the 0.45x gate. Several also step mid-clip — south-west runs 13.9% for four
+frames then 32.7-35.8% for four, north the reverse — so the model re-decides at the cycle's halfway
+point rather than drifting. v3 with a start frame does not do this.
+
+**So the recipe is: the rig draws the keyframe, PixelLab draws the frames between.** An action
+description alone is not enough — name the prop in it *and* hand over the frame.
+
+**Costs**, `ceil(w * h * frames / 65536)` per direction: 64px 1/dir, **128px 2/dir**, 256px 8/dir.
+Template mode is 1/dir flat. Generate at **128 for a 64 cell** — §3 already says 2x buys the colour
+budget and 256 is four times the price for it.
+
+**Two things to size before you spend.** v3 returns a **taller canvas than you gave it** when the
+pose needs the room (128x160 for a raised greatsword) — the same geometry that denies the armed hero
+a roll sheet (`CHARACTER_HARD_CONSTRAINTS.md:184-188`). And the generated figure fills more of its
+canvas than the rig's does: median bbox **53.5px against the shipped hero's 43**, which trips
+`frame:*:height` on 5 of 8 frames until you rescale. Rescale with ONE scale and ONE offset for the
+whole clip; per-frame normalisation flattens a run cycle's bob into a treadmill.
+
+**What is still unsolved.** Sockets. The rig projects them from `rig.json`
+(`assemble.mjs:187-200`) and an external generator cannot; `CHARACTER_HARD_CONSTRAINTS.md:9` requires
+they be projected. `/estimate-skeleton` is the candidate and is untested here. Say where your sockets
+came from; do not imply the rig.
+

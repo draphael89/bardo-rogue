@@ -504,6 +504,48 @@ export function runGates(ctx: GateContext): GateResult[] {
     add(`identity:sheet:${s.name}`, d <= 0.45,
       `palette-histogram distance ${d.toFixed(3)} vs the rest of the sheet (want <= 0.45)`, 'judge')
   }
+  // A held prop can vanish mid-clip and every gate above still passes. Measured 2026-08-31 on a
+  // PixelLab `running-8-frames` clip generated from an approved hero: the greatsword was absent from
+  // 6 of 8 frames, and `identity:run:*` scored 0.001-0.036 against its 0.45 cap — because a thin
+  // blade is a rounding error in a colour histogram. That is the same defect `edit_image` was struck
+  // for, in the one form the identity gate is blind to.
+  //
+  // What separates a blade from armour is VALUE, not hue, so measure the bright band's share of each
+  // frame and compare a clip against the sheet's own bare frames (idle/hurt/dead) — the drawings that
+  // establish what this character carries. Ratio, not an absolute, because an unarmed sheet
+  // legitimately has far less bright mass than an armed one.
+  //
+  // Threshold measured, not assumed. Across all seven shipped sheets the worst clip frame keeps
+  // 0.51x (brute attack/windupEarly) to 0.93x (unarmed_east dodge/fall) of its sheet's bare-frame
+  // share; the generated run clip above sits at 0.29x. 0.45 clears the real art by 13% and still
+  // catches a dropped weapon. `judge`, because a clip that deliberately sheathes or throws a weapon
+  // is a legitimate waiver rather than a defect.
+  {
+    const brightShare = (s: CellStats): number => {
+      if (!s.opaque) return 0
+      let bright = 0
+      for (const [hex, n] of s.hist) if (luminance(hexToRgb(hex)) > 0.62) bright += n
+      return bright / s.opaque
+    }
+    const bare = stats.filter(s => !inClip.has(s.name))
+    const refs = bare.map(brightShare).sort((a, b) => a - b)
+    const ref = refs.length ? refs[refs.length >> 1] : 0
+    // Only meaningful when the character carries something bright to begin with: below ~2% of the
+    // drawing there is no prop to lose, and the ratio turns into noise amplification.
+    if (ref > 0.02) {
+      for (const [clipName, clip] of Object.entries(def.clips ?? {})) {
+        for (const n of clip.frames) {
+          const s = byName.get(resolveName(n))
+          if (!s) continue
+          const r = brightShare(s) / ref
+          add(`clip:${clipName}:prop-mass:${s.name}`, r >= 0.45,
+            `bright-band share ${(brightShare(s) * 100).toFixed(1)}% is ${r.toFixed(2)}x the sheet's bare frames (${(ref * 100).toFixed(1)}%) — want >= 0.45x, a held prop may have dropped out`,
+            'judge', '§3.2.5')
+        }
+      }
+    }
+  }
+
   // Two frames with identical pixels is a wasted cell and a hidden coupling: deliberate reuse is what
   // aliases exist to state. Hard failure — there is no judgment call in which two byte-identical
   // cells are two frames.

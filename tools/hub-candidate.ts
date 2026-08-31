@@ -53,8 +53,11 @@ for (const [file, index] of SINGLES) {
 // The replaced cells are cleared first: compositing a candidate OVER production art leaves the old
 // silhouette showing wherever the new one is narrower, which reads as a rendering bug rather than
 // as the candidate.
+// `dest-out` keeps the destination where the SOURCE is transparent, so the eraser has to be OPAQUE
+// to punch a hole. A transparent eraser is a silent no-op — it left production's flame sitting on
+// top of the candidate lantern, which reads as the candidate being wrong rather than the tool.
 const cleared = SINGLES.map(([, i]) => i).concat([0, 1, 2, 3])
-const blank = await sharp({ create: { width: CELL, height: CELL, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).png().toBuffer()
+const blank = await sharp({ create: { width: CELL, height: CELL, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 255 } } }).png().toBuffer()
 const erase: OverlayOptions[] = cleared.map(i => ({ input: blank, ...at(i), blend: 'dest-out' as const }))
 
 await sharp(SRC).ensureAlpha().composite([...erase, ...layers]).png().toFile(OUT)

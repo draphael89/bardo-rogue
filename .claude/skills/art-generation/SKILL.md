@@ -130,6 +130,38 @@ It is still the right tool for a 2-16 frame sequence whose exact poses do not ma
 tool for anything the rig registers. **The rig's value was never the pixels — it is the guarantee
 that frame N is the pose the hitbox expects.** Nothing generated has replaced that yet.
 
+### 2.4 The enemy pipeline, end to end — WORKS, measured 2026-08-31
+
+Four steps, all of them cheap, and it produced the first enemies in this project that are not
+recoloured Kenney tiles. `SPRITE` in `src/render/views/shared.ts` still reads
+`brute: 109, warden: 109, oathbound: 109` — three enemies including the slice's BOSS sharing one
+free-asset knight tile. That, not the hero, is the largest beauty deficit in the game.
+
+1. **Generate 16 candidates** with §2.2's Pro recipe, described from what the SIM says the enemy is
+   (the Warden's veil is his damage refusal; the Oath-Bound's chains are the oath). 16 per call means
+   picking, not accepting.
+2. **Pick one champion** and judge it composited into a real `pnpm shot` frame at game scale, beside
+   the placeholder it replaces. That comparison is the whole argument and it takes one minute.
+3. **`create-character-v3`** with the champion as `reference_image` → 8 directions, identity intact
+   across all eight. Measured on three enemies at once. **`template_id` must be `mannequin`** — see
+   `tools/pl/README.md` for why an invalid one fails silently and only surfaces at animation time.
+4. **`animate_character`** with a template → the clip. Measured on the Warden's 8-frame walk: the
+   polearm is held in **all 8 frames** and the tabard swings. This is §7's template finding holding
+   in the good direction — a weapon the model can READ is a weapon it keeps.
+
+**What this does NOT give you** is a sim-locked clip. Templates produce a plausible walk, not the
+frame the hitbox expects on tick N, and §2.3 shows nothing generated preserves an authored pose. For
+`timing: 'ticks'` clips (idle, chase, ambient) that is fine and this lane is enough. For
+`timing: 'sim'` chains it is not, and that gap is still open.
+
+### 2.5 Projection still routes to code, even on the Pro model
+
+§1 sends "props whose read depends on projection" to code on the strength of two isometric anvils
+from pixflux. Re-tested on Pro with six Bardo props at one seed: **statues, banners and chains came
+back correct and beautiful; columns, ossuary chests and altars came back ISOMETRIC** — two side faces
+and a top, in a game with none. The split is exactly §1's rule: silhouette-dominant objects are safe,
+box-like objects with visible faces are not. A better model did not move this line.
+
 ### 2.1 The prompt this lane has NOT been measured with
 
 `pnpm art generate <spec> --provider pixellab` dry-runs free (no key) and prints the prompt

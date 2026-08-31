@@ -149,7 +149,14 @@ export class Lighting {
     // the double-flame that started all this: two fires on two clocks that can never agree. So the
     // sprite wins and the tongue stands down — the LIGHT it casts is untouched, because light is
     // still the runtime's job (§12.1) and only the drawn flame moved.
-    const spriteOwnsFire = this.atlas.hasSheet('bardo_brazier')
+    //
+    // SCOPED TO THE BARDO, because the sheet being loaded is not the same question as the sprite
+    // being used. `?hubCandidate=1` binds the animated sheet globally, but `propSheetFor` and
+    // `Presenter.bindAnimatedProp` only apply hub art inside `arena.kind === 'bardo'`. Asking
+    // `hasSheet` alone therefore stood the tongue down in the threshold and the crossing, where
+    // nothing had replaced it — production static brazier, no drawn fire at all. The sprite owns the
+    // flame only where the sprite is actually drawn.
+    const spriteOwnsFire = arena.kind === 'bardo' && this.atlas.hasSheet('bardo_brazier')
     // Measured, not assumed: the warm-pixel centroid of the shipped brazier cell is logical
     // (17.2, 15.5) in its 32px prop cell, and `pnpm hub:candidate` aligns every candidate to the
     // same ground line, so one constant serves the authored and the generated bowl alike.

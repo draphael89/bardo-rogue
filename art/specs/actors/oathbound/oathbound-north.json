@@ -1,0 +1,141 @@
+{
+  "id": "actor.oathbound.north",
+  "kind": "character",
+  "input": ".art-cache/actors/oathbound/master-north.png",
+  "output": ".art-cache/actors/oathbound/compiled/bardo_oathbound_north.png",
+  "sidecar": ".art-cache/actors/oathbound/compiled/bardo_oathbound_north.json",
+  "cell": 64,
+  "cols": 4,
+  "rows": 2,
+  "maxColors": 16,
+  "palette": [
+    "mortar",
+    "seal0",
+    "iron",
+    "ironHi",
+    "brickLo",
+    "brick",
+    "brickHi",
+    "gold"
+  ],
+  "facing": "north",
+  "fit": "grid",
+  "chromaKey": false,
+  "coverage": 0.5,
+  "valueLift": false,
+  "salience": {
+    "minShare": 0.22,
+    "minDelta": 0.16
+  },
+  "frames": [
+    {
+      "name": "idle",
+      "i": 0,
+      "pivot": [
+        32,
+        60
+      ]
+    },
+    {
+      "name": "chase",
+      "i": 1,
+      "pivot": [
+        32,
+        60
+      ]
+    },
+    {
+      "name": "windupEarly",
+      "i": 2,
+      "pivot": [
+        32,
+        60
+      ],
+      "sockets": {
+        "maulHead": [
+          36,
+          31
+        ]
+      }
+    },
+    {
+      "name": "windupCommit",
+      "i": 3,
+      "pivot": [
+        32,
+        60
+      ],
+      "sockets": {
+        "maulHead": [
+          37,
+          32
+        ]
+      }
+    },
+    {
+      "name": "release",
+      "i": 4,
+      "pivot": [
+        32,
+        60
+      ],
+      "sockets": {
+        "maulHead": [
+          40,
+          26
+        ]
+      }
+    },
+    {
+      "name": "contact",
+      "i": 5,
+      "pivot": [
+        32,
+        60
+      ],
+      "sockets": {
+        "maulHead": [
+          41,
+          26
+        ]
+      }
+    },
+    {
+      "name": "recover",
+      "i": 6,
+      "pivot": [
+        32,
+        60
+      ]
+    },
+    {
+      "name": "hurt",
+      "i": 7,
+      "pivot": [
+        32,
+        60
+      ]
+    }
+  ],
+  "clips": {
+    "attack": {
+      "frames": [
+        "windupEarly",
+        "windupCommit",
+        "release",
+        "contact",
+        "recover"
+      ],
+      "timing": "sim",
+      "sim": {
+        "ref": "oathbound",
+        "contact": "contact"
+      }
+    }
+  },
+  "provenance": {
+    "provider": "blender-mannequin-spike",
+    "model": "blender-eevee ortho pitch 20deg, actor oathbound, cell 64, sun 1.07, ambient 1.75"
+  },
+  "registrationNote": "Pivots and sockets are COMPUTED from projected rig bones (rig.json), not judged. Candidate output only: .art-cache/actors, never public/assets."
+}

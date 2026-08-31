@@ -46,6 +46,8 @@
     "ashFieldLit": { "maxShare": 0.31, "maxWidth": 0.28125, "maxHeight": 0.28125 },
     "boneLo": { "maxShare": 0.02, "maxWidth": 0.3125, "maxHeight": 0.609375 },
     "boneDim": { "maxShare": 0.42, "maxWidth": 0.296875, "maxHeight": 0.546875 },
-    "bone": { "maxShare": 0.02, "maxWidth": 0.09375, "maxHeight": 0.0625 }
+    "bone": { "maxShare": 0.02, "maxWidth": 0.203125, "maxHeight": 0.140625 },
+    "ember": { "maxShare": 0.02, "maxWidth": 0.0625, "maxHeight": 0.078125 },
+    "emberHi": { "maxShare": 0.01, "maxWidth": 0.03125, "maxHeight": 0.03125 }
   }
 }

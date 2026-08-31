@@ -12,7 +12,12 @@ import { readFileSync } from 'node:fs'
 import { tuning } from '../../src/tuning'
 import { swingClipFrame, dodgeClipFrame, bruteAttackClipFrame, tickClipFrame, rollClipFrame, promiseFrame, DODGE_START_TICKS } from '../../src/render/clipSelect'
 import { validateClipRefs } from '../../tools/art/compile'
-import type { SheetDef } from '../../src/render/sheet'
+import type { Sheet, SheetDef } from '../../src/render/sheet'
+import { makeEnemy } from '../../src/sim/world'
+import { WARDEN_PATTERN } from '../../src/sim/enemies/warden'
+import { casterFrameName } from '../../src/render/views/enemy-caster'
+import { chargerFrameName } from '../../src/render/views/enemy-charger'
+import { wardenFrameName } from '../../src/render/views/enemy-warden'
 
 const sheetOf = (n: string) => JSON.parse(readFileSync(`public/assets/sprites/${n}.json`, 'utf8')) as SheetDef
 const hero = sheetOf('bardo_veteran_greatsword_east')
@@ -161,6 +166,43 @@ describe('the Oath-Bound elite runs on its own clock', () => {
     // On the brute's clock this tick is already committed; on the Oath-Bound's it is still early.
     expect(bruteAttackClipFrame(clip, b, 'windup', bruteSplit)).toBe(clip.frames[1])
     expect(bruteAttackClipFrame(clip, o, 'windup', bruteSplit)).toBe(clip.frames[0])
+  })
+})
+
+describe('authored enemy sheets follow simulation state', () => {
+  it('selects semantic caster, charger, and warden frames at their state boundaries', () => {
+    const caster = makeEnemy()
+    const casterSheet = { def: { clips: {
+      aim: { frames: ['aimDraw', 'aimLock', 'release', 'settle'] },
+      strafe: { frames: ['strafeA', 'strafeB'], ticks: [6, 6], loop: true },
+    } } } as unknown as Sheet
+    caster.state = 'aim'; caster.stateTick = 0
+    expect(casterFrameName(casterSheet, caster, 0, 0)).toBe('aimDraw')
+    caster.stateTick = 999
+    expect(casterFrameName(casterSheet, caster, 0, 0)).toBe('aimLock')
+    caster.state = 'recover'; caster.stateTick = 0
+    expect(casterFrameName(casterSheet, caster, 0, 0)).toBe('release')
+
+    const charger = makeEnemy()
+    charger.state = 'freeze'; charger.stateTick = 0
+    expect(chargerFrameName(charger, 0)).toBe('coilDraw')
+    charger.stateTick = 999
+    expect(chargerFrameName(charger, 0)).toBe('coilLock')
+    charger.state = 'dash'
+    expect(chargerFrameName(charger, 0)).toBe('lunge')
+    charger.state = 'recover'
+    expect(chargerFrameName(charger, 0)).toBe('skid')
+
+    const warden = makeEnemy()
+    const wardenSheet = { def: {} } as Sheet
+    warden.state = 'windup'; warden.pattern = WARDEN_PATTERN.slam; warden.stateTick = 0
+    expect(wardenFrameName(wardenSheet, warden, 0, 0)).toBe('windSlamGather')
+    warden.stateTick = 999
+    expect(wardenFrameName(wardenSheet, warden, 0, 0)).toBe('windSlamCommit')
+    warden.state = 'attack'; warden.pattern = WARDEN_PATTERN.ring
+    expect(wardenFrameName(wardenSheet, warden, 0, 0)).toBe('ringRelease')
+    warden.pattern = WARDEN_PATTERN.fan
+    expect(wardenFrameName(wardenSheet, warden, 0, 0)).toBe('fanRelease')
   })
 })
 

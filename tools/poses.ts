@@ -9,6 +9,7 @@ const args = Object.fromEntries(process.argv.slice(2).map((a, i, arr) => a.start
 const only = args.only ? args.only.split(',') : null
 const out = args.out ?? 'shots/poses.png'
 const url = args.url ?? 'http://localhost:5173'
+const actorCandidate = args.actorCandidate === '1'
 mkdirSync(dirname(out), { recursive: true })
 
 // helpers injected into every eval: g = api, w = world, p = player, hold(frame, n), until(pred, max), near(enemy, dx, dy)
@@ -50,12 +51,24 @@ const POSES: Pose[] = [
   { name: 'brute-attack', scenario: 'brute-only', god: true, run: 'const b = first(); near(b, 0, 22); until(() => b.state === "attack" && b.stateTick >= 7)', focus: 'enemy' },
   { name: 'brute-recover', scenario: 'brute-only', god: true, run: 'const b = first(); near(b, 0, 22); until(() => b.state === "recover" && b.stateTick >= 10)', focus: 'enemy' },
   { name: 'brute-stagger', scenario: 'brute-only', god: true, run: 'const b = first(); b.hp = 100; near(b, -20, 0); until(() => b.state === "chase" && b.stateTick > 30, 300); holdUntil({attack:true,aimX:1,aimY:0}, () => b.state === "stagger" && b.stateTick >= 4, 300)', focus: 'enemy' },
+  { name: 'oath-idle', scenario: 'oathbound-only', god: true, run: 'const b = first(); near(b, 0, 42); hold({}, 2)', focus: 'enemy' },
+  { name: 'oath-guard-east', scenario: 'oathbound-only', god: true, run: 'const b = first(); near(b, 42, 0); hold({}, 2)', focus: 'enemy' },
+  { name: 'oath-guard-west', scenario: 'oathbound-only', god: true, run: 'const b = first(); near(b, -42, 0); hold({}, 2)', focus: 'enemy' },
+  { name: 'oath-guard-north', scenario: 'oathbound-only', god: true, run: 'const b = first(); near(b, 0, -42); hold({}, 2)', focus: 'enemy' },
+  { name: 'oath-guard-south', scenario: 'oathbound-only', god: true, run: 'const b = first(); near(b, 0, 42); hold({}, 2)', focus: 'enemy' },
+  { name: 'oath-windup', scenario: 'oathbound-only', god: true, run: 'const b = first(); near(b, 0, 22); until(() => b.state === "windup" && b.stateTick >= 15)', focus: 'enemy' },
+  { name: 'oath-attack', scenario: 'oathbound-only', god: true, run: 'const b = first(); near(b, 0, 22); until(() => b.state === "attack" && b.stateTick >= 7)', focus: 'enemy' },
+  { name: 'oath-recover', scenario: 'oathbound-only', god: true, run: 'const b = first(); near(b, 0, 22); until(() => b.state === "recover" && b.stateTick >= 10)', focus: 'enemy' },
   { name: 'kill-shatter', scenario: 'brute-only', run: 'const b = first(); near(b, -18, 0); b.hp = 1; until(() => b.state === "chase" && b.stateTick > 25, 300); hold({attack:true,aimX:1,aimY:0}, 7); g.step(4)' },
   { name: 'caster-aim', scenario: 'caster-only', god: true, run: 'until(() => w().enemies.some(e => e.active && e.state === "aim" && e.stateTick >= 18), 1500)', focus: 'enemy' },
   { name: 'bolt-flight', scenario: 'caster-only', god: true, run: 'until(() => w().projectiles.some(b => b.active), 1500); g.step(14)', focus: 'bolt' },
   { name: 'bolt-cut', scenario: 'caster-only', god: true, run: 'until(() => w().projectiles.some(b => b.active), 1500); const q = p(); const b = w().projectiles.find(b => b.active); const a = Math.atan2(b.vy, b.vx); place(b.x + Math.cos(a) * 30, b.y + Math.sin(a) * 30); hold({attack:true,aimX:-Math.cos(a),aimY:-Math.sin(a)}, 6); until(() => !b.active, 12); g.step(2)' },
   { name: 'charger-freeze', scenario: 'charger-swarm', god: true, run: 'until(() => w().enemies.some(e => e.active && e.state === "freeze" && e.stateTick >= 12), 1500)', focus: 'enemy' },
   { name: 'charger-dash', scenario: 'charger-swarm', god: true, run: 'until(() => w().enemies.some(e => e.active && e.state === "dash" && e.stateTick >= 6), 1500)', focus: 'enemy' },
+  { name: 'warden-idle', scenario: 'boss', god: true, run: 'until(() => !!first(), 300); const b = first(); near(b, 0, 70); hold({}, 2)', focus: 'enemy' },
+  { name: 'warden-windup', scenario: 'boss', god: true, run: 'until(() => !!first(), 300); const b = first(); near(b, 0, 34); until(() => b.state === "windup" && b.stateTick >= 20, 1200)', focus: 'enemy' },
+  { name: 'warden-attack', scenario: 'boss', god: true, run: 'until(() => !!first(), 300); const b = first(); near(b, 0, 34); until(() => b.state === "attack" && b.stateTick >= 2, 1200)', focus: 'enemy' },
+  { name: 'warden-recover', scenario: 'boss', god: true, run: 'until(() => !!first(), 300); const b = first(); near(b, 0, 34); until(() => b.state === "recover" && b.stateTick >= 6, 1200)', focus: 'enemy' },
   { name: 'player-hurt', scenario: 'brute-only', run: 'const b = first(); near(b, 0, 22); until(() => p().hp < 5, 400); g.step(6)' },
   { name: 'player-dead', scenario: 'brute-only', run: 'p().hp = 1; const b = first(); near(b, 0, 22); until(() => p().state === "dead", 400); g.step(40)' },
   { name: 'spawn-marker', scenario: 'wave1', run: 'until(() => w().spawnQueue.length > 0 && w().spawnQueue[0].ticksLeft < 30, 400)', focus: 'enemy' },
@@ -72,7 +85,7 @@ const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } })
 const errors: string[] = []
 page.on('pageerror', e => errors.push('pageerror: ' + e.message))
 page.on('console', message => { if (message.type() === 'error') errors.push('console: ' + message.text()) })
-await page.goto(`${url}/?scenario=empty&seed=1&mute=1&save=off`)   // never let a real save tint a pose sheet
+await page.goto(`${url}/?scenario=empty&seed=1&mute=1&save=off${actorCandidate ? '&actorCandidate=1' : ''}`)   // never let a real save tint a pose sheet
 await page.waitForFunction(() => !!(window as unknown as { __game?: unknown }).__game, null, { timeout: 15000 })
 await page.evaluate((pre) => { (window as any).__PRELUDE = pre; const g = (window as any).__game; g.pause(true); g.presenter.hud.showBanner('', '', 0) }, PRELUDE)
 

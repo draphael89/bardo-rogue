@@ -1,4 +1,6 @@
 import { Container, Graphics, Sprite, Texture } from 'pixi.js'
+import type { Atlas } from '../atlas'
+import type { Sheet } from '../sheet'
 import type { Enemy } from '@/sim/world'
 import { tuning, DT } from '@/tuning'
 import { TILE, type Arena } from '@/sim/arena'
@@ -107,6 +109,10 @@ const IGNITE_TICKS = 2.6 // how long the lock flash takes to fall back to the st
 // tremble", so no part of the floor mark - not the scorch, not a rail, not the ignition star - is
 // allowed inside the silhouette that the player has to read the crouch off.
 const BODY_CLEAR = 6
+// The authored profile is 31x21 at its widest. Its 18px half-diagonal, not only its horizontal
+// half-width, is the honest clearance for arbitrary dash angles; 15 let the white launch burst
+// reach back over the brazen leg whenever the lane was near vertical.
+const AUTHORED_BODY_CLEAR = 20
 
 // The lane's width is mechanical: charger radius + player radius. Floor stain, grout cuts and beat
 // marks all pass the same exact corridor predicate, so tile texture can add character without making
@@ -235,6 +241,21 @@ function laneClock(tk: number, lock: number): { k: number; beat: number } {
 }
 
 const lanes = new WeakMap<EntityView, Lane>()
+const chargerArt = new WeakMap<EntityView, Sheet>()
+
+export function bindChargerArt(v: EntityView, atlas: Atlas): void {
+  chargerArt.set(v, atlas.sheet('bardo_charger_east'))
+  v.markAuthoredReaction()
+}
+
+export function chargerFrameName(e: Enemy, time: number): string {
+  if (e.flash > 0 || e.state === 'stagger') return 'hurt'
+  if (e.state === 'hover') return Math.floor(time * 60 / 6) % 2 ? 'hoverB' : 'hoverA'
+  if (e.state === 'freeze') return e.stateTick < chargerLockTick() ? 'coilDraw' : 'coilLock'
+  if (e.state === 'dash') return 'lunge'
+  if (e.state === 'recover') return 'skid'
+  return 'idle'
+}
 
 function laneFor(v: EntityView): Lane {
   let lane = lanes.get(v)
@@ -258,7 +279,14 @@ export function updateChargerView(v: EntityView, e: Enemy, f: EnemyFrame, out: P
   const LOCK = chargerLockTick()
   let sx = 1, sy = 1, rot = 0, hop = 0, tint = 0xffffff
 
-  drawLane(laneFor(v), v, e, f, arena)
+  const art = chargerArt.get(v)
+  if (art) {
+    const authored = art.frame(chargerFrameName(e, time))
+    v.bindBody(authored.texture, authored.white)
+    v.body.anchor.set(authored.anchorX, authored.anchorY)
+  }
+
+  drawLane(laneFor(v), v, e, f, arena, !!art)
 
   if (e.state === 'hover') {
     if (speed > 5) { hop = Math.abs(Math.sin(time * 22)) * 1.5; sx = 1 + Math.sin(time * 22) * 0.08 }
@@ -300,6 +328,13 @@ export function updateChargerView(v: EntityView, e: Enemy, f: EnemyFrame, out: P
     sx = lerp(1.3, 1, u); sy = lerp(0.75, 1, u); rot = Math.sin(time * 8) * 0.15 * (1 - u)
   } else if (e.state === 'stagger') { rot = -e.facing * 0.5; sx = 0.9; sy = 1.1 }   // mirrored, like every other kind: the epilogue flips scale.x but never negates rotation
 
+  if (art) {
+    // The coil, launch, skid, and hurt shapes are already drawn. Keep the runtime lane and wake,
+    // but do not squash or rotate the candidate back into the legacy 16px puppet. A committed
+    // freeze may still translate by one whole pixel: that tremble communicates time without
+    // resampling the drawing.
+    sx = 1; sy = 1; rot = 0; hop = e.state === 'freeze' ? Math.round(hop) : 0; tint = 0xffffff
+  }
   out.sx = sx; out.sy = sy; out.rot = rot; out.hop = hop; out.tint = tint
 }
 
@@ -316,14 +351,15 @@ function dashPose(e: Enemy, u: number): { sx: number; sy: number; rot: number; h
 
 // ---------------------------------------------------------------- floor mark
 
-function drawLane(lane: Lane, v: EntityView, e: Enemy, f: EnemyFrame, arena: Arena): void {
+function drawLane(lane: Lane, v: EntityView, e: Enemy, f: EnemyFrame, arena: Arena,
+                  authored: boolean): void {
   lane.gm.clear()
   lane.hot.clear()
   lane.hide()
   if (e.state === 'hover') drawArmedRing(lane, e, f)
-  else if (e.state === 'freeze') { capture(lane, e, f, arena); drawTelegraph(lane, e, f, arena) }
-  else if (e.state === 'dash') drawDash(lane, v, e, f, arena)
-  else if (e.state === 'recover') drawResidue(lane, e, f)
+  else if (e.state === 'freeze') { capture(lane, e, f, arena); drawTelegraph(lane, e, f, arena, authored) }
+  else if (e.state === 'dash') drawDash(lane, v, e, f, arena, authored)
+  else if (e.state === 'recover') drawResidue(lane, e, f, authored)
 }
 
 // A ring tightens under a charger in the last ticks before it freezes: the difference between
@@ -360,7 +396,8 @@ function capture(lane: Lane, e: Enemy, f: EnemyFrame, arena: Arena): void {
   lane.len = raycastSolidDistance(arena, f.x, f.y, e.aimAngle, C.dashDist, e.radius)
 }
 
-function drawTelegraph(lane: Lane, e: Enemy, f: EnemyFrame, arena: Arena): void {
+function drawTelegraph(lane: Lane, e: Enemy, f: EnemyFrame, arena: Arena,
+                       authored: boolean): void {
   const g = lane.gm, hg = lane.hot
   const LOCK = chargerLockTick()
   const tk = f.tk
@@ -374,7 +411,7 @@ function drawTelegraph(lane: Lane, e: Enemy, f: EnemyFrame, arena: Arena): void 
   if (len <= 0.5) return
   const reach = locked ? len : Math.min(len, Math.max(BODY_CLEAR + 6, grow * len))
   // every continuous stroke starts outside the body, so the crouch is never under paint
-  const d0 = Math.max(0, Math.min(BODY_CLEAR, reach - 2))
+  const d0 = Math.max(0, Math.min(authored ? AUTHORED_BODY_CLEAR : BODY_CLEAR, reach - 2))
   const strobe = locked ? (strobeFrame(f.time) ? 1 : 0.72) : 1
   const ignite = locked ? clamp01(1 - (tk - LOCK) / IGNITE_TICKS) ** 0.7 : 0
 
@@ -391,7 +428,8 @@ function drawTelegraph(lane: Lane, e: Enemy, f: EnemyFrame, arena: Arena): void 
 //
 // The strike. Everything here exists so a single still of the lunge states speed and direction with
 // the sprite cropped out, and so the frame gets BRIGHTER at the moment the hit exists, not darker.
-function drawDash(lane: Lane, v: EntityView, e: Enemy, f: EnemyFrame, arena: Arena): void {
+function drawDash(lane: Lane, v: EntityView, e: Enemy, f: EnemyFrame, arena: Arena,
+                  authored: boolean): void {
   const g = lane.gm, hg = lane.hot
   // The lane is normally measured on the freeze frames. It is NOT safe to require that: a view can
   // be created mid-dash, and the pose/headless harnesses step the sim many ticks between renders,
@@ -410,6 +448,10 @@ function drawDash(lane: Lane, v: EntityView, e: Enemy, f: EnemyFrame, arena: Are
   const nx = -cy, ny = cx
   const hw = e.radius + tuning.player.radius
   const hx = f.x, hy = f.y
+  // The generated body needs its half-diagonal clear because it stays pixel-aligned while the lane
+  // can point anywhere; the legacy tile extends six. Keep the danger corridor and timing, but begin
+  // light outside the drawing it must explain.
+  const bodyClear = authored ? AUTHORED_BODY_CLEAR : BODY_CLEAR
   // Projected travel, not tk * speed: a charger that hits a wall stops, and a trail that kept
   // growing off a stopped body would be drawn behind the point it actually left.
   const dist = Math.max(0, (hx - ox) * cx + (hy - oy) * cy)
@@ -417,10 +459,10 @@ function drawDash(lane: Lane, v: EntityView, e: Enemy, f: EnemyFrame, arena: Are
   const blow = clamp01(1 - f.tk / 6) ** 0.7                    // the dash-start overexposure
 
   // 1. the wake, growing with the distance actually covered
-  drawWake(lane, hx, hy, cx, cy, nx, ny, Math.min(TRAIL_MAX, dist), hw, 1)
+  drawWake(lane, hx, hy, cx, cy, nx, ny, Math.min(TRAIL_MAX, dist), hw, 1, bodyClear)
 
   // 2. the afterimages and the white copy riding the body itself
-  drawGhosts(lane, v, e, f, cx, cy, dist, 1)
+  drawGhosts(lane, v, e, f, cx, cy, dist, 1, authored)
 
   // 3. the unspent telegraph burns off ahead of the charger over six ticks. It is the handoff: the
   //    warning is spent, the trail has the frame now. Leaving it lit for the whole lunge would keep
@@ -436,13 +478,13 @@ function drawDash(lane: Lane, v: EntityView, e: Enemy, f: EnemyFrame, arena: Are
   //     lunge is dark: the trail cannot exist yet (there is nothing behind the charger to draw) and
   //     the telegraph has been spent, so the strike would open on its dimmest frames.
   const launch = clamp01(1 - f.tk / LAUNCH_TICKS) ** 0.8
-  if (launch > 0.02) burst(hg, ox + cx * (BODY_CLEAR + 1), oy + cy * (BODY_CLEAR + 1), 6 + launch * 13, 0.6 * launch, WHITE, cx, cy)
+  if (launch > 0.02) burst(hg, ox + cx * (bodyClear + 1), oy + cy * (bodyClear + 1), 6 + launch * 13, 0.6 * launch, WHITE, cx, cy)
 
   // 4. the leading edge. Two white chevrons ahead of the body - the same mark the telegraph counts
   //    its beats with, so the strike is written in the vocabulary the tell already taught - plus the
   //    overexposed star for the four ticks in which the hit exists. Ahead of the body, never over
   //    it: a flash centred on the sprite erases the pose the strike is made of.
-  drawHead(g, hg, hx, hy, cx, cy, nx, ny, hw, blow, f.time, 1)
+  drawHead(g, hg, hx, hy, cx, cy, nx, ny, hw, blow, f.time, 1, bodyClear)
 }
 
 // The trail: six additive bands from the head back along the travel axis, tapering from the true
@@ -453,12 +495,12 @@ function drawDash(lane: Lane, v: EntityView, e: Enemy, f: EnemyFrame, arena: Are
 // crouched, stretched silhouette is the thing the player reads the strike off, and a trail drawn
 // over its own author is the opaque-plank mistake again, only moving.
 function drawWake(lane: Lane, hx: number, hy: number, cx: number, cy: number, nx: number, ny: number,
-                  L: number, hw: number, k: number): void {
+                  L: number, hw: number, k: number, bodyClear = BODY_CLEAR): void {
   if (L < 3 || k <= 0.02) return
   const g = lane.gm, hg = lane.hot
   const ang = Math.atan2(cy, cx)
-  const bx = hx - cx * BODY_CLEAR, by = hy - cy * BODY_CLEAR   // where the trail is allowed to begin
-  const run = L - BODY_CLEAR
+  const bx = hx - cx * bodyClear, by = hy - cy * bodyClear     // where the trail is allowed to begin
+  const run = L - bodyClear
   if (run < 2) return
   // Narrow. A glow as wide as the danger lane stacks into a soft plume and the charger reads as
   // being on fire rather than as moving fast; the speed is in the STREAK, not in the volume.
@@ -505,33 +547,43 @@ function drawWake(lane: Lane, hx: number, hy: number, cx: number, cy: number, nx
 // Afterimages, spaced by distance so they separate at 2.7 px a tick, each wearing the pose the body
 // held where it stands. Descending palette behind an additive white copy on the body itself: the
 // charger is the top of the palette and everything behind it is cooling.
-function drawGhosts(lane: Lane, v: EntityView, e: Enemy, f: EnemyFrame, cx: number, cy: number, dist: number, k: number): void {
+function drawGhosts(lane: Lane, v: EntityView, e: Enemy, f: EnemyFrame, cx: number, cy: number,
+                    dist: number, k: number, authored: boolean): void {
   const step = tuning.charger.dashSpeed * DT
   const feet = e.radius + 1
   const dashTicks = Math.max(1, e.dashTicks)
   for (let i = 0; i < GHOSTS; i++) {
     const s = lane.ghosts[i]
     const back = (i + 1) * GHOST_STEP
-    const a = GHOST_ALPHA[i] * k * clamp01(dist / back)         // fades in as the room behind it opens
+    const a = GHOST_ALPHA[i] * (authored ? 0.35 : 1) * k * clamp01(dist / back)
     s.visible = a > 0.02
     if (!s.visible) continue
-    const p = dashPose(e, (f.tk - back / step) / dashTicks)
+    const p = authored ? { sx: 1, sy: 1, rot: 0, hop: 0 }
+      : dashPose(e, (f.tk - back / step) / dashTicks)
     s.texture = v.body.texture
+    s.anchor.copyFrom(v.body.anchor)
     s.position.set(Math.round(f.x - cx * back), Math.round(f.y - cy * back + feet - p.hop))
     s.scale.set(p.sx * e.facing, p.sy)
     s.rotation = p.rot
     s.tint = GHOST_TINT[i]
     s.alpha = a
   }
-  const p = dashPose(e, f.tk / dashTicks)
+  const p = authored ? { sx: 1, sy: 1, rot: 0, hop: 0 } : dashPose(e, f.tk / dashTicks)
   const hgl = lane.headGlow
   hgl.texture = v.body.texture
+  hgl.anchor.copyFrom(v.body.anchor)
   hgl.position.set(Math.round(f.x), Math.round(f.y + feet - p.hop))
   hgl.scale.set(p.sx * e.facing, p.sy)
   hgl.rotation = p.rot
   hgl.tint = WHITE
-  hgl.alpha = 0.20 * k
-  hgl.visible = true
+  // The legacy tile needs an additive white copy to become a moving danger volume. The authored
+  // body needs the opposite: one normal-blend copy after this lane's heat, so its mask and brazen
+  // leg remain themselves through the exact overlap tick. Without it, arbitrary-angle rails can be
+  // geometrically outside the sprite and still composite over it; the signature body disappeared
+  // at the only moment it actually touched the player.
+  hgl.blendMode = authored ? 'normal' : 'add'
+  hgl.alpha = (authored ? 0.96 : 0.20) * k
+  hgl.visible = authored || k > 0.02
 }
 
 // The leading edge: a white chevron front riding just ahead of the charger, and - only on the ticks
@@ -539,24 +591,27 @@ function drawGhosts(lane: Lane, v: EntityView, e: Enemy, f: EnemyFrame, cx: numb
 // 3-frame clock as the telegraph's strobe, so it still reads as alive on a strip sampled every
 // 2 ticks and never aliases to a still.
 function drawHead(g: Graphics, hg: Graphics, hx: number, hy: number, cx: number, cy: number,
-                  nx: number, ny: number, hw: number, blow: number, time: number, k: number): void {
+                  nx: number, ny: number, hw: number, blow: number, time: number, k: number,
+                  bodyClear = BODY_CLEAR): void {
   const flick = (Math.floor(time * 60) % 3) * 0.8
-  const d = hw - 1 + flick
+  const d = Math.max(hw - 1, bodyClear) + flick
   for (let i = 0; i < 2; i++) chevron(g, hx, hy, cx, cy, nx, ny, d - i * 2.5, hw - 3, 1)
   g.fill({ color: EDGE, alpha: 0.7 * k })
   for (let i = 0; i < 2; i++) chevron(hg, hx, hy, cx, cy, nx, ny, d - i * 2.5, hw - 3, 0)
   hg.fill({ color: WHITE, alpha: (0.9 - 0.25 * (flick > 0 ? 1 : 0)) * k })
-  burst(hg, hx + cx * (hw - 1), hy + cy * (hw - 1) - 2, 4 + flick * 0.6 + blow * 11, (0.34 + 0.3 * blow ** 0.6) * k, WHITE, cx, cy)
+  burst(hg, hx + cx * (bodyClear + 2), hy + cy * (bodyClear + 2) - 2,
+    4 + flick * 0.6 + blow * 11, (0.34 + 0.3 * blow ** 0.6) * k, WHITE, cx, cy)
 }
 
 // The aftermath: the wake stays where the lunge ended and cools over ten recover ticks, so the
 // charger's most dangerous ten ticks do not end on a cut.
-function drawResidue(lane: Lane, e: Enemy, f: EnemyFrame): void {
+function drawResidue(lane: Lane, e: Enemy, f: EnemyFrame, authored: boolean): void {
   const k = clamp01(1 - f.tk / RESIDUE_TICKS) ** 0.8
   if (k <= 0.02 || lane.endDist <= 2) return
   const cx = Math.cos(lane.ang), cy = Math.sin(lane.ang)
   drawWake(lane, lane.endX, lane.endY, cx, cy, -cy, cx,
-    Math.min(TRAIL_MAX, lane.endDist), e.radius + tuning.player.radius, k * 0.85)
+    Math.min(TRAIL_MAX, lane.endDist), e.radius + tuning.player.radius, k * 0.85,
+    authored ? AUTHORED_BODY_CLEAR : BODY_CLEAR)
 }
 
 // ---------------------------------------------------------------- primitives

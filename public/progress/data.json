@@ -1,10 +1,14 @@
 {
   "title": "Bardo Rogue",
   "subtitle": "First Gate: one consequential fork, a town that remembers",
-  "updated": "2026-08-30T16:24:30-04:00",
-  "now": "chosen-sentence-human-gate",
-  "round": 8,
+  "updated": "2026-08-30T20:13:04-04:00",
+  "now": "opening-art-candidate-human-gate",
+  "round": 9,
   "timeline": [
+    {
+      "t": "20:13",
+      "text": "Opening-art phase 2 reaches its first human Look gate. Source-to-target texel parity is now asserted for every authored sheet; colour placement and class-relative detail density are blocking compile gates; rejected candidates can carry hash-verified reasons and manifests. The Veteran rig emits one breathing frame and a three-beat sword acquisition across unarmed reach, armed contact, and armed settle. Eight candidate sheets clear 2,154 gates with zero blocking findings and six measured weapon-apex waivers. The live pickup has already lost its flash, particle ring, banner, soft rack glow, and second bell; one hard steel specular leads into the authored poses while the Gate still opens on the authoritative event tick. Typecheck, 967 tests in 82 files, and the room gate pass. The new masters remain in .art-cache: Look and art approval still belong to the user, and the audit score is unchanged until they ship and play in-engine."
+    },
     {
       "t": "16:11",
       "text": "The Chosen Sentence reaches its human gate. Every live descent uses the First Gate; its physical fork says CUT or COMMIT and carries that choice through an authored branch, the Cocytus echo and reward, Minos's opener, and one Smith line on return. Remembrances count rooms cleared, not doors crossed, and a lost run can no longer keep burning or killing behind its verdict. 906 tests pass; build and browser smoke pass; 100/100 seeds resolve with kite 80% and naive 0%. The larger map stays held until attended play proves this choice is readable and worth replaying."

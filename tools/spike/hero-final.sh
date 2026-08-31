@@ -3,8 +3,9 @@
 #
 #   bash tools/spike/hero-final.sh
 #
-# Renders the UNARMED body (14 cells: idle, 8-frame run, and §8's shared body grammar) and the
-# GREATSWORD family (29 cells: the same body, carrying the blade, plus the three attack chains the
+# Renders the UNARMED body (16 cells: breathing idle, 8-frame run, pickup anticipation and §8's
+# shared body grammar) and the GREATSWORD family (32 cells: the same living body, pickup contact /
+# settle, carrying the blade, plus the three attack chains the
 # sim declares — light .0, light .1, heavy .2), assembles both, compiles all six sheets through the
 # real gates, and writes the 1× floor contact sheet and 1× black test for each.
 #
@@ -89,10 +90,10 @@ fi
   echo "HERO-FINAL GATE REPORT — $(date '+%Y-%m-%d %H:%M:%S')"
   echo "Reproduce: bash tools/spike/hero-final.sh"
   echo
-  echo "== UNARMED (14 cells: idle, 8-frame run, hurt/death/dodge/fall/land) =="
+  echo "== UNARMED (16 cells: breathing idle, 8-frame run, pickup anticipation, shared grammar) =="
   node tools/spike/report.mjs --dir "$ROOT/unarmed" --prefix spike_veteran_unarmed
   echo
-  echo "== GREATSWORD (29 cells: the same body carrying the blade + light .0, light .1, heavy .2) =="
+  echo "== GREATSWORD (32 cells: breathing idle, pickup contact/settle + light .0, light .1, heavy .2) =="
   node tools/spike/report.mjs --dir "$ROOT/greatsword" --prefix spike_veteran
   echo
   echo "== WAIVERS CARRIED (every one measured on this run) =="

@@ -751,6 +751,61 @@ POSES = {
         ("R", "shinR", "X", 4), ("R", "shinL", "X", 4),
         ("T", "pelvis", (0, 0, -0.3)),
     ],
+    # One inhalation frame is enough to make stillness alive without turning the Veteran into a
+    # metronome. The feet do not move; breath travels through the barrel trunk and heavy shoulders.
+    # Its clip holds the base pose for most of the cycle, then briefly visits this compressed shape.
+    "idleBreath": BASE + [
+        ("R", "upperArmR", "Y", -3), ("R", "upperArmL", "Y", 3),
+        ("R", "thighR", "X", -2), ("R", "thighL", "X", -2),
+        ("R", "shinR", "X", 4), ("R", "shinL", "X", 4),
+        ("R", "chest", "X", -2), ("R", "head", "X", 1),
+        ("T", "pelvis", (0, 0.15, -0.8)),
+    ],
+    # The approach beat is authored on the unarmed body. He lowers his centre, looks toward the
+    # rack and reaches with the sword hand; the silhouette anticipates acquisition before the sim's
+    # contact event changes families. This is a pose, not a proximity glow.
+    "pickupAnticipate": BASE + [
+        ("R", "thighR", "X", -5), ("R", "shinR", "X", 9),
+        ("R", "thighL", "X", -4), ("R", "shinL", "X", 8),
+        ("R", "pelvis", "Z", 7), ("R", "spine", "Z", 10),
+        ("R", "spine", "X", 8), ("R", "chest", "X", -4),
+        ("R", "head", "X", 8), ("R", "head", "Z", -8),
+        ("A", "upperArmR", (0.50, -0.68, -0.34)),
+        ("A", "foreArmR", (0.66, -0.62, -0.22)),
+        ("A", "handR", (0.78, -0.48, -0.12)),
+        ("A", "upperArmL", (-0.28, -0.42, -0.78)),
+        ("A", "foreArmL", (-0.20, -0.58, -0.74)),
+        ("T", "pelvis", (0, 0.6, -0.3)),
+    ],
+    # Contact and consequence live in the greatsword family: the blade exists on the exact frame
+    # the Gate opens, then its weight draws the body into the first armed stance. Neither receives
+    # CARRY below; their two-handed grips are authored here.
+    "pickupContact": BASE + [
+        ("R", "thighR", "X", -20), ("R", "shinR", "X", 29),
+        ("R", "thighL", "X", -13), ("R", "shinL", "X", 23),
+        ("R", "pelvis", "Z", 4), ("R", "spine", "Z", 20),
+        ("R", "spine", "X", 6), ("R", "chest", "X", -3),
+        ("R", "head", "X", 9), ("R", "head", "Z", -5),
+        ("A", "upperArmR", (0.30, -0.72, -0.42)),
+        ("A", "foreArmR", (0.38, -0.74, -0.42)),
+        ("A", "handR", (0.28, -0.30, 0.91)),
+        ("A", "upperArmL", (-0.10, -0.68, -0.56)),
+        ("A", "foreArmL", (0.08, -0.78, -0.46)),
+        ("T", "pelvis", (0, 0.3, -0.6)),
+    ],
+    "pickupSettle": BASE + [
+        ("R", "thighR", "X", -10), ("R", "shinR", "X", 17),
+        ("R", "thighL", "X", -7), ("R", "shinL", "X", 14),
+        ("R", "pelvis", "Z", -4), ("R", "spine", "Z", -7),
+        ("R", "spine", "X", 5), ("R", "chest", "X", -3),
+        ("R", "head", "X", 4), ("R", "head", "Z", 4),
+        ("A", "upperArmR", (0.36, -0.42, 0.72)),
+        ("A", "foreArmR", (0.30, -0.46, 0.78)),
+        ("A", "handR", (0.18, 0.78, 0.60)),
+        ("A", "upperArmL", (0.18, -0.50, 0.70)),
+        ("A", "foreArmL", (0.12, -0.54, 0.76)),
+        ("T", "pelvis", (0, -0.2, -0.5)),
+    ],
     **{f"run{i}": run_frame(i) for i in range(8)},
     # The greatsword arc: anticipation -> commit -> impact -> follow-through -> recovery (CF SS5).
     # Arms and wrists are AIMED at armature-space directions (blade extends along the hand bone),
@@ -1093,7 +1148,7 @@ if WEAPON == "greatsword":
         ],
     })
     # Every non-attack cell carries the shouldered blade.
-    for _n in ["idle"] + [f"run{i}" for i in range(8)] + GRAMMAR:
+    for _n in ["idle", "idleBreath"] + [f"run{i}" for i in range(8)] + GRAMMAR:
         POSES[_n] = POSES[_n] + CARRY
 
 if WEAPON == "dagger":
@@ -1150,10 +1205,12 @@ if WEAPON == "dagger":
 
 DAGGER_ARC = ["swingAnticipate", "swingCommit", "swingImpact", "swingFollow", "swingRecover"]
 GS_ARCS = ["light1" + s for s in ARC] + ["light2" + s for s in ARC] + ["heavy" + s for s in ARC]
-# What the family's non-locomotion cells hold. The greatsword carries BOTH the shared grammar and
-# three attack chains: 1 + 8 + 5 + 15 = 29 cells, which is why its grid is 6x5 and not 4x4.
-ACTION_FRAMES = (GRAMMAR if WEAPON == "none" else
-                 DAGGER_ARC if WEAPON == "dagger" else GRAMMAR + GS_ARCS)
+# What the family's non-locomotion cells hold. The pickup crosses families: the unarmed reach is
+# anticipation; contact and settle belong to the greatsword that appears on the event tick.
+PICKUP_FRAMES = (["pickupAnticipate"] if WEAPON == "none" else
+                 ["pickupContact", "pickupSettle"] if WEAPON == "greatsword" else [])
+ACTION_FRAMES = (PICKUP_FRAMES + GRAMMAR if WEAPON == "none" else
+                 DAGGER_ARC if WEAPON == "dagger" else PICKUP_FRAMES + GRAMMAR + GS_ARCS)
 # ROLL is rendered by every family that has a body, but it is assembled into its OWN sheet, so it is
 # appended AFTER the action block rather than folded into it — that is what leaves the body sheets'
 # cell counts (and every gate number measured on them) exactly where they were.
@@ -1163,7 +1220,7 @@ ACTION_FRAMES = (GRAMMAR if WEAPON == "none" else
 # weapon. Rendering it armed also fails on its own terms — a greatsword carried through a tuck
 # throws `bladeTip` to art-px (42.7, 71.3), outside the 64px cell, and CARRY forbids answering that
 # by hiding the blade for four cells.
-FRAME_ORDER = (["idle"] + [f"run{i}" for i in range(8)] + ACTION_FRAMES
+FRAME_ORDER = (["idle", "idleBreath"] + [f"run{i}" for i in range(8)] + ACTION_FRAMES
                + (ROLL if WEAPON == "none" else []))
 ATTACK_FRAMES = {f for f in FRAME_ORDER if f in DAGGER_ARC or f in GS_ARCS}
 # The blade is drawn in EVERY cell of an armed family (see CARRY), not only during the attack.

@@ -262,7 +262,6 @@ export function playEventSfx(a: AudioSystem, ev: SimEvent, listener?: Readonly<{
       break
     case 'weaponPrepared':
       a.play('swordMetal', { ...at, gain: 0.72, pitch: 1.05, bus: 'ui' })
-      a.bell(0.48, 329.63, 1.7, 'music', 0.08)
       break
     case 'runStarted':
       a.bell(0.55, 146.83, 2.2)

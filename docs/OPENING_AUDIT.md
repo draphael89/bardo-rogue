@@ -6,6 +6,11 @@ from the approval package, and the orchestrator's own 1× judgement of every sta
 
 Graded against excellent shipped indie games, not against the placeholder it replaced.
 
+**Execution note, 2026-08-30:** source/target parity, colour-placement, detail-density and rejection
+receipts are now implemented. A rig-emitted breathing idle plus reach/contact/settle pickup candidate
+clears all 2,154 applicable gates with six measured weapon-apex waivers. It remains in `.art-cache`
+pending human Look and approval, so the scorecard below is intentionally not regraded yet.
+
 ---
 
 ## 1. Executive verdict

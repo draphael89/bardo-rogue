@@ -13,6 +13,7 @@ export interface TilemapView {
   sprite: Sprite
   door: Container
   setDoorOpen(open: boolean): void
+  setRackProximity(amount: number): void
   /**
    * The cleared room's payout, which does not exist when the room is built — `shrine.ts` lights it
    * on the clear. Reads `arena.shrine` off the same arena object this view was built from, so the
@@ -245,15 +246,13 @@ function inStamp(x: number, y: number): boolean {
   return sy >= 0 && sy < STAMP_H && sx >= 0 && sx < STAMP_W && LIFE_STAMP[sy][sx] === 'X'
 }
 
-function makeRackCluster(rack: ArenaRack): { root: Container; sync(taken: boolean): void } {
+function makeRackCluster(rack: ArenaRack): { root: Container; sync(taken: boolean): void; proximity(amount: number): void } {
   const root = new Container()
   root.position.set(rack.x, rack.y)
-  const glow = new Graphics()
   const rackG = new Graphics()
-  root.addChild(glow, rackG)
+  const specular = new Graphics()
+  root.addChild(rackG, specular)
   const paint = (taken: boolean) => {
-    glow.clear()
-    glow.circle(0, 0, taken ? 14 : 22).fill({ color: taken ? 0x58402c : 0xff9a38, alpha: taken ? 0.06 : 0.16 })
     rackG.clear()
     // Three stone rests establish future weapon slots; only the centre carries steel.
     markPx(rackG, -25, 10, 50, 4, 0x09080d)
@@ -269,7 +268,20 @@ function makeRackCluster(rack: ArenaRack): { root: Container; sync(taken: boolea
     }
   }
   paint(false)
-  return { root, sync: paint }
+  return {
+    root,
+    sync(taken) {
+      paint(taken)
+      if (taken) specular.clear()
+    },
+    proximity(amount) {
+      specular.clear()
+      if (amount <= 0) return
+      // One hard-edged reflected line, on the steel itself. This is proximity feedback without a
+      // glow field, particle, or icon: the nearby hero supplies the light and the blade answers.
+      specular.rect(-4, -10, 8, 1).fill({ color: 0xfff0c8, alpha: Math.min(0.9, 0.18 + amount * 0.72) })
+    },
+  }
 }
 
 /**
@@ -1130,6 +1142,9 @@ export function buildTilemap(renderer: Renderer, atlas: Atlas, arena: Arena, flo
       gift?.sync(!!arena.offeringTaken)
       rack?.sync(!!arena.rackTaken)
       shrine?.sync(!!arena.shrineTaken)
+    },
+    setRackProximity(amount) {
+      rack?.proximity(arena.rackTaken ? 0 : Math.max(0, Math.min(1, amount)))
     },
     lightShrine() {
       if (shrine || !arena.shrine) return

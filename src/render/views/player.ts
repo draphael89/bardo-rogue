@@ -32,6 +32,7 @@ const playerArt = new WeakMap<EntityView, PlayerArt>()
 type ClipSelection = { key: string; direction: HeroDirection; stateTick: number }
 const clipSelection = new WeakMap<EntityView, ClipSelection>()
 const freeDirection = new WeakMap<EntityView, HeroDirection>()
+export type PlayerPoseOverride = { frame: 'pickupAnticipate' | 'pickupContact' | 'pickupSettle'; angle: number }
 
 // Clip names in play order: swings[i] maps to SWING_CLIPS[i] in every armed sidecar.
 const SWING_CLIPS = ['light1', 'light2', 'heavy'] as const
@@ -64,11 +65,16 @@ function requireRollClip(sheet: Sheet): Sheet {
   return sheet
 }
 
-export function heroFrameName(sheet: Sheet, p: Player, world: World, time: number): string {
+export function heroFrameName(sheet: Sheet, p: Player, world: World, time: number, overrideFrame?: string): string {
   const clips = sheet.def.clips!
+  // Candidate pickup frames can be wired before their human-approved masters replace the current
+  // sheets. Until that promotion, the live family remains complete and the override is inert.
+  if (overrideFrame && sheet.has(overrideFrame)) return overrideFrame
   if (p.state === 'dead') return 'dead'
   if (p.state === 'hurt' || p.flash > 0) return 'hurt'
-  if (p.state === 'free') return Math.hypot(p.vx, p.vy) > 10 ? tickClipFrame(clips.run, time) : 'idle'
+  if (p.state === 'free') return Math.hypot(p.vx, p.vy) > 10
+    ? tickClipFrame(clips.run, time)
+    : clips.idle ? tickClipFrame(clips.idle, time) : 'idle'
   if (p.state === 'dodge') return dodgeClipFrame(clips.dodge, tuning.player.dodge, p.stateTick)
   if (p.state !== 'attack' || armOf(world) !== ARM.blade) return 'idle'
   // Timing comes from tuning, never from the sheet: the frame is a function of where stateTick sits
@@ -191,7 +197,7 @@ export function updatePlayerRim(v: EntityView, on: boolean, color: number): void
   }
 }
 
-export function updatePlayerView(v: EntityView, p: Player, world: World, alpha: number, time: number): void {
+export function updatePlayerView(v: EntityView, p: Player, world: World, alpha: number, time: number, pose?: PlayerPoseOverride): void {
   const P = tuning.player
   const x = lerp(p.px, p.x, alpha), y = lerp(p.py, p.y, alpha)
   const feetY = y + p.radius + 1
@@ -199,7 +205,8 @@ export function updatePlayerView(v: EntityView, p: Player, world: World, alpha: 
   let verticalRollFrame = -1
   const b = v.body
   const bladeEquipped = armOf(world) === ARM.blade && p.armed
-  const heroDirection = authoredDirectionFor(v, p)
+  const heroDirection = pose ? nearestHeroDirection(pose.angle) : authoredDirectionFor(v, p)
+  if (pose) freeDirection.set(v, heroDirection)
   const art = playerArt.get(v)!
   const hero = (bladeEquipped ? art.armed : art.unarmed)[heroDirection]
 
@@ -213,7 +220,7 @@ export function updatePlayerView(v: EntityView, p: Player, world: World, alpha: 
     b.anchor.set(frame.anchorX, frame.anchorY)
     hop = VERTICAL_ROLL_HOP[verticalRollFrame]
   } else {
-    const frame = hero.sheet.frame(heroFrameName(hero.sheet, p, world, time))
+    const frame = hero.sheet.frame(heroFrameName(hero.sheet, p, world, time, pose?.frame))
     v.bindBody(frame.texture, frame.white)
     b.anchor.set(frame.anchorX, frame.anchorY)
   }

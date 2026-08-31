@@ -18,6 +18,18 @@ smoke through both endings, and 100/100 seeds for both policies (kite 80% wins, 
 attended human fun/readability gate remains deliberately open; do not expand this into the larger
 map, economy, encounter-director, or environmental-rule proposals before that evidence exists.
 
+**Revision 5 — opening-art foundation, phase 2.** The authored-sheet contract now has a direct
+source-to-target parity regression, every shipped art spec names a colour-placement profile, and
+detail-density is a blocking class-relative gate. Rejected candidates can be preserved with a hash,
+reason and optional generation manifest. The Veteran rig now emits a two-frame breathing idle and a
+three-beat acquisition across the unarmed and greatsword families; all eight candidate sheets clear
+2,154 gates with zero blocking findings and six measured weapon-apex waivers. The live pickup has
+already shed its flash, particle ring, banner and second bell in favour of one hard blade specular,
+the authored reach/contact/settle selector, and the Gate opening on the existing event tick. The new
+masters remain in `.art-cache`: human Look and `pnpm art approve` are still required before the
+frames can replace the eight receipted production masters. Current proof is typecheck, **967 tests in
+82 files**, and `pnpm room:gate`; pinned replay fixtures remain green inside the suite.
+
 ---
 
 # Bardo Vertical Slice Plan (historical header)
@@ -31,6 +43,17 @@ map, economy, encounter-director, or environmental-rule proposals before that ev
 ---
 
 ## STATUS — what has since been built
+
+**Opening-art phase 2 (2026-08-30).** The technical blind spots named by the opening audit are now
+executable contracts: authored sheets assert 1:1 source/target texels after `worldScale`, palette
+grammar constrains each colour's worst-frame share and footprint, floor/prop/character surface churn
+has class caps, and rejection receipts preserve why a candidate failed. The first visible candidate
+purchase is equally narrow: one extra idle drawing and three pickup drawings, all rig-authored with
+computed pivots and sockets. The sword moment has anticipation before sim contact, five ticks of
+contact, nine ticks of settle, one physical sound, and the already-authoritative Gate response; it
+does not stop or mutate the sim. Evidence lives under `.art-cache/spike/hero-final/`. The candidate
+is gated, not approved or shipped, so the audit's animation and experience scores are deliberately
+unchanged pending human Look and an in-engine pass on promoted assets.
 
 **The hero the renderer can load (2026-08-30, late).** The staged hero candidate was immaculate and
 uninstallable: `src/render/views/player.ts` demands clips `run, dodge, light1, light2, heavy`, frames

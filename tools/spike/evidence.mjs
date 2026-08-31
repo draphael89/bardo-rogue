@@ -110,6 +110,8 @@ async function label(text, w, h = 16) {
   const strips = Object.entries(sheets.south.def.clips ?? {})
     .filter(([name]) => name !== 'run')
     .map(([name, c]) => [name, c.frames, c.sim?.ref ?? c.timing])
+  const pickup = FRAMES.filter(name => name.startsWith('pickup'))
+  if (pickup.length) strips.unshift(['pickup', pickup, 'presentation beat'])
   if (!strips.length) strips.push([LABEL, FRAMES.slice(9), 'ticks'])
   for (const [name, frames, ref] of strips) {
     for (const f of FACINGS) {

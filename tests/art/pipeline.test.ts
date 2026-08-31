@@ -518,6 +518,27 @@ describe('review findings', () => {
     expect(south.frames[runtimeKey].i).toBe(21)
   })
 
+  it('plays an authored breathing idle and lets an available pickup pose own its beat', () => {
+    const world = createWorld(1, 'empty')
+    world.player.state = 'free'
+    world.player.vx = world.player.vy = 0
+    const def = {
+      clips: {
+        idle: { frames: ['idle', 'idleBreath'], timing: 'ticks', ticks: [68, 14], loop: true },
+        run: { frames: ['run0'], timing: 'ticks', ticks: [4], loop: true },
+      },
+    }
+    const sheet = {
+      def,
+      has: (name: string) => ['idle', 'idleBreath', 'pickupAnticipate'].includes(name),
+    } as unknown as Parameters<typeof heroFrameName>[0]
+    expect(heroFrameName(sheet, world.player, world, 0)).toBe('idle')
+    expect(heroFrameName(sheet, world.player, world, 68 / 60)).toBe('idleBreath')
+    expect(heroFrameName(sheet, world.player, world, 0, 'pickupAnticipate')).toBe('pickupAnticipate')
+    // Candidate wiring is inert until the named frame exists in a human-approved sheet.
+    expect(heroFrameName(sheet, world.player, world, 0, 'pickupContact')).toBe('idle')
+  })
+
   it('pose fit preserves aspect instead of stretching a cropped silhouette', async () => {
     // A tall, narrow bar on a green matte inside a WIDE cell. Fitting its crop to a square cell by
     // mapping width and height independently would square it up; the whole point of `fit: "pose"` is

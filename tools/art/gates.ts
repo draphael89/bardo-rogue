@@ -331,14 +331,20 @@ export function runGates(ctx: GateContext): GateResult[] {
         if (!rule || !colors[name]) continue
         const hex = colors[name].hex
         let share = 0, bboxW = 0, bboxH = 0
+        let shareFrame = '', bboxWFrame = '', bboxHFrame = ''
         for (const s of stats) {
-          share = Math.max(share, s.opaque ? (s.hist.get(hex) ?? 0) / s.opaque : 0)
+          const frameShare = s.opaque ? (s.hist.get(hex) ?? 0) / s.opaque : 0
+          if (frameShare > share) { share = frameShare; shareFrame = s.name }
           const b = s.colourBounds.get(hex)
-          if (b) { bboxW = Math.max(bboxW, b.w / def.cell); bboxH = Math.max(bboxH, b.h / def.cell) }
+          if (b) {
+            const w = b.w / def.cell, h = b.h / def.cell
+            if (w > bboxW) { bboxW = w; bboxWFrame = s.name }
+            if (h > bboxH) { bboxH = h; bboxHFrame = s.name }
+          }
         }
         const ok = share <= rule.maxShare && bboxW <= rule.maxWidth && bboxH <= rule.maxHeight
         add(`colour-placement:${name}`, ok,
-          `max share ${(share * 100).toFixed(1)}%/${(rule.maxShare * 100).toFixed(1)}%, bbox ${(bboxW * 100).toFixed(1)}x${(bboxH * 100).toFixed(1)}%/${(rule.maxWidth * 100).toFixed(1)}x${(rule.maxHeight * 100).toFixed(1)}%`,
+          `max share ${(share * 100).toFixed(1)}%/${(rule.maxShare * 100).toFixed(1)}% (${shareFrame || 'none'}), bbox ${(bboxW * 100).toFixed(1)}x${(bboxH * 100).toFixed(1)}%/${(rule.maxWidth * 100).toFixed(1)}x${(rule.maxHeight * 100).toFixed(1)}% (${bboxWFrame || 'none'} / ${bboxHFrame || 'none'})`,
           'fail', 'OPENING_AUDIT §7 Article II')
       }
     }

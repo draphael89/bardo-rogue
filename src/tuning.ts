@@ -33,6 +33,10 @@ export const tuning = {
     // A room that fits the viewport collapses the clamp range (camera.ts clampFocus) and is
     // centred exactly, which is what keeps today's rooms static under the same code path.
     camera: { followLerp: 0.12, lookahead: 4, lookaheadLerp: 0.08 },
+    // Presentation-only staging around the Bardo rack. The sim still owns contact at rackRadius;
+    // these values only decide when the authored reach appears and how long the acquired blade's
+    // contact / settle drawings hold. They never pause input or enter replay state.
+    pickup: { anticipateRadius: 30, contactTicks: 5, settleTicks: 9 },
   },
 
   player: {

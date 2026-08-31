@@ -234,11 +234,15 @@ function slabPiece(f: Ramp, hx: 'L' | 'M' | 'R', vy: 'T' | 'B', v: 0 | 1): Uint8
 // ---------------------------------------------------------------------------
 function matTile(part: 'body' | 'north' | 'south'): Uint8Array {
   const t = makeTile()
+  // A FLAT FIELD, because at 16 px logical the weave is below the resolution that can carry it.
+  // Measured: the old 3px checker ran this tile at 38.1% edge density against 9.9% for the floor it
+  // lies on — four times its own ground's energy, which at 1.5x reads as moire, not cloth. Weft
+  // banding was tried next and measured 38.6%: no better, because ANY alternation at 2-4px across a
+  // full cell keeps the transition count high whatever axis it runs on. What actually reads as cloth
+  // here is what reads as cloth on the floor beside it — one value, carrying its form in the folds
+  // and a scatter of slubs. The runner is a colour and a drape, not a texture swatch.
   for (let y = 0; y < ROOM_CELL; y++) for (let x = 0; x < ROOM_CELL; x++) {
-    // A quiet 3px weave at source density. The old logical weave expanded into alternating
-    // 3/4px squares and read as a checkerboard before it read as cloth.
-    const weave = ((Math.floor(x / 3) + Math.floor(y / 3)) & 1) === 0
-    t.pixel(x, y, weave ? P.purple0 : P.purple1)
+    t.pixel(x, y, hash(x, y, 61) % 17 === 0 ? P.purple0 : P.purple1)
   }
   // Three broken folds converge rather than forming vertical rails.
   for (const [fx, sign] of [[5, 1], [13, -1], [18, 1]] as const) {

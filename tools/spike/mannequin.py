@@ -179,7 +179,14 @@ MAT_STEEL = make_mat("steel", canon_srgb("#A8AFBE"), rough=0.45, spec=0.12)   # 
 # keeps "bright metal owns the top of the torso" and the two-segment wear break, and gives the top
 # of the ramp to the brow instead.
 MAT_RIM = make_mat("rim", canon_srgb("#8A92A2"), rough=0.45, spec=0.12)       # -> brickLo / brick
-MAT_BLADE = make_mat("blade", canon_srgb("#C0C6D4"), rough=0.45, spec=0.12)   # -> brickHi / cope
+# THE BLADE IS `brickHi`, NOT `cope`, and the placement profile is what says so. In `veteran`,
+# cope allows 14.3% share in a 37.5x37.5% box while brickHi allows 22.6% in 76.6x67.2% -- cope is
+# budgeted as a POINT (the brow the ramp's top was handed to in 0f4b88b) and brickHi is budgeted as
+# a STREAK. The old one-slab blade rendered 207-215 everywhere and spent 12.4% of a 14.3% cope
+# budget on a 23px bar, which is the hero's own face money. Dropping the body to #B0B6C2 renders it
+# brickHi and leaves cope to a thin lit bevel, where a highlight belongs.
+MAT_BLADE = make_mat("blade", canon_srgb("#B0B6C2"), rough=0.45, spec=0.12)   # -> brick / brickHi
+MAT_BLADE_HI = make_mat("bladeHi", canon_srgb("#C6CCDA"), rough=0.45, spec=0.12)  # -> cope, lit bevel only
 MAT_BONE = make_flat("boneFlat", canon_srgb("#90806C"))       # boneDim, Weber +2.93
 MAT_GOLD = make_flat("goldFlat", canon_srgb("#D4B060"))       # gold, exactly twice per body
 MAT_SLIT = make_flat("slitFlat", canon_srgb("#0A0C12"))       # mortar: the face slit and nape band
@@ -548,6 +555,80 @@ if WEAPON != "none":
         sword.append(o)
         return o
 
+    def sword_prism(name, section, rings, mat, strip_mats=None):
+        """A lofted blade: `section` is a closed 2D profile in (across, depth); `rings` are
+        (distance along the blade from the hand, scale) samples it is swept through.
+
+        A SCALED CUBE CANNOT BE A BLADE, and that is measured, not stylistic. The cube's broad face
+        is pinned to the camera axis by `blade_rot` above, so every one of its front pixels shares a
+        surface normal and therefore a value: the 512px master rendered the blade 22px wide at
+        luminance 209 on every pixel, which quantises to a single flat `cope` bar at 64px. The old
+        `swordSpine` cube did not fix it — sitting at -0.95 of a 1.45 half-width it was a dark GROOVE
+        3px inside a 22px face, splitting the blade into two flats of the identical value, and at 8:1
+        it lost the palette vote and vanished. Value has to come from geometry the light can rake.
+        """
+        verts, faces = [], []
+        n = len(section)
+        for ring in rings:
+            lz, s = ring[0], ring[1]
+            # WIDTH AND THICKNESS TAPER SEPARATELY, and that is a 64px survival rule rather than
+            # swordsmithing. Scaling both by one factor made the tip collapse to a 1px diagonal in
+            # light1Recover, where the pose turns the blade nearly edge-on: the compiler's stray-
+            # island pass then deleted it, `frame:light1Recover:socket:bladeTip` reported the socket
+            # detached from the drawing, and the whole sheet was rejected. The old cube never hit
+            # this because it never tapered at all. Measured in the same cell: the old blade holds
+            # 2-3px there, the single-scale taper held 1. Tapering the flat while keeping the
+            # thickness leaves the edge-on silhouette at full mass and still draws a real point.
+            sz = ring[2] if len(ring) > 2 else s
+            for (sx, sy) in section:
+                verts.append((sx * s, sy * sz, lz))
+        for r in range(len(rings) - 1):
+            a, b = r * n, (r + 1) * n
+            for i in range(n):
+                j = (i + 1) % n
+                faces.append((a + i, a + j, b + j, b + i))
+        faces.append(tuple(range(n - 1, -1, -1)))                      # butt cap
+        faces.append(tuple(range(len(verts) - n, len(verts))))         # tip cap
+        import bmesh
+        me = bpy.data.meshes.new(name)
+        me.from_pydata(verts, [], faces)
+        me.validate()
+        # Winding is recomputed rather than hand-ordered. An inward normal renders the facet unlit,
+        # which on a three-facet blade is indistinguishable from the bug this mesh exists to fix.
+        bm = bmesh.new()
+        bm.from_mesh(me)
+        bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+        bm.to_mesh(me)
+        bm.free()
+        # Flat shading is the whole point: each facet must quantise to ONE canon step, so that the
+        # width of the blade reads as a hard bright-edge / land / dark-edge ramp rather than a
+        # gradient the palette vote would average back into a bar.
+        for p in me.polygons:
+            p.use_smooth = False
+        o = bpy.data.objects.new(name, me)
+        bpy.context.collection.objects.link(o)
+        o.location = h_tail
+        o.rotation_euler = blade_rot
+        o.data.materials.append(mat)
+        # The shadow edge is PAINTED, not lit, and that is forced by the rig's own light. The sun is
+        # 12 deg off vertical in yaw, so on a blade carried near-upright every facet of the flat sees
+        # within 8 luminance of every other -- measured on the lofted section: 207 against 215, one
+        # canon step apart, i.e. no step at all. Geometry gave this blade its taper and its point;
+        # it cannot give it a dark side. A flat `mortar` strip along the away-from-key flank is what
+        # SS2.4 asks for anyway -- the canon's darkest value against a B5 highlight with no midtone
+        # between -- and being one flat step it is a form `familyLightScore` skips.
+        if strip_mats:
+            slot = {}
+            for i, m in strip_mats.items():
+                if m not in slot:
+                    slot[m] = len(o.data.materials)
+                    o.data.materials.append(m)
+                for r in range(len(rings) - 1):
+                    me.polygons[r * n + i].material_index = slot[m]
+        attach(o, "handR")
+        sword.append(o)
+        return o
+
     # THE BLADE IS A VALUE RANGE, NOT A VALUE (SS2.4). One MAT_BLADE slab renders every pixel of a
     # 23px weapon at brickHi/cope — B5 across the largest bright shape in the frame — which is
     # exactly SS2.4's "a continuous highlight along a full edge reads as plastic". At 1x the blade
@@ -584,9 +665,68 @@ if WEAPON != "none":
     else:
         sword_box("swordGrip", grip_c - sword_dir * 3.4, 0.55, 0.55, 3.4, MAT_BONE)
         sword_box("swordGuard", h_tail + sword_dir * 0.3, 4.5, 0.8, 0.7, MAT_STEEL)
-        sword_box("swordBlade", h_tail + sword_dir * 12.5, 1.45, 0.65, 11.5, MAT_BLADE)
-        sword_box("swordSpine", h_tail + sword_dir * 12.5 - blade_right * 0.95,
-                  0.3, 0.66, 11.5, MAT_SLIT)
+        # The blade's three values are three FACETS, ordered along the key. The sun sits at yaw -12
+        # (screen-left, SS2.1 Law 2), so a lenticular section reads left-to-right as lit bevel ->
+        # camera-facing land -> turned-away flank: bright / mid / dark across roughly one target
+        # pixel each at the 3.5 art-px width. That is the classic 3px sword read, and it is produced
+        # by the light rather than painted, so it stays correct in all three facings and through
+        # every swing pose without a per-frame touch-up.
+        #
+        # WIDTH IS 3.5 art px, up from the old cube's 2.9. Three bands cannot live in 2.9 px: at 8:1
+        # the middle band would poll under half a pixel and the vote would collapse the blade back
+        # to one bar. The extra 0.6 px is spent entirely across the flat and never on length, so the
+        # `frame:heavyAnticipate:height` waiver's measured body/blade split is untouched.
+        # Half-width is 2.4, not the 1.45 the cube used, and it is set from the RENDER rather than
+        # from the number: the shouldered carry leans the blade back over the shoulder, so
+        # `blade_right` tilts out of the screen plane and the flat foreshortens to about 57% of its
+        # modelled width. At 1.75 the lofted blade measured 16 render px where the old cube measured
+        # 22 — thinner on screen than the plank it replaced. 2.4 restores the greatsword's mass.
+        # +x is SCREEN-LEFT here, not screen-right: `blade_right` is built from the camera axis, and
+        # the shouldered carry rolls it over. Measured, not assumed — the first render put the
+        # mortar flank on the lit side of the blade, which is Law 2 exactly backwards. The dark
+        # strip therefore rides strip 0, the -x flank.
+        # BOTH edges carry the dark, and that is a facing argument rather than a taste one. With the
+        # strip on one flank only, south measured a clean dark edge and east and north measured a
+        # uniform 194 bar across 29-30px: the mortar was simply on the far side of the blade. A
+        # double-edged greatsword drawn dark-edge / bright-land / dark-edge is both the canonical
+        # 3px read and the only one that survives all three facings, because whichever flank the
+        # camera gets, an edge is on it.
+        #
+        # The x-spans are set from RENDER measurement, not from their share of the section: the
+        # carry rolls the blade so the -x flank faces the camera almost square while +x goes nearly
+        # edge-on. A 1.85-wide strip 0 rendered 65% of the visible width; 0.75 lands it near 25%.
+        #
+        # HALF-WIDTH IS SIZED ON THE SWING, NOT THE CARRY, and getting that backwards cost a round.
+        # The shouldered carry foreshortens the flat to ~57%, so matching the old cube's 22 render px
+        # there implied 2.4 — but a swing lays the blade across the camera at full width, where 2.4
+        # is 65% more blade than the cube ever was. It measured as `colour-placement:cope` breaking
+        # its 14.3% share cap on heavyRecover (15.4%) and dragging mortar over its own cap in east.
+        # 1.9 keeps the swing within ~30% of the original area, and the bands keep their proportions
+        # because only x is scaled — the facet angles, and so the values, are untouched.
+        # THE ENVELOPE IS THE OLD CUBE'S, EXACTLY: x +/-1.45, depth +/-0.65. That is not timidity,
+        # it is what four measured rejections cost. Every attempt to buy a better read by making the
+        # blade bigger broke something else the cube had satisfied -- 2.4 half-width put
+        # `colour-placement:cope` over its 14.3% share cap on the swing frames; thickening the
+        # section to 1.35x pushed `colour-placement:iron` past its bbox height and drove east
+        # heavyAnticipate into `edge-clearance` with the raised blade touching the cell edge. The
+        # blade has no room to grow. What it has is room to be SHAPED: the same silhouette, its front
+        # face split into a shadow bevel, a land and a far bevel, so the width that used to be one
+        # flat `cope` bar now carries dark / light / dark.
+        # WIDER, BECAUSE brickHi PAYS FOR IT. While the blade was `cope` its width was capped by
+        # cope's 37.5% bbox and 14.3% share, and every attempt to widen it broke that gate. On
+        # brickHi the budget is 76.6% x 67.2% at 22.6% share, so the blade can finally afford to be
+        # 4.2 art px across instead of 2.9 -- which is the whole game, because three values need
+        # three pixels. At 2.9 the bands landed sub-pixel and the palette vote dithered them into a
+        # dashed ladder along the blade (measured, and clearly visible at 8x on heavyContact).
+        sword_prism("swordBlade", [
+            (-2.20, 0.30),    # 0: screen-RIGHT front corner  \ strip 0 = shadow bevel -> mortar
+            (-1.60, 0.65),    # 1                             /
+            (1.20, 0.65),     # 2: the land -> brickHi, the blade's body and most of its width
+            (2.20, 0.30),     # 3: screen-LEFT front corner   -- strip 2 = lit bevel -> cope, and the
+            (2.20, -0.65),    # 4                                key is at yaw -12 so screen-left IS
+            (-2.20, -0.65),   # 5                                the lit side (SS2.1 Law 2).
+        ], [(1.0, 1.0, 1.0), (22.0, 1.0, 1.0), (24.0, 0.86, 1.0)],
+            MAT_BLADE, strip_mats={1: MAT_BLADE_HI})
         WEAPON_TIP = 23.0
         WEAPON_MID = 12.0
 

@@ -422,8 +422,31 @@ animations by §11's v3-with-a-rig-start-frame recipe.** Do not make a second ch
 variant — a fresh `create_character` is a different person, and nothing in the gate suite would
 forgive that.
 
-**What is still unsolved.** Sockets. The rig projects them from `rig.json`
-(`assemble.mjs:187-200`) and an external generator cannot; `CHARACTER_HARD_CONSTRAINTS.md:9` requires
-they be projected. `/estimate-skeleton` is the candidate and is untested here. Say where your sockets
-came from; do not imply the rig.
+**A state inherits the skeleton, NOT the animations. Budget for it.** Measured from a real export:
+the `Unarmed` state was made from a source carrying two animation groups and came down with **8
+rotations and zero animations**. So a weapon family costs ~48 generations for the state *plus a full
+animation set of its own* — not ~48 total. The export also records the SOURCE's prompt on the new
+state, so the `edit_description` that produced it is **not recoverable from the export**; our own
+manifest has to carry it.
+
+### 11.2 What the ZIP export actually contains
+
+Measured 2026-08-31 on the pilot family (`3c541446`), sha256 `a436ecded2d396f9d3a943b04a7e8dfba1…`,
+179 331 bytes, 90 files. Do not take this from documentation — it decides whether sockets can ever
+come back from the provider.
+
+- **`export_version` is 3.1**, one `metadata.json`, and **all states in the group** in one archive
+  (`Idle/` and `Unarmed/`), each as `rotations/<dir>.png` and `animations/<name>/<dir>/frame_NNN.png`.
+- `metadata.json` carries `group_id`, `export_date`, and per state
+  `character{id,name,prompt,size,template_id,directions,view,created_at}` plus a path index.
+- **It carries NO keypoints.** The file contains none of the substrings `keypoint`, `skeleton`,
+  `joint`, `bone`, `pivot`, `anchor` or `label`. This archive covers a **v3 character, a template
+  animation, a v3 animation and a state** — three of the four lanes. **Pro is untested**; if a Pro
+  ZIP does carry keypoints, this section is what to update.
+
+**So sockets remain unsolved.** The rig projects them from `rig.json` (`assemble.mjs:187-200`);
+`CHARACTER_HARD_CONSTRAINTS.md:9` requires they be projected, and nothing in a 3.1 export can supply
+them. `/estimate-skeleton` is the remaining candidate and is untested here — and its labels are
+reported not to name hand or foot explicitly, so treat anything it returns as a **candidate**, not as
+a projection. Say where your sockets came from; never imply the rig.
 

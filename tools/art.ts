@@ -17,6 +17,7 @@ import { makeContext, runGates, formatGates, summarise, loadPixels } from './art
 import { isProductionPath, verifyApproval, writeReceipt } from './art/approve'
 import { validateSheetDef, type SheetDef } from '../src/render/sheet'
 import { buildPrompt, generate, parseProvider, promptHash, requests, resolveReferences, tokenFor, type GenerateSpec } from './art/generate'
+import { writeRejection } from './art/reject'
 
 const argv = process.argv.slice(2)
 const cmd = argv[0]
@@ -31,6 +32,7 @@ const usage = (): never => {
   pnpm art compile <spec.json> [--out <png>]
   pnpm art gate <sheet.png> [--sidecar <json>]
   pnpm art approve <art/approved/master.png> --id <identity.vN> --by <who> [--note <why>]
+  pnpm art reject <candidate.png> --reason <why> [--by <who>] [--manifest <run.manifest.json>]
   pnpm art preview <sheet.png> [--scale 6] [--out <png>]
   pnpm art generate <gen-spec.json> [--provider retrodiffusion|pixellab] [--live]`)
   process.exit(1)
@@ -148,6 +150,16 @@ function cmdApprove(): void {
   console.log(`approved ${file} as ${receipt.id} (sha ${receipt.sha256.slice(0, 12)}…) by ${receipt.approvedBy}`)
 }
 
+function cmdReject(): void {
+  const candidate = argv[1]
+  const reason = flag('reason')
+  if (!candidate) usage()
+  if (!reason) usage()
+  const out = writeRejection(candidate!, reason!, flag('by') ?? 'codex', flag('manifest'))
+  console.log(`rejected ${candidate} -> ${out.image}`)
+  console.log(`  receipt ${out.receipt} (sha ${out.data.sha256.slice(0, 12)}…)`)
+}
+
 // --- gate -------------------------------------------------------------------------------------------
 async function cmdGate(): Promise<void> {
   const png = argv[1]
@@ -257,6 +269,7 @@ switch (cmd) {
   case 'generate': await cmdGenerate(); break
   case 'compile': await cmdCompile(); break
   case 'approve': cmdApprove(); break
+  case 'reject': cmdReject(); break
   case 'gate': await cmdGate(); break
   case 'preview': await cmdPreview(); break
   default: usage()

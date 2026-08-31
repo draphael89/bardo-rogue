@@ -162,6 +162,36 @@ back correct and beautiful; columns, ossuary chests and altars came back ISOMETR
 and a top, in a game with none. The split is exactly §1's rule: silhouette-dominant objects are safe,
 box-like objects with visible faces are not. A better model did not move this line.
 
+### 2.6 Why generated actors fail `colour-placement`, and it is the OUTLINE
+
+Compiling a generated Warden through its own shipped spec fails nearly every `colour-placement`
+gate, some of them 5-15x over. Two explanations were tested and the first one was wrong.
+
+**Wrong: "the profile is a straitjacket built from a small sparse rig figure."** The `warden` profile
+allows `nave1` at **83% share in an 84.7x82.0% bbox**. It is not asking for a small figure at all.
+
+**Also a real error, mine: the generated Warden was off-identity.** `nave0/1/2` are a cool blue-grey
+STONE ramp and the profile makes `nave1` dominant — the Warden is a pale stone gatekeeper. The first
+generation was dark iron plate with a crimson tabard: beautiful, and a different character. Re-
+prompting with the ramp named by hex and "that stone is the dominant colour" moved `nave1` from 4.7%
+to 7.4%. Worth doing, and not the blocker.
+
+**The blocker is `seal0`, and it is the outline.** Measured by splitting seal0 into silhouette-edge
+and interior pixels: **54% of it is outline** (322 edge against 269 interior, the interior being the
+veil, which IS the character). Interior alone is 5.2% against a 5.0% cap — at the line. So the whole
+overage is the black keyline every generated sprite carries.
+
+**`style_options.outline: false` does NOT remove it.** Same prompt, same seed, outline copy off:
+seal0 11.1% against 11.4%. That flag governs whether the STYLE IMAGE'S outline is copied, not whether
+the model draws one. It draws one either way.
+
+So the incompatibility is structural, not a tuning miss: **these profiles were measured on
+outline-less Blender renders, and outlined pixel art — which is what this lane produces and what most
+pixel art looks like — cannot satisfy a 5% cap on its own keyline colour.** Two honest ways forward,
+and choosing between them is an art-direction call rather than a gate fix: give the profiles an
+explicit outline allowance, or strip/thin the keyline in the compile before the gates see it. Do not
+shrink the art to fit.
+
 ### 2.1 The prompt this lane has NOT been measured with
 
 `pnpm art generate <spec> --provider pixellab` dry-runs free (no key) and prints the prompt

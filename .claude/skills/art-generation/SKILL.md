@@ -323,6 +323,50 @@ so a new master can silently change what a future generation is conditioned on.
   mechanical cause of twelve gold-framed gates. **Judge against them; never condition on them.**
 - ~~`create_image_pro`~~ 20–40 generations and it buys nothing pixflux's free palette lock delivers.
 
+## 7.1 Levers this repo has never pulled — UNTESTED, surveyed 2026-08-31
+
+Read off `https://api.pixellab.ai/v2/llms.txt` + `openapi.json` and the logged-in web Creator. Every
+one of these is a REST v2 endpoint with **no MCP tool**, so nothing above could have used them. None
+is measured here. They are listed so the next round starts from the real surface instead of the
+MCP's subset — treat each as a hypothesis, and measure before writing it into the recipe.
+
+**`POST /transfer-outfit-v2` (Pro) is the one to test first, because it targets the exact failure §7
+struck.** It takes `reference_image` (the appearance) plus **`frames`: 2-16 ANIMATION FRAMES** and a
+`seed`. §7 struck `edit_image` as a finishing pass because it redrew one garment three different ways
+across three frames at one seed — no cross-frame consistency. This endpoint consumes the frames
+*together* and is built for that consistency. If it holds, it is the missing half of the hybrid this
+project keeps reaching for: the Blender rig owns motion, registration and the sockets for all 29
+frames, and this owns authored surface detail the 8:1 downsample cannot produce.
+
+**`POST /animate-with-skeleton` + `POST /estimate-skeleton`.** Takes `skeleton_keypoints` (**exactly
+3 frames** — it is a 3-frame window), `reference_image`, `init_images`, `guidance_scale`, `view`,
+`direction`, and **`color_image`, the same forced-palette lock §2 relies on, on an animation call**.
+`mannequin.py` already projects rig bones and writes `rig.json`, so the poses could be OURS rather
+than a canned humanoid template — which is precisely why templates drop the greatsword (§7: they do
+not know the character holds anything).
+
+**`POST /interpolation-v2` (Pro).** `start_image`, `end_image`, `action`, `seed`. The attack chains
+are 5 authored keyframes; this is the in-betweener.
+
+**`POST /generate-with-style-v2` (Pro).** 1-4 `style_images` + `description`. A style lock that is
+not the palette lock.
+
+Two more from the web Creator that the MCP `create_character` does not expose:
+
+- **Four ADDRESSABLE reference images**, cited in the description as "reference image 1/2/…". The
+  MCP takes one `reference_image_base64`. Four would let the armour and the weapon be conditioned
+  separately, which is the whole difficulty with this hero.
+- **Character proportion sliders** — head size, arms length, legs length, shoulder width, hip width,
+  each 0.5x-2.0x. The rig's Veteran recipe already fixes these numbers; matching them is what a
+  from-scratch challenger needs to be comparable at all.
+
+**Also: the model this skill's entire §2 recipe is built on is no longer the current one.** The
+Creator presents **Pro** (Recommended, 16-512px) and **Pixen** (Fast, 16-768px) as the two models,
+with `pixflux` reachable only behind a "Legacy models" dropdown. `create_image_pro` and
+`create_image_pixen` both exist as MCP tools and neither has been tried here. Every measured number
+in §2/§3 came from pixflux, so re-running the brazier on Pro is the cheapest way to find out whether
+the recipe is still the right one.
+
 ## 8. Cost and transport
 
 `pixflux` **1 generation**. `edit_image` / `inpaint_image` / `create_image_pro` **20–40, billed by

@@ -33,5 +33,19 @@
     "bone": { "maxShare": 0.066, "maxWidth": 0.625, "maxHeight": 0.765625 },
     "ember": { "maxShare": 0.05, "maxWidth": 0.609375, "maxHeight": 0.671875 },
     "wood": { "maxShare": 0.174, "maxWidth": 0.703125, "maxHeight": 0.875 }
+  },
+  "caster": {
+    "mortar": { "maxShare": 0.01, "maxWidth": 0.078125, "maxHeight": 0.046875 },
+    "grout": { "maxShare": 0.05, "maxWidth": 0.234375, "maxHeight": 0.109375 },
+    "woodLo": { "maxShare": 0.08, "maxWidth": 0.171875, "maxHeight": 0.28125 },
+    "sky": { "maxShare": 0.01, "maxWidth": 0.046875, "maxHeight": 0.078125 },
+    "iron": { "maxShare": 0.04, "maxWidth": 0.1875, "maxHeight": 0.25 },
+    "ironHi": { "maxShare": 0.25, "maxWidth": 0.40625, "maxHeight": 0.65625 },
+    "slateHi": { "maxShare": 0.03, "maxWidth": 0.3125, "maxHeight": 0.3125 },
+    "ashField": { "maxShare": 0.03, "maxWidth": 0.296875, "maxHeight": 0.203125 },
+    "ashFieldLit": { "maxShare": 0.31, "maxWidth": 0.28125, "maxHeight": 0.28125 },
+    "boneLo": { "maxShare": 0.02, "maxWidth": 0.3125, "maxHeight": 0.609375 },
+    "boneDim": { "maxShare": 0.42, "maxWidth": 0.296875, "maxHeight": 0.546875 },
+    "bone": { "maxShare": 0.02, "maxWidth": 0.09375, "maxHeight": 0.0625 }
   }
 }

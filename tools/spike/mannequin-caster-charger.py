@@ -241,7 +241,12 @@ def marker(name, world_pos, bone_name):
 # thing that reads as furniture until it moves, which is the correct read for a nymph who is a lamp.
 # It also helps the black test rather than costing it: there is no thin arm left to mud at 1x.
 if ACTOR == "caster":
-    HIP = 22.0            # legs 22px of a 36px standing body = 61% (the Veteran's are ~46%)
+    # A walking funeral lamp, not a stick under a bracket. The first 1x candidate spent 61% of its
+    # height on bare legs, gave the pale column a face, and hung the lantern near its knees on a
+    # 17px chain. Together those relations drew a thin person carrying a rectangular placard. Lower
+    # hips, one broad wax bell, no face cue, and a chest-height dead lantern make the noun complete;
+    # the crook and sim-aligned socket remain the identity and timing contract.
+    HIP = 17.0
 
     MAT_WAX = make_mat("wax", canon_srgb("#90806C"))              # -> boneDim, SHADED. The body mid,
     #   ~38% of opaque at Weber +2.93: the ground-separation solution AND the identity, because she is
@@ -279,32 +284,27 @@ if ACTOR == "caster":
     # measurement and still clears the 52px cap on a 64 cell — so the sheet ships waiver-free.
     bone("crook", V(0, 3.5, HIP + 8), V(0, 3.5, HIP + 24), "chest")
     bone("lampArm", V(0, 3.5, HIP + 24), V(0, -9.5, HIP + 24), "crook")
-    bone("lamp", V(0, -9.5, HIP + 17), V(0, -9.5, HIP - 5), "lampArm")
+    bone("lamp", V(0, -9.5, HIP + 17), V(0, -9.5, HIP + 1), "lampArm")
     for side, sx in (("R", 1), ("L", -1)):
         bone("thigh" + side, V(2.2 * sx, 0, HIP), V(2.2 * sx, 0, HIP - 11), "pelvis")
         bone("shin" + side, V(2.2 * sx, 0, HIP - 11), V(2.2 * sx, 0, 1.6), "thigh" + side)
         bone("foot" + side, V(2.2 * sx, 0, 1.6), V(2.2 * sx, -2.6, 0.6), "shin" + side)
     bpy.ops.object.mode_set(mode="OBJECT")
 
-    # --- the wax column. 8.8px of body DEPTH, which is what east reads as WIDTH: 0.25 of the standing
-    # height against the hero's measured 0.50 (18x36). That 2:1 is the primary hero separator, and the
-    # two standing heights are identical on purpose — the separator is aspect, which survives
-    # downscale, not size, which does not.
-    sphere("torso", V(0, 0, HIP + 5), 3.0, 4.4, 6.0, "spine", MAT_WAX)
-    sphere("chestCap", V(0, 0, HIP + 9), 2.8, 3.8, 2.6, "chest", MAT_WAX)
-    sphere("skull", V(0, -1.0, HIP + 11.5), 2.6, 3.4, 3.2, "head", MAT_WAX)
-    box("pelvisBlock", V(0, 0, HIP - 1), 2.6, 3.4, 2.2, "pelvis", MAT_WAX)
+    # --- the wax body. East reads local depth as width, so these `ry` values are the silhouette,
+    # not hidden volume. One uninterrupted bell replaces the humanoid head / chest / waist stack.
+    sphere("torso", V(0, 0, HIP + 4), 4.0, 7.5, 7.0, "spine", MAT_WAX)
+    sphere("chestCap", V(0, 0, HIP + 9), 3.7, 6.8, 3.2, "chest", MAT_WAX)
+    box("wick", V(0, 0, HIP + 12.0), 1.6, 2.4, 2.2, "head", MAT_WAX)
+    box("pelvisBlock", V(0, 0, HIP - 1), 3.5, 6.6, 2.4, "pelvis", MAT_WAX)
     # The material-dark contour on the side away from the north-15-left key (§4.3.3), got the proven
     # way: a dark box that OVERHANGS the lit body, the capeShadow mechanism from mannequin.py, rather
     # than shading that hopes a rim appears. Never behind the crook — a backing plate there would
     # fill the closed hole, which is the one thing on this sheet no gate can see.
-    box("napeShadow", V(0, 3.9, HIP + 4), 3.1, 1.1, 6.6, "spine", MAT_OUT_WAX)
-    # A 1px notch where a face would be. Deliberately NOT a boneLo eye socket: on a 7px head that is
-    # 3px of ornament that muds at 1x, and a dark BONE step high on the body is exactly what flips
-    # familyLightScore's sign test. woodLo is its own single-step family, so the gate skips it.
-    box("faceNotch", V(0, -4.0, HIP + 11.4), 1.6, 0.5, 0.5, "head", MAT_OUT_WAX)
-    # The sheet's only B5 pixels: the crown cap and the wick tip, ~3% of opaque against a 25% cap.
-    box("crownCap", V(0, -1.0, HIP + 14.2), 2.2, 2.8, 0.5, "head", MAT_WAX_HI)
+    box("napeShadow", V(0, 7.1, HIP + 3), 4.0, 1.1, 7.2, "spine", MAT_OUT_WAX)
+    # The sheet's only B5 pixels: one unlit wick cap and the lantern wick, ~3% of opaque against a
+    # 25% cap. It is centred, never projected as a nose or eye.
+    box("crownCap", V(0, 0, HIP + 14.2), 1.4, 1.8, 0.5, "head", MAT_WAX_HI)
 
     for side, sx in (("R", 1), ("L", -1)):
         limb("thighM" + side, "thigh" + side, 1.5, MAT_WAX)
@@ -315,10 +315,11 @@ if ACTOR == "caster":
         box("kneeHollow" + side, V(2.2 * sx, 1.3, HIP - 10.6), 1.2, 0.45, 1.0, "shin" + side, MAT_WAX_LO)
         box("shinCuff" + side, V(2.2 * sx, 0, 5.6), 1.45, 1.45, 1.1, "shin" + side, MAT_IRON)
 
-    # --- the shroud, waist to knee: the dark band that stops a pale column reading as one undivided
-    # bar. No specular, two bands, and it never touches B5 (§2.5).
-    box("shroud", V(0, 0, HIP - 6.0), 2.9, 4.3, 5.0, "pelvis", MAT_SHROUD)
-    box("shroudHem", V(0, 0, HIP - 11.4), 2.95, 4.35, 0.7, "pelvis", MAT_OUT_CLTH)
+    # --- a two-step bell shroud. The upper mass carries the wax body; the narrower lower mass
+    # exposes both feet and makes the taper readable in solid black rather than through colour.
+    box("shroudUpper", V(0, 0, HIP - 5.0), 3.8, 8.0, 4.0, "pelvis", MAT_SHROUD)
+    box("shroudLower", V(0, 0.3, HIP - 10.2), 3.4, 6.5, 2.6, "pelvis", MAT_SHROUD)
+    box("shroudHem", V(0, 0.3, HIP - 13.1), 3.45, 6.55, 0.7, "pelvis", MAT_OUT_CLTH)
 
     # --- THE CROOK: an iron shepherd's crook fused to the spine. A closed RING above the crown —
     # stem up the nape, a top bar reaching forward, a front bar descending to the hook tip, and a
@@ -340,20 +341,19 @@ if ACTOR == "caster":
     box("crookEyeFront", V(0, -4.5, HIP + 20.0), 0.85, 0.5, 2.0, "lampArm", MAT_IRON)
     box("crookSpec", V(0, -3.0, HIP + 24.1), 0.6, 3.0, 0.35, "lampArm", MAT_IRON_SP)
 
-    # --- the lamp: a 6x5px cage on 3px of chain, hung at the PROJECTED position of the sim's own bolt
-    # origin — e.radius + 4 = 9 world px along the aim (src/sim/enemies/caster.ts:116) — so the drawn
-    # charge and the fired bolt leave the same pixel and the aim maths needs no change. The rig
-    # projects the socket per frame; there is no pivot table.
-    box("lampChain", V(0, -9.5, HIP + 8.5), 0.5, 0.5, 8.5, "lamp", MAT_IRON)
-    box("lampCage", V(0, -9.5, HIP - 1.5), 1.4, 3.0, 2.5, "lamp", MAT_IRON)
-    box("lampBack", V(0, -6.4, HIP - 1.5), 1.2, 0.4, 2.2, "lamp", MAT_IRON_CREV)
-    box("lampRim", V(0, -9.5, HIP + 0.8), 0.9, 2.4, 0.3, "lamp", MAT_IRON_SP)
-    box("lampPane", V(0, -12.4, HIP - 1.6), 1.0, 0.35, 1.5, "lamp", MAT_GLASS)
-    box("lampWick", V(0, -11.0, HIP - 0.4), 0.4, 0.4, 0.4, "lamp", MAT_WAX_HI)
-    box("lampFoot", V(0, -9.5, HIP - 4.2), 1.3, 2.6, 0.4, "lamp", MAT_OUT_IRON)
+    # --- the lamp: a 6x6px dead cage on a short chain, at the PROJECTED position of the sim's own
+    # bolt origin — e.radius + 4 = 9 world px along the aim (src/sim/enemies/caster.ts:116). Keeping
+    # the cage beside the chest makes the crook a hanger, not a second body-height rectangle.
+    box("lampChain", V(0, -9.5, HIP + 13.0), 0.5, 0.5, 4.0, "lamp", MAT_IRON)
+    box("lampCage", V(0, -9.5, HIP + 6.0), 1.5, 3.2, 3.0, "lamp", MAT_IRON)
+    box("lampBack", V(0, -6.2, HIP + 6.0), 1.3, 0.4, 2.6, "lamp", MAT_IRON_CREV)
+    box("lampRim", V(0, -9.5, HIP + 8.8), 1.0, 2.6, 0.3, "lamp", MAT_IRON_SP)
+    box("lampPane", V(0, -12.6, HIP + 5.9), 1.1, 0.35, 1.8, "lamp", MAT_GLASS)
+    box("lampWick", V(0, -11.0, HIP + 7.2), 0.4, 0.4, 0.4, "lamp", MAT_WAX_HI)
+    box("lampFoot", V(0, -9.5, HIP + 2.8), 1.4, 2.8, 0.4, "lamp", MAT_OUT_IRON)
 
     marker("feetCenter", V(0, 0, -2.2), "feetCenter")
-    marker("lamp", arm.matrix_world @ V(0, -9.5, HIP - 1.5), "lamp")
+    marker("lamp", arm.matrix_world @ V(0, -9.5, HIP + 6.0), "lamp")
 
     # ---- poses. Sim states are idle / position / aim / recover / stagger / dead. The light key is
     # unchanged from the rig — do not re-aim the sun.
@@ -429,6 +429,7 @@ if ACTOR == "caster":
         "cell": 64, "cols": 3, "rows": 3, "mirror": True,
         "palette": ["mortar", "grout", "woodLo", "sky", "iron", "ironHi", "slateHi",
                     "ashField", "ashFieldLit", "boneLo", "boneDim", "bone"],
+        "colourPlacement": "caster",
         "sockets": SOCKETS,
         "clips": {
             "strafe": {"frames": ["strafeA", "strafeB"], "timing": "ticks",

@@ -20,6 +20,11 @@ highlight and top-one focality gates. A source-backed north threshold now breaks
 four-way equality without changing collision. The named concept exhibits still win all three blind
 composition pairs, so §15 item 5 and the scorecard remain open rather than being awarded by metric.
 
+**Actor-candidate note, 2026-08-30:** the Lampad now has a rig-only east candidate whose walking
+funeral-lamp silhouette clears 106/106 gates with zero waivers and maintains Weber +1.50 to +1.60
+across all nine frames. The two failed carrier/placard iterations have rejection receipts. It is not
+approved or integrated, so the Kenney inventory and scorecard below remain unchanged.
+
 ---
 
 ## 1. Executive verdict

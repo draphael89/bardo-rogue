@@ -394,6 +394,51 @@ thing about it** is doing neither invention nor constraint satisfaction — it h
 front of it. That is `edit_image`, `inpaint_image` and `correct_pixelart`, and it is the one mode this
 project has never tried.
 
+### The prop recipe that works — and the error that hid it
+
+**Correction first, because it invalidates a number this document printed.** The "74 % edge density,
+2–3.5× the world" figure came from generating at the target size, 48 px, and measuring the raw output
+against *compiled* code-authored art. That is not like-for-like, and it skipped the entire reason the
+compiler exists: `reduce()` downsamples **by voting in palette space**, and voting is the density
+lever. Generating the same objects at 192 px against a 48 px cell:
+
+| | edge density | colours | gates |
+|---|---|---|---|
+| raw 48 px generation (the wrong test) | 74.2 % | 36 | — |
+| **192 px → compiled to 48** | **42.7–47.6 %** | **7–12** | **PASS, 0 blocking** |
+| code-authored props | 26.2–41.2 % | 9–10 | — |
+
+The gap is ~15 % busier, not 200 %. **The tool was never the problem; the methodology was.**
+
+**The recipe, in four steps.**
+
+1. **Generate at 4× the target cell**, canon palette locked (`color_image`). The lock is real: 0
+   off-canon colours and 0 partial-alpha pixels on every candidate, which passes two hard gates
+   outright.
+2. **Prompt it lit and complete.** Asking for an "empty, cold, unlit brazier" produced a formless
+   blue-grey bowl with no legs — the model needs the fire to know what the object *is*. It was
+   correctly blocked.
+3. **Remove what the runtime owns in the RAMP, not the prompt.** Recompiling that same lit master
+   against a ramp with no ember colours in it snapped the flame down into iron and ash: a proper
+   wrought-iron bowl on three legs, 7 colours, 42.7 % density, **PASS 0 blocking**. The game then
+   owns the flame (`particles.flame`), the light pool (`arena.braziers`) and the cast shadow
+   (`bakePropShadows`) — which is the division that lets a brazier gutter.
+4. **A ramp is per-asset. Never copy one.** Doing exactly that twice in this session mapped an
+   anvil's wooden stump into orange fire, then into snow.
+
+**And the guard rail already exists.** §5 of this document says the gates cannot see baked lighting.
+That is wrong at the sheet level: `frame:*:light-direction` fired on the prompted-unlit candidate at
+correlation **0.66 against a +0.35 cap** and refused to promote it. The one structural objection to
+generated props is already machine-checked.
+
+**Where it beats the code lane outright:** radially symmetric, silhouette-dominant objects — braziers,
+bowls, bells, jars, lanterns. The generated brazier is a better object than the hand-coded one, on
+palette, on budget, gate-green, and it sits correctly in a real 1× frame.
+
+**Where it still loses:** anything whose read depends on projection. The anvil came back isometric
+both times, which no ramp fixes. And `create_map_object` style-matching against a real room patch
+matched the palette and **lost the subject entirely** — it returned a barrel.
+
 ### The lane, per asset class — measured
 
 One test per class, same palette, same room, same measurements. **The axis every row turns on is not
@@ -404,7 +449,7 @@ room's light and the clip's timing, or may carry its own.**
 |---|---|---|
 | **Hero, enemies — anything with a clip** | **Rig, decisively** | The rig gives frame consistency by construction: 6 sheets, 1 823 gate assertions, 54 s. `edit_image` redrew one garment three different ways across three frames at the same seed. Generation on hero identity is 0 for 10 historically, because every hero constraint is a *relation*. |
 | **Floors, walls, autotiles** | **Code, decisively** | 20.4 % edge density, slabs that cross tile boundaries, wear paths that follow real traffic, a bake coupled to the room's light pools. None of that is a static image — it is parametric behaviour a generated tile cannot have. **PixelLab's `create_topdown_tileset` is untested here**; say so rather than assume. |
-| **Props and set pieces** | **Split, and this is the real trade** | PixelLab draws a *better object*: its anvil, column and stall each read in one second, where the code lane's `pew` and `shard` are ambiguous brown and grey masses. But measured at 48 px with canon locked: **edge density 74.2 / 71.9 / 72.4 % against the code props' 38.1 / 41.2 / 26.2 % and the floor's 20.4 %** — two to three-and-a-half times the churn of the world they sit in. The anvil used **36 colours** against the code lane's 9–10. |
+| **Props and set pieces** | **PixelLab, for the right shapes** — see the recipe above | Generated at 4× and compiled, a brazier comes out at 42.7 % density and 7 colours, gate-green, and is a **better object** than the hand-coded one. The code lane's `pew` and `shard` are ambiguous brown and grey masses by comparison. Loses on anything whose read depends on projection: the anvil came back isometric twice. |
 | **Particles, decals, impacts, swing arcs** | **Code, no contest** | They track `tuning.ts`. A sprite cannot. |
 | **Title screen and UI** | **Code — there is no asset to generate** | The title is `Graphics.rect()` and `Text` held over the *living hub*, which is the best composition decision in the project: the first frame a player sees is the room they are about to stand in. The only generable thing here is separate key art, and that is gpt-image's job, not PixelLab's. |
 | **Concept art, marketing, key art** | **gpt-image** | 79 000 colours, no alpha discipline, no grid — useless as an asset, excellent as a target. Judge against it; never condition on it. |

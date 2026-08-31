@@ -1,0 +1,44 @@
+{
+  "id": "probe.anvil.candidate",
+  "kind": "prop",
+  "input": ".art-cache/props-test/masters/anvil-192.png",
+  "output": ".art-cache/props-test/compiled/probe_anvil.png",
+  "sidecar": ".art-cache/props-test/compiled/probe_anvil.json",
+  "cell": 48,
+  "cols": 1,
+  "rows": 1,
+  "maxColors": 12,
+  "palette": [
+    "void",
+    "mortar",
+    "seal0",
+    "iron",
+    "ironHi",
+    "brickLo",
+    "brick",
+    "woodLo",
+    "wood",
+    "woodHi",
+    "boneLo",
+    "slate1"
+  ],
+  "fit": "grid",
+  "chromaKey": false,
+  "coverage": 0.5,
+  "salience": {
+    "minShare": 0.2,
+    "minDelta": 0.16
+  },
+  "frames": [
+    {
+      "name": "anvil",
+      "i": 0
+    }
+  ],
+  "provenance": {
+    "provider": "pixellab",
+    "model": "create_image_pixflux (MCP), seed 3, 192x192, forced canon ramp",
+    "promptFile": ".art-cache/props-test/masters/anvil-192.txt"
+  },
+  "registrationNote": "CANDIDATE ONLY, .art-cache. Generated at 192px against a 48px cell so the compiler's 4x palette-space vote does the density reduction it exists for. NOTE the ramp: an earlier run copied the brazier's ramp wholesale, which left ember/emberHi in it, and the compiler duly mapped the anvil's wooden stump into orange fire. A ramp is per-asset; copying one is a bug, not a shortcut."
+}

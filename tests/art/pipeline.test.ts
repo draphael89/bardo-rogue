@@ -16,18 +16,7 @@ import { rackSpecularRect } from '../../src/render/tilemap'
 import { createWorld } from '../../src/sim/scenarios'
 import { ARM } from '../../src/sim/weapons'
 import { tuning } from '../../src/tuning'
-
-const SHEETS = [
-  'bardo_veteran_unarmed_east',
-  'bardo_veteran_unarmed_north',
-  'bardo_veteran_unarmed_south',
-  'bardo_veteran_unarmed_north_roll',
-  'bardo_veteran_unarmed_south_roll',
-  'bardo_veteran_greatsword_east',
-  'bardo_veteran_greatsword_north',
-  'bardo_veteran_greatsword_south',
-  'bardo_brute',
-] as const
+import { SHEETS } from '../../src/render/atlas'
 const sheetPath = (n: string) => `public/assets/sprites/${n}.png`
 const sidecarPath = (n: string) => `public/assets/sprites/${n}.json`
 

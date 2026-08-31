@@ -28,7 +28,7 @@ already shed its flash, particle ring, banner and second bell in favour of one h
 the authored reach/contact/settle selector, a four-tick planted contact that cancels settle into held
 movement, and the Gate opening on the existing event tick. The new
 masters remain in `.art-cache`: human Look and `pnpm art approve` are still required before the
-frames can replace the eight receipted production masters. Current proof is typecheck, **970 tests in
+frames can replace the eight receipted production masters. Current proof is typecheck, **971 tests in
 82 files**, `pnpm room:gate`, all nine shipped authored sheets at zero blocking art findings, and a
 100-seed matrix at 80% kite / 0% naive with no stranded seed. The intended pickup pause was re-recorded
 through `pnpm record-bots` (`slice-kite-loop-s7` hash `2495559391`; the other three hashes unchanged),
@@ -80,8 +80,9 @@ grammar constrains each colour's worst-frame share and footprint, floor/prop/cha
 has class caps, and rejection receipts preserve why a candidate failed. The first visible candidate
 purchase is equally narrow: one extra idle drawing and three pickup drawings, all rig-authored with
 computed pivots and sockets. The sword moment has anticipation before sim contact, five ticks of
-contact, nine ticks of settle, one physical sound, and the already-authoritative Gate response; it
-does not stop or mutate the sim. Evidence lives under `.art-cache/spike/hero-final/`. The candidate
+contact, nine ticks of settle, one physical sound, and the already-authoritative Gate response.
+Pose selection is presentation-only; contact plants the hero through four deterministic frozen sim
+ticks. Evidence lives under `.art-cache/spike/hero-final/`. The candidate
 is gated, not approved or shipped, so the audit's animation and experience scores are deliberately
 unchanged pending human Look and an in-engine pass on promoted assets.
 

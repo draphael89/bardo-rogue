@@ -1,0 +1,130 @@
+{
+  "version": 1,
+  "status": "hero_pilot_complete_not_admitted",
+  "createdAt": "2026-08-31T05:40:38Z",
+  "balanceBefore": {
+    "generationsRemaining": 752,
+    "reset": "2026-09-04"
+  },
+  "characterId": "3c541446-069a-4cc1-8a9b-ab4c12a492b2",
+  "groupId": "50489a98-8624-4cc1-9a8d-8e11a73aed0d",
+  "mode": "v3",
+  "direction": "south",
+  "frameCount": 4,
+  "keepFirstFrame": true,
+  "segments": [
+    {
+      "animationName": "bardo_light1_anticipate_to_contact",
+      "actionDescription": "From the braced greatsword anticipation pose, perform the fast first half of a committed waist-to-chest descending greatsword cut and land exactly in the supplied contact pose. Keep both hands locked to the same sword, preserve the dark red cloak, iron plate, split helm crest, low top-down camera, planted feet, body identity, pixel clusters and north-left key light. No detached weapon, duplicate body, extra limb, magic trail or camera motion.",
+      "startFrame": {
+        "path": ".art-cache/pixellab/hero-light1/anchors/light1Anticipate.png",
+        "sha256": "5799f828ef2f9c93f3832a2b9dc4b0862c0d7b4bbde82772001edcf95eca820f"
+      },
+      "endFrame": {
+        "path": ".art-cache/pixellab/hero-light1/anchors/light1Contact.png",
+        "sha256": "4964f420a672869ba4ed6faaa10885e6ee8f0b6ad12ab810dab832d47dbe4214"
+      }
+    },
+    {
+      "animationName": "bardo_light1_contact_to_recover",
+      "actionDescription": "Continue from the exact greatsword contact pose through the follow-through and settle exactly into the supplied recover pose. Keep both hands locked to the same sword, preserve the dark red cloak, iron plate, split helm crest, low top-down camera, planted feet, body identity, pixel clusters and north-left key light. No detached weapon, duplicate body, extra limb, magic trail or camera motion.",
+      "startFrame": {
+        "path": ".art-cache/pixellab/hero-light1/anchors/light1Contact.png",
+        "sha256": "4964f420a672869ba4ed6faaa10885e6ee8f0b6ad12ab810dab832d47dbe4214"
+      },
+      "endFrame": {
+        "path": ".art-cache/pixellab/hero-light1/anchors/light1Recover.png",
+        "sha256": "b2dd085d274bdfde7baaca99223cd64430a0e5ce577e185b36ff66438c242021"
+      }
+    }
+  ],
+  "expectedGenerations": 2,
+  "balanceAfterV3": {
+    "generationsRemaining": 748,
+    "actualGenerationsSpent": 4,
+    "note": "The MCP reported one generation per transition, but the account balance fell by two per transition. Account balance is authoritative."
+  },
+  "v3Verdict": {
+    "pairingsTested": 16,
+    "bestBlockingGates": 11,
+    "decision": "reject",
+    "reasons": [
+      "material placement drift across the actor family",
+      "rig weapon sockets detach on generated intermediates",
+      "the Contact-to-Recover pass baked large white arcs into early frames despite an explicit no-trail instruction"
+    ]
+  },
+  "skeletonPlan": {
+    "imageSize": [128, 128],
+    "estimate": ["light1Anticipate", "light1Commit", "light1Contact", "light1Follow", "light1Recover"],
+    "segments": ["Anticipate-to-Contact", "Contact-to-Recover"],
+    "guidanceScale": 8,
+    "initImageStrength": 600,
+    "expectedGenerationCeiling": 7,
+    "calls": []
+  },
+  "skeletonVerdict": {
+    "balanceAfter": 746,
+    "actualGenerationsSpent": 2,
+    "estimateUsage": "0.1 generation each; account balance remained integer-valued",
+    "blockingGates": 10,
+    "socketFailures": 0,
+    "decision": "adapt through one Pro appearance-transfer bake-off",
+    "reasons": [
+      "skeleton control preserved all rig socket hypotheses",
+      "eight material-placement gates and two identity transitions still blocked admission"
+    ]
+  },
+  "outfitTransferPlan": {
+    "endpoint": "/transfer-outfit-v2",
+    "imageSize": [64, 64],
+    "frames": 5,
+    "seed": 84141,
+    "expectedGenerations": [20, 40],
+    "status": "complete",
+    "jobId": "f2cfa925-4111-4461-91f8-69ee79e175a1",
+    "actualGenerationsSpent": 20,
+    "balanceAfter": 726
+  },
+  "outfitTransferVerdict": {
+    "source": "PixelLab Pro outfit transfer frame 1, palette-snapped by the Bardo compiler and finished at 1x in Aseprite",
+    "compiler": {
+      "gates": 447,
+      "blocking": 0,
+      "existingWaivers": 1,
+      "sourceSha256Prefix": "f0374f617100063a"
+    },
+    "runtimeCaptures": {
+      "candidate": ".art-cache/pixellab/hero-light1/review/swing-down-sentence-candidate.png",
+      "production": ".art-cache/pixellab/hero-light1/review/swing-down-sentence-production.png",
+      "ticks": [1, 2, 4, 8, 15]
+    },
+    "decision": "do not admit over the approved hero",
+    "reason": "The generated Commit is mechanically admissible and reads in motion, but its heavier sword clusters and darker torso do not improve the approved rig-authored frame at native scale. Keep this as proof that PixelLab-to-compiler-to-runtime works; spend the next effort where the existing cast is visibly weakest."
+  },
+  "jobs": [
+    {
+      "segment": "bardo_light1_anticipate_to_contact",
+      "animationGroupId": "3e49f37b-c515-4081-ba01-4c429aaabc1d",
+      "directions": ["south"],
+      "reportedFrames": 5,
+      "reportedGenerations": 1,
+      "status": "complete"
+    },
+    {
+      "segment": "bardo_light1_contact_to_recover",
+      "animationGroupId": "54abe733-e57a-47f4-a535-866663627b32",
+      "directions": ["south"],
+      "reportedFrames": 5,
+      "reportedGenerations": 1,
+      "status": "complete"
+    }
+  ],
+  "errors": [
+    {
+      "at": "2026-08-31T05:41:00Z",
+      "segment": "bardo_light1_anticipate_to_contact",
+      "message": "MCP transport returned fetch failed without a job ID; immediate read-only balance and character reconciliation hit the same transport failure. Do not resubmit until account and character state can be read."
+    }
+  ]
+}

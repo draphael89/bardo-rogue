@@ -10,6 +10,7 @@ const only = args.only ? args.only.split(',') : null
 const out = args.out ?? 'shots/poses.png'
 const url = args.url ?? 'http://localhost:5173'
 const actorCandidate = args.actorCandidate === '1'
+const heroCandidate = args.heroCandidate === '1'
 mkdirSync(dirname(out), { recursive: true })
 
 // helpers injected into every eval: g = api, w = world, p = player, hold(frame, n), until(pred, max), near(enemy, dx, dy)
@@ -45,7 +46,11 @@ const POSES: Pose[] = [
   { name: 'swing3-active', scenario: 'dummy', run: 'near(first(), -18, 0); holdUntil({attack:true,aimX:1,aimY:0}, () => p().state === "attack" && p().swingIndex === 2 && p().stateTick === 13, 200)' },
   { name: 'swing3-recover', scenario: 'dummy', run: 'near(first(), -18, 0); holdUntil({attack:true,aimX:1,aimY:0}, () => p().state === "attack" && p().swingIndex === 2 && p().stateTick === 22, 200)' },
   { name: 'swing-up-aim', scenario: 'dummy', run: 'near(first(), 0, 20); hold({attack:true,aimX:0,aimY:-1}, 8)' },
-  { name: 'swing-down-aim', scenario: 'dummy', run: 'near(first(), 0, -20); hold({attack:true,aimX:0,aimY:1}, 8)' },
+  { name: 'swing-down-anticipate', scenario: 'dummy', run: 'near(first(), 0, -20); hold({attack:true,aimX:0,aimY:1}, 1); holdUntil({aimX:0,aimY:1}, () => p().state === "attack" && p().stateTick >= 1, 40)' },
+  { name: 'swing-down-commit', scenario: 'dummy', run: 'near(first(), 0, -20); hold({attack:true,aimX:0,aimY:1}, 1); holdUntil({aimX:0,aimY:1}, () => p().state === "attack" && p().stateTick >= 2, 40)' },
+  { name: 'swing-down-contact', scenario: 'dummy', run: 'near(first(), 0, -20); hold({attack:true,aimX:0,aimY:1}, 1); holdUntil({aimX:0,aimY:1}, () => p().state === "attack" && p().stateTick >= 4, 40)' },
+  { name: 'swing-down-follow', scenario: 'dummy', run: 'near(first(), 0, -20); hold({attack:true,aimX:0,aimY:1}, 1); holdUntil({aimX:0,aimY:1}, () => p().state === "attack" && p().stateTick >= 8, 40)' },
+  { name: 'swing-down-recover', scenario: 'dummy', run: 'near(first(), 0, -20); hold({attack:true,aimX:0,aimY:1}, 1); holdUntil({aimX:0,aimY:1}, () => p().state === "attack" && p().stateTick >= 15, 40)' },
   { name: 'hit-flash', scenario: 'dummy', run: 'near(first(), -18, 0); hold({attack:true,aimX:1,aimY:0}, 7); g.step(1)' },
   { name: 'brute-windup', scenario: 'brute-only', run: 'const b = first(); near(b, 0, 22); until(() => b.state === "windup" && b.stateTick >= 15)', focus: 'enemy' },
   { name: 'brute-attack', scenario: 'brute-only', god: true, run: 'const b = first(); near(b, 0, 22); until(() => b.state === "attack" && b.stateTick >= 7)', focus: 'enemy' },
@@ -85,7 +90,7 @@ const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } })
 const errors: string[] = []
 page.on('pageerror', e => errors.push('pageerror: ' + e.message))
 page.on('console', message => { if (message.type() === 'error') errors.push('console: ' + message.text()) })
-await page.goto(`${url}/?scenario=empty&seed=1&mute=1&save=off${actorCandidate ? '&actorCandidate=1' : ''}`)   // never let a real save tint a pose sheet
+await page.goto(`${url}/?scenario=empty&seed=1&mute=1&save=off${actorCandidate ? '&actorCandidate=1' : ''}${heroCandidate ? '&heroCandidate=1' : ''}`)   // never let a real save tint a pose sheet
 await page.waitForFunction(() => !!(window as unknown as { __game?: unknown }).__game, null, { timeout: 15000 })
 await page.evaluate((pre) => { (window as any).__PRELUDE = pre; const g = (window as any).__game; g.pause(true); g.presenter.hud.showBanner('', '', 0) }, PRELUDE)
 

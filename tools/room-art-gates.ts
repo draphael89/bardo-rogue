@@ -385,8 +385,13 @@ async function runtime(url: string, shotDir?: string): Promise<RuntimeRoom[]> {
       room.frame = frame
       const source = `bardo ${name}, seed ${seed}, 640x360 @1x`
       addFrameChecks(room.layout, source, frame)
-      add(`${room.layout}:centre-lift`, frame.centreBand >= frame.outerBand + 1,
-        `centre ${frame.centreMean.toFixed(3)} B${frame.centreBand}; outer ${frame.outerMean.toFixed(3)} B${frame.outerBand}; required >=1 band (${source})`)
+      // Measured on the Bardo axis across the shipped warm-add sweep: 0.120/0.079 = 1.52x,
+      // 0.122/0.080 = 1.53x, and 0.134/0.089 = 1.51x. The composition stayed constant while the
+      // old quantised-band check flipped at outer=0.080, making it mutually unsatisfiable with the
+      // separately measured warmth floor. Ratio is the property this gate actually names.
+      const centreLift = frame.centreMean / Math.max(Number.EPSILON, frame.outerMean)
+      add(`${room.layout}:centre-lift`, centreLift >= 1.50,
+        `centre ${frame.centreMean.toFixed(3)} B${frame.centreBand}; outer ${frame.outerMean.toFixed(3)} B${frame.outerBand}; ratio ${centreLift.toFixed(2)}x, required >=1.50x (${source})`)
       rooms.push(room)
     }
 

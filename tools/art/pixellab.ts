@@ -14,13 +14,70 @@
 // recovery is to reconcile against IDs already on disk.
 import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { mkdirSync, writeFileSync, readFileSync, existsSync, rmSync, renameSync, statSync, mkdtempSync } from 'node:fs'
+import { dirname, join, resolve, sep } from 'node:path'
 import sharp from 'sharp'
 
 const API = 'https://api.pixellab.ai/v2'
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const MAX_ARCHIVE_FILES = 20_000
+const MAX_ARCHIVE_BYTES = 1024 * 1024 * 1024
 
 export const sha256 = (b: Buffer | string): string => createHash('sha256').update(b).digest('hex')
+
+export interface ArchiveEntry {
+  name: string
+  type: 'file' | 'directory' | 'other'
+  uncompressedBytes: number
+}
+
+export function validateArchiveEntries(entries: readonly ArchiveEntry[]): void {
+  if (!entries.length) throw new Error('pixellab: archive is empty')
+  if (entries.length > MAX_ARCHIVE_FILES) throw new Error(`pixellab: archive has ${entries.length} entries; limit ${MAX_ARCHIVE_FILES}`)
+  let bytes = 0
+  const seen = new Set<string>()
+  for (const entry of entries) {
+    if (entry.type !== 'file' && entry.type !== 'directory') throw new Error(`pixellab: archive member is not a regular file or directory: ${entry.name}`)
+    if (!Number.isSafeInteger(entry.uncompressedBytes) || entry.uncompressedBytes < 0) throw new Error(`pixellab: invalid archive size for ${entry.name}`)
+    bytes += entry.uncompressedBytes
+    const name = entry.name
+    const parts = name.split('/')
+    if (!name || name.includes('\\') || name.startsWith('/') || parts.some((part, i) => (part === '' && i !== parts.length - 1) || part === '.' || part === '..')) {
+      throw new Error(`pixellab: unsafe archive path: ${name}`)
+    }
+    const key = name.replace(/\/$/, '').toLowerCase()
+    if (seen.has(key)) throw new Error(`pixellab: duplicate archive path: ${name}`)
+    seen.add(key)
+  }
+  if (bytes > MAX_ARCHIVE_BYTES) throw new Error(`pixellab: archive expands to ${bytes} bytes; limit ${MAX_ARCHIVE_BYTES}`)
+}
+
+function child(root: string, ...parts: string[]): string {
+  const base = resolve(root)
+  const target = resolve(base, ...parts)
+  if (target === base || !target.startsWith(base + sep)) throw new Error(`pixellab: path escapes import root: ${parts.join('/')}`)
+  return target
+}
+
+function archiveEntries(zipPath: string): ArchiveEntry[] {
+  const names = execFileSync('unzip', ['-Z', '-1', zipPath], { encoding: 'utf8' }).trim().split('\n').filter(Boolean)
+  const rows = execFileSync('unzip', ['-Z', '-l', zipPath], { encoding: 'utf8' }).split('\n')
+    .filter(line => /^[?dl-][rwx-]{9}\s/.test(line))
+  if (rows.length !== names.length) throw new Error(`pixellab: could not verify all archive members (${names.length} names, ${rows.length} entries)`)
+  const entries = names.map((name, i): ArchiveEntry => {
+    const fields = rows[i].trim().split(/\s+/)
+    const kind = fields[0][0]
+    return {
+      name,
+      // Info-ZIP prints `?` for ordinary files whose producer omitted Unix mode bits. It extracts
+      // those as files; actual links still carry `l` and are rejected below.
+      type: kind === '-' || kind === '?' ? 'file' : kind === 'd' ? 'directory' : 'other',
+      uncompressedBytes: Number(fields[3]),
+    }
+  })
+  validateArchiveEntries(entries)
+  return entries
+}
 
 /** The token, or a message that says exactly how to supply it. Never inlined into a manifest. */
 export function requireToken(): string {
@@ -95,7 +152,10 @@ export interface PixellabManifest {
  * particular no keypoints, so sockets cannot be recovered here (see the art-generation skill §11.2).
  */
 export async function importCharacter(id: string, outRoot = '.art-cache/pixellab'): Promise<{ manifest: PixellabManifest; manifestPath: string }> {
-  const dir = join(outRoot, id)
+  if (!UUID.test(id)) throw new Error(`pixellab: invalid character id "${id}" (expected UUID)`)
+  const root = resolve(outRoot)
+  mkdirSync(root, { recursive: true })
+  const dir = child(root, id)
   mkdirSync(dir, { recursive: true })
   const zipPath = join(dir, 'character.zip')
   const errors: string[] = []
@@ -104,71 +164,101 @@ export async function importCharacter(id: string, outRoot = '.art-cache/pixellab
   const bytes = Buffer.from(await res.arrayBuffer())
   // A truncated or error-page download must not be mistaken for an archive.
   if (bytes.subarray(0, 2).toString('ascii') !== 'PK') throw new Error(`pixellab: ${id} did not return a ZIP (first bytes ${bytes.subarray(0, 4).toString('hex')})`)
-  writeFileSync(zipPath, bytes)
+  const staged = mkdtempSync(join(dir, '.import-'))
+  const stagedZip = join(staged, 'character.zip')
+  const stagedUnpack = join(staged, 'unpacked')
+  try {
+    writeFileSync(stagedZip, bytes)
+    const entries = archiveEntries(stagedZip)
+    if (!entries.some(entry => entry.name === 'metadata.json' && entry.type === 'file')) throw new Error(`pixellab: ${id} archive has no metadata.json`)
+    mkdirSync(stagedUnpack, { recursive: true })
+    execFileSync('unzip', ['-q', '-o', stagedZip, '-d', stagedUnpack])
 
-  const unpack = join(dir, 'unpacked')
-  rmSync(unpack, { recursive: true, force: true })
-  mkdirSync(unpack, { recursive: true })
-  execFileSync('unzip', ['-q', '-o', zipPath, '-d', unpack])
+    const metaPath = join(stagedUnpack, 'metadata.json')
+    const raw = JSON.parse(readFileSync(metaPath, 'utf8')) as unknown
+    if (!raw || typeof raw !== 'object') throw new Error(`pixellab: ${id} metadata.json is not an object`)
+    const meta = raw as {
+      group_id?: unknown
+      export_version?: unknown
+      states?: unknown
+    }
+    if (typeof meta.group_id !== 'string' || !meta.group_id) throw new Error(`pixellab: ${id} metadata has no group_id`)
+    if ((typeof meta.export_version !== 'string' && typeof meta.export_version !== 'number') || !String(meta.export_version)) throw new Error(`pixellab: ${id} metadata has no export_version`)
+    if (!Array.isArray(meta.states) || !meta.states.length) throw new Error(`pixellab: ${id} metadata has no states`)
 
-  const metaPath = join(unpack, 'metadata.json')
-  if (!existsSync(metaPath)) throw new Error(`pixellab: ${id} archive has no metadata.json`)
-  const meta = JSON.parse(readFileSync(metaPath, 'utf8')) as {
-    group_id?: string
-    export_version?: string
-    states?: Array<{
+    const unpack = join(dir, 'unpacked')
+    const statesMeta = meta.states as Array<{
       folder: string
       character?: { id: string; name: string; view?: string; prompt?: string; size?: { width: number; height: number } }
       frames?: { rotations?: Record<string, string>; animations?: Record<string, Record<string, string[]>> }
     }>
-  }
 
-  const states: ManifestState[] = []
-  for (const s of meta.states ?? []) {
-    const rot = Object.values(s.frames?.rotations ?? {})
-    const anims: Record<string, Record<string, number>> = {}
-    for (const [name, dirs] of Object.entries(s.frames?.animations ?? {})) {
-      anims[name] = Object.fromEntries(Object.entries(dirs).map(([d, paths]) => [d, paths.length]))
+    const states: ManifestState[] = []
+    for (const s of statesMeta) {
+      if (!s || typeof s !== 'object' || typeof s.folder !== 'string' || !s.folder) throw new Error(`pixellab: ${id} metadata contains an invalid state`)
+      child(stagedUnpack, s.folder)
+      if (!s.character || typeof s.character.id !== 'string' || typeof s.character.name !== 'string') throw new Error(`pixellab: ${id} state ${s.folder} has invalid character metadata`)
+      if (!s.frames || !s.frames.rotations || !s.frames.animations || typeof s.frames.rotations !== 'object' || typeof s.frames.animations !== 'object') {
+        throw new Error(`pixellab: ${id} state ${s.folder} has invalid frame metadata`)
+      }
+      const rot = Object.values(s.frames.rotations)
+      const anims: Record<string, Record<string, number>> = {}
+      for (const [name, dirs] of Object.entries(s.frames.animations)) {
+        if (!dirs || typeof dirs !== 'object') throw new Error(`pixellab: ${id} animation ${name} has invalid directions`)
+        anims[name] = Object.fromEntries(Object.entries(dirs).map(([d, paths]) => [d, paths.length]))
+      }
+      // Every path the index names must actually be in the archive; a manifest that promises frames
+      // the assembler cannot open is worse than no manifest.
+      for (const p of [...rot, ...Object.values(s.frames.animations).flatMap(d => Object.values(d).flat())]) {
+        if (typeof p !== 'string') errors.push(`non-string frame path in state ${s.folder}`)
+        else {
+          const file = child(stagedUnpack, p)
+          if (!existsSync(file) || !statSync(file).isFile()) errors.push(`missing from archive: ${p}`)
+        }
+      }
+      states.push({
+        id: s.character.id,
+        name: s.character.name,
+        folder: s.folder,
+        view: s.character.view,
+        size: s.character.size,
+        prompt: s.character.prompt,
+        rotations: Object.keys(s.frames.rotations),
+        animations: anims,
+      })
     }
-    // Every path the index names must actually be in the archive; a manifest that promises frames
-    // the assembler cannot open is worse than no manifest.
-    for (const p of [...rot, ...Object.values(s.frames?.animations ?? {}).flatMap(d => Object.values(d).flat())]) {
-      if (!existsSync(join(unpack, p))) errors.push(`missing from archive: ${p}`)
-    }
-    states.push({
-      id: s.character?.id ?? '(unknown)',
-      name: s.character?.name ?? s.folder,
-      folder: s.folder,
-      view: s.character?.view,
-      size: s.character?.size,
-      prompt: s.character?.prompt,
-      rotations: Object.keys(s.frames?.rotations ?? {}),
-      animations: anims,
-    })
-  }
 
-  const manifest: PixellabManifest = {
-    version: 1,
-    kind: 'import',
-    fetchedAt: new Date().toISOString(),
-    endpoint: `${API}/characters/${id}/zip`,
-    characterId: id,
-    groupId: meta.group_id,
-    exportVersion: meta.export_version,
-    zip: {
-      path: zipPath,
-      sha256: sha256(bytes),
-      contentSha256: contentHash(unpack),
-      bytes: bytes.length,
-      files: execFileSync('unzip', ['-l', zipPath], { encoding: 'utf8' }).trim().split('\n').length - 5,
-    },
-    states,
-    usage: null,
-    errors,
+    const manifest: PixellabManifest = {
+      version: 1,
+      kind: 'import',
+      fetchedAt: new Date().toISOString(),
+      endpoint: `${API}/characters/${id}/zip`,
+      characterId: id,
+      groupId: meta.group_id,
+      exportVersion: String(meta.export_version),
+      zip: {
+        path: zipPath,
+        sha256: sha256(bytes),
+        contentSha256: contentHash(stagedUnpack),
+        bytes: bytes.length,
+        files: entries.filter(entry => entry.type === 'file').length,
+      },
+      states,
+      usage: null,
+      errors,
+    }
+    if (errors.length) {
+      throw new Error(`pixellab: ${id} archive is incomplete: ${errors.slice(0, 3).join('; ')}`)
+    }
+    rmSync(unpack, { recursive: true, force: true })
+    renameSync(stagedUnpack, unpack)
+    renameSync(stagedZip, zipPath)
+    const manifestPath = join(dir, 'manifest.json')
+    writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n')
+    return { manifest, manifestPath }
+  } finally {
+    rmSync(staged, { recursive: true, force: true })
   }
-  const manifestPath = join(dir, 'manifest.json')
-  writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + '\n')
-  return { manifest, manifestPath }
 }
 
 /**

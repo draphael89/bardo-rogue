@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "file": "swing-96-93e3c0c3f03e.png",
+  "sha256": "93e3c0c3f03ef7d3fcd7f3a4523f7c2093eef52cd1f45136415c6a89e9a4832e",
+  "originalFile": ".art-cache/pixellab/bell-object/swing-96.png",
+  "rejectedAt": "2026-08-31T11:56:18.345Z",
+  "recordedBy": "codex",
+  "reason": "Rejected for runtime because the strong pendulum motion redraws the fixed basalt yoke and drifts its lighting across frames; four moving frames also fail the north-key light-direction judge.",
+  "manifest": {
+    "file": "swing-96-93e3c0c3f03e.manifest.json",
+    "sha256": "5c8eac10524ac1dbcda7e7a1034f6dfd4d8a99fc93b98b58e5293503c02efe71"
+  }
+}

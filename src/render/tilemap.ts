@@ -1051,19 +1051,31 @@ function bakeBardoCauseway(g: Graphics, arena: Arena): void {
   // 1) The walk. Scuffs scatter densest on the line and thin off it — a soft edge made of hard
   //    pixels. One step UP from the body (slate2); warm (naveWarm) inside the Keeper's pool,
   //    which is how the wear and the light agree (§3.2.7); a sparse dark heel-gouge (grout).
-  const x0 = 33.5 * TILE, y0 = 31.5 * TILE, x1 = 32.9 * TILE, y1 = 24.5 * TILE
-  const steps = Math.round((y0 - y1) / 2)
-  for (let i = 0; i <= steps; i++) {
-    const t = i / steps
-    const h = wearHash(i, 7, 113)
-    const lat = ((h >>> 3) % 17) - 8
-    if (Math.abs(lat) > 3 && (h & 3) !== 0) continue
-    const wx = x0 + (x1 - x0) * t + lat
-    const wy = y0 + (y1 - y0) * t + ((h >>> 9) % 3) - 1
-    if (!floorAt(wx, wy)) continue
-    const warm = Math.hypot(wx - 39.5 * TILE, wy - 29.8 * TILE) < 52
-    const col = (h >>> 6) % 5 === 0 ? C.grout : warm ? C.naveWarm : C.slate2
-    artPx(g, wx * S, wy * S, 2 + ((h >>> 13) % 3), 1, col)
+  //    The walk runs the WHOLE pilgrimage, landing to Gate, not just as far as the bridge mouth.
+  //    It used to stop at row 24.5, which left the northern two thirds of the axis — the part the
+  //    player actually walks toward the Gate — as bare slabs with nothing on them but seven sett
+  //    pairs, and it read as a corridor rather than as a route anyone had taken.
+  //    Deliberately NOT more gold: bakeBardoProcession's own comment names adding brightness out
+  //    here as the discipline most likely to slip and the gate most likely to break. slate2 is
+  //    luminance 79 and grout is 14 — neither can enter a frame's top 1%, so a walked path costs
+  //    no highlight budget at all. The seed is per-segment so the two do not repeat each other.
+  for (const [x0, y0, x1, y1, salt] of [
+    [33.5 * TILE, 31.5 * TILE, 32.9 * TILE, 24.5 * TILE, 113],   // landing -> bridge mouth
+    [32.9 * TILE, 24.5 * TILE, 33.4 * TILE, 9.0 * TILE, 229],    // bridge mouth -> the Gate
+  ] as const) {
+    const steps = Math.round((y0 - y1) / 2)
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps
+      const h = wearHash(i, 7, salt)
+      const lat = ((h >>> 3) % 17) - 8
+      if (Math.abs(lat) > 3 && (h & 3) !== 0) continue
+      const wx = x0 + (x1 - x0) * t + lat
+      const wy = y0 + (y1 - y0) * t + ((h >>> 9) % 3) - 1
+      if (!floorAt(wx, wy)) continue
+      const warm = Math.hypot(wx - 39.5 * TILE, wy - 29.8 * TILE) < 52
+      const col = (h >>> 6) % 5 === 0 ? C.grout : warm ? C.naveWarm : C.slate2
+      artPx(g, wx * S, wy * S, 2 + ((h >>> 13) % 3), 1, col)
+    }
   }
   // 2) Cold soot fanned south and 15° right (§3.2.8) of every dead fire: it burned for years,
   //    and then nobody came. Quantized hard-edged wedges (§6.6), all below the floor body.

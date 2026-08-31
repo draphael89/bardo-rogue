@@ -706,7 +706,7 @@ function buildBardo(rng: Rng): Arena {
   // 32px logical body eats two of the walk's four columns and reads as a mass the hero has to be
   // read against rather than as furniture beside them. The pan is low, small, and is already this
   // room's vocabulary for something left behind at a threshold.
-  furniture(31, 14, PROP.brazierCold, false)
+  furniture(31, 16, PROP.brazierCold, false)
   furniture(34, 18, PROP.pan, false)
   // FORGE: the Smith's ground; the forge fire has a body, and quenched slag sits by the west wall.
   furniture(18, 21, PROP.brazier)

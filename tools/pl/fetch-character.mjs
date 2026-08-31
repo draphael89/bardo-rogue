@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, writeFileSync, rmSync, renameSync } from 'node:fs'
 
 // Node does not read .env.local on its own, and only `pnpm art` passes --env-file-if-exists.
 // Load it here so the documented `node tools/pl/*.mjs` invocations actually carry the token instead
@@ -18,7 +18,13 @@ const j = await lookup.json()
 const rot = j.rotation_urls ?? j.rotations ?? {}
 const keys = Object.keys(rot)
 if (!keys.length) { console.log(id, 'status:', j.status ?? JSON.stringify(j).slice(0,180)); process.exit(0) }
-mkdirSync(out, { recursive: true })
+// Stage the whole set first. Writing each rotation as it arrives meant a later signed URL failing
+// left the earlier directions overwritten and the unvisited ones stale from the previous run — a
+// mixed candidate set, on a command that exits non-zero and looks like it changed nothing.
+const staging = `${out}.staging-${process.pid}`
+rmSync(staging, { recursive: true, force: true })
+mkdirSync(staging, { recursive: true })
+const fetched = []
 for (const k of keys) {
   const url = typeof rot[k] === 'string' ? rot[k] : rot[k]?.url
   if (!url) continue
@@ -27,6 +33,9 @@ for (const k of keys) {
   const res = await fetch(url)
   if (!res.ok) throw new Error(`rotation "${k}" failed: HTTP ${res.status} ${url.split('?')[0]}`)
   const b = Buffer.from(await res.arrayBuffer())
-  writeFileSync(`${out}/${k}.png`, b)
+  writeFileSync(`${staging}/${k}.png`, b)
+  fetched.push(k)
 }
+rmSync(out, { recursive: true, force: true })
+renameSync(staging, out)
 console.log(out, keys.length, 'directions')

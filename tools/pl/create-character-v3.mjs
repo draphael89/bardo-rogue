@@ -21,4 +21,19 @@ const body = {
 const r = await fetch('https://api.pixellab.ai/v2/create-character-v3', { method: 'POST', headers: H, body: JSON.stringify(body) })
 const j = await r.json()
 if (!r.ok && r.status !== 202) { console.error(r.status, JSON.stringify(j).slice(0, 600)); process.exit(1) }
-console.log(name, '->', j.character_id ?? j.background_job_id ?? JSON.stringify(j).slice(0, 200))
+const id = j.character_id ?? j.id
+if (!id) { console.error('no character id in response:', JSON.stringify(j).slice(0, 300)); process.exit(1) }
+// This endpoint returns a character_id, not a job id — but the character is `pending` for minutes,
+// and fetch-character on a pending character finds no rotations and exits 0. Wait here so the
+// documented two-driver workflow does not need a human polling in between.
+const sleep = ms => new Promise(r => setTimeout(r, ms))
+for (let i = 0; i < 120; i++) {
+  await sleep(5000)
+  const c = await (await fetch(`https://api.pixellab.ai/v2/characters/${id}`, { headers: H })).json()
+  if (String(c.status).toLowerCase() === 'completed') { console.log(`${name} -> ${id}`); process.exit(0) }
+  if (['failed', 'error'].includes(String(c.status).toLowerCase())) {
+    console.error(`${name} -> ${id} ended ${c.status}`); process.exit(1)
+  }
+  if (i % 6 === 0) process.stderr.write(`  ${name} ${c.status}\n`)
+}
+console.error(`${name} -> ${id} still pending after 10 minutes`); process.exit(1)

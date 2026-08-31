@@ -63,9 +63,15 @@ mkdirSync(dirname(cfg.out), { recursive: true })
 // on out-0..out-15 and a single-image result on out.png, so a re-run whose payload count changed
 // left the old numbered candidates sitting beside the new ones, indistinguishable from current
 // output. Only reached once `found` is non-empty, so a failed run never destroys the last good set.
+// Parsed, not pattern-matched. A stem built into a RegExp treats its own metacharacters as syntax,
+// so an ordinary name like `hero.v2` produces /^hero.v2-\d+\.png$/ where each dot matches ANY
+// character — and that deletes the unrelated sibling `hero-v2-0.png` before writing.
 const dir = dirname(cfg.out), stem = basename(cfg.out).replace(/\.png$/, '')
 for (const f of readdirSync(dir)) {
-  if (f === `${stem}.png` || new RegExp(`^${stem}-\\d+\\.png$`).test(f)) rmSync(`${dir}/${f}`, { force: true })
+  if (!f.endsWith('.png')) continue
+  const base = f.slice(0, -4)
+  const isFamily = base === stem || (base.startsWith(`${stem}-`) && /^\d+$/.test(base.slice(stem.length + 1)))
+  if (isFamily) rmSync(`${dir}/${f}`, { force: true })
 }
 found.forEach((b64, i) => {
   const p = found.length > 1 ? cfg.out.replace(/\.png$/, `-${i}.png`) : cfg.out

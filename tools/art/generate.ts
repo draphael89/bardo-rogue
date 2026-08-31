@@ -67,7 +67,11 @@ const BIBLE_RULES = [
   'metal is a value range with its extremes touching, not one flat value',
   'cloth has no specular',
   'no pure black and no pure white pixels',
-  'a uniform #00ff00 background, no shadow, no scenery, no text, no labels, no grid, no watermark',
+  // NOT a #00ff00 matte. Both providers are already asked for transparency — `remove_bg` for Retro
+  // Diffusion and `no_background` for PixelLab — so demanding a green background contradicted the
+  // request in the same breath, and worse, handed the model a colour to paint INTO the sprite. It
+  // survived unnoticed because this client has never been run live.
+  'a transparent background, no shadow, no scenery, no text, no labels, no grid, no watermark',
 ]
 
 const FORBIDDEN = [

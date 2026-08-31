@@ -8,16 +8,35 @@
   "cols": 1,
   "rows": 1,
   "maxColors": 10,
-  "palette": ["void","mortar","seal0","iron","ironHi","slate1","slate2","boneLo","ashField","ashFieldLit"],
+  "palette": [
+    "void",
+    "mortar",
+    "seal0",
+    "iron",
+    "ironHi",
+    "slate1",
+    "slate2",
+    "boneLo",
+    "ashField",
+    "ashFieldLit"
+  ],
   "fit": "grid",
   "chromaKey": false,
   "coverage": 0.5,
-  "salience": { "minShare": 0.2, "minDelta": 0.16 },
-  "frames": [{ "name": "brazierCold", "i": 0 }],
+  "salience": {
+    "minShare": 0.2,
+    "minDelta": 0.16
+  },
+  "frames": [
+    {
+      "name": "brazierCold",
+      "i": 0
+    }
+  ],
   "provenance": {
     "provider": "pixellab",
     "model": "create_image_pixflux (MCP), seed 3, 192x192, forced canon ramp",
-    "promptFile": ".art-cache/props-test/masters/brazier-cold-192.txt"
+    "promptFile": "art/prompts/probe_brazier_cold_192.txt"
   },
   "registrationNote": "CANDIDATE ONLY, .art-cache. Deliberately UNLIT and EMPTY: the game owns flame (particles.flame), the light pool (arena.braziers) and the cast shadow (bakePropShadows). A generated sprite with fire painted into it would double the flame and its fire could not gutter with the room's flicker. Generate the dead matter; let the runtime own anything that moves or emits."
 }

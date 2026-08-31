@@ -1,10 +1,10 @@
 {
-  "id": "probe.brazier.candidate",
+  "id": "probe.brazier96.candidate",
   "kind": "prop",
   "input": ".art-cache/props-test/masters/brazier-192.png",
-  "output": ".art-cache/props-test/compiled/probe_brazier.png",
-  "sidecar": ".art-cache/props-test/compiled/probe_brazier.json",
-  "cell": 48,
+  "output": ".art-cache/props-test/compiled/probe_brazier_96.png",
+  "sidecar": ".art-cache/props-test/compiled/probe_brazier_96.json",
+  "cell": 96,
   "cols": 1,
   "rows": 1,
   "maxColors": 12,
@@ -40,5 +40,5 @@
     "model": "create_image_pixflux (MCP), seed 3, 192x192, forced canon ramp",
     "promptFile": "art/prompts/probe_brazier_192.txt"
   },
-  "registrationNote": "CANDIDATE ONLY, .art-cache. Generated at 192px against a 48px cell so the compiler's 4x palette-space vote does the density reduction it exists for -- the earlier native-48 test skipped that entirely and measured raw generator output against compiled code-authored art."
+  "registrationNote": "CANDIDATE ONLY. Ratio probe: the same 192px master compiled to a 96px cell (2x downsample) to measure how density falls with the palette-space vote."
 }

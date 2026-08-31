@@ -519,7 +519,7 @@ function detectPivot(idx: Int16Array, cell: number): [number, number] {
  * no provenance at all. A spec now names the checked-in prompt FILE and the reference master, and the
  * compiler hashes both; hand-typing the hashes is rejected so they cannot drift from the files.
  */
-function computedProvenance(spec: CompileSpec): Partial<SheetProvenance> {
+function computedProvenance(spec: CompileSpec, fromDisk: boolean): Partial<SheetProvenance> {
   const p = spec.provenance
   if (!p) return {}
   const out: Partial<SheetProvenance> = {}
@@ -528,6 +528,17 @@ function computedProvenance(spec: CompileSpec): Partial<SheetProvenance> {
     throw new Error(`spec ${spec.id}: provenance.promptHash is computed from provenance.promptFile — name the prompt file, do not type a hash`)
   }
   if (p.promptFile) {
+    // A spec that LIVES ON DISK is a committed artefact, so its prompt of record must be committed
+    // too: provenance that is not tracked is not provenance. Specs naming a prompt inside the
+    // gitignored .art-cache/ pass on the machine that made them and throw on every clean checkout —
+    // `setpiece-gate` and `setpiece-skiff` are both in that state right now, with their prompts gone
+    // for good. Scoped to `fromDisk` rather than to the production path on purpose: the bug is a
+    // committed spec, and candidate specs get committed too. A programmatic compile ('<inline>',
+    // which is what the unit tests use) may point its fixture anywhere.
+    // Checked before existsSync so the error names the real problem rather than "does not exist".
+    if (fromDisk && !norm(p.promptFile).startsWith('art/prompts/')) {
+      throw new Error(`spec ${spec.id}: provenance.promptFile "${p.promptFile}" must live under art/prompts/ — a prompt inside .art-cache/ is gitignored and will not survive a clean checkout`)
+    }
     if (!existsSync(p.promptFile)) throw new Error(`spec ${spec.id}: provenance.promptFile "${p.promptFile}" does not exist`)
     // Full 64-hex digest: the shipped sidecars and their provenance test pin the whole sha256, and a
     // reviewer can verify it with sha256sum without knowing a truncation convention.
@@ -802,7 +813,7 @@ export async function compileSheet(spec: CompileSpec, specPath = '<inline>'): Pr
     source: {
       provider: spec.provenance?.provider ?? 'unknown',
       ...spec.provenance,
-      ...computedProvenance(spec),
+      ...computedProvenance(spec, specPath !== '<inline>'),
       compiler: COMPILER_VERSION,
       sourceFile: relative(process.cwd(), spec.input),
       sourceHash,

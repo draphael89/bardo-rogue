@@ -173,6 +173,12 @@ def canon_srgb(hexstr):
 MAT_IRON = make_mat("iron", canon_srgb("#393942"))            # -> iron / ironHi
 MAT_WINE = make_mat("wine", canon_srgb("#8A3A4C"))            # -> purple2 / purple3
 MAT_STEEL = make_mat("steel", canon_srgb("#A8AFBE"), rough=0.45, spec=0.12)   # -> brick / brickHi
+# The pauldron rims, one step under steel. Nothing about the rims was wrong except their RANK: in
+# steel they quantised to brickHi, the top of this ramp, over thirty pixels of it on the widest part
+# of the figure -- so the brightest thing on the hero was his shoulder line, and the face lost. This
+# keeps "bright metal owns the top of the torso" and the two-segment wear break, and gives the top
+# of the ramp to the brow instead.
+MAT_RIM = make_mat("rim", canon_srgb("#8A92A2"), rough=0.45, spec=0.12)       # -> brickLo / brick
 MAT_BLADE = make_mat("blade", canon_srgb("#C0C6D4"), rough=0.45, spec=0.12)   # -> brickHi / cope
 MAT_BONE = make_flat("boneFlat", canon_srgb("#90806C"))       # boneDim, Weber +2.93
 MAT_GOLD = make_flat("goldFlat", canon_srgb("#D4B060"))       # gold, exactly twice per body
@@ -382,7 +388,23 @@ box("faceSlit", V(0, -7.3, HZ + 17.0), 2.3, 0.5, 0.8, "head", MAT_SLIT)
 # invisible INSIDE the plate — the whole face reads as one black block and SS3.4's "the face slit
 # must remain readable" quietly fails while every gate stays green. What makes a slit read is the LIT
 # edge above it, not a darker dark: one steel line, and the black below it becomes a slit.
-box("helmBrow", V(0, -7.0, HZ + 18.1), 2.7, 0.85, 0.34, "head", MAT_STEEL)
+#
+# That line is right and it was still losing. In steel the brow quantised to `brick`, while the two
+# pauldron rims below it quantised a step higher to `brickHi` — so the brightest thing on the hero
+# was his shoulders, over thirty pixels of them against four on his face. Measured on the shipped
+# south idle: helm dome L 0.110 against pauldrons L 0.213. At 1x the eye landed on the shoulder line
+# and the figure read as a domino with a bright bar across it; the face was fully modelled and
+# nobody could see it. (Lifting the DOME instead was tried and measured first: MAT_IRON -> #5C6070
+# moved dome L 0.1100 -> 0.1114 and the head:shoulder ratio not at all, because `helmCrown` and the
+# visor own almost every visible head pixel and the ball is behind them. The value was never the
+# dome's to spend.)
+#
+# So the brow takes the top of the ramp instead. It is the correct pixel to spend it on: four pixels,
+# directly above the slit, in the one place on a character a viewer is already looking. The rims keep
+# their brightness and their two-segment break — that argument is sound and cited above; it was never
+# the rims that were wrong, only that nothing on the head outranked them.
+MAT_BROW = make_mat("brow", canon_srgb("#C8CEDC"), rough=0.42, spec=0.14)   # -> brickHi / cope
+box("helmBrow", V(0, -7.0, HZ + 18.1), 2.7, 0.85, 0.34, "head", MAT_BROW)
 box("napeBand", V(0, 1.0, HZ + 17.2), 2.3, 0.5, 1.1, "head", MAT_SLIT)
 
 # ANCHOR 2 — ONE wine garment in five meshes, sized as a GARMENT against a 10.4-unit torso rather
@@ -459,8 +481,8 @@ for _s, _sx in (("R", 1), ("L", -1)):
     # line and was the brightest thing in the frame — a chrome bar, not a worn pauldron. Two segments
     # with a 0.9-unit gap, and the gap sits on the OUTBOARD half so the break reads as wear at the
     # edge that takes the hits.
-    box("pauldronRimA" + _s, V(4.55 * _sx, -0.4, HZ + 12.6), 1.7, 3.35, 0.45, "upperArm" + _s, MAT_STEEL)
-    box("pauldronRimB" + _s, V(7.5 * _sx, -0.4, HZ + 12.6), 1.15, 3.35, 0.45, "upperArm" + _s, MAT_STEEL)
+    box("pauldronRimA" + _s, V(4.55 * _sx, -0.4, HZ + 12.6), 1.7, 3.35, 0.45, "upperArm" + _s, MAT_RIM)
+    box("pauldronRimB" + _s, V(7.5 * _sx, -0.4, HZ + 12.6), 1.15, 3.35, 0.45, "upperArm" + _s, MAT_RIM)
 
 # Gold, exactly twice, both FLAT. SS7: gold marks boundaries and identity, never the armor body.
 # The cape sigil is north's mark (literally the concept exhibit's shot); the baldric clasp is

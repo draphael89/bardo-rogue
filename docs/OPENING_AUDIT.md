@@ -33,11 +33,34 @@ remain unchanged.
 
 ---
 
+## 0. What has landed since this audit was written
+
+**Done, on this branch, measured.**
+
+- **The light has a colour** (§13 item 1). An additive pass over the multiply, tinted per room; a
+  constant blue-violet floor under the crushed blacks. Bardo arrival: lit warmth **0.08 → 0.50**,
+  shadow mean blue **3.5 → 14.7**, bright-set lead **`slate2` @ 14.7% → `boneDim` @ 1.8%** — §3.2.5
+  satisfied. Cost 0.1 ms p50 under a dense fight. Nothing was drawn.
+- **Both missing gates exist** (§13 item 3). `room:gate` now reads the composited frame; a
+  source:target parity test guards #28's pixel grid, verified by breaking it (9 of 19 go red).
+
+**Open, and waiting on a human.**
+
+- **The hero's head** (§13 item 2) — a candidate sits unapproved in `.art-cache`; see §9, which is
+  rewritten because the framing in it was wrong.
+
+---
+
 ## 1. Executive verdict
 
 **PR #28 was real. The hero is on the grid, crisp, and authored. The next gap is not darkness, not
-asset count, and not PixelLab prompting — it is that your light is the wrong colour and your hero has
-no face.**
+asset count, and not PixelLab prompting — it is that your light is the wrong colour, and that nothing
+in this project has ever measured the frame it actually ships.**
+
+*(An earlier draft of this line ended "and your hero has no face." That was wrong, and §9 records the
+correction: he has one, fully modelled, and it was losing a rank fight to his own shoulder rims. I am
+leaving the mistake visible because its shape is the lesson — the defect looked like missing art and
+was a value decision, which is the same trap this project fell into with the light.)*
 
 Three findings reframe the work, and two of them contradict things this project currently believes.
 
@@ -49,9 +72,11 @@ manifest writer — has never been executed. There are zero manifests, zero prom
 
 That rig is excellent at what it does: it computes proportion, registration, pivots, sockets, planted
 feet and an 8-frame gait, and it re-renders the whole catalogue in 52 seconds. It solves every
-constraint a generator structurally could not. **It also cannot draw.** The shipped hero has no face,
-no visor, no jaw; his torso is a stack of axis-aligned rectangles; his mantle is a wine blob with no
-hem or fold; his two legs read as one column. He is geometrically correct and artistically empty.
+constraint a generator structurally could not. **What it cannot do is compose.** It renders exactly
+what it is told, correctly lit, and it has no opinion about which of those surfaces the eye should
+find first — so the hero's torso is a stack of axis-aligned rectangles, his mantle is a wine blob with
+no hem, his legs read as one column, and the brightest thing on him is a pauldron rim. Every one of
+those is a decision nobody made rather than a thing the tool got wrong.
 
 **Finding 2 — the game is not too dark. Measured, its blacks match the concept boards almost
 exactly.** I assumed otherwise from the first screenshot and the measurement corrected me:
@@ -96,14 +121,14 @@ that ship, not doctrine.
 
 | Axis | v1 | now | Why |
 |---|---|---|---|
-| Art direction | 55 | **58** | The bible is genuinely excellent and its reach grew (characters now compile through it). But the shipped frame violates §3.2.5 and §3.2.6 measurably, and nothing detects that. |
-| Character design | 35 | **38** | Now authored, on-grid, one hand, consistent across 8 sheets. Still: no face, no interior modelling, a domino silhouette at 1×, and 4 of 6 actors are Kenney. |
+| Art direction | 55 | **58 → 64** | The bible is genuinely excellent and its reach grew (characters now compile through it). But the shipped frame violates §3.2.5 and §3.2.6 measurably, and nothing detects that. |
+| Character design | 35 | **38** | Now authored, on-grid, one hand, consistent across 8 sheets. Still: no interior modelling on torso or legs, a domino silhouette at 1×, an inverted value hierarchy (§9), and 4 of 6 actors are Kenney. |
 | Environment design | 68 | **60** | Marked **down** on measurement, not on regression. `buildBardo` is sophisticated — four islands, ranked pools, a worn spine, a fainter fork, staggered links, seals as teasers. At 1× it renders as **flat grey rectangles**: ~19 props over 465 paved cells, and nothing stands up. |
 | Composition | 70 | **66** | The plan is good; the frame does not sell it. Three of the four islands are visually identical, so there is no pull toward any of them. |
 | Colour & palette | 80 | **72** | Canon holds absolutely — 0 off-canon pixels. But the palette is *used* monochromatically: 55 colours, and the frame reads as grey with orange dots. |
-| Lighting | 72 | **48** | The largest correction in this document. Pools are ranked, tuned and coupled to the bake — configured beautifully. What renders is a multiply that cannot warm anything, and cold stone in the top brightness rank. |
+| Lighting | 72 | **48 → 68** | The largest correction in this document, and now largely acted on. Pools were always ranked, tuned and coupled to the bake — configured beautifully — but what rendered was a multiply that cannot warm anything, with cold stone in the top brightness rank. Since fixed (§0): warmth 0.08 → 0.50, shadow blue 3.5 → 14.7, architecture out of the top rank. Short of the concepts' 0.61–0.79 because their pools are small and hard and ours are the room's calibrated radii. |
 | Asset consistency | 30 | **45** | Hero and Brute are now one hand from one rig. Caster, charger, warden and dummy are still visibly from another game. |
-| Readability | 40 | **52** | The grid fix is real and the hero is crisp. Value hierarchy is inverted: the blade (B5) out-ranks the body (B0–B1), and the helmet out-ranks the face that isn't there. |
+| Readability | 40 | **52** | The grid fix is real and the hero is crisp. Value hierarchy is inverted: the blade (B5) out-ranks the body (B0–B1), and the pauldron rims out-rank the face — measured, dome L 0.110 against pauldrons L 0.213. |
 | Distinctiveness | 72 | **74** | "Islands in a starfield void" is ownable and held everywhere. |
 | Visual polish | 35 | **55** | Crawling outlines are gone — the single biggest win in #28. Remaining: a bone-white ring at the hero's feet brighter than the hero, a raw staircase on the blade's diagonal, no cast shadow from anything onto stone. |
 
@@ -115,7 +140,7 @@ that ship, not doctrine.
 | Environmental animation | 55 | **55** | Braziers gutter, motes drift, fog moves, flame tongues take their source's colour. Modest and correct. |
 | Movement feel | 70 | **72** | 957 tests green, matrix measured, no seed strands a player. Input responsiveness is not a problem here. |
 | Animation transitions | 45 | **58** | `clipSelect` is well built and the plant-pose branch is now **reachable** — every swing clip ships `ci = 2`, and the heavy passes `commitTick = 3`. v1 called it dead code; it is live for the heavy. The light swings still take an even split because they pass no commit tick. |
-| Character personality | 20 | **25** | **Idle is one static cell.** No idle clip exists in any sidecar. No breathing, no weight shift, no cloak follow-through, no secondary motion, no face to emote with. The dodge's middle frame holds 10 ticks on one drawing; the heavy's commit holds 9. |
+| Character personality | 20 | **25** | **Idle is one static cell.** No idle clip exists in any sidecar. No breathing, no weight shift, no cloak follow-through, no secondary motion, and a visor slit that cannot move. The dodge's middle frame holds 10 ticks on one drawing; the heavy's commit holds 9. |
 | Weapon interaction | 25 | **38** | More fires than v1 credited: `swordMetal` + a 329.63 Hz bell, the Gate's mark lights, the rack redraws without its blade. But the hero does not move, and a full-width gold HUD banner is the loudest thing in the frame. |
 
 ### Production system — 67
@@ -177,7 +202,7 @@ That is not a regression — it is v1 grading the *configuration* and v2 grading
 
 | # | What | Evidence |
 |---|---|---|
-| 1 | **The hero's head** | A grey rectangle with a lighter cap. No visor, no jaw, no eye slit. The pauldrons are brighter than the head, so **the eye lands on his shoulders, not his face.** At 1× he is a domino. |
+| 1 | **The hero's head** | Not for want of a face — `visorPlate`, `faceSlit` and a lit `helmBrow` all render correctly (§9). The brow quantises to `brick` and the two pauldron rims to `brickHi`, so **the eye lands on his shoulders**: dome L 0.110 against pauldrons L 0.213, four face pixels against thirty shoulder ones. At 1× he is a domino with a bright bar across it. |
 | 2 | **Caster, charger, warden, dummy** | Kenney tiles 84 / 122 / 54 / 109 under runtime `Graphics`. In the pose sheet the caster is a magenta blob with a red laser and the charger is a white-red streak — visibly from another game. |
 | 3 | **The bone ring at the hero's feet** | `#d1c3ae` (canon `bone`), a bright ellipse ring under every actor, **brighter than the entire hero body**. It is the first thing the eye finds on the character. |
 | 4 | **The blade's diagonal** | A raw 2-1-2-1 staircase in near-white with a pure-black edge running its full length. The clearest "rendered, not drawn" tell on the sprite, and the highest-value object in most frames. |
@@ -367,27 +392,56 @@ poses) into its strongest mode.
 
 ---
 
-## 9. Hero plan
+## 9. Hero plan — **rewritten; the first draft of this section was wrong**
 
-**The hero's problem is one word: face.** Everything else about him is now correct.
+The first draft said "the hero has no face" and routed the fix to the PixelLab edit lane. Both halves
+were wrong, and the correction is worth more than the recommendation was.
 
-1. **Give him a head.** A visor slit, a jaw line, one dark socket, a lit brow edge — four or five
-   pixels that make the eye land on the head instead of the pauldrons. Today the pauldrons are the
-   brightest thing on the body and the head is darker than they are. This is the single highest-value
-   art change in the game and it is roughly 20 pixels, repeated across 3 facings.
-2. **Give the body interior modelling.** Two separated legs with a gap, a hem on the mantle, a fold or
-   two, a lit top edge on the greave. He currently has ~8 readable shapes and needs ~15.
-3. **Author an idle clip.** Two or three frames, 20–30 ticks each: a breath, a settle, a slow blade
-   dip. Personality is 25/100 and this is most of it. There is no idle clip in any sidecar today.
-4. **Re-pace the long holds.** Split the dodge's 10-tick middle and the heavy's 9-tick commit. The
-   frames to do it with already exist in the chain.
+**He has a face, and it is properly built.** `mannequin.py` models a `visorPlate` in `seal0`, a
+`faceSlit` in `mortar`, and — added in an earlier pass for exactly this reason — a `helmBrow` in
+steel, under a comment that already gets the principle right: *"What makes a slit read is the LIT
+edge above it, not a darker dark."* All three render correctly. Read the compiled south idle back as
+hex and the face is there: a lit brow over a two-row black slit inside a dark visor plate.
+
+**What was wrong was the rank, not the drawing.** The brow quantised to `brick`; the two pauldron
+rims quantised a step higher to `brickHi`, the top of the ramp — over thirty pixels of it, on the
+widest part of the figure, against four on his face. The brightest thing on the hero was his shoulder
+line. Measured on the shipped south idle: **helm dome L 0.110, pauldrons L 0.213** — a 1.9× inversion.
+
+**Two things were tried, and one of them failed usefully.** Lifting the *dome* (MAT_IRON → `#5C6070`)
+moved dome L **0.1100 → 0.1114** and the head:shoulder ratio not at all — because `helmCrown` and the
+visor own nearly every visible head pixel and the ball is behind them. That value was never the
+dome's to spend. Reverted. What worked was giving the top of the ramp to the **brow** and stepping the
+**rims** down one: the brow becomes `brickHi` directly above a `mortar` slit, which is the largest
+value step this palette has, four pixels wide, at eye level.
+
+**And it is an improvement, not a transformation. Say so.** At 14× the face clearly reads. At 1×, full
+figure, the difference is subtle. What makes the hero a domino at gameplay scale is not one material:
+his head is ~13 px of a 37 px figure and mostly occluded by crest and visor, his torso and legs carry
+no interior modelling, and the whole body is near-monochrome with two bright accents. Fixing *that* is
+a proportion-and-value redesign of the mannequin — it changes who the character is, so it is a
+decision, not a defect.
+
+**Note also what this says about §8.** The stage-3 "PixelLab draws the face" proposal was written
+before this investigation and it is now over-scoped: the face is *geometry and material*, which the
+rig computes, and the rig was already right. Keep the edit lane on its proper ground — folds, worn
+edges, hand-placed accents, the things not derivable from bones — and stop assuming a generator is
+needed for anything the eye is missing.
+
+**Still open, in order:**
+
+1. **Decide the body's value structure.** Does the shoulder line keep the top of the ramp, or does the
+   head? A candidate for the second answer is compiled and gate-green in `.art-cache/spike/hero-final`
+   (169 gates unarmed, 404 armed, 0 blocking). **Approval is a human's; no agent may award it.**
+2. **Give the body interior modelling.** Two separated legs with a gap, a hem on the mantle, a lit top
+   edge on the greave. ~8 readable shapes today; a shipped indie protagonist at this size carries 15–20.
+3. **Author an idle clip.** Two or three frames, 20–30 ticks each. There is no idle clip in any
+   sidecar; personality is 25/100 and this is most of it.
+4. **Re-pace the long holds.** The dodge's 10-tick middle and the heavy's 9-tick commit.
 5. **Kill the bone ring at his feet**, and pull the blade's value down one band so the character
    out-ranks his weapon.
 6. **Do not add an outline or a rim.** Ground separation is already carried by value and the wine
-   mantle. An outline would fight the code-authored world's flat-mass language. (The existing white
-   rim on a perfect dodge is a *reward*, one tick, and should stay.)
-
-Route 1 and 2 through §8 stage 3 — this is exactly the pass the rig cannot do and the edit lane can.
+   mantle. (The white rim on a perfect dodge is a *reward*, one tick, and should stay.)
 
 ---
 

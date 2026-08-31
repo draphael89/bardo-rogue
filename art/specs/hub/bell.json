@@ -7,7 +7,7 @@
   "cell": 96,
   "cols": 1,
   "rows": 1,
-  "maxColors": 12,
+  "maxColors": 11,
   "palette": [
     "void",
     "mortar",
@@ -16,7 +16,6 @@
     "ironHi",
     "coinBrass",
     "goldDim",
-    "gold",
     "boneLo",
     "slate0",
     "slate1",

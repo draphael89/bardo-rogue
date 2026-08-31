@@ -22,7 +22,8 @@ const at = (i: number) => ({ left: (i % COLS) * CELL, top: Math.floor(i / COLS) 
 const SINGLES: Array<[string, number]> = [
   ['.art-cache/hub/compiled/hub_ossuary.png', 5],   // PROP.ossuary
   ['.art-cache/hub/compiled/hub_lamp.png', 12],     // PROP.keeperLamp
-  ['.art-cache/hub/compiled/hub_stele.png', 15],    // PROP.verdictStele
+  // PROP.verdictStele (15) is DELIBERATELY absent: the candidate lost production's legible carved
+  // cross and read as a plain standing rock. art/specs/hub/stele.json is kept as the record.
 ]
 const BELL = '.art-cache/hub/compiled/hub_bell.png' // PROP.bellNW/NE/SW/SE = 0,1,2,3
 

@@ -854,17 +854,12 @@
       "maxHeight": 0.95
     },
     "coinBrass": {
-      "maxShare": 0.45,
+      "maxShare": 0.55,
       "maxWidth": 0.95,
       "maxHeight": 0.95
     },
     "goldDim": {
-      "maxShare": 0.2,
-      "maxWidth": 0.95,
-      "maxHeight": 0.95
-    },
-    "gold": {
-      "maxShare": 0.32,
+      "maxShare": 0.45,
       "maxWidth": 0.95,
       "maxHeight": 0.95
     },
@@ -926,7 +921,7 @@
       "maxHeight": 0.95
     },
     "boneDim": {
-      "maxShare": 0.3,
+      "maxShare": 0.46,
       "maxWidth": 0.95,
       "maxHeight": 0.95
     },

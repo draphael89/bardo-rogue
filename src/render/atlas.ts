@@ -92,17 +92,24 @@ export async function loadAtlas(manifest: Record<string, string[]>): Promise<Atl
   const candidateMode = import.meta.env.DEV && params.get('actorCandidate') === '1'
   const heroCandidateMode = import.meta.env.DEV && params.get('heroCandidate') === '1'
   const hubCandidateMode = import.meta.env.DEV && params.get('hubCandidate') === '1'
-  const requested: Array<readonly [SheetName, string]> = [
+  // The third element is OPTIONAL: a sheet whose absence is a legitimate state rather than an error.
+  const requested: Array<readonly [SheetName, string, boolean]> = [
     ...SHEETS.map(name => [name, heroCandidateMode && name === 'bardo_veteran_greatsword_south'
       ? HERO_CANDIDATE
-      : `${base}sprites/${name}`] as const),
+      : `${base}sprites/${name}`, false] as const),
     ...(candidateMode
       ? Object.entries(CANDIDATE_SHEETS).filter(([n]) => !(HUB_SHEETS as readonly string[]).includes(n))
-        .map(([name, path]) => [name as CandidateSheetName, path] as const)
+        .map(([name, path]) => [name as CandidateSheetName, path, false] as const)
       : []),
     // The animated brazier rides the hub lane, not the actor lane: it is hub art and it is what
-    // `pnpm hub:candidate` and ?hubCandidate=1 are for.
-    ...(hubCandidateMode ? HUB_SHEETS.map(n => [n, CANDIDATE_SHEETS[n]] as const) : []),
+    // `pnpm hub:candidate` and ?hubCandidate=1 are for. It is OPTIONAL because the two lanes are
+    // separate commands: `pnpm hub:candidate` builds and validates the composite still sheet only,
+    // while these animated sheets come from their own `pnpm art compile` pass. A developer who ran
+    // the documented preview command and not that pass has the still sheet and not these, and
+    // loading them unconditionally rejected the Promise.all below and stopped the game booting at
+    // all. Missing is the case `Presenter.bindAnimatedProp` already handles: hasSheet() returns
+    // false and the static prop cell stays.
+    ...(hubCandidateMode ? HUB_SHEETS.map(n => [n, CANDIDATE_SHEETS[n], true] as const) : []),
   ]
 
   // Nothing here depends on anything else here, so every file goes out in ONE wave. Loading them in
@@ -120,15 +127,21 @@ export async function loadAtlas(manifest: Record<string, string[]>): Promise<Atl
     group('particles', manifest.particles),
     group('decals', manifest.decals),
     group('light', manifest.light),
-    Promise.all(requested.map(async ([name, path]) => {
-      const [tex, def] = await Promise.all([
-        Assets.load<Texture>(`${path}.png`),
-        fetch(`${path}.json`).then(r => {
-          if (!r.ok) throw new Error(`sheet ${name}: sidecar request failed (${r.status})`)
-          return r.json() as Promise<SheetDef>
-        }),
-      ])
-      return { name, tex, def }
+    Promise.all(requested.map(async ([name, path, optional]) => {
+      try {
+        const [tex, def] = await Promise.all([
+          Assets.load<Texture>(`${path}.png`),
+          fetch(`${path}.json`).then(r => {
+            if (!r.ok) throw new Error(`sheet ${name}: sidecar request failed (${r.status})`)
+            return r.json() as Promise<SheetDef>
+          }),
+        ])
+        return { name, tex, def }
+      } catch (error) {
+        if (!optional) throw error
+        console.warn(`atlas: optional sheet "${name}" not loaded (${(error as Error).message}) — keeping the static prop cell`)
+        return null
+      }
     })),
   ])
 
@@ -166,7 +179,9 @@ export async function loadAtlas(manifest: Record<string, string[]>): Promise<Atl
   }
   const tinyWhite = whiteSheet(tiny)
   const sheets = new Map<string, Sheet>()
-  for (const { name, tex, def } of loadedSheets) {
+  for (const entry of loadedSheets) {
+    if (!entry) continue
+    const { name, tex, def } = entry
     // The contract is checked at load, not assumed: a sidecar and its PNG can drift apart, and a
     // silent mismatch shows up as the wrong pose on the wrong tick rather than as an error.
     validateSheetDef(def, name)

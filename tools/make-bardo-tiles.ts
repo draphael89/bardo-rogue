@@ -307,15 +307,21 @@ function wallFace(variant: 'a' | 'b'): Uint8Array {
     if (y <= 2) col = P.boneLo
     else if (y === 3) col = P.woodHi
     else {
+      // The bond period MUST divide the 24px cell. It was 15 with a 7px course offset, and 15 does
+      // not divide 24 — so the perpends ran 15, 9, 15, 9 and broke at every tile seam. Measured, 13
+      // of 24 rows disagreed where two wall tiles butt, which is a vertical stutter every 24px down
+      // a wall eighteen tiles long, and it is what made the walls read as tiles rather than masonry.
+      // 12 divides 24 exactly and 6 is its half, so a brick is 12x6 — a true 2:1 running bond that
+      // continues through a seam it cannot see.
       const row = Math.floor((y - 4) / 6)
-      const ox = (row & 1) * 7
-      const hx = (x + ox) % 15, hy = (y - 4) % 6
+      const ox = (row & 1) * 6
+      const hx = (x + ox) % 12, hy = (y - 4) % 6
       col = P.wood
       if (hy === 0) col = P.mortar                 // course joint
       else if (hy === 1) col = P.boneLo            // one band up: the lit course face
       else if (hy >= 4) col = P.woodLo
       if (hx === 0) col = P.mortar
-      if (variant === 'b' && hy === 3 && hx > 8) col = P.woodLo
+      if (variant === 'b' && hy === 3 && hx > 6) col = P.woodLo
     }
     if (chance(x, y, 83, 5) && y > 3) col = P.woodLo
     t.pixel(x, y, col)

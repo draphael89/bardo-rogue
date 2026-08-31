@@ -18,6 +18,17 @@ import { drawVoidUnderlay } from './starfield'
 import { TILE, PROP } from '@/sim/arena'
 import { tickClipFrame } from './clipSelect'
 import type { Sheet, SheetClip } from './sheet'
+import type { SheetName } from './atlas'
+
+/**
+ * Props that carry their own ambient loop, by PROP index. The clip is `timing: 'ticks'` — motion the
+ * sim has no opinion about, per src/render/sheet.ts. A prop with no entry here, or whose sheet is
+ * not loaded, stays the static cell it has always been, so this is inert in production.
+ */
+const ANIMATED_PROPS: Record<number, { sheet: SheetName; clip: string }> = {
+  [PROP.brazier]: { sheet: 'bardo_brazier', clip: 'burn' },
+  [PROP.keeperLamp]: { sheet: 'bardo_lamp', clip: 'glow' },
+}
 import { Hud } from './hud'
 import { Particles } from './particles'
 import { lerp } from './anim'
@@ -1184,10 +1195,11 @@ export class Presenter {
    * already was, so this is inert in production and in every room without candidate art.
    */
   private bindAnimatedProp(s: Sprite, p: { tile: number; sheet: 'room' | 'prop'; x: number; y: number }): void {
-    if (p.sheet !== 'prop' || p.tile !== PROP.brazier) return
-    if (!this.atlas.hasSheet('bardo_brazier')) return
-    const sheet = this.atlas.sheet('bardo_brazier')
-    const clip = sheet.def.clips?.burn
+    if (p.sheet !== 'prop') return
+    const bind = ANIMATED_PROPS[p.tile]
+    if (!bind || !this.atlas.hasSheet(bind.sheet)) return
+    const sheet = this.atlas.sheet(bind.sheet)
+    const clip = sheet.def.clips?.[bind.clip]
     if (!clip) return
     // Every cresset in the room shares one clip, so without a phase offset they all flicker in
     // lockstep and read as one animation stamped twice rather than as two fires. Derived from the

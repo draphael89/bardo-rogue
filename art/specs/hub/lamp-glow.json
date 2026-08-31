@@ -1,0 +1,127 @@
+{
+  "id": "hub.lampGlow.candidate",
+  "kind": "prop",
+  "input": ".art-cache/hub/masters/lamp-glow.png",
+  "output": ".art-cache/hub/compiled/bardo_lamp.png",
+  "sidecar": ".art-cache/hub/compiled/bardo_lamp.json",
+  "cell": 48,
+  "cols": 7,
+  "rows": 1,
+  "maxColors": 12,
+  "palette": [
+    "void",
+    "mortar",
+    "seal0",
+    "iron",
+    "ironHi",
+    "boneLo",
+    "numenDim",
+    "numen",
+    "numenHi",
+    "goldDim",
+    "woodLo",
+    "wood"
+  ],
+  "colourPlacement": "hub-lamp",
+  "fit": "grid",
+  "chromaKey": false,
+  "coverage": 0.5,
+  "salience": {
+    "minShare": 0.2,
+    "minDelta": 0.16
+  },
+  "frames": [
+    {
+      "name": "glow0",
+      "i": 0
+    },
+    {
+      "name": "glow1",
+      "i": 1
+    },
+    {
+      "name": "glow2",
+      "i": 2
+    },
+    {
+      "name": "glow3",
+      "i": 3
+    },
+    {
+      "name": "glow4",
+      "i": 4
+    },
+    {
+      "name": "glow5",
+      "i": 5
+    },
+    {
+      "name": "glow6",
+      "i": 6
+    }
+  ],
+  "clips": {
+    "glow": {
+      "frames": [
+        "glow0",
+        "glow1",
+        "glow2",
+        "glow3",
+        "glow4",
+        "glow5",
+        "glow6"
+      ],
+      "timing": "ticks",
+      "ticks": [
+        9,
+        9,
+        18,
+        9,
+        9,
+        9,
+        9
+      ],
+      "loop": true
+    }
+  },
+  "waivers": [
+    {
+      "gate": "detail-density",
+      "reason": "prop cap 25% is measured-miscalibrated (art-generation SS3.1); every compiled prop lands 34-49% while the approved shipped bardo_brute runs 65.6%."
+    },
+    {
+      "gate": "frame:glow0:light-direction",
+      "reason": "HUMAN CALL PENDING. The numen glass core IS the emitter \u2014 this clip exists to make it breathe, so the brightest pixels are the light source by construction and the gradient reads bright-south on every frame. Judge at 1x against the runtime light pool before promotion; do not carry into production unexamined."
+    },
+    {
+      "gate": "frame:glow1:light-direction",
+      "reason": "HUMAN CALL PENDING. The numen glass core IS the emitter \u2014 this clip exists to make it breathe, so the brightest pixels are the light source by construction and the gradient reads bright-south on every frame. Judge at 1x against the runtime light pool before promotion; do not carry into production unexamined."
+    },
+    {
+      "gate": "frame:glow2:light-direction",
+      "reason": "HUMAN CALL PENDING. The numen glass core IS the emitter \u2014 this clip exists to make it breathe, so the brightest pixels are the light source by construction and the gradient reads bright-south on every frame. Judge at 1x against the runtime light pool before promotion; do not carry into production unexamined."
+    },
+    {
+      "gate": "frame:glow3:light-direction",
+      "reason": "HUMAN CALL PENDING. The numen glass core IS the emitter \u2014 this clip exists to make it breathe, so the brightest pixels are the light source by construction and the gradient reads bright-south on every frame. Judge at 1x against the runtime light pool before promotion; do not carry into production unexamined."
+    },
+    {
+      "gate": "frame:glow4:light-direction",
+      "reason": "HUMAN CALL PENDING. The numen glass core IS the emitter \u2014 this clip exists to make it breathe, so the brightest pixels are the light source by construction and the gradient reads bright-south on every frame. Judge at 1x against the runtime light pool before promotion; do not carry into production unexamined."
+    },
+    {
+      "gate": "frame:glow5:light-direction",
+      "reason": "HUMAN CALL PENDING. The numen glass core IS the emitter \u2014 this clip exists to make it breathe, so the brightest pixels are the light source by construction and the gradient reads bright-south on every frame. Judge at 1x against the runtime light pool before promotion; do not carry into production unexamined."
+    },
+    {
+      "gate": "frame:glow6:light-direction",
+      "reason": "HUMAN CALL PENDING. The numen glass core IS the emitter \u2014 this clip exists to make it breathe, so the brightest pixels are the light source by construction and the gradient reads bright-south on every frame. Judge at 1x against the runtime light pool before promotion; do not carry into production unexamined."
+    }
+  ],
+  "provenance": {
+    "provider": "pixellab",
+    "model": "animate_image (MCP), seed 3, 48x48 x8, last_frame pinned to first for a seamless loop",
+    "promptFile": "art/prompts/hub_lamp_glow.txt"
+  },
+  "registrationNote": "CANDIDATE ONLY (?hubCandidate=1). The keeper's lamp as one animated object: the numen glass core breathes, the iron frame and post are byte-identical to the still. 1 generation, animated from our own already-compiled 48px cell. This lamp is NOT fire. src/render/light.ts stops emitting an orange flame tongue at any anchor sitting on a keeperLamp \u2014 measured, three of the four hub anchors with no brazier under them were on lamps, so the room was spitting orange particles out of a cold blue-green lantern."
+}

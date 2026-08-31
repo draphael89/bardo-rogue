@@ -36,6 +36,7 @@ const CANDIDATE_SHEETS = {
   // sheet is bound, src/render/light.ts stops emitting a particle tongue on that bowl — the whole
   // point is one fire drawn by one tool, not a sprite and a particle system on different clocks.
   bardo_brazier: '/.art-cache/hub/compiled/bardo_brazier',
+  bardo_lamp: '/.art-cache/hub/compiled/bardo_lamp',
 } as const
 
 const HERO_CANDIDATE = '/.art-cache/pixellab/hero-light1/compiled/bardo_veteran_greatsword_south'
@@ -44,6 +45,9 @@ const HERO_CANDIDATE = '/.art-cache/pixellab/hero-light1/compiled/bardo_veteran_
 // import.meta.env.DEV with ?hubCandidate=1, so unapproved art cannot reach a build: publicDir is off
 // for `command === 'build'` and .art-cache is gitignored besides.
 const HUB_PROPS_CANDIDATE = '/.art-cache/hub/compiled/bardo_props.png'
+
+/** Animated hub props: hub art, so they ride ?hubCandidate=1 rather than the actor lane. */
+const HUB_SHEETS = ['bardo_brazier', 'bardo_lamp'] as const satisfies readonly CandidateSheetName[]
 
 type ProductionSheetName = (typeof SHEETS)[number]
 type CandidateSheetName = keyof typeof CANDIDATE_SHEETS
@@ -93,12 +97,12 @@ export async function loadAtlas(manifest: Record<string, string[]>): Promise<Atl
       ? HERO_CANDIDATE
       : `${base}sprites/${name}`] as const),
     ...(candidateMode
-      ? Object.entries(CANDIDATE_SHEETS).filter(([n]) => n !== 'bardo_brazier')
+      ? Object.entries(CANDIDATE_SHEETS).filter(([n]) => !(HUB_SHEETS as readonly string[]).includes(n))
         .map(([name, path]) => [name as CandidateSheetName, path] as const)
       : []),
     // The animated brazier rides the hub lane, not the actor lane: it is hub art and it is what
     // `pnpm hub:candidate` and ?hubCandidate=1 are for.
-    ...(hubCandidateMode ? [['bardo_brazier' as CandidateSheetName, CANDIDATE_SHEETS.bardo_brazier] as const] : []),
+    ...(hubCandidateMode ? HUB_SHEETS.map(n => [n, CANDIDATE_SHEETS[n]] as const) : []),
   ]
 
   // Nothing here depends on anything else here, so every file goes out in ONE wave. Loading them in

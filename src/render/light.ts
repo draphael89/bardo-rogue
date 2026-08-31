@@ -156,14 +156,25 @@ export class Lighting {
     const EMBER_BED = { x: 17, y: 15 }
     const bowls = arena.props.filter(p => p.sheet === 'prop' && p.tile === PROP.brazier)
       .map(p => ({ x: p.x + EMBER_BED.x, y: p.y + EMBER_BED.y }))
+    // A keeper's lamp is numen glass, not fire. Measured in the hub, THREE of the four anchors that
+    // had no brazier under them sit on a lamp instead — so the room was spitting orange flame
+    // particles out of a cold blue-green lantern. The lamp still pools its light; it just stops
+    // pretending to burn.
+    const lamps = arena.props.filter(p => p.sheet === 'prop' && p.tile === PROP.keeperLamp)
+      .map(p => ({ x: p.x + 16, y: p.y + 16 }))
     const reach = TILE * 1.6
-    return arena.braziers.map(b => {
+    const nearest = (b: { x: number; y: number }, ps: Array<{ x: number; y: number }>) => {
       let best: { x: number; y: number } | null = null, bestD = reach
-      for (const q of bowls) {
+      for (const q of ps) {
         const d = Math.hypot(b.x - q.x, b.y - q.y)
         if (d < bestD) { bestD = d; best = q }
       }
-      if (best) return spriteOwnsFire ? null : best
+      return best
+    }
+    return arena.braziers.map(b => {
+      const bowl = nearest(b, bowls)
+      if (bowl) return spriteOwnsFire ? null : bowl
+      if (nearest(b, lamps)) return null
       return { x: b.x, y: b.y - 6 }
     })
   }

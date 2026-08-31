@@ -1104,6 +1104,18 @@
     {
       "t": "02:59",
       "text": "The arrival causeway art pass: the first frame of gameplay now lands in light. The Keeper's column became a lamp column (new prop) whose cresset is the island's key — its pool is baked into the stone as quantized warm value blocks running from the column to the landing, so the pilgrim arrives on firelit ground a full band over the perimeter (measured: pool 0.21 B2 vs 0.11 B1; before, the centre was DARKER than the edge). The pilgrimage wear line runs into the landing as baked scuffs crossing tile boundaries; a cold brazier with its soot fan and the pier-damp stains say someone left; the Ferryman's pole carries a numen-glass lantern — the ramp's first machine-form entries in canon.json. Sim-neutral: every pinned hash stands, all room gates green."
+    },
+    {
+      "t": "03:35",
+      "text": "The light got a colour. The lightmap only ever multiplied, so it could return a surface to its authored value and no further — and the authored stone is cold slate, which is why every lit surface in the game measured neutral grey (brightest-5% warmth +0.04) against +0.61..+0.79 on the concept boards, with cold 'slate2' leading the opening frame's bright set at 14.7%: the exact failure ART_DIRECTION §3.2.5 names. The same light scene is now rendered a second time with the ambient blacked out — what the lamps EMIT, black everywhere else — and composited with 'add', tinted per room. Measured on the arrival: warmth 0.08 -> 0.50, shadow mean blue 3.5 -> 14.7 (concepts 13-26), bright-set lead slate2@14.7% -> boneDim@1.8%. Cold rooms stayed cold — Cocytus -0.22, the crossings -0.37/-0.41 — because their own lamps are cold. Cost 0.1ms p50 under wave3. Nothing was drawn."
+    },
+    {
+      "t": "03:52",
+      "text": "Two gates, because both of those defects shipped for a year with 507/507 sheet gates green — every gate in the suite measures a sheet, and neither is a property of a sheet. room:gate now reads the composited frame: lit warmth, shadow floor, and whether static architecture leads the bright set, armed on the Bardo and reported everywhere else (a global warm floor would be a rule saying the ice room is broken for being ice). And a source:target parity test over every shipped sidecar, guarding the 1:1 pixel grid that landed in #28 with nothing asserting it — verified by deleting the line that provides it: 9 of 19 assertions go red."
+    },
+    {
+      "t": "04:20",
+      "text": "The hero was not missing a face. The rig already models a visor plate, a face slit and a lit brow, under a comment that gets the principle right. What was wrong was the rank: the brow quantised to 'brick' and the two pauldron rims a step higher to 'brickHi' — thirty-odd pixels across the widest part of the figure against four on his face, dome L 0.110 vs pauldrons L 0.213. The brightest thing on the hero was his shoulder line. Brow now takes brickHi, rims step down one, and the brow sits directly above a mortar slit: the largest value step this palette has, at eye level. Candidate only, gates green (169 unarmed / 404 armed, 0 blocking), in .art-cache — approval is a human's. Honest about the size of it: clear at 14x, subtle at 1x. What makes him a domino at gameplay scale is proportion and interior modelling, which is a design decision rather than a defect."
     }
   ],
   "pieces": [

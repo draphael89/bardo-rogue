@@ -8,8 +8,10 @@ Graded against excellent shipped indie games, not against the placeholder it rep
 
 **Execution note, 2026-08-30:** source/target parity, colour-placement, detail-density and rejection
 receipts are now implemented. A rig-emitted breathing idle plus reach/contact/settle pickup candidate
-clears all 2,154 applicable gates with six measured weapon-apex waivers. It remains in `.art-cache`
-pending human Look and approval, so the scorecard below is intentionally not regraded yet.
+clears all 2,154 applicable gates with six measured weapon-apex waivers. Contact now plants for four
+stopped ticks, while held movement cancels settle into the armed run instead of skating a static pose
+through the rack. The candidate remains in `.art-cache` pending human Look and approval, so the
+scorecard below is intentionally not regraded yet.
 
 ---
 

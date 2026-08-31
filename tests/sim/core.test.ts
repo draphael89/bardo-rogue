@@ -872,12 +872,26 @@ describe('return', () => {
     expect(loop.events.some(e => e.type === 'dodge' || e.type === 'swing')).toBe(false)
     const rack = loop.arena.rack!
     loop.player.x = rack.x; loop.player.y = rack.y
+    loop.player.px = rack.x - 2; loop.player.py = rack.y + 1
+    loop.player.vx = 95; loop.player.vy = -45
     stepWorld(loop, emptyInput())
     expect(loop.arena.rackTaken).toBe(true)
     expect(loop.player.armed).toBe(true)
     expect(loop.session.preparedWeapon).toBe('blade')
     expect(loop.doorOpen).toBe(true)
     expect(loop.events.some(e => e.type === 'weaponPrepared')).toBe(true)
+    expect(loop.freeze).toBe(tuning.hitstop.pickup)
+    expect(loop.player.vx).toBe(0)
+    expect(loop.player.vy).toBe(0)
+    expect(loop.player.px).toBe(loop.player.x)
+    expect(loop.player.py).toBe(loop.player.y)
+    const planted = { x: loop.player.x, y: loop.player.y }
+    for (let i = 0; i < tuning.hitstop.pickup; i++) {
+      stepWorld(loop, { ...emptyInput(), moveY: -1 })
+      expect({ x: loop.player.x, y: loop.player.y }).toEqual(planted)
+    }
+    stepWorld(loop, { ...emptyInput(), moveY: -1 })
+    expect(loop.player.y).toBeLessThan(planted.y)
 
     const empty = createWorld(1, 'empty')
     killPlayer(empty)

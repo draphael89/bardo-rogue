@@ -7,7 +7,7 @@ import type { World, Enemy, Projectile } from '@/sim/world'
 import type { EnemyKind, HitSource, SimEvent } from '@/sim/events'
 import { tuning } from '@/tuning'
 import { EntityView, createPlayerView, createEnemyView, updatePlayerView, updateEnemyView, makePropSprite, BoltView, ArrowView, EchoView, MirrorBoltView, drawAimLine, drawSwingArc, drawSwingTip, drawBowAim } from './views'
-import { updatePlayerRim } from './views/player'
+import { pickupPhaseFrame, updatePlayerRim } from './views/player'
 import type { PlayerPoseOverride } from './views/player'
 import { snapToTarget } from './views/shared'
 import { promiseFrame } from './clipSelect'
@@ -933,8 +933,8 @@ export class Presenter {
     const timing = tuning.view.pickup
     if (this.pickupTick >= 0) {
       const age = w.tick - this.pickupTick
-      if (age < timing.contactTicks) return { frame: 'pickupContact', angle: this.pickupAngle }
-      if (age < timing.contactTicks + timing.settleTicks) return { frame: 'pickupSettle', angle: this.pickupAngle }
+      const frame = pickupPhaseFrame(age, Math.hypot(p.vx, p.vy))
+      if (frame) return { frame, angle: this.pickupAngle }
       this.pickupTick = -1
     }
     const rack = w.arena.rack
@@ -1243,8 +1243,8 @@ export class Presenter {
     }
     const rack = w.arena.rack
     const rackDistance = rack ? Math.hypot(rack.x - p.x, rack.y - p.y) : Infinity
-    const pickupSpan = tuning.view.pickup.anticipateRadius - tuning.run.rackRadius
-    this.tilemap.setRackProximity((tuning.view.pickup.anticipateRadius - rackDistance) / pickupSpan)
+    const pickupSpan = tuning.view.pickup.specularRadius - tuning.run.rackRadius
+    this.tilemap.setRackProximity((tuning.view.pickup.specularRadius - rackDistance) / pickupSpan)
     updatePlayerView(this.playerView, p, w, alpha, this.time, this.pickupPose(w))
     if (!p.armed && this.playerView.weapon) this.playerView.weapon.visible = false
     this.contactReaction(dtSec)

@@ -24,10 +24,15 @@ const landed = (interrupted = false): DamageResult => ({
   outcome: 'landed', landed: true, killed: false, guarded: false, interrupted, resolvedDamage: 1,
 })
 
+function finishPickupBeat(world: ReturnType<typeof createWorld>): void {
+  for (let i = 0; i < tuning.hitstop.pickup; i++) stepWorld(world, emptyInput())
+}
+
 function prepareAndDescend(world = createWorld(1, 'loop')) {
   const rack = world.arena.rack!
   world.player.x = rack.x; world.player.y = rack.y
   stepWorld(world, emptyInput())
+  finishPickupBeat(world)
   const north = world.arena.doors.find(d => d.dir === 'north')!
   world.player.x = (north.col + 0.5) * TILE
   world.player.y = doorEnterMaxY(north)
@@ -107,6 +112,7 @@ describe('production vertical slice', () => {
     const rack = world.arena.rack!
     world.player.x = rack.x; world.player.y = rack.y
     stepWorld(world, emptyInput())
+    finishPickupBeat(world)
     const north = world.arena.doors.find(d => d.dir === 'north')!
     world.player.x = (north.col + 0.5) * TILE
     world.player.y = doorEnterMaxY(north)
@@ -578,6 +584,7 @@ describe('attempt identity', () => {
       const rack = world.arena.rack!
       world.player.x = rack.x; world.player.y = rack.y
       stepWorld(world, emptyInput())
+      finishPickupBeat(world)
       const north = world.arena.doors.find(d => d.dir === 'north')!
       world.player.x = (north.col + 0.5) * TILE
       world.player.y = doorEnterMaxY(north)

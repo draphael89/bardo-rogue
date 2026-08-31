@@ -40,6 +40,14 @@ export function heroMirrorScale(direction: HeroDirection, facing: number, poseAn
   return Math.cos(poseAngle) < 0 ? -1 : 1
 }
 
+export function pickupPhaseFrame(age: number, speed: number): PlayerPoseOverride['frame'] | undefined {
+  const timing = tuning.view.pickup
+  if (age < timing.contactTicks) return 'pickupContact'
+  if (speed > timing.cancelSpeed) return undefined
+  if (age < timing.contactTicks + timing.settleTicks) return 'pickupSettle'
+  return undefined
+}
+
 // Clip names in play order: swings[i] maps to SWING_CLIPS[i] in every armed sidecar.
 const SWING_CLIPS = ['light1', 'light2', 'heavy'] as const
 // What every hero sheet must carry, and what only an armed one must. The unarmed family cannot

@@ -20,7 +20,7 @@ const FIXTURES = [
   // The only fixture that builds the Bardo: a full descent (island hub -> rack -> Gate -> six
   // rooms -> Minos -> return), so the hub geometry the wave/full fixtures never construct is
   // hash-pinned too.
-  { file: 'slice-kite-loop-s7.json', hash: 358263678, check: (m: Record<string, unknown>) => { expect(m.returns).toBe(1); expect(m.runResult).toBe('won') } },
+  { file: 'slice-kite-loop-s7.json', hash: 2495559391, check: (m: Record<string, unknown>) => { expect(m.returns).toBe(1); expect(m.runResult).toBe('won') } },
 ]
 
 function loadFixture(file: string): Replay {

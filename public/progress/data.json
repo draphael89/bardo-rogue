@@ -1,13 +1,13 @@
 {
   "title": "Bardo Rogue",
   "subtitle": "First Gate: one consequential fork, a town that remembers",
-  "updated": "2026-08-30T20:13:04-04:00",
+  "updated": "2026-08-30T20:30:00-04:00",
   "now": "opening-art-candidate-human-gate",
   "round": 9,
   "timeline": [
     {
-      "t": "20:13",
-      "text": "Opening-art phase 2 reaches its first human Look gate. Source-to-target texel parity is now asserted for every authored sheet; colour placement and class-relative detail density are blocking compile gates; rejected candidates can carry hash-verified reasons and manifests. The Veteran rig emits one breathing frame and a three-beat sword acquisition across unarmed reach, armed contact, and armed settle. Eight candidate sheets clear 2,154 gates with zero blocking findings and six measured weapon-apex waivers. The live pickup has already lost its flash, particle ring, banner, soft rack glow, and second bell; one hard steel specular leads into the authored poses while the Gate still opens on the authoritative event tick. Typecheck, 967 tests in 82 files, and the room gate pass. The new masters remain in .art-cache: Look and art approval still belong to the user, and the audit score is unchanged until they ship and play in-engine."
+      "t": "20:30",
+      "text": "Opening-art phase 2 reaches its first human Look gate. Source-to-target texel parity is now asserted for every authored sheet; colour placement and class-relative detail density are blocking compile gates; rejected candidates can carry hash-verified reasons and manifests. The Veteran rig emits one breathing frame and a three-beat sword acquisition across unarmed reach, armed contact, and armed settle. Eight candidate sheets clear 2,154 gates with zero blocking findings and six measured weapon-apex waivers. The live pickup has already lost its flash, particle ring, banner, soft rack glow, and second bell; one target-grid steel specular leads into a four-tick planted contact, held movement cancels settle into the armed run, and the Gate still opens on the authoritative event tick. Typecheck, 970 tests in 82 files, room gate, and all nine shipped authored-sheet gates pass; the 100-seed matrix remains 80% kite / 0% naive with no stranded seed. The intended pickup pause was re-recorded by the bot tool at loop hash 2495559391; the other three pinned hashes are unchanged. The new masters remain in .art-cache: Look and art approval still belong to the user, and the audit score is unchanged until they ship and play in-engine."
     },
     {
       "t": "16:11",

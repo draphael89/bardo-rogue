@@ -25,10 +25,14 @@ reason and optional generation manifest. The Veteran rig now emits a two-frame b
 three-beat acquisition across the unarmed and greatsword families; all eight candidate sheets clear
 2,154 gates with zero blocking findings and six measured weapon-apex waivers. The live pickup has
 already shed its flash, particle ring, banner and second bell in favour of one hard blade specular,
-the authored reach/contact/settle selector, and the Gate opening on the existing event tick. The new
+the authored reach/contact/settle selector, a four-tick planted contact that cancels settle into held
+movement, and the Gate opening on the existing event tick. The new
 masters remain in `.art-cache`: human Look and `pnpm art approve` are still required before the
-frames can replace the eight receipted production masters. Current proof is typecheck, **967 tests in
-82 files**, and `pnpm room:gate`; pinned replay fixtures remain green inside the suite.
+frames can replace the eight receipted production masters. Current proof is typecheck, **970 tests in
+82 files**, `pnpm room:gate`, all nine shipped authored sheets at zero blocking art findings, and a
+100-seed matrix at 80% kite / 0% naive with no stranded seed. The intended pickup pause was re-recorded
+through `pnpm record-bots` (`slice-kite-loop-s7` hash `2495559391`; the other three hashes unchanged),
+and all fixtures are green.
 
 ---
 

@@ -11,7 +11,7 @@ import { makeContext, measureDetailDensity, runGates, summarise } from '../../to
 import { canon, rgbToHex, type RGB } from '../../tools/art/palette'
 import { verifyApproval } from '../../tools/art/approve'
 import { authoredFxFrame, quantizeFxAlpha, quantizeFxRotation } from '../../src/render/fxUnits'
-import { heroFrameName, heroMirrorScale } from '../../src/render/views/player'
+import { heroFrameName, heroMirrorScale, pickupPhaseFrame } from '../../src/render/views/player'
 import { rackSpecularRect } from '../../src/render/tilemap'
 import { createWorld } from '../../src/sim/scenarios'
 import { ARM } from '../../src/sim/weapons'
@@ -556,6 +556,16 @@ describe('review findings', () => {
     }
     expect(r.width).toBe(4) // the whole steel blade and no air beside it
     expect(r.height * scale).toBe(1)
+  })
+
+  it('holds pickup contact for the plant, then cancels settle into held movement', () => {
+    expect(tuning.view.pickup.contactTicks).toBe(tuning.hitstop.pickup + 1)
+    expect(pickupPhaseFrame(0, 95)).toBe('pickupContact')
+    expect(pickupPhaseFrame(4, 95)).toBe('pickupContact')
+    expect(pickupPhaseFrame(5, 24)).toBeUndefined()
+    expect(pickupPhaseFrame(5, 0)).toBe('pickupSettle')
+    expect(pickupPhaseFrame(13, 0)).toBe('pickupSettle')
+    expect(pickupPhaseFrame(14, 0)).toBeUndefined()
   })
 
   it('pose fit preserves aspect instead of stretching a cropped silhouette', async () => {

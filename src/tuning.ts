@@ -33,10 +33,10 @@ export const tuning = {
     // A room that fits the viewport collapses the clamp range (camera.ts clampFocus) and is
     // centred exactly, which is what keeps today's rooms static under the same code path.
     camera: { followLerp: 0.12, lookahead: 4, lookaheadLerp: 0.08 },
-    // Presentation-only staging around the Bardo rack. The sim still owns contact at rackRadius;
-    // these values only decide when the authored reach appears and how long the acquired blade's
-    // contact / settle drawings hold. They never pause input or enter replay state.
-    pickup: { anticipateRadius: 30, contactTicks: 5, settleTicks: 9 },
+    // Presentation staging around the Bardo rack. The steel answers first; the reach appears only
+    // in the last two world pixels so a planted drawing cannot skate through the approach. Contact
+    // owns the pickup hit-stop below, and held movement cancels the settle into the armed run.
+    pickup: { specularRadius: 30, anticipateRadius: 20, contactTicks: 5, settleTicks: 9, cancelSpeed: 10 },
   },
 
   player: {
@@ -114,7 +114,7 @@ export const tuning = {
     moveRecover: 0.55,
   },
 
-  hitstop: { killBonus: 2, max: 12, boltCut: 3 },
+  hitstop: { killBonus: 2, max: 12, boltCut: 3, pickup: 4 },
   knockbackDecayTicks: 8,
   wallSlamMinSpeed: 100, // only committed knockback can author a stone punctuation; no extra damage
 

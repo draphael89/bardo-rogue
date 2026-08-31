@@ -11,6 +11,7 @@ function prepareAndDescend(world = createWorld(1, 'loop')) {
   const rack = world.arena.rack!
   world.player.x = rack.x; world.player.y = rack.y
   stepWorld(world, emptyInput())
+  for (let i = 0; i < tuning.hitstop.pickup; i++) stepWorld(world, emptyInput())
   const north = world.arena.doors.find(d => d.dir === 'north')!
   world.player.x = (north.col + 0.5) * TILE
   world.player.y = doorEnterMaxY(north)

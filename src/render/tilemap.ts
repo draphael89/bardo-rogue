@@ -612,7 +612,11 @@ function bakeWallCope(g: Graphics, arena: Arena): void {
     // one, which measured 40 segments down to 20 across the plaza — that is not de-stamping a
     // highlight, it is deleting half of it, and the wall read dimmer rather than less regular.
     // Three in, three out, each jittered inside its own third so two never collide.
-    for (const x of [2, 12, 23]) artPx(g, ox + x, oy + 21, 3, 2, C.boneDim)
+    // Clamped to the cell. The authored highlight at x=23 is one pixel wide against a 24px tile, so
+    // a blind 3px erase wrote two `boneDim` pixels into the NEXT cell — and a cap run ends beside a
+    // corner or a plain wall tile, where this pass draws over the atlas sprite and leaves a bright
+    // smear that belongs to no tile. The lay-back loop below already fits (max x 20 + 3 = 23).
+    for (const x of [2, 12, 23]) artPx(g, ox + x, oy + 21, Math.min(3, ROOM_ART_TILE - x), 2, C.boneDim)
     for (let i = 0; i < 3; i++) {
       const nx = 1 + i * 7 + (h >>> (i * 5)) % 6
       artPx(g, ox + nx, oy + 21, 3, 1, C.brick)

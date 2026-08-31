@@ -75,8 +75,11 @@ A stock combat scenario stops 2 s after clear or death; the production `loop` st
   emits NO particle tongue on a brazier — the sprite owns the fire, the runtime still owns the light.
 - `hubCandidate=1`: development-only; swaps the prop sheet for the Bardo hub's PixelLab candidates.
   Build it first with `pnpm hub:candidate`, which composites the compiled candidates from
-  `.art-cache/hub/compiled` over a copy of `bardo_props.png` (bell into cells 0-3, ossuary 5,
-  keeper's lamp 12, verdict stele 15). `pnpm shot -- --hubCandidate 1` captures it. Production builds
+  `.art-cache/hub/compiled` over a copy of `bardo_props.png` (bell into cells 0-3, lit brazier 4,
+  ossuary 5, keeper's lamp 12, cold brazier 13). The verdict stele (15) is deliberately NOT among
+  them — its candidate lost production's legible carved cross and read as a plain standing rock, so
+  cell 15 is production art; `SINGLES` in `tools/hub-candidate.ts` is the list of record.
+  `pnpm shot -- --hubCandidate 1` captures it. Production builds
   ignore this switch, and `.art-cache` is gitignored, so no unapproved pixel can reach a build.
   The Bardo's TILES come from `bardo_hub.png`, its own fork of `bardo_room.png` at identical indices
   (`roomSheetFor` in `src/render/tilemap.ts`) — that is what stops a hub retexture reaching the other

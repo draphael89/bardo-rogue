@@ -719,12 +719,24 @@ if WEAPON != "none":
         # three pixels. At 2.9 the bands landed sub-pixel and the palette vote dithered them into a
         # dashed ladder along the blade (measured, and clearly visible at 8x on heavyContact).
         sword_prism("swordBlade", [
-            (-2.20, 0.30),    # 0: screen-RIGHT front corner  \ strip 0 = shadow bevel -> mortar
+            (-2.20, 0.30),    # 0: screen-RIGHT front corner  \ strip 0 = flank, brickHi
             (-1.60, 0.65),    # 1                             /
-            (1.20, 0.65),     # 2: the land -> brickHi, the blade's body and most of its width
-            (2.20, 0.30),     # 3: screen-LEFT front corner   -- strip 2 = lit bevel -> cope, and the
-            (2.20, -0.65),    # 4                                key is at yaw -12 so screen-left IS
-            (-2.20, -0.65),   # 5                                the lit side (SS2.1 Law 2).
+            (1.20, 0.65),     # 2: THE LAND -> cope. Strip 1 is the camera-facing face and the only
+            (2.20, 0.30),     # 3: screen-LEFT front corner      band wide enough to hold a value in
+            (2.20, -0.65),    # 4                                every pose, so the light goes here.
+            (-2.20, -0.65),   # 5: strip 2 = the far flank, brickHi like strip 0.
+        #
+        # TWO BANDS, NOT THREE, and a MORTAR BEVEL IS THE ONE THING NOT TO PUT BACK. An earlier pass
+        # ran exactly the three-band design the section above used to describe -- mortar on strip 0,
+        # brickHi land, cope on strip 2 -- and it was measured worse than the flat bar it replaced.
+        # mortar against cope is a ~200-luminance swing across a band that goes sub-pixel once the
+        # shouldered carry foreshortens the blade to ~57%: the palette vote dithered it into a dashed
+        # ladder along heavyContact, and in the idle it landed in the MIDDLE of the blade at rows
+        # 25-30, reinstating the dark centre groove this whole change exists to remove.
+        #
+        # brickHi against cope is 21 luminance. It reads as a lit face and a shadow face, and when it
+        # dithers nobody can see it. The land carries the light because strip 1 is the camera-facing
+        # band in almost every pose -- strip 2 goes nearly edge-on and could not hold a value at all.
         ], [(1.0, 1.0, 1.0), (22.0, 1.0, 1.0), (24.0, 0.86, 1.0)],
             MAT_BLADE, strip_mats={1: MAT_BLADE_HI})
         WEAPON_TIP = 23.0

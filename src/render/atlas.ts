@@ -39,7 +39,9 @@ const CANDIDATE_SHEETS = {
   bardo_lamp: '/.art-cache/hub/compiled/bardo_lamp',
 } as const
 
-const HERO_CANDIDATE = '/.art-cache/pixellab/hero-light1/compiled/bardo_veteran_greatsword_south'
+// The live hill-climb slot for the hero's south sheet, bound by ?heroCandidate=1 in dev only.
+// Currently the lofted-blade rig candidate: `bash .art-cache/hero/build.sh` rebuilds it.
+const HERO_CANDIDATE = '/.art-cache/hero/candidate/bardo_veteran_greatsword_south'
 
 // The Bardo hub's PixelLab prop candidates, assembled by `pnpm hub:candidate`. Bound only under
 // import.meta.env.DEV with ?hubCandidate=1, so unapproved art cannot reach a build: publicDir is off

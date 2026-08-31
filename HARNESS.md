@@ -30,6 +30,8 @@ per tick: `stepWorld(world, inputFrame)`.
 | `pnpm strip -- ...` | Frame strip of anything that moves, for judging motion (`tools/strip.ts`; writes a JSON state/event sidecar beside the PNG) |
 | `pnpm assets` / `pnpm tiles` | Regenerate `public/assets/` (Kenney subset, then the original bardo tilesets). Both rewrite `manifest.json`; run `tiles` **after** `assets` or the bardo sprites drop out. |
 | `pnpm room:gate -- [--url <server>] [--shot-dir <dir>] [--out <json>]` | Blocks room-source dimension, palette, alpha, material-span, and Bardo negative-space drift. The live lane owns every render and proves native composite dimensions plus exact 1x value/highlight/focality budgets from Bardo through the seven-room representative spine (`tools/room-art-gates.ts`). |
+| `pnpm hero:candidate` | Builds the hero sheet `?heroCandidate=1` binds, into `.art-cache/hero/candidate/` (`tools/hero-candidate.mjs`). Renders the Blender rig with the armour the approved masters ship — rims and brow reverted to steel, since `0f4b88b` changed both after approval — so the only difference from production is the blade. Needs Blender; never touches `public/assets`. The slot is OPTIONAL at load: without it, `?heroCandidate=1` falls back to the production hero. |
+| `pnpm deline -- <src.png> <out.png> [darkHex]` | Erodes a generated sprite's black keyline, replacing each outline pixel with its nearest interior neighbour so the silhouette survives (`tools/deline.mjs`). PixelLab outlines every sprite and `colour-placement` was measured on outline-less Blender renders, so the keyline alone can fail the gate: measured on a generated Warden, `seal0` 11.4% -> 6.8% in one pass against a 5.0% cap. Converges after one pass. |
 | `pnpm art:stress-hero` | Candidate-only Blender proof: renders dagger grammar and heavy-armor geometry from the Veteran rig, compiles six sheets through the real gates, and writes 1x/black evidence under `.art-cache/spike/stress/`. Never approves or touches shipping assets. |
 | `pnpm build` | Web build, then `tools/check-build.ts` gates the payload (no evidence, no video, no missing asset, within budget) |
 | `pnpm check:build` | Re-run the built-payload gate against the current `dist/` |
@@ -67,6 +69,23 @@ A stock combat scenario stops 2 s after clear or death; the production `loop` st
   `bash tools/spike/run-caster-charger.sh caster charger` and
   `bash tools/spike/run-lane3.sh warden oathbound`. Capture them with `pnpm shot`, `pnpm poses`, or
   `pnpm strip` by passing `--actorCandidate 1` after `--`. Production builds ignore this switch.
+- `hubCandidate=1` also binds the ANIMATED brazier sheet (`bardo_brazier`), an 8-frame `burn` clip
+  with `timing: 'ticks'` played by `tickClipFrame`. Build it with
+  `pnpm anim:pack -- --frames <dir of fN.png> --out <strip.png> --cols <spec cols>` (packs a provider's loose frames
+  into one row-major strip, dropping the trailing byte-identical loop wrap) and then
+  `pnpm art compile art/specs/hub/brazier-burn.json`. While that sheet is bound `src/render/light.ts`
+  emits NO particle tongue on a brazier — the sprite owns the fire, the runtime still owns the light.
+- `hubCandidate=1`: development-only; swaps the prop sheet for the Bardo hub's PixelLab candidates.
+  Build it first with `pnpm hub:candidate`, which composites the compiled candidates from
+  `.art-cache/hub/compiled` over a copy of `bardo_props.png` (bell into cells 0-3, lit brazier 4,
+  ossuary 5, keeper's lamp 12, cold brazier 13). The verdict stele (15) is deliberately NOT among
+  them — its candidate lost production's legible carved cross and read as a plain standing rock, so
+  cell 15 is production art; `SINGLES` in `tools/hub-candidate.ts` is the list of record.
+  `pnpm shot -- --hubCandidate 1` captures it. Production builds
+  ignore this switch, and `.art-cache` is gitignored, so no unapproved pixel can reach a build.
+  The Bardo's TILES come from `bardo_hub.png`, its own fork of `bardo_room.png` at identical indices
+  (`roomSheetFor` in `src/render/tilemap.ts`) — that is what stops a hub retexture reaching the other
+  thirteen layouts.
 - `bot=idle|naive-melee|kite|slice-naive|slice-kite`: a scripted player drives the sim. The `slice-*` bots physically prepare, navigate either branch by seed parity, choose boons, fight the Warden, and return; their suffix selects the combat policy.
 - `playtest=baseline|no-heavy|no-dash`: arms a playtest session (see `PLAYTEST.md`). The whole session records itself from tick 0, the condition applies to LIVE play only (bots bypass it), and **F4** downloads the session bundle — a valid encoded replay plus a `playtest` key carrying condition, build, counters, and `metrics.summary()`. The two conditions are not the same kind of thing. `no-heavy` is a frame filter: `f.heavy` is dropped before the frame is recorded, so it is baked into the bundle and replays for free. `no-dash` cannot be a filter — a same-tick dodge+attack and an attack buffered just before the roll both leak past one — so it closes the cancel **window** in `tuning` instead, and a window is not in the frames. Every replay path therefore re-applies it from the bundle's own key (`src/playtest.ts`): `pnpm sim -- --replay bundle.json` does this automatically and echoes the `playtest` field it used, and `pnpm shot -- --replay bundle.json` does the same through `__game.replay()`. `--playtest <condition>` overrides, for measuring the same frames under another condition on purpose. Four things are interlocked to keep a bundle honest: the pause card's **abandon row is absent** while a session is armed (an abandon changes the world outside the frame stream), **F2/F3 are locked out** (they would restart or end the session's recording), **an import is refused** (it calls reset(), which stops a recorder the session cannot rearm), and **a saved descent is not resumed** — the bundle header names only (seed, scenario, meta), so a replay rebuilds a fresh Bardo and frames recorded in a resumed world would replay into a run that never happened. That run is over; note it and discard its bundle.
 

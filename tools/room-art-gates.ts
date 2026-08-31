@@ -86,13 +86,43 @@ function tileColorSpan(data: Buffer, tile: number, cols: number, cell: number, s
   return colors.size
 }
 
-async function materialSpan(): Promise<void> {
-  const { data, info } = await sharp('public/assets/sprites/bardo_room.png').ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+/**
+ * Floor cells must be FULLY opaque, not merely binary-alpha. `sourceSheet()` counts partial-alpha
+ * pixels and `materialSpan()` skips alpha-zero ones entirely, so a floor cell shot through with
+ * transparent holes passes both: the alpha is binary and three colours survive among what is left.
+ *
+ * That is not cosmetic. `src/render/light.ts` masks the whole lightmap on the baked room texture's
+ * alpha, so an alpha-zero floor pixel drops out of both the multiply and the additive pass and
+ * renders as raw starfield — a hole straight through the floor to the void behind it.
+ */
+async function floorOpacity(file: string): Promise<void> {
+  const { data, info } = await sharp(file).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+  const CELL = 24, COLS = 8
+  let holes = 0, worst = -1
+  for (let i = 1; i <= 60; i++) {
+    const cx = (i % COLS) * CELL, cy = Math.floor(i / COLS) * CELL
+    let n = 0
+    for (let y = cy; y < cy + CELL; y++) for (let x = cx; x < cx + CELL; x++) {
+      if (data[(y * info.width + x) * 4 + 3] !== 255) n++
+    }
+    if (n > 0) { holes += n; if (worst < 0) worst = i }
+  }
+  add(`room:floor-opacity:${file.split('/').pop()!.replace('.png', '')}`, holes === 0,
+    holes === 0 ? 'floor cells 1-60 fully opaque'
+      : `${holes} non-opaque pixels across floor cells 1-60 (first at cell ${worst}) — these render as raw starfield`)
+}
+
+// Parameterised because the Bardo forked its tile sheet: `bardo_hub.png` is a SEPARATE 60-cell floor
+// ramp, and while sourceSheet() checked its dimensions, palette and alpha, this gate -- the one that
+// actually judges whether a floor cell still carries three material values -- only ever read
+// bardo_room.png. A promoted hub floor could collapse to two values with room:gate still green.
+async function materialSpan(file: string): Promise<void> {
+  const { data, info } = await sharp(file).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
   const spans = Array.from({ length: 60 }, (_, i) => tileColorSpan(data, i + 1, 8, 24, info.width))
   // Some low-key ramp cells intentionally collapse chip into lit (§2.2); three distinct material
   // values is the honest lower bound, not four invented merely to satisfy this counter.
   const weak = spans.filter(n => n < 3).length
-  add('room:floor-material-span', weak === 0,
+  add(`room:floor-material-span:${file.split('/').pop()!.replace('.png', '')}`, weak === 0,
     `${Math.min(...spans)}..${Math.max(...spans)} colours per floor cell; ${weak} below three material values`)
 }
 
@@ -435,8 +465,17 @@ async function runtime(url: string, shotDir?: string): Promise<RuntimeRoom[]> {
 }
 
 await sourceSheet('public/assets/sprites/bardo_room.png', 8 * 24, 12 * 24)
+// The Bardo hub's fork is gated on the same terms as the sheet it forked from. It is not a copy any
+// more once hub art lands, and an ungated sheet is where off-canon colour or partial alpha gets in.
+// Alpha matters twice over here: src/render/light.ts:72-86 masks the whole lightmap on the baked
+// room texture's alpha, so a hub tile carrying alpha-0 pixels drops out of BOTH the multiply and the
+// additive pass and renders as raw starfield.
+await sourceSheet('public/assets/sprites/bardo_hub.png', 8 * 24, 12 * 24)
 await sourceSheet('public/assets/sprites/bardo_props.png', 4 * 48, 4 * 48)
-await materialSpan()
+await materialSpan('public/assets/sprites/bardo_room.png')
+await materialSpan('public/assets/sprites/bardo_hub.png')
+await floorOpacity('public/assets/sprites/bardo_room.png')
+await floorOpacity('public/assets/sprites/bardo_hub.png')
 negativeSpace(buildArena(new Rng(1), 'bardo'))
 const url = flag('url')
 const rooms = url ? await runtime(url, flag('shot-dir')) : []

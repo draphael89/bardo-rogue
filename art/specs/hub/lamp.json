@@ -1,0 +1,55 @@
+{
+  "id": "hub.lamp.candidate",
+  "kind": "prop",
+  "input": ".art-cache/hub/masters/lamp-96.png",
+  "output": ".art-cache/hub/compiled/hub_lamp.png",
+  "sidecar": ".art-cache/hub/compiled/hub_lamp.json",
+  "cell": 48,
+  "cols": 1,
+  "rows": 1,
+  "maxColors": 12,
+  "palette": [
+    "void",
+    "mortar",
+    "seal0",
+    "iron",
+    "ironHi",
+    "boneLo",
+    "numenDim",
+    "numen",
+    "numenHi",
+    "goldDim",
+    "woodLo",
+    "wood"
+  ],
+  "colourPlacement": "hub-lamp",
+  "fit": "grid",
+  "chromaKey": false,
+  "coverage": 0.5,
+  "salience": {
+    "minShare": 0.2,
+    "minDelta": 0.16
+  },
+  "frames": [
+    {
+      "name": "lamp",
+      "i": 0
+    }
+  ],
+  "provenance": {
+    "provider": "pixellab",
+    "model": "create_image_pixflux (MCP), 96x96, forced canon ramp",
+    "promptFile": "art/prompts/hub_lamp_96.txt"
+  },
+  "registrationNote": "CANDIDATE ONLY. Bardo hub prop lane; output stays in .art-cache and never reaches art/approved or public/assets. The hub-* colourPlacement caps are PROVISIONAL: they were set from this candidate's own measurements because bardo_props.png carries no sidecar and no accepted prop has ever faced a placement profile. They are not a perceptual threshold and must be re-derived by a human before promotion.",
+  "waivers": [
+    {
+      "gate": "detail-density",
+      "reason": "prop cap 25% is measured-miscalibrated (art-generation SS3.1); 33.9% sits inside the 34-49% band every compiled prop occupies."
+    },
+    {
+      "gate": "frame:lamp:light-direction",
+      "reason": "HUMAN CALL PENDING. The numen glass core is the lantern's identity and is deliberately lit, so the gradient is the prop's own emission rather than a baked scene key. Flagged for review at 1x against the runtime light pool before any promotion."
+    }
+  ]
+}

@@ -1,8 +1,25 @@
 import { Container, Sprite, RenderTexture, Graphics, type DestroyOptions, type Renderer } from 'pixi.js'
 import { TILE, T, PROP, interior, type Arena, type ArenaDoor, type ArenaShrine, type DoorMark, type ArenaOffering, type ArenaRack, doorOpens } from '@/sim/arena'
-import type { Atlas } from './atlas'
+import type { Atlas, RoomSheet, PropSheet } from './atlas'
 import { OATH } from './oathMetal'
 import { tuning } from '@/tuning'
+
+/**
+ * Which room sheet a layout paves from. Every layout shares `bardo_room.png` except the Bardo hub,
+ * which has its own byte-identical fork at the same indices — so hub art can be replaced without
+ * repainting Cocytus or Asphodel. Indices are deliberately unchanged, which is what keeps the
+ * `tile >= 1 && tile <= 60` floor tests in this file correct for both sheets.
+ */
+export const roomSheetFor = (atlas: Atlas, arena: Arena): RoomSheet =>
+  arena.kind === 'bardo' ? atlas.hub : atlas.room
+
+/**
+ * The same fork for FURNITURE. Props are placed by index out of one sheet, so binding the hub's
+ * candidates globally put them on every bell, brazier, lamp and ossuary in all fourteen layouts —
+ * a switch documented as a hub preview quietly restyling the rooms you were comparing it against.
+ */
+export const propSheetFor = (atlas: Atlas, arena: Arena): PropSheet =>
+  arena.kind === 'bardo' ? atlas.hubProp : atlas.prop
 
 // Static floor/walls baked into one texture; door clusters (sprites + marks) change with open state.
 // `door` is a Container so every exit rides with presenter addChild / destroy. destroy() always
@@ -135,11 +152,11 @@ function paintMark(g: Graphics, mark: DoorMark): void {
   }
 }
 
-function makeDoorCluster(atlas: Atlas, d: ArenaDoor): { root: Container; setOpen: (open: boolean) => void } {
+function makeDoorCluster(atlas: Atlas, room: RoomSheet, d: ArenaDoor): { root: Container; setOpen: (open: boolean) => void } {
   const root = new Container()
-  const spr = new Sprite(atlas.room(T.doorClosed))
-  const wingA = new Sprite(atlas.room(T.doorOpen))
-  const wingB = new Sprite(atlas.room(T.doorOpen))
+  const spr = new Sprite(room(T.doorClosed))
+  const wingA = new Sprite(room(T.doorOpen))
+  const wingB = new Sprite(room(T.doorOpen))
   const mark = new Graphics()
   if (d.mark) paintMark(mark, d.mark)
   const glow = new Sprite(atlas.light('circle'))
@@ -178,7 +195,7 @@ function makeDoorCluster(atlas: Atlas, d: ArenaDoor): { root: Container; setOpen
     setOpen(roomOpen) {
       // The cluster owns the exit gating, so a second caller can never forget it.
       const open = doorOpens(d, roomOpen)
-      spr.texture = atlas.room(open ? T.doorOpen : T.doorClosed)
+      spr.texture = room(open ? T.doorOpen : T.doorClosed)
       const show = open && !!d.mark
       wingA.visible = wingB.visible = show
       mark.visible = show
@@ -273,10 +290,21 @@ function makeRackCluster(rack: ArenaRack): { root: Container; sync(taken: boolea
       markPx(rackG, x - 3, 4, 6, 7, 0x4b4650)
     }
     if (!taken) {
-      markPx(rackG, -2, -19, 4, 23, 0xd8e0e8)
-      markPx(rackG, -1, -18, 2, 21, 0xfff0c8)
-      markPx(rackG, -8, 0, 16, 3, 0x8c5028)
-      markPx(rackG, -3, 3, 6, 7, 0x3a2018)
+      // The blade was two near-identical off-canon whites (#d8e0e8 over #fff0c8, luminance 223 and
+      // 239) which made a 4px flat white slab — measured at 252 in a rendered plaza frame whose top
+      // 0.1% starts at 238. A STATIC PROP was the brightest object in the room, brighter than either
+      // fire, which is exactly what §3.2.5 forbids, and with no value break inside it it read as a
+      // glitch rather than as steel.
+      //
+      // A blade seen edge-on is a dark spine with ONE lit edge, so that is what it is now: slate1
+      // body, slate3 on the side facing the key, one brick pixel of edge at 155 — under `gold` at
+      // 178 and far under the fires. It does not need to be pre-lit, because proximity() already
+      // draws the specular when the hero is near; that is the moment the steel is supposed to answer.
+      markPx(rackG, -2, -19, 4, 23, C.slate1)
+      markPx(rackG, 0, -19, 2, 23, C.slate3)
+      markPx(rackG, 1, -18, 1, 21, C.brick)
+      markPx(rackG, -8, 0, 16, 3, C.woodHi)
+      markPx(rackG, -3, 3, 6, 7, C.woodLo)
     }
   }
   paint(false)
@@ -512,6 +540,9 @@ const C = {
   woodHi: 0x5c4230,
   purple0: 0x2a0e1c,
   boneLo: 0x5a4e42,
+  // The cope's own value and its one bright segment (bakeWallCope re-lays them off the tile grid).
+  boneDim: 0x90806c,
+  brick: 0x949cac,
   goldDim: 0x8c7040,
   // Two canon names the map did not carry yet, for the warm marks the causeway bake scatters on
   // ground the paving already says is lit. L 0.428 and 0.698: coinBrass stays under the 0.70
@@ -563,6 +594,67 @@ function bakeMaterialWear(g: Graphics, arena: Arena): void {
     const w = 2 + (h >>> 17) % 4
     artPx(g, x, y, w, 1, h & 1 ? C.grout : C.slate0)
     if ((h >>> 23) % 3 === 0) artPx(g, x + 1, y + 1, Math.max(1, w - 2), 1, C.mortar)
+  }
+}
+
+/**
+ * Break the cope's repeat.
+ *
+ * `capNorth` is ONE 24px cell stamped 72 times in the hub, in runs up to eighteen tiles, and its
+ * `brick` segments — the single brightest element on any wall (§3.2.5 keeps architecture out of the
+ * top rank, so this is the whole highlight budget) — land at x 2-4, 12-14 and 23 in every one of
+ * them. Measured off the sheet, that is a perfectly periodic dashed line the length of the plaza.
+ *
+ * The sheet cannot fix it: one cell cannot vary against itself. So this does for walls exactly what
+ * `bakeMaterialWear` already does for floors — coordinate-authored marks that ignore the tile grid.
+ * Per cell it erases some segments back to cope value and re-lays one at a hash-chosen offset, so
+ * the dashes stay the same DENSITY and the same value, and stop being on a 24px beat.
+ */
+function bakeWallCope(g: Graphics, arena: Arena): void {
+  for (let r = 0; r < arena.rows; r++) for (let c = 0; c < arena.cols; c++) {
+    if (arena.base[r * arena.cols + c] !== T.capNorth) continue
+    const h = wearHash(c, r, 137)
+    const ox = c * ROOM_ART_TILE, oy = r * ROOM_ART_TILE
+    // Erase the authored segments back to cope value, then lay the SAME NUMBER back at offsets this
+    // cell picked for itself. Count is what matters: an earlier cut erased two of three and added
+    // one, which measured 40 segments down to 20 across the plaza — that is not de-stamping a
+    // highlight, it is deleting half of it, and the wall read dimmer rather than less regular.
+    // Three in, three out, each jittered inside its own third so two never collide.
+    // Clamped to the cell. The authored highlight at x=23 is one pixel wide against a 24px tile, so
+    // a blind 3px erase wrote two `boneDim` pixels into the NEXT cell — and a cap run ends beside a
+    // corner or a plain wall tile, where this pass draws over the atlas sprite and leaves a bright
+    // smear that belongs to no tile. The lay-back loop below already fits (max x 20 + 3 = 23).
+    for (const x of [2, 12, 23]) artPx(g, ox + x, oy + 21, Math.min(3, ROOM_ART_TILE - x), 2, C.boneDim)
+    // Same COUNT, same AREA, same THICKNESS. Keeping only the count was the second version of the
+    // very mistake the note above records: the authored segments are 3+3+1 px wide over TWO rows,
+    // 14 px, and laying three 3x1 segments back restored 9 px on ONE row -- a highlight 5 px smaller
+    // and half as thick in every cap cell, which dims the wall edge across the hub's long runs
+    // exactly as erasing two of three did. Widths 3+2+2 over two rows is 14 px again.
+    for (const [i, w] of [3, 2, 2].entries()) {
+      const nx = 1 + i * 7 + (h >>> (i * 5)) % 6
+      artPx(g, ox + nx, oy + 21, w, 2, C.brick)
+    }
+  }
+  // The three EDGE caps carry the same defect over 108 more placements: capEdge lays a boneDim tick
+  // every 7 along its bounce lip, on the logical grid, so every cell stamps ticks at the same
+  // offsets — measured at x 3-4 and 14 on capSouth, and the mirror of that on capWest/capEast. Same
+  // remedy, along whichever axis the cap runs, and the lip itself (boneLo) is what they erase back to.
+  for (let r = 0; r < arena.rows; r++) for (let c = 0; c < arena.cols; c++) {
+    const t = arena.base[r * arena.cols + c]
+    const along: 'x' | 'y' | null = t === T.capSouth ? 'x' : (t === T.capWest || t === T.capEast) ? 'y' : null
+    if (!along) continue
+    const h = wearHash(c, r, 199)
+    const ox = c * ROOM_ART_TILE, oy = r * ROOM_ART_TILE
+    // Where the lip sits inside the cell: capSouth's is its top rows, capEast's its left columns,
+    // capWest's its right columns — always the face that looks back into the room.
+    const lip = t === T.capSouth ? 0 : t === T.capEast ? 0 : ROOM_ART_TILE - 2
+    if (along === 'x') {
+      artPx(g, ox, oy + lip, ROOM_ART_TILE, 2, C.boneLo)
+      for (let i = 0; i < 2; i++) artPx(g, ox + 2 + i * 11 + (h >>> (i * 5)) % 8, oy + lip, 2, 2, C.boneDim)
+    } else {
+      artPx(g, ox + lip, oy, 2, ROOM_ART_TILE, C.boneLo)
+      for (let i = 0; i < 2; i++) artPx(g, ox + lip, oy + 2 + i * 11 + (h >>> (i * 5)) % 8, 2, 2, C.boneDim)
+    }
   }
 }
 
@@ -958,7 +1050,12 @@ function bakeBardoCauseway(g: Graphics, arena: Arena): void {
     if (d > 92) continue
     const keep = d < 34 ? (h & 7) < 6 : d < 62 ? (h & 7) < 3 : (h & 7) < 1
     if (!keep || levelAt(wx, wy) < 2) continue
-    const w = 4 + (h >>> 14) % 6, ht = 2 + (h >>> 18) % 2
+    // SIZE, not count. The count is load-bearing — these blocks are what `top-one-focality` finds
+    // near the player at the arrival capture — so it is untouched. But at 4-9 x 2-3 they were the
+    // same aspect as the floor's own value blocks, and read at 5x that made them bricks set INTO
+    // the paving rather than firelight lying ON it. 2-5 x 1-2 is a glint: same population, same
+    // colours, same places, less mass each.
+    const w = 2 + (h >>> 14) % 4, ht = 1 + (h >>> 18) % 2
     artPx(g, wx * S, wy * S, w, ht, (h >>> 20) % 3 === 0 ? C.nave0 : C.naveWarm)
   }
   // TWO glints, and they stay goldDim. They sit 96 world px from the spawn — outside the
@@ -992,19 +1089,31 @@ function bakeBardoCauseway(g: Graphics, arena: Arena): void {
   // 1) The walk. Scuffs scatter densest on the line and thin off it — a soft edge made of hard
   //    pixels. One step UP from the body (slate2); warm (naveWarm) inside the Keeper's pool,
   //    which is how the wear and the light agree (§3.2.7); a sparse dark heel-gouge (grout).
-  const x0 = 33.5 * TILE, y0 = 31.5 * TILE, x1 = 32.9 * TILE, y1 = 24.5 * TILE
-  const steps = Math.round((y0 - y1) / 2)
-  for (let i = 0; i <= steps; i++) {
-    const t = i / steps
-    const h = wearHash(i, 7, 113)
-    const lat = ((h >>> 3) % 17) - 8
-    if (Math.abs(lat) > 3 && (h & 3) !== 0) continue
-    const wx = x0 + (x1 - x0) * t + lat
-    const wy = y0 + (y1 - y0) * t + ((h >>> 9) % 3) - 1
-    if (!floorAt(wx, wy)) continue
-    const warm = Math.hypot(wx - 39.5 * TILE, wy - 29.8 * TILE) < 52
-    const col = (h >>> 6) % 5 === 0 ? C.grout : warm ? C.naveWarm : C.slate2
-    artPx(g, wx * S, wy * S, 2 + ((h >>> 13) % 3), 1, col)
+  //    The walk runs the WHOLE pilgrimage, landing to Gate, not just as far as the bridge mouth.
+  //    It used to stop at row 24.5, which left the northern two thirds of the axis — the part the
+  //    player actually walks toward the Gate — as bare slabs with nothing on them but seven sett
+  //    pairs, and it read as a corridor rather than as a route anyone had taken.
+  //    Deliberately NOT more gold: bakeBardoProcession's own comment names adding brightness out
+  //    here as the discipline most likely to slip and the gate most likely to break. slate2 is
+  //    luminance 79 and grout is 14 — neither can enter a frame's top 1%, so a walked path costs
+  //    no highlight budget at all. The seed is per-segment so the two do not repeat each other.
+  for (const [x0, y0, x1, y1, salt] of [
+    [33.5 * TILE, 31.5 * TILE, 32.9 * TILE, 24.5 * TILE, 113],   // landing -> bridge mouth
+    [32.9 * TILE, 24.5 * TILE, 33.4 * TILE, 9.0 * TILE, 229],    // bridge mouth -> the Gate
+  ] as const) {
+    const steps = Math.round((y0 - y1) / 2)
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps
+      const h = wearHash(i, 7, salt)
+      const lat = ((h >>> 3) % 17) - 8
+      if (Math.abs(lat) > 3 && (h & 3) !== 0) continue
+      const wx = x0 + (x1 - x0) * t + lat
+      const wy = y0 + (y1 - y0) * t + ((h >>> 9) % 3) - 1
+      if (!floorAt(wx, wy)) continue
+      const warm = Math.hypot(wx - 39.5 * TILE, wy - 29.8 * TILE) < 52
+      const col = (h >>> 6) % 5 === 0 ? C.grout : warm ? C.naveWarm : C.slate2
+      artPx(g, wx * S, wy * S, 2 + ((h >>> 13) % 3), 1, col)
+    }
   }
   // 2) Cold soot fanned south and 15° right (§3.2.8) of every dead fire: it burned for years,
   //    and then nobody came. Quantized hard-edged wedges (§6.6), all below the floor body.
@@ -1094,6 +1203,7 @@ function bakeGrit(g: Graphics, arena: Arena): void {
  * and a tint applied at one of them would give the realm a floor on arrival and lose it on rebuild.
  */
 export function buildTilemap(renderer: Renderer, atlas: Atlas, arena: Arena, floorTint: number, c: Container): TilemapView {
+  const room = roomSheetFor(atlas, arena)
   const overlays = new Container()
   for (let r = 0; r < arena.rows; r++) for (let col = 0; col < arena.cols; col++) {
     const i = r * arena.cols + col
@@ -1101,13 +1211,13 @@ export function buildTilemap(renderer: Renderer, atlas: Atlas, arena: Arena, flo
     // the sky between an island room's masses, and a baked void tile would freeze a second one.
     // The invariant lives in the SHEET — tools/make-bardo-tiles.ts emits cell 0 alpha-0 — so the
     // bake needs no per-tile branch.
-    const s = new Sprite(atlas.room(arena.base[i]))
+    const s = new Sprite(room(arena.base[i]))
     s.position.set(col * ROOM_ART_TILE, r * ROOM_ART_TILE)
     s.scale.set(ROOM_ART_SCALE)
     c.addChild(s)
     const o = arena.overlay[i]
     if (o >= 0) {
-      const os = new Sprite(atlas.room(o))
+      const os = new Sprite(room(o))
       os.position.set(col * ROOM_ART_TILE, r * ROOM_ART_TILE)
       os.scale.set(ROOM_ART_SCALE)
       overlays.addChild(os)
@@ -1117,6 +1227,7 @@ export function buildTilemap(renderer: Renderer, atlas: Atlas, arena: Arena, flo
   bakeMaterialWear(wear, arena)
   c.addChild(wear, overlays)
   const g = new Graphics()
+  bakeWallCope(g, arena)
   bakeOcclusion(g, arena)
   bakeIslandUnderside(g, arena)
   bakeBardoProcession(g, arena)
@@ -1144,7 +1255,7 @@ export function buildTilemap(renderer: Renderer, atlas: Atlas, arena: Arena, flo
   sprite.tint = floorTint
 
   const door = new Container()
-  const clusters = (arena.doors.length ? arena.doors : [arena.door]).map(d => makeDoorCluster(atlas, d))
+  const clusters = (arena.doors.length ? arena.doors : [arena.door]).map(d => makeDoorCluster(atlas, room, d))
   for (const c of clusters) door.addChild(c.root)
   const gift = arena.offering ? makeOfferingCluster(atlas, arena.offering) : null
   if (gift) door.addChild(gift.root)

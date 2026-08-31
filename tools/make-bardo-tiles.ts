@@ -234,17 +234,27 @@ function slabPiece(f: Ramp, hx: 'L' | 'M' | 'R', vy: 'T' | 'B', v: 0 | 1): Uint8
 // ---------------------------------------------------------------------------
 function matTile(part: 'body' | 'north' | 'south'): Uint8Array {
   const t = makeTile()
+  // A FLAT FIELD, because at 16 px logical the weave is below the resolution that can carry it.
+  // Measured: the old 3px checker ran this tile at 38.1% edge density against 9.9% for the floor it
+  // lies on — four times its own ground's energy, which at 1.5x reads as moire, not cloth. Weft
+  // banding was tried next and measured 38.6%: no better, because ANY alternation at 2-4px across a
+  // full cell keeps the transition count high whatever axis it runs on. What actually reads as cloth
+  // here is what reads as cloth on the floor beside it — one value, carrying its form in the folds
+  // and a scatter of slubs. The runner is a colour and a drape, not a texture swatch.
   for (let y = 0; y < ROOM_CELL; y++) for (let x = 0; x < ROOM_CELL; x++) {
-    // A quiet 3px weave at source density. The old logical weave expanded into alternating
-    // 3/4px squares and read as a checkerboard before it read as cloth.
-    const weave = ((Math.floor(x / 3) + Math.floor(y / 3)) & 1) === 0
-    t.pixel(x, y, weave ? P.purple0 : P.purple1)
+    t.pixel(x, y, hash(x, y, 61) % 17 === 0 ? P.purple0 : P.purple1)
   }
-  // Three broken folds converge rather than forming vertical rails.
-  for (const [fx, sign] of [[5, 1], [13, -1], [18, 1]] as const) {
+  // ONE fold per cell, because the runner is three cells wide and cloth that narrow has two or
+  // three folds across it — not nine. Three folds per cell gave exactly that: 3 x 3 vertical rails
+  // resetting every 24px, which read as corduroy at 1x once the checker beneath them was gone and
+  // stopped hiding them. The drift is also steeper now (1px every 4 rows against every 6): a line
+  // that barely moves over a cell is a rail whatever it is called, and a fold has to wander to read
+  // as fabric lying on stone.
+  {
+    const fx = 9
     for (let y = 1; y < ROOM_CELL - 1; y++) {
-      if ((y + fx) % 7 === 0) continue
-      const x = fx + Math.floor(y / 6) * sign
+      if ((y + fx) % 7 === 0) continue                  // the fold breaks rather than running whole
+      const x = fx + Math.floor(y / 4)
       t.pixel(x, y, P.purple0)
       if (y % 3 !== 0) t.pixel(x + 1, y, P.purple2)
     }
@@ -303,15 +313,21 @@ function wallFace(variant: 'a' | 'b'): Uint8Array {
     if (y <= 2) col = P.boneLo
     else if (y === 3) col = P.woodHi
     else {
+      // The bond period MUST divide the 24px cell. It was 15 with a 7px course offset, and 15 does
+      // not divide 24 — so the perpends ran 15, 9, 15, 9 and broke at every tile seam. Measured, 13
+      // of 24 rows disagreed where two wall tiles butt, which is a vertical stutter every 24px down
+      // a wall eighteen tiles long, and it is what made the walls read as tiles rather than masonry.
+      // 12 divides 24 exactly and 6 is its half, so a brick is 12x6 — a true 2:1 running bond that
+      // continues through a seam it cannot see.
       const row = Math.floor((y - 4) / 6)
-      const ox = (row & 1) * 7
-      const hx = (x + ox) % 15, hy = (y - 4) % 6
+      const ox = (row & 1) * 6
+      const hx = (x + ox) % 12, hy = (y - 4) % 6
       col = P.wood
       if (hy === 0) col = P.mortar                 // course joint
       else if (hy === 1) col = P.boneLo            // one band up: the lit course face
       else if (hy >= 4) col = P.woodLo
       if (hx === 0) col = P.mortar
-      if (variant === 'b' && hy === 3 && hx > 8) col = P.woodLo
+      if (variant === 'b' && hy === 3 && hx > 6) col = P.woodLo
     }
     if (chance(x, y, 83, 5) && y > 3) col = P.woodLo
     t.pixel(x, y, col)
@@ -381,7 +397,10 @@ function windowHalf(side: 'l' | 'r'): Uint8Array {
   else starPane(t.set, 0, 12, 3, 12, 6, 16)
   const mx = side === 'l' ? 14 : 1                 // bone mullion, one band, no specular
   for (let y = 3; y <= 12; y++) t.set(mx, y, P.boneLo)
-  for (let x = 0; x < SIZE; x++) { t.set(x, 13, P.woodLo); t.set(x, 14, P.mortar); t.set(x, 15, P.grout) }
+  // The occlusion strip is INHERITED from wallFace above, at its native 24px rows. Re-writing it
+  // here on the 16px logical grid is what put a 1 px jog in the wall-to-floor shadow wherever a
+  // window or a relief sat inside a plain wall run: wallFace lays woodLo/woodLo/mortar/grout on
+  // rows 20-23, and `set` on logical rows 13-15 lands one row off it.
   return t.d
 }
 
@@ -428,7 +447,10 @@ function relief(): Uint8Array {
   t.set(6, 7, P.mortar); t.set(9, 7, P.mortar)
   for (let x = 6; x < 10; x++) t.set(x, 10, P.mortar)
   for (let x = 5; x < 11; x++) t.set(x, 12, P.woodLo)   // cast shadow under the brow
-  for (let x = 0; x < SIZE; x++) { t.set(x, 13, P.woodLo); t.set(x, 14, P.mortar); t.set(x, 15, P.grout) }
+  // The occlusion strip is INHERITED from wallFace above, at its native 24px rows. Re-writing it
+  // here on the 16px logical grid is what put a 1 px jog in the wall-to-floor shadow wherever a
+  // window or a relief sat inside a plain wall run: wallFace lays woodLo/woodLo/mortar/grout on
+  // rows 20-23, and `set` on logical rows 13-15 lands one row off it.
   return t.d
 }
 
@@ -685,6 +707,23 @@ const out = 'public/assets/sprites/bardo_room.png'
 await sharp(sheet, { raw: { width: COLS * ROOM_CELL, height: ROWS * ROOM_CELL, channels: 4 } }).png().toFile(out)
 console.log('wrote', out, COLS * ROOM_CELL, 'x', ROWS * ROOM_CELL, '(' + tiles.length + ' tiles)')
 
+// The Bardo hub paves from its OWN copy of this sheet, at identical indices. bardo_room.png serves
+// the other thirteen layouts, so replacing a hub tile cannot reach Cocytus or Asphodel — which is
+// exactly how the brass level-4 ramp escaped once before (see LV[4]).
+//
+// SEEDED ONCE, then never touched. Divergence from bardo_room.png is the POINT of the fork, so an
+// unconditional write here would silently destroy every promoted hub tile on the next `pnpm tiles`
+// — and this tool runs for reasons that have nothing to do with the hub (a prop edit, an fx tweak).
+// `--reseed-hub` is the deliberate re-fork, and it says what it is discarding.
+const hubOut = 'public/assets/sprites/bardo_hub.png'
+const reseedHub = process.argv.includes('--reseed-hub')
+if (!existsSync(hubOut) || reseedHub) {
+  await sharp(sheet, { raw: { width: COLS * ROOM_CELL, height: ROWS * ROOM_CELL, channels: 4 } }).png().toFile(hubOut)
+  console.log('wrote', hubOut, COLS * ROOM_CELL, 'x', ROWS * ROOM_CELL, reseedHub ? '(hub fork RESEEDED — any promoted hub art is gone)' : '(hub fork seeded)')
+} else {
+  console.log('kept', hubOut, '— the hub fork owns its own art; pass --reseed-hub to re-fork from bardo_room')
+}
+
 const preview = 'public/progress/shots/tiles-r4.png'
 await sharp(sheet, { raw: { width: COLS * ROOM_CELL, height: ROWS * ROOM_CELL, channels: 4 } })
   .resize(COLS * ROOM_CELL * 6, ROWS * ROOM_CELL * 6, { kernel: 'nearest' })
@@ -695,7 +734,7 @@ console.log('wrote', preview)
 const manPath = 'public/assets/manifest.json'
 if (existsSync(manPath)) {
   const man = JSON.parse(readFileSync(manPath, 'utf8')) as { sprites: string[] }
-  for (const f of ['bardo_room.png', 'bardo_props.png']) {
+  for (const f of ['bardo_room.png', 'bardo_hub.png', 'bardo_props.png']) {
     if (!man.sprites.includes(f)) man.sprites.push(f)
   }
   writeFileSync(manPath, JSON.stringify(man, null, 2) + '\n')

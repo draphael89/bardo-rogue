@@ -1,0 +1,49 @@
+{
+  "id": "hub.brazierCold.candidate",
+  "kind": "prop",
+  "input": ".art-cache/props-test/masters/brazier-192.png",
+  "output": ".art-cache/hub/compiled/hub_brazier_cold.png",
+  "sidecar": ".art-cache/hub/compiled/hub_brazier_cold.json",
+  "cell": 48,
+  "cols": 1,
+  "rows": 1,
+  "maxColors": 10,
+  "palette": [
+    "void",
+    "mortar",
+    "seal0",
+    "iron",
+    "ironHi",
+    "slate1",
+    "boneLo",
+    "woodLo",
+    "wood",
+    "ashField"
+  ],
+  "colourPlacement": "probe-brazier-deflamed",
+  "fit": "grid",
+  "chromaKey": false,
+  "coverage": 0.5,
+  "salience": {
+    "minShare": 0.2,
+    "minDelta": 0.16
+  },
+  "frames": [
+    {
+      "name": "brazier",
+      "i": 0
+    }
+  ],
+  "provenance": {
+    "provider": "pixellab",
+    "model": "create_image_pixflux (MCP), seed 3, 192x192, forced canon ramp",
+    "promptFile": "art/prompts/probe_brazier_192.txt"
+  },
+  "registrationNote": "CANDIDATE ONLY (?hubCandidate=1), for PROP.brazierCold. Zero generations: the same already-paid LIT master as hub.brazier, compiled against a ramp with the ember colours removed so the palette vote snaps the flame into iron and ash (art-generation SS4). This is what SS4 means by generating lit and subtracting in the ramp, and it is the correct source for the COLD brazier \u2014 measured, it has zero warm pixels. It replaces art/specs/probe/prop-brazier-cold.json, whose prompted-unlit master is a recorded negative result (formless bowl; still fails light-direction 0.66 and slate1 54% against a checked-in 10% cap).",
+  "waivers": [
+    {
+      "gate": "detail-density",
+      "reason": "prop cap 25% is measured-miscalibrated (art-generation SS3.1); 41.8% sits inside the 34-49% band every compiled prop occupies."
+    }
+  ]
+}

@@ -85,6 +85,121 @@ pnpm art compile art/specs/<id>.json
 **6. Promotion is two compiles, not one** (§6). A candidate compile lands in `.art-cache/` and needs
 no approval. Production needs a human to approve the **master**, then a second spec compiles it.
 
+### 2.2 The Pro lane — MEASURED 2026-08-31, and it is a different tool
+
+§2 above is the **pixflux** recipe. The web Creator now files pixflux under "Legacy models" and
+offers **Pro** and **Pixen**; `POST /generate-image-v2` is Pro and it has no MCP tool. Driven through
+`tools/pl/generate-pro.mjs`. One call returns **16 candidates**, so this lane is pick-the-best, not
+one-shot.
+
+**The measured recipe, from four A/B variants on the hero at one seed:**
+
+1. **`style_image` = a shipped 64px cell of ours**, with `style_options`
+   `{color_palette: true, outline: true, shading: true, detail: false}`. Palette, outline and shading
+   copy our look; leaving `detail` FALSE is what lets it out-detail the source, which is the entire
+   point of using it over the rig.
+2. **NO `reference_images`.** This is the counter-intuitive one and it cost a round to find. Passing
+   the rig's own idle as a subject reference produced 16 heroes whose greatsword was a **detached
+   floating white bar** — because the rig's blade IS a featureless white bar, so the reference taught
+   exactly that. Dropping it and letting the description carry the weapon produced a properly gripped,
+   shouldered greatsword with a visible crossguard in nearly every candidate. **A reference teaches
+   its own defects.** Use one only when the thing being referenced is already good.
+3. **Generate AT the target cell**, not at 2×. §3's 2× rule exists to win the palette vote; here
+   `style_options.color_palette` wins it directly, and generating at 64 keeps the authored pixel
+   PLACEMENT that is the reason to use this lane at all. Downsampling averages exactly that away.
+4. Description carries the art direction literally: view, light direction ("lit from the upper left"),
+   feet-near-the-bottom margin, the ramp in words, "no pure black and no pure white", and explicit
+   negatives ("no skin tone, no green, no brown leather") — those negatives did real work.
+
+Quality at 64px is far beyond both the rig and the pixflux lane: layered pauldrons, cloth folds,
+cloaks, shield sigils, hooded robes with a lit staff ember. This is the first lane in the project
+that produced art good enough to judge on beauty rather than on gates.
+
+**`create-character-v3` then rotates a champion into 8 consistent directions** (`tools/pl/`), and
+identity holds across all eight — measured on three enemies at once.
+
+### 2.3 `transfer-outfit-v2` does NOT preserve pose — tested, and this is the caveat that matters
+
+§7.1 flagged it as the endpoint that targets the failure §7 struck. Tested on the rig's 8-frame run
+cycle with a champion as the reference: **the artwork is superb and the poses are gone.** The run
+cycle came back as a generic standing pose, and the greatsword is absent in several frames. It
+restyles by REDRAWING, so it cannot carry a sim-locked clip whose frames the renderer indexes by
+`stateTick`.
+
+It is still the right tool for a 2-16 frame sequence whose exact poses do not matter. It is the wrong
+tool for anything the rig registers. **The rig's value was never the pixels — it is the guarantee
+that frame N is the pose the hitbox expects.** Nothing generated has replaced that yet.
+
+### 2.4 The enemy pipeline, end to end — WORKS, measured 2026-08-31
+
+Four steps, all of them cheap, and it produced the first enemies in this project that are not
+recoloured Kenney tiles. `SPRITE` in `src/render/views/shared.ts` still reads
+`brute: 109, warden: 109, oathbound: 109` — three enemies including the slice's BOSS sharing one
+free-asset knight tile. That, not the hero, is the largest beauty deficit in the game.
+
+1. **Generate 16 candidates** with §2.2's Pro recipe, described from what the SIM says the enemy is
+   (the Warden's veil is his damage refusal; the Oath-Bound's chains are the oath). 16 per call means
+   picking, not accepting.
+2. **Pick one champion** and judge it composited into a real `pnpm shot` frame at game scale, beside
+   the placeholder it replaces. That comparison is the whole argument and it takes one minute.
+3. **`create-character-v3`** with the champion as `reference_image` → 8 directions, identity intact
+   across all eight. Measured on three enemies at once. **`template_id` must be `mannequin`** — see
+   `tools/pl/README.md` for why an invalid one fails silently and only surfaces at animation time.
+4. **`animate_character`** with a template → the clip. Measured on the Warden's 8-frame walk: the
+   polearm is held in **all 8 frames** and the tabard swings. This is §7's template finding holding
+   in the good direction — a weapon the model can READ is a weapon it keeps.
+
+**What this does NOT give you** is a sim-locked clip. Templates produce a plausible walk, not the
+frame the hitbox expects on tick N, and §2.3 shows nothing generated preserves an authored pose. For
+`timing: 'ticks'` clips (idle, chase, ambient) that is fine and this lane is enough. For
+`timing: 'sim'` chains it is not, and that gap is still open.
+
+### 2.5 Projection still routes to code, even on the Pro model
+
+§1 sends "props whose read depends on projection" to code on the strength of two isometric anvils
+from pixflux. Re-tested on Pro with six Bardo props at one seed: **statues, banners and chains came
+back correct and beautiful; columns, ossuary chests and altars came back ISOMETRIC** — two side faces
+and a top, in a game with none. The split is exactly §1's rule: silhouette-dominant objects are safe,
+box-like objects with visible faces are not. A better model did not move this line.
+
+### 2.6 Why generated actors fail `colour-placement`, and it is the OUTLINE
+
+Compiling a generated Warden through its own shipped spec fails nearly every `colour-placement`
+gate, some of them 5-15x over. Two explanations were tested and the first one was wrong.
+
+**Wrong: "the profile is a straitjacket built from a small sparse rig figure."** The `warden` profile
+allows `nave1` at **83% share in an 84.7x82.0% bbox**. It is not asking for a small figure at all.
+
+**Also a real error, mine: the generated Warden was off-identity.** `nave0/1/2` are a cool blue-grey
+STONE ramp and the profile makes `nave1` dominant — the Warden is a pale stone gatekeeper. The first
+generation was dark iron plate with a crimson tabard: beautiful, and a different character. Re-
+prompting with the ramp named by hex and "that stone is the dominant colour" moved `nave1` from 4.7%
+to 7.4%. Worth doing, and not the blocker.
+
+**The blocker is `seal0`, and it is the outline.** Measured by splitting seal0 into silhouette-edge
+and interior pixels: **54% of it is outline** (322 edge against 269 interior, the interior being the
+veil, which IS the character). Interior alone is 5.2% against a 5.0% cap — at the line. So the whole
+overage is the black keyline every generated sprite carries.
+
+**`style_options.outline: false` does NOT remove it.** Same prompt, same seed, outline copy off:
+seal0 11.1% against 11.4%. That flag governs whether the STYLE IMAGE'S outline is copied, not whether
+the model draws one. It draws one either way.
+
+So the incompatibility is structural, not a tuning miss: **these profiles were measured on
+outline-less Blender renders, and outlined pixel art — which is what this lane produces and what most
+pixel art looks like — cannot satisfy a 5% cap on its own keyline colour.** Two ways forward, and the second one is now
+BUILT AND MEASURED rather than hypothetical.
+
+**`pnpm deline` erodes the keyline, and it works.** Each outline pixel takes its nearest INTERIOR
+neighbour's colour, so the silhouette is preserved rather than eaten. On the stone Warden: `seal0`
+**11.4% -> 6.8% in one pass**, a second pass changes nothing (it converges), and at 9x the figure is
+indistinguishable except for the missing outline. That is the whole keyline gone for free.
+
+**It is not sufficient on its own, and the residual is informative.** The remaining 6.8% against a
+5.0% cap is the Warden's VEIL — his defining feature, the thing the design calls his refusal. So the
+last 1.8pp is a real art-direction question (a smaller veil, or a profile that admits the feature),
+not a processing gap. Do not shrink the art to fit, and do not let `deline` paper over it.
+
 ### 2.1 The prompt this lane has NOT been measured with
 
 `pnpm art generate <spec> --provider pixellab` dry-runs free (no key) and prints the prompt
@@ -293,6 +408,24 @@ so a new master can silently change what a future generation is conditioned on.
   0.001-0.036 against a 0.45 cap, because a thin blade is a rounding error in a colour histogram.
   Templates are humanoid skeleton animations; they do not know the character is holding anything.
   This is what `clip:*:prop-mass` now catches (§5).
+
+  **Re-measured 2026-08-31 with a LEGIBLE blade, and the result reverses: 0 of 8 directions lost it.**
+  Same call, same template, same 8 directions, on a v3 character built from a reference whose sword
+  had been given a cross-section — a lit face, a darker face, a crossguard and a tapered point —
+  instead of the shipped hero's featureless bar. Per-direction prop-mass against each direction's own
+  idle: south **1.30x** (the recorded worst case, previously 0.22x), south-east 0.92x, east 0.61x,
+  north-east 1.21x, north 1.03x, north-west 1.11x, west 1.10x, south-west 0.90x. Minimum 0.61x
+  against the 0.45x floor. Frame-to-frame identity cosine measured 0.874-0.970.
+
+  The variable is the REFERENCE, not the template. A blade the model cannot read as a weapon is a
+  blade it drops; give it one with form and it carries it through the whole cycle. Both measurements
+  stand — the failure is real for a featureless prop, and so is the recovery. Fix the reference before
+  concluding the template lane is unusable, and keep measuring every direction either way.
+
+  **What template output still gets wrong: it bakes a ground shadow.** Measured on the same run,
+  9-11 opaque near-black pixels per frame in the bottom rows, on every direction. `bakePropShadows`
+  and the room's own pass already own that shadow, so it double-draws — the §4 subtraction rule
+  applies to clips exactly as it does to a brazier's flame.
 - ~~"Generate at the target size."~~ See §3.
 - ~~"The anvil is worth one more PixelLab try with the bible prompt."~~ **Not struck — untested, and
   the two are in tension.** The anvil verdict is n=2 under the short subject line, and the bible
@@ -304,6 +437,50 @@ so a new master can silently change what a future generation is conditioned on.
   glowing gate — what §8.2.2 and §10.22 forbid. Reference beats rule when they disagree, which is the
   mechanical cause of twelve gold-framed gates. **Judge against them; never condition on them.**
 - ~~`create_image_pro`~~ 20–40 generations and it buys nothing pixflux's free palette lock delivers.
+
+## 7.1 Levers this repo has never pulled — UNTESTED, surveyed 2026-08-31
+
+Read off `https://api.pixellab.ai/v2/llms.txt` + `openapi.json` and the logged-in web Creator. Every
+one of these is a REST v2 endpoint with **no MCP tool**, so nothing above could have used them. None
+is measured here. They are listed so the next round starts from the real surface instead of the
+MCP's subset — treat each as a hypothesis, and measure before writing it into the recipe.
+
+**`POST /transfer-outfit-v2` (Pro) is the one to test first, because it targets the exact failure §7
+struck.** It takes `reference_image` (the appearance) plus **`frames`: 2-16 ANIMATION FRAMES** and a
+`seed`. §7 struck `edit_image` as a finishing pass because it redrew one garment three different ways
+across three frames at one seed — no cross-frame consistency. This endpoint consumes the frames
+*together* and is built for that consistency. If it holds, it is the missing half of the hybrid this
+project keeps reaching for: the Blender rig owns motion, registration and the sockets for all 29
+frames, and this owns authored surface detail the 8:1 downsample cannot produce.
+
+**`POST /animate-with-skeleton` + `POST /estimate-skeleton`.** Takes `skeleton_keypoints` (**exactly
+3 frames** — it is a 3-frame window), `reference_image`, `init_images`, `guidance_scale`, `view`,
+`direction`, and **`color_image`, the same forced-palette lock §2 relies on, on an animation call**.
+`mannequin.py` already projects rig bones and writes `rig.json`, so the poses could be OURS rather
+than a canned humanoid template — which is precisely why templates drop the greatsword (§7: they do
+not know the character holds anything).
+
+**`POST /interpolation-v2` (Pro).** `start_image`, `end_image`, `action`, `seed`. The attack chains
+are 5 authored keyframes; this is the in-betweener.
+
+**`POST /generate-with-style-v2` (Pro).** 1-4 `style_images` + `description`. A style lock that is
+not the palette lock.
+
+Two more from the web Creator that the MCP `create_character` does not expose:
+
+- **Four ADDRESSABLE reference images**, cited in the description as "reference image 1/2/…". The
+  MCP takes one `reference_image_base64`. Four would let the armour and the weapon be conditioned
+  separately, which is the whole difficulty with this hero.
+- **Character proportion sliders** — head size, arms length, legs length, shoulder width, hip width,
+  each 0.5x-2.0x. The rig's Veteran recipe already fixes these numbers; matching them is what a
+  from-scratch challenger needs to be comparable at all.
+
+**Also: the model this skill's entire §2 recipe is built on is no longer the current one.** The
+Creator presents **Pro** (Recommended, 16-512px) and **Pixen** (Fast, 16-768px) as the two models,
+with `pixflux` reachable only behind a "Legacy models" dropdown. `create_image_pro` and
+`create_image_pixen` both exist as MCP tools and neither has been tried here. Every measured number
+in §2/§3 came from pixflux, so re-running the brazier on Pro is the cheapest way to find out whether
+the recipe is still the right one.
 
 ## 8. Cost and transport
 

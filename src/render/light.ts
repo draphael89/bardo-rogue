@@ -2,7 +2,7 @@ import { Container, MaskFilter, RenderTexture, Sprite, Texture, type Renderer } 
 import type { RenderApp } from './app'
 import type { Atlas } from './atlas'
 import type { World } from '@/sim/world'
-import { TILE, doorOpens, type ArenaDoor } from '@/sim/arena'
+import { TILE, PROP, doorOpens, type ArenaDoor } from '@/sim/arena'
 import type { Particles } from './particles'
 import { tuning } from '@/tuning'
 import { atmosphereFor, brazierFlame } from './atmospherePresets'
@@ -39,6 +39,8 @@ export class Lighting {
   private base: Sprite
   private vignette: Sprite
   private braziers: Sprite[] = []
+  /** Flame-tongue emission points, parallel to `arena.braziers`; null where a sprite owns the fire. */
+  private flames: Array<{ x: number; y: number } | null> = []
   private cores: Array<{ s: Sprite; src: { radius: number; strength: number; tint?: number } }> = []
   private windows: Sprite[] = []
   private door: Sprite
@@ -125,8 +127,68 @@ export class Lighting {
     this.layoutLights(arena)
   }
 
+  /**
+   * Where each light source's FLAME TONGUE is emitted, which is not the same question as where its
+   * light pools. `arena.braziers` is authored for composition (§3.2 says where the room wants light),
+   * so an anchor lands near its cresset rather than on it — up to a tile and a half out. The tongue
+   * was spawning at the anchor, so the fire sat beside the bowl instead of in it, and the sprite had
+   * to paint its own fire to cover for it. That is the double-flame §12 warns about: two fires that
+   * can never agree, because one is a particle system and the other is a texture.
+   *
+   * Each anchor is snapped onto the ember bed of the nearest brazier prop when one is in reach, and
+   * left where it is otherwise. Count is unchanged, so no room gains or loses a fire — the tongue
+   * just lands in the bowl. Props are placed at `c*TILE - 8, r*TILE - 20`, and the ember bed is the
+   * measured constant below.
+   *
+   * Only PROP.brazier counts. The keeper's lamp is numen glass, not fire — snapping an orange tongue
+   * onto it would light a cold lantern.
+   */
+  private flamePoints(arena: World['arena']): Array<{ x: number; y: number } | null> {
+    // A brazier whose sheet carries its own `burn` clip draws its own fire, frame by frame, in the
+    // same palette and on the same pixel grid as the bowl. Emitting a particle tongue there too is
+    // the double-flame that started all this: two fires on two clocks that can never agree. So the
+    // sprite wins and the tongue stands down — the LIGHT it casts is untouched, because light is
+    // still the runtime's job (§12.1) and only the drawn flame moved.
+    //
+    // SCOPED TO THE BARDO, because the sheet being loaded is not the same question as the sprite
+    // being used. `?hubCandidate=1` binds the animated sheet globally, but `propSheetFor` and
+    // `Presenter.bindAnimatedProp` only apply hub art inside `arena.kind === 'bardo'`. Asking
+    // `hasSheet` alone therefore stood the tongue down in the threshold and the crossing, where
+    // nothing had replaced it — production static brazier, no drawn fire at all. The sprite owns the
+    // flame only where the sprite is actually drawn.
+    const spriteOwnsFire = arena.kind === 'bardo' && this.atlas.hasSheet('bardo_brazier')
+    // Measured, not assumed: the warm-pixel centroid of the shipped brazier cell is logical
+    // (17.2, 15.5) in its 32px prop cell, and `pnpm hub:candidate` aligns every candidate to the
+    // same ground line, so one constant serves the authored and the generated bowl alike.
+    const EMBER_BED = { x: 17, y: 15 }
+    const bowls = arena.props.filter(p => p.sheet === 'prop' && p.tile === PROP.brazier)
+      .map(p => ({ x: p.x + EMBER_BED.x, y: p.y + EMBER_BED.y }))
+    // A keeper's lamp is numen glass, not fire. Measured in the hub, THREE of the four anchors that
+    // had no brazier under them sit on a lamp instead — so the room was spitting orange flame
+    // particles out of a cold blue-green lantern. The lamp still pools its light; it just stops
+    // pretending to burn.
+    const lamps = arena.props.filter(p => p.sheet === 'prop' && p.tile === PROP.keeperLamp)
+      .map(p => ({ x: p.x + 16, y: p.y + 16 }))
+    const reach = TILE * 1.6
+    const nearest = (b: { x: number; y: number }, ps: Array<{ x: number; y: number }>) => {
+      let best: { x: number; y: number } | null = null, bestD = reach
+      for (const q of ps) {
+        const d = Math.hypot(b.x - q.x, b.y - q.y)
+        if (d < bestD) { bestD = d; best = q }
+      }
+      return best
+    }
+    return arena.braziers.map(b => {
+      const bowl = nearest(b, bowls)
+      if (bowl) return spriteOwnsFire ? null : bowl
+      if (nearest(b, lamps)) return null
+      return { x: b.x, y: b.y - 6 }
+    })
+  }
+
   private layoutLights(arena: World['arena']): void {
     const atlas = this.atlas
+    this.flames = this.flamePoints(arena)
     // ART_DIRECTION.md §3.2: one key + at most two named accents + ambient. The room (not
     // this file) says where they are and how far they reach; tuning owns flicker and tint.
     // arena.braziers[0] is the key and it sits on the focal object, never at the frame edge.
@@ -276,7 +338,8 @@ export class Lighting {
     this.flameAcc += dtSec * L.flameRate * src.length
     while (this.flameAcc >= 1) {
       this.flameAcc -= 1
-      const bz = src[fxRng.light.int(0, src.length - 1)]
+      const bi = fxRng.light.int(0, src.length - 1)
+      const bz = src[bi]
       // A tongue is the fire that MAKES this light, so it takes the source's own colour whenever
       // the room names one — the same "dress tint still wins" rule the light itself already obeys.
       // `air.keyTint` is only the fallback for a source that named none, and in the hub that
@@ -285,7 +348,10 @@ export class Lighting {
       // player at the arrival. Read at 1x it was ice, not fire. Canon `ember` is what a named
       // flame cools to as it rises.
       const tongue = bz.tint === undefined ? brazierFlame(air) : { tint: bz.tint, tint1: 0xff7a18 }
-      this.particles.flame(bz.x, bz.y - 6, tongue.tint, tongue.tint1)
+      // The tongue burns in the bowl, not at the light's authored centre. See flamePoints().
+      // null means an animated sprite already draws this fire; adding a tongue would double it.
+      const at = this.flames[bi]
+      if (at) this.particles.flame(at.x, at.y, tongue.tint, tongue.tint1)
     }
 
     // Follow the camera: anchor the RT's world origin at the padded view window (rounded to whole

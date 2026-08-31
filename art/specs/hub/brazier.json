@@ -1,0 +1,51 @@
+{
+  "id": "hub.brazier.candidate",
+  "kind": "prop",
+  "input": ".art-cache/props-test/masters/brazier-192.png",
+  "output": ".art-cache/hub/compiled/hub_brazier.png",
+  "sidecar": ".art-cache/hub/compiled/hub_brazier.json",
+  "cell": 48,
+  "cols": 1,
+  "rows": 1,
+  "maxColors": 12,
+  "palette": [
+    "void",
+    "mortar",
+    "seal0",
+    "iron",
+    "ironHi",
+    "woodLo",
+    "wood",
+    "woodHi",
+    "emberLo",
+    "ember",
+    "emberHi",
+    "boneLo"
+  ],
+  "colourPlacement": "probe-brazier",
+  "fit": "grid",
+  "chromaKey": false,
+  "coverage": 0.5,
+  "salience": {
+    "minShare": 0.2,
+    "minDelta": 0.16
+  },
+  "frames": [
+    {
+      "name": "brazier",
+      "i": 0
+    }
+  ],
+  "provenance": {
+    "provider": "pixellab",
+    "model": "create_image_pixflux (MCP), seed 3, 192x192, forced canon ramp",
+    "promptFile": "art/prompts/probe_brazier_192.txt"
+  },
+  "registrationNote": "CANDIDATE ONLY (?hubCandidate=1). Reuses the probe's already-paid 192px master and tracked prompt \u2014 zero generations. EMBERS ARE KEPT, and the deflamed ramp was tried and rejected for this cell: measured, the deflamed compile has ZERO warm pixels, because SS4's deflamed variant IS the cold brazier, not a lit one waiting for runtime fire. Dropped into a lit cresset it read as a bowl of pale rubble. The runtime tongue is what animates it: src/render/light.ts now emits on the bowl's ember bed rather than at the light pool's authored centre, so the painted embers and the particle flame are one fire instead of two that cannot agree.",
+  "waivers": [
+    {
+      "gate": "detail-density",
+      "reason": "prop cap 25% is measured-miscalibrated (art-generation SS3.1): the approved shipped bardo_brute runs 65.6% while every compiled prop lands 34-49%. 48.6% here is the top of that band; the ember ramp costs the extra churn over the deflamed variant's 41.8%."
+    }
+  ]
+}

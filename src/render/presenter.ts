@@ -12,10 +12,46 @@ import type { PlayerPoseOverride } from './views/player'
 import { snapToTarget } from './views/shared'
 import { promiseFrame } from './clipSelect'
 import { ARM, armOf } from '@/sim/weapons'
-import { buildTilemap, rackProximityAmount, SHRINE_INK, type TilemapView } from './tilemap'
+import { buildTilemap, rackProximityAmount, roomSheetFor, propSheetFor, SHRINE_INK, type TilemapView } from './tilemap'
 import { Camera, clampFocus } from './camera'
 import { drawVoidUnderlay } from './starfield'
-import { TILE } from '@/sim/arena'
+import { TILE, PROP } from '@/sim/arena'
+import { tickClipFrame } from './clipSelect'
+import type { Sheet, SheetClip } from './sheet'
+import type { SheetName } from './atlas'
+
+/**
+ * Props that carry their own ambient loop, by PROP index. The clip is `timing: 'ticks'` — motion the
+ * sim has no opinion about, per src/render/sheet.ts. A prop with no entry here, or whose sheet is
+ * not loaded, stays the static cell it has always been, so this is inert in production.
+ */
+/**
+ * The prop grid's registration contract: 48px source cells drawn at 32 logical px.
+ *
+ * The ground row is PER PROP and is measured off production's own art, exactly as
+ * `tools/hub-candidate.ts` measures it for the static cells: brazier and cold brazier stand on row
+ * 46, ossuary and keeper's lamp on 47. One shared constant was wrong for the lamp by a pixel.
+ */
+const PROP_CELL = 48
+const PROP_LOGICAL = 32
+
+/**
+ * A position -> phase hash for ambient prop clips. Mixes the bits rather than adding two scaled
+ * coordinates, because the linear form collided on exactly the pair the phase offset exists to
+ * separate (the two Bardo gate braziers). Integer-only and deterministic — no RNG in presentation.
+ */
+const propPhaseHash = (x: number, y: number): number => {
+  let h = Math.imul(x | 0, 0x27d4eb2d) ^ Math.imul(y | 0, 0x165667b1)
+  h ^= h >>> 15
+  h = Math.imul(h, 0x2c1b3c6d)
+  h ^= h >>> 13
+  return h >>> 0
+}
+
+const ANIMATED_PROPS: Record<number, { sheet: SheetName; clip: string; groundRow: number }> = {
+  [PROP.brazier]: { sheet: 'bardo_brazier', clip: 'burn', groundRow: 46 },
+  [PROP.keeperLamp]: { sheet: 'bardo_lamp', clip: 'glow', groundRow: 47 },
+}
 import { Hud } from './hud'
 import { Particles } from './particles'
 import { lerp } from './anim'
@@ -104,6 +140,13 @@ export class Presenter {
   // The one you left. The kind is still a Hoplite; this set is how the room knows which body waded in.
   private huntIds = new Set<number>()
   private propSprites: Sprite[] = []
+  /**
+   * Props that carry their own looping animation. `arena.props` is otherwise static — a sprite is
+   * built once and never touched again — so ambient motion had nowhere to live and ended up as a
+   * particle system on a clock the art could not see. An animated prop is a normal authored sheet
+   * with a `timing: 'ticks'` clip, played by the same tickClipFrame() the hero's run uses.
+   */
+  private animProps: Array<{ s: Sprite; sheet: Sheet; clip: SheetClip; phase: number }> = []
   // Pixi caches a batcher per render-root InstructionSet and never evicts that cache. Reusing one
   // offscreen root keeps room bakes bounded while its children are rebuilt for each arena.
   private tileBakeRoot = new Container()
@@ -127,9 +170,12 @@ export class Presenter {
     this.rebuildVoid()
     this.tilemap = buildTilemap(ra.app.renderer, atlas, world.arena, floorTintFor(world), this.tileBakeRoot)
     L.floor.addChild(this.tilemap.sprite, this.tilemap.door)
+    const propRoom = roomSheetFor(atlas, world.arena)
+    const propProps = propSheetFor(atlas, world.arena)
     for (const p of world.arena.props) {
-      const s = makePropSprite(atlas, p)
+      const s = makePropSprite(propRoom, propProps, p)
       this.propSprites.push(s)
+      this.bindAnimatedProp(s, p)
       L.entities.addChild(s)
     }
     this.playerView = createPlayerView(atlas, L)
@@ -1118,12 +1164,16 @@ export class Presenter {
     this.tilemap.door.destroy()
     for (const s of this.propSprites) s.destroy()
     this.propSprites = []
+    this.animProps = []
     this.rebuildVoid()
     this.tilemap = buildTilemap(this.ra.app.renderer, this.atlas, this.world.arena, floorTintFor(this.world), this.tileBakeRoot)
     L.floor.addChild(this.tilemap.sprite, this.tilemap.door)
+    const propRoom = roomSheetFor(this.atlas, this.world.arena)
+    const propProps = propSheetFor(this.atlas, this.world.arena)
     for (const p of this.world.arena.props) {
-      const s = makePropSprite(this.atlas, p)
+      const s = makePropSprite(propRoom, propProps, p)
       this.propSprites.push(s)
+      this.bindAnimatedProp(s, p)
       L.entities.addChild(s)
     }
     this.particles.bindArena(this.world.arena)
@@ -1165,9 +1215,52 @@ export class Presenter {
     if (n >= 8) v.trailAcc = 0   // a long hitch must not dump a frame's worth of pool in one go
   }
 
+  /**
+   * Bind a prop to its animated sheet when one is loaded. Absent, the prop stays the static cell it
+   * already was, so this is inert in production and in every room without candidate art.
+   */
+  private bindAnimatedProp(s: Sprite, p: { tile: number; sheet: 'room' | 'prop'; x: number; y: number }): void {
+    if (p.sheet !== 'prop') return
+    // Hub art, hub only — the same scoping propSheetFor() applies to the still cells. Without it a
+    // threshold's brazier would pick up the hub candidate's burn clip while its static cell stayed
+    // production, which is worse than either sheet on its own.
+    if (this.world.arena.kind !== 'bardo') return
+    const bind = ANIMATED_PROPS[p.tile]
+    if (!bind || !this.atlas.hasSheet(bind.sheet)) return
+    const sheet = this.atlas.sheet(bind.sheet)
+    const clip = sheet.def.clips?.[bind.clip]
+    if (!clip) return
+    // A separately compiled sheet does not know the prop grid's ground line, and the grid's contract
+    // IS that line: `tools/hub-candidate.ts` measures it per prop and drops each static candidate
+    // cell onto it. The animated frames bypass that, because they are swapped in as textures under a
+    // sprite already positioned for the static cell — so the burn clip hung ~6 world px above its own
+    // floor and its baked shadow. Re-registering here uses the sheet's declared foot pivot, which is
+    // the same contract `atlas.ts` gives every authored sheet, rather than a per-prop table.
+    // TWO CONVENTIONS MEET HERE, and mixing them cost a pixel. `compile.ts` returns a frame's foot
+    // pivot as `footY + 1` (compile.ts:513) — a BOUNDARY, one past the last opaque row — while
+    // `groundLine()` in tools/hub-candidate.ts returns the row INDEX of that last opaque row. So the
+    // target is the ground-row boundary, `groundRow + 1`, and the shift is that minus the pivot.
+    // Measured: brazier 47 - 38 = 9 source px, which is the same 9 the static assembler reports.
+    const foot = sheet.frame(clip.frames[0]).anchorY * sheet.def.cell
+    s.y += (bind.groundRow + 1 - foot) * (PROP_LOGICAL / PROP_CELL)
+    // Every cresset in the room shares one clip, so without a phase offset they all flicker in
+    // lockstep and read as one animation stamped twice rather than as two fires. Derived from the
+    // prop's own position: deterministic, no RNG, and stable across a room rebuild.
+    //
+    // The multiply-and-mix is not decoration. A plain `x * 7 + y * 13` collides on the two Bardo
+    // gate braziers — (488,44) and (568,60) both land on residue 4 against the 48-tick burn clip —
+    // so the one pair the offset exists for animated in exact lockstep. Mixing the bits first
+    // separates them (36 vs 46) and holds for every authored placement at 36, 48 and 60 ticks.
+    const total = (clip.ticks ?? []).reduce((a, b) => a + b, 0)
+    const phase = total ? (propPhaseHash(p.x, p.y) % total) / 60 : 0
+    this.animProps.push({ s, sheet, clip, phase })
+  }
+
   render(alpha: number, dtSec: number) {
     const w = this.world
     this.time += dtSec
+    // Ambient loops advance on the presentation clock; nothing in the sim depends on their phase.
+    for (const a of this.animProps) a.s.texture = a.sheet.frame(tickClipFrame(a.clip, this.time + a.phase)).texture
     // Everything on the far side of the slow-motion gate advances on a stretched clock, so it needs a
     // stretched alpha or it holds still for three frames and jumps on the fourth. slowAcc is where the
     // gate's accumulator stands after this tick, so this sweeps 0..1 across the whole stretched

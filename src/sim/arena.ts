@@ -693,6 +693,21 @@ function buildBardo(rng: Rng): Arena {
   // the taller east pylon, off the centre line; that cell was already solid void, so the prop
   // remains decorative without changing the route.
   furniture(35, 17, PROP.keeperLamp, false)
+  // THE NORTH SPINE, cols 31-34 rows 12-19: eight tiles of bridge that carried nothing at all, so
+  // the longest walk in the opening read as a corridor rather than as a road anyone had used. Both
+  // pieces are the causeway's own vocabulary (§8.2.4, "the bardo shows that someone left") and both
+  // are `hard = false`: no solid write, so the route, the collision and every bot path are
+  // untouched, and hashWorld does not read arena at all so no replay can move.
+  // Staggered on X and on Y, off the centre pair the player actually walks, and §5.2's rule against
+  // a mirrored pair sharing a row is why they sit four rows apart rather than opposite each other.
+  // The cold brazier also earns its soot fan for free: bakeBardoCauseway fans a wedge under every
+  // PROP.brazierCold in the room, so the bridge gets ground evidence as well as an object.
+  // The southern piece is the offering PAN and not the pew: a pew was tried here first and its
+  // 32px logical body eats two of the walk's four columns and reads as a mass the hero has to be
+  // read against rather than as furniture beside them. The pan is low, small, and is already this
+  // room's vocabulary for something left behind at a threshold.
+  furniture(31, 16, PROP.brazierCold, false)
+  furniture(34, 18, PROP.pan, false)
   // FORGE: the Smith's ground; the forge fire has a body, and quenched slag sits by the west wall.
   furniture(18, 21, PROP.brazier)
   furniture(11, 24, PROP.shard)

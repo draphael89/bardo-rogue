@@ -618,6 +618,27 @@ function bakeWallCope(g: Graphics, arena: Arena): void {
       artPx(g, ox + nx, oy + 21, 3, 1, C.brick)
     }
   }
+  // The three EDGE caps carry the same defect over 108 more placements: capEdge lays a boneDim tick
+  // every 7 along its bounce lip, on the logical grid, so every cell stamps ticks at the same
+  // offsets — measured at x 3-4 and 14 on capSouth, and the mirror of that on capWest/capEast. Same
+  // remedy, along whichever axis the cap runs, and the lip itself (boneLo) is what they erase back to.
+  for (let r = 0; r < arena.rows; r++) for (let c = 0; c < arena.cols; c++) {
+    const t = arena.base[r * arena.cols + c]
+    const along: 'x' | 'y' | null = t === T.capSouth ? 'x' : (t === T.capWest || t === T.capEast) ? 'y' : null
+    if (!along) continue
+    const h = wearHash(c, r, 199)
+    const ox = c * ROOM_ART_TILE, oy = r * ROOM_ART_TILE
+    // Where the lip sits inside the cell: capSouth's is its top rows, capEast's its left columns,
+    // capWest's its right columns — always the face that looks back into the room.
+    const lip = t === T.capSouth ? 0 : t === T.capEast ? 0 : ROOM_ART_TILE - 2
+    if (along === 'x') {
+      artPx(g, ox, oy + lip, ROOM_ART_TILE, 2, C.boneLo)
+      for (let i = 0; i < 2; i++) artPx(g, ox + 2 + i * 11 + (h >>> (i * 5)) % 8, oy + lip, 2, 2, C.boneDim)
+    } else {
+      artPx(g, ox + lip, oy, 2, ROOM_ART_TILE, C.boneLo)
+      for (let i = 0; i < 2; i++) artPx(g, ox + lip, oy + 2 + i * 11 + (h >>> (i * 5)) % 8, 2, 2, C.boneDim)
+    }
+  }
 }
 
 // The title screenshot proved the Bardo's destination was a one-cell door in a horizontal wall:

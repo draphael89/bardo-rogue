@@ -460,6 +460,27 @@ sash"` inside the prompt. The 3.1 export object has exactly four keys (`group_id
 `export_version`, `export_date`) and each state's `frames` has exactly two (`rotations`,
 `animations`). There is nowhere for a keypoint to be.
 
+### 11.2.1 Importing what the account already holds — do this before generating anything
+
+```bash
+pnpm art pixellab import <characterId>          # download + hash + manifest. Spends NOTHING.
+pnpm art pixellab assemble <manifest.json> --state Idle --animation <name> --direction south --clip run
+```
+
+The account holds ~600 already-paid animations, which is more than a cycle's budget could buy.
+`import` is a GET, so **check what exists before spending on a candidate.**
+
+**Do not use the archive's own hash as identity.** Measured: two downloads of an unchanged character
+are the same 179 331 bytes with **different** sha256, because `metadata.json` stamps a fresh
+`export_date` and all 89 PNG members are byte-identical. The manifest therefore carries
+**`contentSha256`** — every member hashed, sorted, re-hashed, `metadata.json` excluded — which is
+stable across downloads and changes on a single changed pixel. That is the field to compare.
+
+`assemble` pads to a **square** cell, because v3 returns a taller canvas than it was given when the
+pose needs it (128×160 for a raised blade) and the compiler's contract is one square cell. It emits
+the master; you write the compile spec with `cell` set to the **target** (64 for a character) and let
+the palette vote do the rest.
+
 ### 11.3 Sockets: three of five are recoverable, and the API says which
 
 `/estimate-skeleton` is a real path, and `SkeletonLabel` in the live OpenAPI is an 18-value enum:

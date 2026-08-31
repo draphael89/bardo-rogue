@@ -33,7 +33,7 @@ per tick: `stepWorld(world, inputFrame)`.
 | `pnpm art:stress-hero` | Candidate-only Blender proof: renders dagger grammar and heavy-armor geometry from the Veteran rig, compiles six sheets through the real gates, and writes 1x/black evidence under `.art-cache/spike/stress/`. Never approves or touches shipping assets. |
 | `pnpm build` | Web build, then `tools/check-build.ts` gates the payload (no evidence, no video, no missing asset, within budget) |
 | `pnpm check:build` | Re-run the built-payload gate against the current `dist/` |
-| `pnpm art <generate\|compile\|gate\|preview\|approve\|palette>` | The authored-art CLI (`tools/art.ts`). `generate` dry-runs by default and needs no key; `approve` is human-only. How to drive it: `.claude/skills/art-generation` |
+| `pnpm art <generate\|compile\|gate\|preview\|approve\|palette\|pixellab>` | The authored-art CLI (`tools/art.ts`). `generate` dry-runs by default and needs no key; `approve` is human-only. `pixellab import <characterId>` downloads and hashes an EXISTING provider family into `.art-cache/pixellab/<id>/` with a manifest, and `pixellab assemble <manifest> --state --animation --direction --clip` lays one animation out as a compile input — both are GETs of already-paid state and cannot spend. Reads `PIXELLAB_SECRET` from a gitignored `.env.local` (see `.env.example`). How to drive it: `.claude/skills/art-generation` |
 | `pnpm palette` / `pnpm fx` | Rebuild the canonical palette, or the Bardo FX sheets |
 | `pnpm desktop:dev` | Electron shell against the already-running `:5173`. Does NOT start Vite; HMR still works inside the shell. |
 | `pnpm desktop:build` | `pnpm build` (payload gate included) then compiles `desktop/*.cts` to `desktop/out/*.cjs` |

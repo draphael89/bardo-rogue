@@ -20,6 +20,7 @@
     "wood",
     "ashField"
   ],
+  "colourPlacement": "probe-brazier-deflamed",
   "fit": "grid",
   "chromaKey": false,
   "coverage": 0.5,

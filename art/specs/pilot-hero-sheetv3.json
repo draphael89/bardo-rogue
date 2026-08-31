@@ -25,6 +25,7 @@
     "cope",
     "gold"
   ],
+  "colourPlacement": "veteran",
   "fit": "grid",
   "chromaKey": false,
   "coverage": 0.5,

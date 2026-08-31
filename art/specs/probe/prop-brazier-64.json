@@ -22,6 +22,7 @@
     "emberHi",
     "boneLo"
   ],
+  "colourPlacement": "probe-brazier",
   "fit": "grid",
   "chromaKey": false,
   "coverage": 0.5,

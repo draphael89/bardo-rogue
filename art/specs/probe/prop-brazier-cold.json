@@ -20,6 +20,7 @@
     "ashField",
     "ashFieldLit"
   ],
+  "colourPlacement": "probe-brazier-cold",
   "fit": "grid",
   "chromaKey": false,
   "coverage": 0.5,

@@ -293,6 +293,24 @@ so a new master can silently change what a future generation is conditioned on.
   0.001-0.036 against a 0.45 cap, because a thin blade is a rounding error in a colour histogram.
   Templates are humanoid skeleton animations; they do not know the character is holding anything.
   This is what `clip:*:prop-mass` now catches (§5).
+
+  **Re-measured 2026-08-31 with a LEGIBLE blade, and the result reverses: 0 of 8 directions lost it.**
+  Same call, same template, same 8 directions, on a v3 character built from a reference whose sword
+  had been given a cross-section — a lit face, a darker face, a crossguard and a tapered point —
+  instead of the shipped hero's featureless bar. Per-direction prop-mass against each direction's own
+  idle: south **1.30x** (the recorded worst case, previously 0.22x), south-east 0.92x, east 0.61x,
+  north-east 1.21x, north 1.03x, north-west 1.11x, west 1.10x, south-west 0.90x. Minimum 0.61x
+  against the 0.45x floor. Frame-to-frame identity cosine measured 0.874-0.970.
+
+  The variable is the REFERENCE, not the template. A blade the model cannot read as a weapon is a
+  blade it drops; give it one with form and it carries it through the whole cycle. Both measurements
+  stand — the failure is real for a featureless prop, and so is the recovery. Fix the reference before
+  concluding the template lane is unusable, and keep measuring every direction either way.
+
+  **What template output still gets wrong: it bakes a ground shadow.** Measured on the same run,
+  9-11 opaque near-black pixels per frame in the bottom rows, on every direction. `bakePropShadows`
+  and the room's own pass already own that shadow, so it double-draws — the §4 subtraction rule
+  applies to clips exactly as it does to a brazier's flame.
 - ~~"Generate at the target size."~~ See §3.
 - ~~"The anvil is worth one more PixelLab try with the bible prompt."~~ **Not struck — untested, and
   the two are in tension.** The anvil verdict is n=2 under the short subject line, and the bible
